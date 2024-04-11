@@ -1,2 +1,2 @@
 mod fields;
-mod test;
+mod fields_test;

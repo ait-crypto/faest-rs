@@ -1,27 +1,34 @@
-use std::{fs::canonicalize, ops::{BitAnd, BitXor, BitXorAssign, Mul, Shl, Shr, Sub}, u128};
+use std::{ops::{BitAnd, BitXor, BitXorAssign, Mul, Shl, Shr, Sub}, u128};
 
 use rand::{distributions::{Distribution, Standard}, random};
-
 
 pub trait GalloisField<T> where T: Sized 
                                 + std::ops::BitAnd<Output = T> 
                                 + std::ops::Sub + std::ops::Shl<i32> 
                                 + std::ops::Mul<<T as std::ops::BitAnd>::Output, Output = T> 
                                 + std::ops::Shr<<T as std::ops::Sub>::Output, Output = T>
+                                + std::ops::Sub<Output = T> + std::ops::Shl<i32> 
                                 + std::ops::Mul
                                 + std::ops::BitXorAssign
-                                + Clone {
+                                + Clone
+                                + std::ops::Shr
+                                + std::ops::Add<Output = T>
+                                + std::ops::AddAssign
+                                + std::fmt::Debug{
 
     const MODULUS : T;
 
     const ONE : T;
+
     fn new(value: T) -> Self;
 
     fn get_value(&self) -> T;
 
     fn get_max() -> T;
 
-    fn get_bit() -> i32;
+    fn get_bit_usize() -> usize;
+
+    fn get_bit_int() -> T;
 
     fn set_value(&mut self, value: T);
 
@@ -31,83 +38,90 @@ pub trait GalloisField<T> where T: Sized
         return res;
     }
 
-    fn mul(lhs : Self, rhs : Self) -> Self where Self: Sized,
+    fn mul(lhs : &Self, rhs : &Self) -> Self where Self: Sized,
                                                      <T as Shl<i32>>::Output: BitXor<<T as BitAnd>::Output, Output = T>, 
                                                      <T as Mul<<T as BitAnd>::Output>>::Output: BitAnd<T>, 
                                                      <T as Shr<<T as Sub>::Output>>::Output: BitAnd<T>, 
                                                      <T as BitAnd>::Output: BitXorAssign, 
                                                      <T as Shl<i32>>::Output: BitXor<T> 
-                                                     + std::ops::Mul{
+                                                     + std::ops::Mul
+                                                     + std::ops::Add<Output = T>
+                                                     + std::fmt::Debug{
         let mut left = lhs.get_value();
         let right = rhs.get_value();
-        let mut result_value = Self::get_max() * (right.clone() & Self::ONE) & left.clone();
-        for i in 1..Self::get_bit() {
-            let mask : T = Self::get_max() * (left.clone() >>(Self::get_max() - Self::ONE) & Self::ONE);
+        let mut result_value = (Self::get_max() * (right.clone() & Self::ONE)) & left.clone();
+        let mut count = Self::ONE;
+        for _i in 1..Self::get_bit_usize() {
+            let mask : T = Self::get_max() * ((left.clone() >> (Self::get_bit_int() - Self::ONE)) & Self::ONE);
             left  = (left.clone() << 1) ^ (mask & Self::MODULUS);
-            result_value ^= Self::get_max() * (right.clone() & Self::ONE) & left.clone()
+            result_value ^= (Self::get_max() * ((right.clone()>> count.clone()) & Self::ONE)) & left.clone();
+            count += Self::ONE;
         }
         return Self::new(result_value);
     }
 }
 
 
+#[derive(Debug, PartialEq)]
 pub struct GF8 {
-    pub value : u8
+    value : u8
 }
 
 impl GF8 {
-    fn inv(self) -> Self {
-        let t2 = GF8::mul(self, self);
-        let t3 = GF8::mul(self, t2);
-        let t5 = GF8::mul( t3, t2);
-        let t7 = GF8::mul( t5, t2);
-        let t14 = GF8::mul( t7, t7);
-        let t28 = GF8::mul(t14, t14);
-        let t56 = GF8::mul( t28, t28);
-        let t63 = GF8::mul( t56, t7);
-        let t126 = GF8::mul( t63, t63);
-        let t252 = GF8::mul( t126, t126);
-        return GF8::mul( t252, t2);
+    pub fn inv(self) -> Self {
+        let t2 = GF8::mul(&self, &self);
+        let t3 = GF8::mul(&self, &t2);
+        let t5 = GF8::mul( &t3, &t2);
+        let t7 = GF8::mul( &t5, &t2);
+        let t14 = GF8::mul( &t7, &t7);
+        let t28 = GF8::mul(&t14, &t14);
+        let t56 = GF8::mul( &t28, &t28);
+        let t63 = GF8::mul( &t56, &t7);
+        let t126 = GF8::mul( &t63, &t63);
+        let t252 = GF8::mul( &t126, &t126);
+        return GF8::mul(&t252, &t2);
     }
 }
 
 impl GalloisField<u8> for GF8 {
-    const MODULUS : u8 = 0b00011011;
-
-    const ONE : u8 = 1u8;
-
-    fn new(value: u8) -> Self {
-        return GF8 { value : value}; 
-    }
 
     fn get_value(&self) -> u8 {
         return self.value;
     }
 
     fn get_max() -> u8 {
-        return u8::MAX
-    }
-
-    fn get_bit() -> i32 {
-        return u8::BITS.try_into().unwrap();
+        return u8::MAX;
     }
 
     fn set_value(&mut self, value: u8) {
         self.value = value;
+     }
+        
+    const ONE : u8 = 1u8;
+    
+    const MODULUS : u8 = 0b11011u8;
+    
+    fn new(value: u8) -> Self {
+        return GF8 { value : value }
     }
     
+    fn get_bit_usize() -> usize {
+        return u8::BITS as usize;
+    }
     
+    fn get_bit_int() -> u8 {
+        return u8::BITS as u8;
+    }
 }
 
 
+#[derive(Debug, PartialEq)]
 pub struct GF64 {
     value : u64
 }
 
 impl GalloisField<u64> for GF64 {
     const MODULUS : u64 = 0b00011011u64;
-
-    const ONE: u64 = 1u64;
 
     fn new(value: u64) -> Self {
         return GF64 { value : value};
@@ -118,21 +132,27 @@ impl GalloisField<u64> for GF64 {
     }
 
     fn get_max() -> u64 {
-        return u64::MAX
-    }
-
-    fn get_bit() -> i32 {
-        return u64::BITS.try_into().unwrap();
+        return u64::MAX;
     }
 
     fn set_value(&mut self, value: u64) {
         self.value = value;
     }
+    
+    const ONE : u64 = 1u64;
+    
+    fn get_bit_usize() -> usize {
+        return u64::BITS as usize;
+    }
+    
+    fn get_bit_int() -> u64 {
+        return u64::BITS as u64;
+    }
 }
 
 //For GF192 and GF256, as u192 and u256 dont exist in rust, we will implement a new trait BigGalloisField, in wich we will also implement basis operations. 
 
-pub trait BigGalloisField: Clone where Self : Sized{
+pub trait BigGalloisField: Clone where Self : Sized + Copy{
 
     const LENGTH : u32;
 
@@ -150,10 +170,10 @@ pub trait BigGalloisField: Clone where Self : Sized{
 
     fn rand() -> Self;
 
-    fn add(left: Self, right : Self) -> Self;
+    fn add(left: &Self, right : &Self) -> Self;
 
     fn complement_to_0(self) -> Self {
-        return Self::add(Self::xor(self, Self::MAX), Self::ONE);
+        return Self::add(&Self::xor(&self, &Self::MAX), &Self::ONE);
     }
 
     fn switch_right(self, int : u32) -> Self {
@@ -164,24 +184,34 @@ pub trait BigGalloisField: Clone where Self : Sized{
 
     fn switch_left(self, int : u32) -> Self;
 
-    fn mul(left: Self, right: Self) -> Self {
+    fn mul(left: &Self, right: &Self) -> Self {
         let mut leftc = left.clone(); //to avoid side effect
-        let mut result = Self::and(Self::and(right, Self::ONE).complement_to_0(), left);
+        let mut result = Self::and(&Self::and(&right, &Self::ONE).complement_to_0(), &leftc);
         for i in 1..Self::LENGTH{
-            let mask = Self::and(leftc.switch_right(Self::LENGTH -1), Self::ONE).complement_to_0();
-            leftc = Self::xor(leftc.switch_left(1), Self::and(mask, Self::MODULUS));
-            result = Self::xor(Self::and(Self::and(right.switch_right(i), Self::ONE).complement_to_0(), leftc), result)
+            let mask = Self::and(&leftc.switch_right(Self::LENGTH -1), &Self::ONE).complement_to_0();
+            leftc = Self::xor(&leftc.switch_left(1), &Self::and(&mask, &Self::MODULUS));
+            result = Self::xor(&Self::and(&Self::and(&(right.switch_right(i)), &Self::ONE).complement_to_0(), &leftc), &result)
         }
         return result
     }
 
-    fn and(left: Self, right: Self) -> Self {
+    fn mul_64 (self, right : u64) -> Self {
+        let self_right = Self::new(right as u128, 0u128);
+        return Self::mul(&self, &self_right);
+    }
+
+    fn mul_bit (self, right : u8) -> Self {
+        let self_right = Self::new(right as u128, 0u128);
+        return Self::mul(&self, &self_right);
+    }
+
+    fn and(left: &Self, right: &Self) -> Self {
         let (l_first_value, l_second_value) = left.get_value();
         let (r_first_value, r_second_value) = right.get_value();
         return Self::new(l_first_value & r_first_value, l_second_value & r_second_value);
     }
 
-    fn xor(left: Self, right: Self) -> Self
+    fn xor(left: &Self, right: &Self) -> Self
     {
         let (l_first_value, l_second_value) = left.get_value();
         let (r_first_value, r_second_value) = right.get_value();
@@ -189,29 +219,40 @@ pub trait BigGalloisField: Clone where Self : Sized{
     }
 
     fn byte_combine (x : [Self; 8] ) -> Self {
-        let mut out = x[0];
+        let mut out = x[0].clone();
         for i in 1..8 {
-            out  = Self::add(out, Self::mul(x[i], Self::ALPHA[i - 1]));
+            out  =  Self::add(&out, &Self::mul(&x[i], &Self::ALPHA[i - 1]));
         }
         return out;
     }
 
-    fn and_64 (mut left: Self, right: u64) -> Self {
-        let mut res = Self::and(left, Self::new(right as u128, 0u128));
-        res = Self::and(res, Self::new((right << 64) as u128, 0u128));
-        res = Self::and(res, Self::new(0u128,  right as u128));
-        res = Self::and(res, Self::new(0u128, (right << 64) as u128));
+    fn from_bit(x: u8) -> Self {
+        return Self::new((x&1) as u128, 0u128);
+    }
+
+    fn byte_combine_bits (x : u8) -> Self {
+        let mut out = Self::from_bit(x);
+        for i in 1..8 {
+            out = Self::add(&out, &Self::ALPHA[i-1].mul_bit(x >> i));
+        } 
+        return out
+    }
+
+    #[allow(arithmetic_overflow)]
+    fn and_64 (left: Self, right: u64) -> Self {
+        let mut res = Self::and(&left, &Self::new(right as u128, 0u128));
+        res = Self::and(&res, &Self::new((right << 64) as u128, 0u128));
+        res = Self::and(&res, &Self::new(0u128,  right as u128));
+        res = Self::and(&res, &Self::new(0u128, (right << 64) as u128));
         return res;
     }
-    
-    fn bit_to_u64_mask (&self, bit : u8) -> u64 ;
 
-    fn sum_poly(v : [Self; Self::LENGTH]) -> Self {
-        let mut res = v[0];
+    fn sum_poly(v : [Self; 256]) -> Self {
+        let mut res = v[0].clone();
         let mut alpha = Self::MODULUS;
-        for i in 1..Self::LENGTH {
-            res = Self::add(res, Self::mul(v[i], alpha));
-            alpha = Self::mul(alpha, alpha);
+        for i in 1..Self::LENGTH as usize{
+            res = Self::add(&res, &Self::mul(&v[i], &alpha));
+            alpha = Self::mul(&alpha, &alpha);
         }
         return res
 
@@ -220,7 +261,7 @@ pub trait BigGalloisField: Clone where Self : Sized{
 
 } 
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct GF128{
     first_value : u128,
     second_value : u128
@@ -256,7 +297,7 @@ impl BigGalloisField for GF128 {
         return Self::new(random(), 0u128);
     }
 
-    fn add(left: Self, right : Self) -> Self {
+    fn add(left: &Self, right : &Self) -> Self {
         return GF128 { first_value : left.first_value + right.first_value, second_value : 0u128};
     }
     
@@ -264,12 +305,8 @@ impl BigGalloisField for GF128 {
         return Self::new(self.first_value << int, 0u128);
     }
     
-    fn bit_to_u64_mask (&self, bit : u8) -> u64  {
-        todo!()
-    }
-    
     fn complement_to_0(self) -> Self {
-        return Self::add(Self::xor(self, Self::MAX), Self::ONE);
+        return Self::add(&Self::xor(&self, &Self::MAX), &Self::ONE);
     }
     
     fn switch_right(self, int : u32) -> Self {
@@ -278,55 +315,34 @@ impl BigGalloisField for GF128 {
         return Self::new((first_value >> int) | (carry <<(128 - int)), second_value >> int)
     }
     
-    fn mul(left: Self, right: Self) -> Self {
-        let mut leftc = left.clone(); //to avoid side effect
-        let mut result = Self::and(Self::and(right, Self::ONE).complement_to_0(), left);
-        for i in 1..Self::LENGTH{
-            let mask = Self::and(leftc.switch_right(Self::LENGTH -1), Self::ONE).complement_to_0();
-            leftc = Self::xor(leftc.switch_left(1), Self::and(mask, Self::MODULUS));
-            result = Self::xor(Self::and(Self::and(right.switch_right(i), Self::ONE).complement_to_0(), leftc), result)
-        }
-        return result
-    }
-    
     fn byte_combine (x : [Self; 8] ) -> Self {
-        let mut out = x[0];
+        let mut out = x[0].clone();
         for i in 1..8 {
-            out  = Self::add(out, Self::mul(x[i], Self::ALPHA[i - 1]));
+            out  = Self::add(&out, &Self::mul(&x[i], &Self::ALPHA[i - 1]));
         }
         return out;
     }
     
-    fn and_64 (mut left: Self, right: u64) -> Self {
-        let mut res = Self::and(left, Self::new(right as u128, 0u128));
-        res = Self::and(res, Self::new((right << 64) as u128, 0u128));
-        res = Self::and(res, Self::new(0u128 , right as u128));
-        res = Self::and(res, Self::new(0u128 , (right << 64) as u128));
+    #[allow(arithmetic_overflow)]
+    fn and_64 (left: Self, right: u64) -> Self {
+        let mut res = Self::and(&left, &Self::new(right as u128, 0u128));
+        res = Self::and(&res, &Self::new((right << 64) as u128, 0u128));
+        res = Self::and(&res, &Self::new(0u128 , right as u128));
+        res = Self::and(&res, &Self::new(0u128 , (right << 64) as u128));
         return res;
     }
     
-    fn sum_poly(v : [Self; Self::LENGTH as usize]) -> Self {
-        let mut res = v[0];
-        let mut alpha = Self::MODULUS;
-        for i in 1..Self::LENGTH as usize {
-            res = Self::add(res, Self::mul(v[i], alpha));
-            alpha = Self::mul(alpha, alpha);
-        }
-        return res
-    
-    }
-    
-    fn and(left: Self, right: Self) -> Self {
+    fn and(left: &Self, right: &Self) -> Self {
         return Self::new(left.first_value & right.first_value, left.second_value & right.second_value);
     }
     
-    fn xor(left: Self, right: Self) -> Self
+    fn xor(left: &Self, right: &Self) -> Self
     {
         return Self::new(left.first_value ^ right.first_value, left.second_value ^ right.second_value);
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct GF192 {
     first_value : u128,
     second_value : u128
@@ -350,10 +366,7 @@ impl BigGalloisField for GF192 {
                                 GF192 {first_value : 0xf3eaf7ae5fd72048970f9c76eed5e1bau128, second_value : 0x29a6bd5f696cea43u128},
                                 GF192 {first_value : 0x6019fd623906e9d3f5945dc265068571u128, second_value : 0xc77c56540f87c4b0u128},];
     
-    fn add(left: Self, right : Self) -> Self {
-        let mut res_first = 0u128;
-        let mut res_second = 0u128;
-
+    fn add(left: &Self, right : &Self) -> Self {
         //How to do the carry without side-attack friendly if-statement
         let a = left.first_value;
         let b = right.first_value;
@@ -386,14 +399,10 @@ impl BigGalloisField for GF192 {
         return Self::new(first_value << int, ((second_value << int) | carry) & u64::MAX as u128);
     }
 
-    fn bit_to_u64_mask (&self, bit : u8) -> u64 {
-        todo!()
-    }
-
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct GF256{
     first_value : u128,
     second_value : u128
@@ -429,10 +438,7 @@ impl BigGalloisField for GF256 {
         return Self::new(random(), random());
     }
 
-    fn add(left: Self, right : Self) -> Self {
-        let mut res_first = 0u128;
-        let mut res_second = 0u128;
-
+    fn add(left: &Self, right : &Self) -> Self {
         //How to do the carry without side-attack friendly if-statement
         let a = left.first_value;
         let b = right.first_value;
@@ -452,10 +458,6 @@ impl BigGalloisField for GF256 {
         let carry = self.first_value & (u128::MAX << (128 - int));
         return Self::new(first_value << int, (second_value << int) | carry);
     }
-    
-    fn bit_to_u64_mask (&self, bit : u8) -> u64  {
-        todo!()
-    }
-    
+  
 
 }
