@@ -11,7 +11,7 @@ test:
     - cargo build
 
 build-all-features:
-  stage: test
+  stage: build
   script:
     - cd $CI_PROJECT_DIR/faest
     - cargo build --all-features
