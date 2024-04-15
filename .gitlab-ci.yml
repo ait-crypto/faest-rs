@@ -1,15 +1,8 @@
-image: rust:1-bookworm
+image: git-service.ait.ac.at:8010/sct-crypto/students/2024_naves/docker-images/rust-faest:latest
 
 stages:
-  - prepare
   - build
   - test
-
-cargo-update:
-  stage: prepare
-  script:
-    - cd $CI_PROJECT_DIR/faest
-    - cargo update
 
 test:
   stage: build
