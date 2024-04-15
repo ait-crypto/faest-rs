@@ -1,0 +1,48 @@
+image: rust:1-bookworm
+
+stages:
+  - prepare
+  - build
+  - test
+
+cargo-update:
+  stage: prepare
+  script:
+    - cd $CI_PROJECT_DIR/faest
+    - cargo update
+
+test:
+  stage: build
+  script:
+    - cd $CI_PROJECT_DIR/faest
+    - cargo build
+
+build-all-features:
+  stage: test
+  script:
+    - cd $CI_PROJECT_DIR/faest
+    - cargo build --all-features
+
+clippy:
+  stage: test
+  script:
+    - cd $CI_PROJECT_DIR/faest
+    - cargo clippy -- -D warnings
+
+fmt:
+  stage: test
+  script:
+    - cd $CI_PROJECT_DIR/faest
+    - cargo fmt -- --check
+
+test:
+  stage: test
+  script:
+    - cd $CI_PROJECT_DIR/faest
+    - cargo test
+
+test-all-features:
+  stage: test
+  script:
+    - cd $CI_PROJECT_DIR/faest
+    - cargo test --all-features
