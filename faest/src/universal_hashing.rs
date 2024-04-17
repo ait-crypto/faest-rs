@@ -1,7 +1,7 @@
 use crate::fields::{self, GalloisField, GF64};
 
 #[allow(dead_code)]
-pub fn volehash<const LAMBDA: usize, const L: usize, const B: usize, T>(
+pub fn volehash<const L: usize, const B: usize, T>(
     sd: Vec<u8>,
     mut x0: Vec<u8>,
     x1: Vec<u8>,
@@ -11,12 +11,16 @@ where
 {
     let mut r: [T; 4] = [T::new(0u128, 0u128); 4];
     for i in 0..4 {
-        r[i] = T::to_field(sd[i * LAMBDA / 8..(i + 1) * LAMBDA / 8].to_vec())[0];
+        r[i] = T::to_field(
+            sd[i * (T::LENGTH as usize) / 8..(i + 1) * (T::LENGTH as usize) / 8].to_vec(),
+        )[0];
     }
-    let s = T::to_field(sd[4 * LAMBDA / 8..5 * LAMBDA / 8].to_vec())[0];
-    let t = &GF64::to_field(sd[5 * LAMBDA / 8..(5 * LAMBDA / 8) + 8].to_vec())[0];
-    let l_p = LAMBDA * (L + LAMBDA).div_ceil(LAMBDA);
-    for _i in 1..(l_p - (L + LAMBDA)) {
+    let s = T::to_field(sd[4 * (T::LENGTH as usize) / 8..5 * (T::LENGTH as usize) / 8].to_vec())[0];
+    let t = &GF64::to_field(
+        sd[5 * (T::LENGTH as usize) / 8..(5 * (T::LENGTH as usize) / 8) + 8].to_vec(),
+    )[0];
+    let l_p = (T::LENGTH as usize) * (L + (T::LENGTH as usize)).div_ceil(T::LENGTH as usize);
+    for _i in 1..(l_p - (L + (T::LENGTH as usize))) {
         x0.push(0u8);
     }
     let y_h = T::to_field(x0.clone());
@@ -24,8 +28,11 @@ where
 
     let mut h0 = T::new(0u128, 0u128);
     let mut s_add = T::ONE;
-    for i in 0..(l_p / LAMBDA) {
-        h0 = T::xor(&h0, &T::mul(&s_add, &y_h[(l_p / LAMBDA) - 1 - i]));
+    for i in 0..(l_p / (T::LENGTH as usize)) {
+        h0 = T::xor(
+            &h0,
+            &T::mul(&s_add, &y_h[(l_p / (T::LENGTH as usize)) - 1 - i]),
+        );
         s_add = T::mul(&s_add, &s);
     }
 
@@ -44,12 +51,44 @@ where
     );
 
     let mut h = h2.get_value().0.to_le_bytes().to_vec();
-    h.append(&mut h2.get_value().1.to_le_bytes()[..(LAMBDA / 8) - 16].to_vec());
+    h.append(&mut h2.get_value().1.to_le_bytes()[..((T::LENGTH as usize) / 8) - 16].to_vec());
     //taking the B first bytes of h3
     h.append(
         &mut h3.get_value().0.to_le_bytes()[..16 * (B / 16) + (1 - B / 16) * (B % 16)].to_vec(),
     );
     h.append(&mut h3.get_value().1.to_le_bytes()[..(B / 16) * (B % 16)].to_vec());
     h.iter_mut().zip(x1.iter()).for_each(|(x1, x2)| *x1 ^= *x2);
+    h
+}
+
+#[allow(dead_code)]
+pub fn zkhash<const L: usize, T>(sd: Vec<u8>, x0: Vec<T>, x1: T) -> Vec<u8>
+where
+    T: fields::BigGalloisField,
+{
+    let r0 = T::to_field(sd[..(T::LENGTH as usize) / 8].to_vec())[0];
+    let r1 = T::to_field(sd[(T::LENGTH as usize) / 8..2 * ((T::LENGTH as usize) / 8)].to_vec())[0];
+    let s =
+        T::to_field(sd[2 * ((T::LENGTH as usize) / 8)..3 * ((T::LENGTH as usize) / 8)].to_vec())[0];
+    let mut t_vec = sd[3 * ((T::LENGTH as usize) / 8)..].to_vec();
+    t_vec.append(&mut vec![0u8; ((T::LENGTH as usize) / 8) - 8]);
+    let t = T::to_field(t_vec)[0];
+    let mut h0 = T::new(0u128, 0u128);
+    let mut s_add = T::ONE;
+    for i in 0..L {
+        h0 = T::xor(&h0, &T::mul(&x0[L - 1 - i], &s_add));
+        s_add = T::mul(&s_add, &s);
+    }
+
+    let mut h1 = T::new(0u128, 0u128);
+    let mut t_add = T::ONE;
+    for i in 0..L {
+        h1 = T::xor(&h1, &T::mul(&x0[L - 1 - i], &t_add));
+        t_add = T::mul(&t_add, &t);
+    }
+
+    let gf_h = T::xor(&T::xor(&T::mul(&r0, &h0), &T::mul(&r1, &h1)), &x1);
+    let mut h = gf_h.get_value().0.to_le_bytes().to_vec();
+    h.append(&mut gf_h.get_value().1.to_le_bytes()[..((T::LENGTH as usize) / 8) - 16].to_vec());
     h
 }
