@@ -1,5 +1,6 @@
 use crate::fields::{self, GalloisField, GF64};
 
+#[allow(dead_code)]
 pub fn volehash<const LAMBDA: usize, const L: usize, const B: usize, T>(
     sd: Vec<u8>,
     mut x0: Vec<u8>,
@@ -43,10 +44,12 @@ where
     );
 
     let mut h = h2.get_value().0.to_le_bytes().to_vec();
-    h.append(&mut h2.get_value().1.to_le_bytes()[..(LAMBDA/8) - 16].to_vec());
-    //taking the B first bytes of h3 
-    h.append(&mut h3.get_value().0.to_le_bytes()[..16*(B/16) + (1 - B/16)*(B%16)].to_vec());
-    h.append(&mut h3.get_value().1.to_le_bytes()[..(B/16)*(B%16)].to_vec());
+    h.append(&mut h2.get_value().1.to_le_bytes()[..(LAMBDA / 8) - 16].to_vec());
+    //taking the B first bytes of h3
+    h.append(
+        &mut h3.get_value().0.to_le_bytes()[..16 * (B / 16) + (1 - B / 16) * (B % 16)].to_vec(),
+    );
+    h.append(&mut h3.get_value().1.to_le_bytes()[..(B / 16) * (B % 16)].to_vec());
     h.iter_mut().zip(x1.iter()).for_each(|(x1, x2)| *x1 ^= *x2);
     h
 }
