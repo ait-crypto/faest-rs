@@ -49,7 +49,7 @@ where
         Standard: Distribution<T>,
     {
         let ret: T = rand::random();
-        
+
         Self::new(ret)
     }
 
@@ -135,6 +135,21 @@ impl GalloisField<u8> for GF8 {
 #[derive(Debug, PartialEq)]
 pub struct GF64 {
     value: u64,
+}
+
+impl GF64 {
+    pub fn to_field(x: Vec<u8>) -> Vec<GF64> {
+        let mut res = vec![];
+        for i in 0..x.len() / 8 {
+            let mut array = [0u8; 8];
+            let slice = &x[(i * 8)..((i + 1) * 8)];
+            for i in 0..8 {
+                array[i] = slice[i];
+            }
+            res.push(GF64::new(u64::from_le_bytes(array)));
+        }
+        return res;
+    }
 }
 
 impl GalloisField<u64> for GF64 {
@@ -233,8 +248,7 @@ where
                 &Self::new(
                     (1_u128 - ((Self::LENGTH - 1) / 128) as u128)
                         * (1_u128 << ((Self::LENGTH - 1) % 128)),
-                    ((Self::LENGTH - 1) as u128 / 128)
-                        * (1_u128 << ((Self::LENGTH - 1) % 128)),
+                    ((Self::LENGTH - 1) as u128 / 128) * (1_u128 << ((Self::LENGTH - 1) % 128)),
                 ),
             )
             .all_bytes_heavyweight();
@@ -311,6 +325,25 @@ where
         for (i, _) in v.iter().enumerate().skip(1) {
             res = Self::xor(&res, &Self::mul(&v[i], &alpha));
             alpha = Self::mul(&alpha, &alpha);
+        }
+        res
+    }
+
+    fn to_field(x: Vec<u8>) -> Vec<Self> {
+        let n = 8 * x.len() / (Self::LENGTH as usize);
+        let mut res = vec![];
+        for i in 0..n {
+            let (mut first_value, mut second_value) = (0u128, 0u128);
+            for j in 0..(Self::LENGTH) / 8 {
+                first_value += ((1u128 - ((8 * j) / 128) as u128)
+                    * (x[(i * (Self::LENGTH) as usize / 8) + j as usize] as u128))
+                    << ((8 * j) % 128);
+
+                second_value += ((((8 * j) / 128) as u128)
+                    * (x[(i * (Self::LENGTH) as usize / 8) + j as usize] as u128))
+                    << ((8 * j) % 128);
+            }
+            res.push(Self::new(first_value, second_value));
         }
         res
     }

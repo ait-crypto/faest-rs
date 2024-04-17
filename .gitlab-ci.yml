@@ -1,0 +1,41 @@
+image: git-service.ait.ac.at:8010/sct-crypto/students/2024_naves/docker-images/rust-faest:latest
+
+stages:
+  - build
+  - test
+
+test:
+  stage: build
+  script:
+    - cd $CI_PROJECT_DIR/faest
+    - cargo build
+
+build-all-features:
+  stage: build
+  script:
+    - cd $CI_PROJECT_DIR/faest
+    - cargo build --all-features
+
+clippy:
+  stage: test
+  script:
+    - cd $CI_PROJECT_DIR/faest
+    - cargo clippy -- -D warnings
+
+fmt:
+  stage: test
+  script:
+    - cd $CI_PROJECT_DIR/faest
+    - cargo fmt -- --check
+
+test:
+  stage: test
+  script:
+    - cd $CI_PROJECT_DIR/faest
+    - cargo test
+
+test-all-features:
+  stage: test
+  script:
+    - cd $CI_PROJECT_DIR/faest
+    - cargo test --all-features
