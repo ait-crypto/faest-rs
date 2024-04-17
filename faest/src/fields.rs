@@ -137,18 +137,22 @@ pub struct GF64 {
     value: u64,
 }
 
+impl From<&[u8]> for GF64 {
+    fn from(value: &[u8]) -> Self {
+        let mut array = [0u8; 8];
+        array.copy_from_slice(&value[..8]);
+        GF64::new(u64::from_le_bytes(array))
+    }
+}
+
 impl GF64 {
+    #[allow(dead_code)]
     pub fn to_field(x: Vec<u8>) -> Vec<GF64> {
         let mut res = vec![];
         for i in 0..x.len() / 8 {
-            let mut array = [0u8; 8];
-            let slice = &x[(i * 8)..((i + 1) * 8)];
-            for i in 0..8 {
-                array[i] = slice[i];
-            }
-            res.push(GF64::new(u64::from_le_bytes(array)));
+            res.push(GF64::from(&x[(i * 8)..((i + 1) * 8)]))
         }
-        return res;
+        res
     }
 }
 
@@ -187,6 +191,7 @@ impl GalloisField<u64> for GF64 {
 pub trait BigGalloisField: Clone
 where
     Self: Sized + Copy,
+    Self: for<'a> From<&'a [u8]>,
 {
     const LENGTH: u32;
 
@@ -332,22 +337,33 @@ where
     fn to_field(x: Vec<u8>) -> Vec<Self> {
         let n = 8 * x.len() / (Self::LENGTH as usize);
         let mut res = vec![];
+        let padding_array = [0u8; 16];
         for i in 0..n {
-            let (mut first_value, mut second_value) = (0u128, 0u128);
-            for j in 0..(Self::LENGTH) / 8 {
-                first_value += ((1u128 - ((8 * j) / 128) as u128)
-                    * (x[(i * (Self::LENGTH) as usize / 8) + j as usize] as u128))
-                    << ((8 * j) % 128);
-
-                second_value += ((((8 * j) / 128) as u128)
-                    * (x[(i * (Self::LENGTH) as usize / 8) + j as usize] as u128))
-                    << ((8 * j) % 128);
-            }
-            res.push(Self::new(first_value, second_value));
+            let padded_value = &mut x
+                [(i * (Self::LENGTH as usize) / 8)..((i + 1) * (Self::LENGTH as usize) / 8)]
+                .to_vec();
+            padded_value.append(&mut padding_array[..(32 - (Self::LENGTH as usize) / 8)].to_vec());
+            res.push(Self::from(padded_value));
         }
         res
     }
 }
+
+macro_rules! impl_From {
+    (for $($t:ty),+) => {
+        $(impl From<&[u8]> for $t {
+            fn from(value: &[u8]) -> Self {
+                let mut array_1 = [0u8; 16];
+                let mut array_2 = [0u8; 16];
+                array_1.copy_from_slice(&value[..16]);
+                array_2.copy_from_slice(&value[16..]);
+                Self::new(u128::from_le_bytes(array_1), u128::from_le_bytes(array_2))
+            }
+        })*
+    }
+}
+
+impl_From!(for GF128, GF192, GF256);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GF128 {

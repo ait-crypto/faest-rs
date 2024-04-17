@@ -911,15 +911,15 @@ fn gf64_test_mul() {
 
 #[test]
 fn gf64_test_to_field() {
-    for i in 0..1000{
-        let random = random::<[u8;8]>();
+    for _i in 0..1000 {
+        let random = random::<[u8; 8]>();
         let res = GF64::to_field(random.to_vec());
         let verif = u64::from_le_bytes(random);
         assert_eq!(res[0].get_value(), verif);
     }
     //with many
-    for i in 0..1000{
-        let random = random::<[u8;16]>();
+    for _i in 0..1000 {
+        let random = random::<[u8; 16]>();
         let res = GF64::to_field(random.to_vec());
         let verif_1 = u64::from_le_bytes(random[0..8].try_into().expect("REASON"));
         let verif_2 = u64::from_le_bytes(random[8..16].try_into().expect("REASON"));
