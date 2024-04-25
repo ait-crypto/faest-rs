@@ -1,11 +1,10 @@
 #[cfg(test)]
 use crate::random_oracles::RandomOracle;
 #[cfg(test)]
-use crate::random_oracles::{shake, Oracle};
+use crate::random_oracles::{RandomOracleShake128, RandomOracleShake256};
 
 #[test]
 fn test_h0() {
-    let oracle = Oracle { gen: shake };
     //Database obtained from the reference implementation
     let database = [
         (
@@ -729,15 +728,25 @@ fn test_h0() {
     for data in database {
         let lambda = data.0;
         let input = data.1;
-        let output = data.2;
-        let res = oracle.h0(lambda, input.to_vec());
-        assert_eq!(res, output);
+        let output = &data.2;
+        if lambda == 128 {
+            let mut res = [0u8; 48];
+            RandomOracleShake128::h0(&input, &mut res);
+            assert_eq!(res[..], output[..]);
+        } else if lambda == 192 {
+            let mut res = [0u8; 72];
+            RandomOracleShake256::h0(&input, &mut res);
+            assert_eq!(res[..], output[..]);
+        } else {
+            let mut res = [0u8; 96];
+            RandomOracleShake256::h0(&input, &mut res);
+            assert_eq!(res[..], output[..]);
+        }
     }
 }
 
 #[test]
 fn test_h1() {
-    let oracle = Oracle { gen: shake };
     //Database obtained from the reference implementation
     let database = [
         (
@@ -2995,7 +3004,18 @@ fn test_h1() {
         let lambda = data.0;
         let input = data.1;
         let output = data.2;
-        let res = oracle.h1(lambda, input.to_vec());
-        assert_eq!(res, output);
+        if lambda == 128 {
+            let mut res = [0u8; 32];
+            RandomOracleShake128::h1(&input, &mut res);
+            assert_eq!(res[..], output[..]);
+        } else if lambda == 192 {
+            let mut res = [0u8; 48];
+            RandomOracleShake256::h1(&input, &mut res);
+            assert_eq!(res[..], output[..]);
+        } else {
+            let mut res = [0u8; 64];
+            RandomOracleShake256::h1(&input, &mut res);
+            assert_eq!(res[..], output[..]);
+        }
     }
 }

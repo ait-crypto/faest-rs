@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::fields::{BigGalloisField, GalloisField, GF128, GF192, GF256, GF64, GF8};
+use crate::fields::{BigGaloisField, GaloisField, GF128, GF192, GF256, GF64, GF8};
 #[cfg(test)]
 use num_bigint::BigUint;
 #[cfg(test)]
@@ -913,14 +913,14 @@ fn gf64_test_mul() {
 fn gf64_test_to_field() {
     for _i in 0..1000 {
         let random = random::<[u8; 8]>();
-        let res = GF64::to_field(random.to_vec());
+        let res = GF64::to_field(&random);
         let verif = u64::from_le_bytes(random);
         assert_eq!(res[0].get_value(), verif);
     }
     //with many
     for _i in 0..1000 {
         let random = random::<[u8; 16]>();
-        let res = GF64::to_field(random.to_vec());
+        let res = GF64::to_field(&random);
         let verif_1 = u64::from_le_bytes(random[0..8].try_into().expect("REASON"));
         let verif_2 = u64::from_le_bytes(random[8..16].try_into().expect("REASON"));
         assert_eq!(res[0].get_value(), verif_1);
@@ -950,14 +950,14 @@ fn gf128_test_new_get_value() {
 //postcondition : return MAX if the input is different from 0
 fn gf128_test_all_bytes_heavyweight() {
     //input != 0
-    let pol_1 = GF128::new(1u128, 0u128);
+    let pol_1 = GF128::ONE;
     let pol_1_big = GF128::new(2730312856557028196081990424695764059u128 | 1u128, 0u128);
     let pol_2 = pol_1.all_bytes_heavyweight();
     let pol_2_big = pol_1_big.all_bytes_heavyweight();
     assert_eq!(pol_2, GF128::MAX);
     assert_eq!(pol_2_big, GF128::MAX);
     //input = 0
-    let pol_0 = GF128::new(0u128, 0u128);
+    let pol_0 = GF128::default();
     let pol_res = pol_0.all_bytes_heavyweight();
     assert_eq!(pol_res, pol_0);
     let pol_0_p = GF128::new(0u128, 63483453u128);
@@ -981,29 +981,30 @@ fn gf128_test_switch_left_1() {
 
 #[test]
 //input : two GF128
-//output : the product of the two according to the rules of Gallois Fields arithmetic
+//output : the product of the two according to the rules of Galois Fields arithmetic
 fn gf128_test_mul() {
     //0 * anything = 0
-    let pol_0 = GF128::new(0u128, 0u128);
+    let pol_0 = GF128::default();
     for _i in 0..1000 {
         let anything = GF128::rand();
-        let pol_res = GF128::mul(&pol_0, &anything);
+        let pol_res = pol_0 * anything;
         let (first_value, second_value) = pol_res.get_value();
         assert_eq!(first_value, 0u128);
         assert_eq!(second_value, 0u128);
         //1 * anything = anything
         let (first_value_anything, _second_value_anything) = anything.get_value();
-        let pol_res = GF128::mul(&GF128::ONE, &anything);
+        #[deny(clippy::op_ref)]
+        let pol_res = GF128::ONE * anything;
         let (first_value, second_value) = pol_res.get_value();
         assert_eq!(first_value, first_value_anything);
         assert_eq!(second_value, 0u128);
         //anything * 0 = 0
-        let pol_res_rev = GF128::mul(&anything, &pol_0);
+        let pol_res_rev = anything * pol_0;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, 0u128);
         assert_eq!(second_value_rev, 0u128);
         //anything * 1 = anything
-        let pol_res_rev = GF128::mul(&anything, &GF128::ONE);
+        let pol_res_rev = anything * GF128::ONE;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, first_value_anything);
         assert_eq!(second_value_rev, 0u128);
@@ -1967,54 +1968,86 @@ fn gf128_test_mul() {
         ],
     ];
     for data in database {
-        let left = GF128::new(data[0], 0);
+        let mut left = GF128::new(data[0], 0);
+        let mut left_2 = GF128::new(data[0], 0);
         let right = GF128::new(data[1], 0);
         let result = GF128::new(data[2], 0);
-        let res = GF128::mul(&left, &right);
-        let res_rev = GF128::mul(&right, &left);
+        let res = left * right;
+        let res_rev = right * left;
         let (first_value, second_value) = res.get_value();
         assert_eq!(first_value, result.get_value().0);
         assert_eq!(second_value, result.get_value().1);
         //to test commutativity
         assert_eq!(res, res_rev);
+        //to test with ref
+        #[allow(clippy::op_ref)]
+        let res_rev = &left * &right;
+        #[allow(clippy::op_ref)]
+        let res = left * &right;
+        assert_eq!(res, result);
+        assert_eq!(res_rev, result);
+        //to test mulassign
+        left *= right;
+        left_2 *= &right;
+        assert_eq!(left, result);
+        assert_eq!(left_2, result);
     }
 }
 
 #[test]
 //input : one GF128 and one GF128 restricted to 64 memory bits
-//output : the product of the two according to the rules of Gallois Fields arithmetic
+//output : the product of the two according to the rules of Galois Fields arithmetic
+#[allow(clippy::erasing_op)]
 fn gf128_test_mul_64() {
-    let pol_0 = GF128::new(0u128, 0u128);
+    let pol_0 = GF128::default();
     for _i in 0..1000 {
         //0 * anything = 0
         let anything = random::<u64>();
-        let pol_res = GF128::mul_64(pol_0, anything);
+        let pol_res = pol_0 * anything;
         let (first_value, second_value) = pol_res.get_value();
         assert_eq!(first_value, 0u128);
         assert_eq!(second_value, 0u128);
         //1 * anything = anything
-        let pol_res_1 = GF128::mul_64(GF128::ONE, anything);
+        let pol_res_1 = GF128::ONE * anything;
         let (first_value_1, second_value_1) = pol_res_1.get_value();
         assert_eq!(first_value_1, anything as u128);
         assert_eq!(second_value_1, 0u128);
         //anything * 0 = 0
         let anything = GF128::rand();
-        let pol_res_rev = GF128::mul_64(anything, 0u64);
+        let pol_res_rev = anything * 0u64;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, 0u128);
         assert_eq!(second_value_rev, 0u128);
         //anything * 1 = anything
         let (first_value_anything, _second_value_anything) = anything.get_value();
-        let pol_res_rev = GF128::mul_64(anything, 1u64);
+        let pol_res_rev = anything * 1u64;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, first_value_anything);
         assert_eq!(second_value_rev, 0u128);
     }
     //to test with complex values we use the tests values of the reference implementation
-    let left = GF128::new(0xefcdab8967452301efcdab8967452301u128, 0);
+    let mut left = GF128::new(0xefcdab8967452301efcdab8967452301u128, 0);
+    let mut left_2 = GF128::new(0xefcdab8967452301efcdab8967452301u128, 0);
     let right = 0x0123456789abcdefu64;
     let result = GF128::new(0x40404040404040403bf4ad534a85dc22u128, 0);
-    let res = GF128::mul_64(left, right);
+    let res = left * right;
+    assert_eq!(res, result);
+    //to test with ref
+    #[allow(clippy::op_ref)]
+    let res_rev = &left * &right;
+    #[allow(clippy::op_ref)]
+    let res = left * &right;
+    assert_eq!(res, result);
+    assert_eq!(res_rev, result);
+    //to test mulassign
+    left *= right;
+    left_2 *= &right;
+    assert_eq!(left, result);
+    assert_eq!(left_2, result);
+
+
+
+    
     let (first_value, second_value) = res.get_value();
     assert_eq!(first_value, result.get_value().0);
     assert_eq!(second_value, result.get_value().1);
@@ -2022,30 +2055,30 @@ fn gf128_test_mul_64() {
 
 #[test]
 //input : one GF128 and one GF128 restricted to 1 memory bits
-//output : the product of the two according to the rules of Gallois Fields arithmetic
+#[allow(clippy::erasing_op)]//output : the product of the two according to the rules of Galois Fields arithmetic
 fn gf128_test_mul_bit() {
     for _i in 0..1000 {
         //anything * 0 = 0
         let anything = GF128::rand();
-        let pol_res_rev = GF128::mul_bit(anything, 0u8);
+        let pol_res_rev = anything * 0u8;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, 0u128);
         assert_eq!(second_value_rev, 0u128);
         //anything * 1 = anything
         let (first_value_anything, second_value_anything) = anything.get_value();
-        let pol_res_rev = GF128::mul_bit(anything, 1u8);
+        let pol_res_rev = anything * 1u8;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, first_value_anything);
         assert_eq!(second_value_rev, 0u128);
         //anything_1 * anything_2 (odd) = anything_1
         let anything_2 = random::<u8>() | 1u8;
-        let pol_res_2 = GF128::mul_bit(anything, anything_2);
+        let pol_res_2 = anything * anything_2;
         let (first_value_2, second_value_2) = pol_res_2.get_value();
         assert_eq!(first_value_2, first_value_anything);
         assert_eq!(second_value_2, second_value_anything);
         //anything_1 * anything_2 (even) = 0
         let anything_3 = random::<u8>() & u8::MAX << 1;
-        let pol_res_3 = GF128::mul_bit(anything, anything_3);
+        let pol_res_3 = anything * anything_3;
         let (first_value_3, second_value_3) = pol_res_3.get_value();
         assert_eq!(first_value_3, 0u128);
         assert_eq!(second_value_3, 0u128);
@@ -2071,16 +2104,23 @@ fn gf128_test_and() {
 #[test]
 //input : two GF128
 //output : the result of the xor bitwise operation on the two inputs
-fn gf128_test_xor() {
+fn gf128_test_add() {
     for _i in 0..10000 {
         let random_1_1 = random::<u128>();
         let random_2_1 = random::<u128>();
-        let pol_1 = GF128::new(random_1_1, 0u128);
+        let mut pol_1 = GF128::new(random_1_1, 0u128);
         let pol_2 = GF128::new(random_2_1, 0u128);
-        let pol_res = GF128::xor(&pol_1, &pol_2);
-        let (first_value, second_value) = pol_res.get_value();
-        assert_eq!(first_value, random_1_1 ^ random_2_1);
-        assert_eq!(second_value, 0u128);
+        #[allow(clippy::op_ref)]
+        let pol_res = pol_1 + &pol_2;
+        let pol_res_2 = pol_1 + pol_2;
+        #[allow(clippy::op_ref)]
+        let pol_res_3 = &pol_1 + &pol_2;
+        let res = GF128::new(random_1_1 ^ random_2_1, 0u128);
+        assert_eq!(pol_res, res);
+        assert_eq!(pol_res_2, res);
+        assert_eq!(pol_res_3, res);
+        pol_1 += pol_2;
+        assert_eq!(pol_1, res)
     }
 }
 
@@ -2277,7 +2317,7 @@ fn gf128_test_byte_combine() {
         ],
     ];
     for data in database {
-        let mut tab = [GF128::new(0u128, 0u128); 8];
+        let mut tab = [GF128::default(); 8];
         for i in 0..8 {
             tab[i] = GF128::new(data[i], 0u128);
         }
@@ -2355,7 +2395,7 @@ fn gf128_test_sum_poly() {}
 fn gf128_test_to_field() {
     for _i in 0..1000 {
         let random = random::<[u8; 16]>();
-        let pol = GF128::to_field(random.to_vec());
+        let pol = GF128::to_field(&random);
         let verif_big = BigUint::from_bytes_le(&random);
         let verif =
             verif_big.to_u64_digits()[0] as u128 + ((verif_big.to_u64_digits()[1] as u128) << 64);
@@ -2364,7 +2404,7 @@ fn gf128_test_to_field() {
     //with many polynomes
     for _i in 0..1000 {
         let random = random::<[u8; 32]>();
-        let pol = GF128::to_field(random.to_vec());
+        let pol = GF128::to_field(&random);
         let verif_big = BigUint::from_bytes_le(&random);
         let verif_0 =
             verif_big.to_u64_digits()[0] as u128 + ((verif_big.to_u64_digits()[1] as u128) << 64);
@@ -2427,7 +2467,7 @@ fn gf192_test_all_bytes_heavyweight() {
     assert_eq!(pol_2_p, GF192::MAX);
 
     //input = 0
-    let pol_3 = GF192::new(0u128, 0u128);
+    let pol_3 = GF192::default();
     let pol_4 = pol_3.all_bytes_heavyweight();
     assert_eq!(pol_4, pol_3);
 }
@@ -2453,29 +2493,29 @@ fn gf192_test_switch_left_1() {
 
 #[test]
 //input : two GF192
-//output : the product of the two according to te rules of Gallois Fields arithmetic
+//output : the product of the two according to te rules of Galois Fields arithmetic
 fn gf192_test_mul() {
     //0 * anything = 0
-    let pol_0 = GF192::new(0u128, 0u128);
+    let pol_0 = GF192::default();
     for _i in 0..1000 {
         let anything = GF192::rand();
-        let pol_res = GF192::mul(&pol_0, &anything);
+        let pol_res = pol_0 * anything;
         let (first_value, second_value) = pol_res.get_value();
         assert_eq!(first_value, 0u128);
         assert_eq!(second_value, 0u128);
         //anything * 0 = 0
-        let pol_res_rev = GF192::mul(&anything, &pol_0);
+        let pol_res_rev = anything * pol_0;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, 0u128);
         assert_eq!(second_value_rev, 0u128);
         //1 * anything = anything
         let (first_value_anything, second_value_anything) = anything.get_value();
-        let pol_res = GF192::mul(&GF192::ONE, &anything);
+        let pol_res = GF192::ONE * anything;
         let (first_value, second_value) = pol_res.get_value();
         assert_eq!(first_value, first_value_anything);
         assert_eq!(second_value, second_value_anything);
         //anything * 1 = anything
-        let pol_res_rev = GF192::mul(&anything, &GF192::ONE);
+        let pol_res_rev = anything * GF192::ONE;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, first_value_anything);
         assert_eq!(second_value_rev, second_value_anything);
@@ -4012,51 +4052,70 @@ fn gf192_test_mul() {
         ],
     ];
     for data in database {
-        let left = GF192::new(data[0], data[1]);
+        let mut left = GF192::new(data[0], data[1]);
+        let mut left_2 = GF192::new(data[0], data[1]);
         let right = GF192::new(data[2], data[3]);
         let result = GF192::new(data[4], data[5]);
-        let res = GF192::mul(&left, &right);
-        let res_rev = GF192::mul(&right, &left);
+        let res = left * right;
+        #[allow(clippy::op_ref)]
+        let res_rev = right * &left;
         let (first_value, second_value) = res.get_value();
         assert_eq!(first_value, result.get_value().0);
         assert_eq!(second_value, result.get_value().1);
         //to test commutativity
         assert_eq!(res, res_rev);
+        //to test with ref
+        #[allow(clippy::op_ref)]
+        let res_rev = &left * &right;
+        #[allow(clippy::op_ref)]
+        let res = left * &right;
+        assert_eq!(res, result);
+        assert_eq!(res_rev, result);
+        //to test mulassign
+        left *= right;
+        left_2 *= &right;
+        assert_eq!(left, result);
+        assert_eq!(left_2, result);
     }
 }
 
 #[test]
 //input : one GF192 and one GF192 restricted to 64 memory bits
-//output : the product of the two according to the rules of Gallois Fields arithmetic
+//output : the product of the two according to the rules of Galois Fields arithmetic
+#[allow(clippy::erasing_op)]
 fn gf192_test_mul_64() {
-    let pol_0 = GF192::new(0u128, 0u128);
+    let pol_0 = GF192::default();
     for _i in 0..1000 {
         //0 * anything = 0
         let anything = random::<u64>();
-        let pol_res = GF192::mul_64(pol_0, anything);
+        let pol_res = pol_0 * anything;
         let (first_value, second_value) = pol_res.get_value();
         assert_eq!(first_value, 0u128);
         assert_eq!(second_value, 0u128);
         //1 * anything = anything
-        let pol_res_1 = GF192::mul_64(GF192::ONE, anything);
+        let pol_res_1 = GF192::ONE * anything;
         let (first_value_1, second_value_1) = pol_res_1.get_value();
         assert_eq!(first_value_1, anything as u128);
         assert_eq!(second_value_1, 0u128);
         //anything * 0 = 0
         let anything = GF192::rand();
-        let pol_res_rev = GF192::mul_64(anything, 0u64);
+        let pol_res_rev = anything * 0u64;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, 0u128);
         assert_eq!(second_value_rev, 0u128);
         //anything * 1 = anything
         let (first_value_anything, second_value_anything) = anything.get_value();
-        let pol_res_rev = GF192::mul_64(anything, 1u64);
+        let pol_res_rev = anything * 1u64;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, first_value_anything);
         assert_eq!(second_value_rev, second_value_anything);
     }
     //to test with complex values we use the tests values of the reference implementation
-    let left = GF192::new(
+    let mut left = GF192::new(
+        0xefcdab8967452301efcdab8967452301u128,
+        0xefcdab8967452301u128,
+    );
+    let mut left_2 = GF192::new(
         0xefcdab8967452301efcdab8967452301u128,
         0xefcdab8967452301u128,
     );
@@ -4065,38 +4124,49 @@ fn gf192_test_mul_64() {
         0x40404040404040403bf4ad534a85dc22u128,
         0x4040404040404040u128,
     );
-    let res = GF192::mul_64(left, right);
-    let (first_value, second_value) = res.get_value();
-    assert_eq!(first_value, result.get_value().0);
-    assert_eq!(second_value, result.get_value().1);
+    let res = left * right;
+    assert_eq!(res, result);
+    //to test with ref
+    #[allow(clippy::op_ref)]
+    let res_rev = &left * &right;
+    #[allow(clippy::op_ref)]
+    let res = left * &right;
+    assert_eq!(res, result);
+    assert_eq!(res_rev, result);
+    //to test mulassign
+    left *= right;
+    left_2 *= &right;
+    assert_eq!(left, result);
+    assert_eq!(left_2, result);
 }
 
 #[test]
 //input : one GF192 and one GF192 restricted to 1 memory bits
-//output : the product of the two according to the rules of Gallois Fields arithmetic
+//output : the product of the two according to the rules of Galois Fields arithmetic
+#[allow(clippy::erasing_op)]
 fn gf192_test_mul_bit() {
     for _i in 0..1000 {
         //anything * 0 = 0
         let anything = GF192::rand();
-        let pol_res_rev = GF192::mul_bit(anything, 0u8);
+        let pol_res_rev = anything * 0u8;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, 0u128);
         assert_eq!(second_value_rev, 0u128);
         //anything * 1 = anything
         let (first_value_anything, second_value_anything) = anything.get_value();
-        let pol_res_rev = GF192::mul_bit(anything, 1u8);
+        let pol_res_rev = anything * 1u8;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, first_value_anything);
         assert_eq!(second_value_rev, second_value_anything);
         //anything_1 * anything_2 (odd) = anything_1
         let anything_2 = random::<u8>() | 1u8;
-        let pol_res_2 = GF192::mul_bit(anything, anything_2);
+        let pol_res_2 = anything * anything_2;
         let (first_value_2, second_value_2) = pol_res_2.get_value();
         assert_eq!(first_value_2, first_value_anything);
         assert_eq!(second_value_2, second_value_anything);
         //anything_1 * anything_2 (even) = 0
         let anything_3 = random::<u8>() & u8::MAX << 1;
-        let pol_res_3 = GF192::mul_bit(anything, anything_3);
+        let pol_res_3 = anything * anything_3;
         let (first_value_3, second_value_3) = pol_res_3.get_value();
         assert_eq!(first_value_3, 0u128);
         assert_eq!(second_value_3, 0u128);
@@ -4114,7 +4184,7 @@ fn gf192_test_and() {
         let random_2_2 = random::<u128>() & u64::MAX as u128;
         let pol_1 = GF192::new(random_1_1, random_1_2);
         let pol_2 = GF192::new(random_2_1, random_2_2);
-        let pol_res = GF192::xor(&pol_1, &pol_2);
+        let pol_res = pol_1 + pol_2;
         let (first_value, second_value) = pol_res.get_value();
         assert_eq!(first_value, random_1_1 ^ random_2_1);
         assert_eq!(second_value, random_1_2 ^ random_2_2);
@@ -4485,7 +4555,7 @@ fn gf192_test_byte_combine() {
         ],
     ];
     for data in database {
-        let mut tab = [GF192::new(0u128, 0u128); 8];
+        let mut tab = [GF192::default(); 8];
         for i in 0..8 {
             tab[i] = GF192::new(data[2 * i], data[(2 * i) + 1]);
         }
@@ -4634,7 +4704,7 @@ fn gf192_test_sum_poly() {}
 fn gf192_test_to_field() {
     for _i in 0..1000 {
         let random = random::<[u8; 24]>();
-        let pol = GF192::to_field(random.to_vec());
+        let pol = GF192::to_field(&random);
         let verif_big = BigUint::from_bytes_le(&random);
         let verif_0_0 =
             verif_big.to_u64_digits()[0] as u128 + ((verif_big.to_u64_digits()[1] as u128) << 64);
@@ -4647,7 +4717,7 @@ fn gf192_test_to_field() {
         let mut random_1 = random::<[u8; 24]>().to_vec();
         let mut random_2 = random::<[u8; 24]>().to_vec();
         random_1.append(&mut random_2);
-        let pol = GF192::to_field(random_1.clone());
+        let pol = GF192::to_field(&random_1.clone());
         let verif_big = BigUint::from_bytes_le(&random_1);
         let verif_0_0 =
             verif_big.to_u64_digits()[0] as u128 + ((verif_big.to_u64_digits()[1] as u128) << 64);
@@ -4695,7 +4765,7 @@ fn gf256_test_all_bytes_heavyweight() {
     assert_eq!(pol_2_p, GF256::MAX);
 
     //input = 0
-    let pol_3 = GF256::new(0u128, 0u128);
+    let pol_3 = GF256::default();
     let pol_4 = pol_3.all_bytes_heavyweight();
     assert_eq!(pol_4, pol_3);
 }
@@ -4720,29 +4790,29 @@ fn gf256_test_switch_left_1() {
 
 #[test]
 //input : two GF256
-//output : the product of the two according to te rules of Gallois Fields arithmetic
+//output : the product of the two according to te rules of Galois Fields arithmetic
 fn gf256_test_mul() {
     //0 * anything = 0
-    let pol_0 = GF256::new(0u128, 0u128);
+    let pol_0 = GF256::default();
     for _i in 0..1000 {
         let anything = GF256::rand();
-        let pol_res = GF256::mul(&pol_0, &anything);
+        let pol_res = pol_0 * anything;
         let (first_value, second_value) = pol_res.get_value();
         assert_eq!(first_value, 0u128);
         assert_eq!(second_value, 0u128);
         //anything * 0 = 0
-        let pol_res_rev = GF256::mul(&anything, &pol_0);
+        let pol_res_rev = anything * pol_0;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, 0u128);
         assert_eq!(second_value_rev, 0u128);
         //1 * anything = anything
         let (first_value_anything, second_value_anything) = anything.get_value();
-        let pol_res = GF256::mul(&GF256::ONE, &anything);
+        let pol_res = GF256::ONE * anything;
         let (first_value, second_value) = pol_res.get_value();
         assert_eq!(first_value, first_value_anything);
         assert_eq!(second_value, second_value_anything);
         //anything * 1 = anything
-        let pol_res_rev = GF256::mul(&anything, &GF256::ONE);
+        let pol_res_rev = anything * GF256::ONE;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, first_value_anything);
         assert_eq!(second_value_rev, second_value_anything);
@@ -6279,51 +6349,69 @@ fn gf256_test_mul() {
         ],
     ];
     for data in database {
-        let left = GF256::new(data[0], data[1]);
+        let mut left = GF256::new(data[0], data[1]);
+        let mut left_2 = GF256::new(data[0], data[1]);
         let right = GF256::new(data[2], data[3]);
         let result = GF256::new(data[4], data[5]);
-        let res = GF256::mul(&left, &right);
-        let res_rev = GF256::mul(&right, &left);
+        let res = left * right;
+        let res_rev = right * left;
         let (first_value, second_value) = res.get_value();
         assert_eq!(first_value, result.get_value().0);
         assert_eq!(second_value, result.get_value().1);
         //to test commutativity
         assert_eq!(res, res_rev);
+        //to test with ref
+        #[allow(clippy::op_ref)]
+        let res_rev = &left * &right;
+        #[allow(clippy::op_ref)]
+        let res = left * &right;
+        assert_eq!(res, result);
+        assert_eq!(res_rev, result);
+        //to test mulassign
+        left *= right;
+        left_2 *= &right;
+        assert_eq!(left, result);
+        assert_eq!(left_2, result);
     }
 }
 
 #[test]
 //input : one GF256 and one GF256 restricted to 64 memory bits
-//output : the product of the two according to the rules of Gallois Fields arithmetic
+//output : the product of the two according to the rules of Galois Fields arithmetic
+#[allow(clippy::erasing_op)]
 fn gf256_test_mul_64() {
-    let pol_0 = GF256::new(0u128, 0u128);
+    let pol_0 = GF256::default();
     for _i in 0..1000 {
         //0 * anything = 0
         let anything = random::<u64>();
-        let pol_res = GF256::mul_64(pol_0, anything);
+        let pol_res = pol_0 * anything;
         let (first_value, second_value) = pol_res.get_value();
         assert_eq!(first_value, 0u128);
         assert_eq!(second_value, 0u128);
         //1 * anything = anything
-        let pol_res_1 = GF256::mul_64(GF256::ONE, anything);
+        let pol_res_1 = GF256::ONE * anything;
         let (first_value_1, second_value_1) = pol_res_1.get_value();
         assert_eq!(first_value_1, anything as u128);
         assert_eq!(second_value_1, 0u128);
         //anything * 0 = 0
         let anything = GF256::rand();
-        let pol_res_rev = GF256::mul_64(anything, 0u64);
+        let pol_res_rev = anything * 0u64;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, 0u128);
         assert_eq!(second_value_rev, 0u128);
         //anything * 1 = anything
         let (first_value_anything, second_value_anything) = anything.get_value();
-        let pol_res_rev = GF256::mul_64(anything, 1u64);
+        let pol_res_rev = anything * 1u64;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, first_value_anything);
         assert_eq!(second_value_rev, second_value_anything);
     }
     //to test with complex values we use the tests values of the reference implementation
-    let left = GF256::new(
+    let mut left = GF256::new(
+        0xefcdab8967452301efcdab8967452301u128,
+        0xefcdab8967452301efcdab8967452301u128,
+    );
+    let mut left_2 = GF256::new(
         0xefcdab8967452301efcdab8967452301u128,
         0xefcdab8967452301efcdab8967452301u128,
     );
@@ -6332,38 +6420,49 @@ fn gf256_test_mul_64() {
         0x4040404040404043911817139d141b1cu128,
         0x40404040404040404040404040404040u128,
     );
-    let res = GF256::mul_64(left, right);
-    let (first_value, second_value) = res.get_value();
-    assert_eq!(first_value, result.get_value().0);
-    assert_eq!(second_value, result.get_value().1);
+    let res = left * right;
+    assert_eq!(res, result);
+    //to test with ref
+    #[allow(clippy::op_ref)]
+    let res_rev = &left * &right;
+    #[allow(clippy::op_ref)]
+    let res = left * &right;
+    assert_eq!(res, result);
+    assert_eq!(res_rev, result);
+    //to test mulassign
+    left *= right;
+    left_2 *= &right;
+    assert_eq!(left, result);
+    assert_eq!(left_2, result);
 }
 
 #[test]
 //input : one GF256 and one GF256 restricted to 1 memory bits
-//output : the product of the two according to the rules of Gallois Fields arithmetic
+//output : the product of the two according to the rules of Galois Fields arithmetic
+#[allow(clippy::erasing_op)]
 fn gf256_test_mul_bit() {
     for _i in 0..1000 {
         //anything * 0 = 0
         let anything = GF256::rand();
-        let pol_res_rev = GF256::mul_bit(anything, 0u8);
+        let pol_res_rev = anything * 0u8;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, 0u128);
         assert_eq!(second_value_rev, 0u128);
         //anything * 1 = anything
         let (first_value_anything, second_value_anything) = anything.get_value();
-        let pol_res_rev = GF256::mul_bit(anything, 1u8);
+        let pol_res_rev = anything * 1u8;
         let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
         assert_eq!(first_value_rev, first_value_anything);
         assert_eq!(second_value_rev, second_value_anything);
         //anything_1 * anything_2 (odd) = anything_1
         let anything_2 = random::<u8>() | 1u8;
-        let pol_res_2 = GF256::mul_bit(anything, anything_2);
+        let pol_res_2 = anything * anything_2;
         let (first_value_2, second_value_2) = pol_res_2.get_value();
         assert_eq!(first_value_2, first_value_anything);
         assert_eq!(second_value_2, second_value_anything);
         //anything_1 * anything_2 (even) = 0
         let anything_3 = random::<u8>() & u8::MAX << 1;
-        let pol_res_3 = GF256::mul_bit(anything, anything_3);
+        let pol_res_3 = anything * anything_3;
         let (first_value_3, second_value_3) = pol_res_3.get_value();
         assert_eq!(first_value_3, 0u128);
         assert_eq!(second_value_3, 0u128);
@@ -6399,7 +6498,7 @@ fn gf256_test_xor() {
         let random_2_2 = random::<u128>();
         let pol_1 = GF256::new(random_1_1, random_1_2);
         let pol_2 = GF256::new(random_2_1, random_2_2);
-        let pol_res = GF256::xor(&pol_1, &pol_2);
+        let pol_res = pol_1 + pol_2;
         let (first_value, second_value) = pol_res.get_value();
         assert_eq!(first_value, random_1_1 ^ random_2_1);
         assert_eq!(second_value, random_1_2 ^ random_2_2);
@@ -6752,7 +6851,7 @@ fn gf256_test_byte_combine() {
         ],
     ];
     for data in database {
-        let mut tab = [GF256::new(0u128, 0u128); 8];
+        let mut tab = [GF256::default(); 8];
         for i in 0..8 {
             tab[i] = GF256::new(data[2 * i], data[(2 * i) + 1]);
         }
@@ -6901,7 +7000,7 @@ fn gf256_test_sum_poly() {}
 fn gf256_test_to_field() {
     for _i in 0..1000 {
         let random = random::<[u8; 32]>();
-        let pol = GF256::to_field(random.to_vec());
+        let pol = GF256::to_field(&random);
         let verif_big = BigUint::from_bytes_le(&random);
         let verif_0_0 =
             verif_big.to_u64_digits()[0] as u128 + ((verif_big.to_u64_digits()[1] as u128) << 64);
@@ -6915,7 +7014,7 @@ fn gf256_test_to_field() {
         let mut random_1 = random::<[u8; 32]>().to_vec();
         let mut random_2 = random::<[u8; 32]>().to_vec();
         random_1.append(&mut random_2);
-        let pol = GF256::to_field(random_1.clone());
+        let pol = GF256::to_field(&random_1.clone());
         let verif_big = BigUint::from_bytes_le(&random_1);
         let verif_0_0 =
             verif_big.to_u64_digits()[0] as u128 + ((verif_big.to_u64_digits()[1] as u128) << 64);

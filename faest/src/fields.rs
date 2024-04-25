@@ -1,6 +1,6 @@
 use std::{
     fmt::Debug,
-    ops::{BitAnd, BitXor, BitXorAssign, Mul, Shl, Shr, Sub},
+    ops::{Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Shl, Shr, Sub, SubAssign},
     u128,
 };
 
@@ -9,7 +9,8 @@ use rand::{
     random,
 };
 
-pub trait GalloisField<T>
+
+pub trait GaloisField<T>
 where
     T: Sized
         + std::ops::BitAnd<Output = T>
@@ -79,7 +80,7 @@ where
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct GF8 {
     value: u8,
 }
@@ -102,7 +103,7 @@ impl GF8 {
     }
 }
 
-impl GalloisField<u8> for GF8 {
+impl GaloisField<u8> for GF8 {
     fn get_value(&self) -> u8 {
         self.value
     }
@@ -132,7 +133,7 @@ impl GalloisField<u8> for GF8 {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct GF64 {
     value: u64,
 }
@@ -147,7 +148,7 @@ impl From<&[u8]> for GF64 {
 
 impl GF64 {
     #[allow(dead_code)]
-    pub fn to_field(x: Vec<u8>) -> Vec<GF64> {
+    pub fn to_field(x: &[u8]) -> Vec<GF64> {
         let mut res = vec![];
         for i in 0..x.len() / 8 {
             res.push(GF64::from(&x[(i * 8)..((i + 1) * 8)]))
@@ -156,7 +157,7 @@ impl GF64 {
     }
 }
 
-impl GalloisField<u64> for GF64 {
+impl GaloisField<u64> for GF64 {
     const MODULUS: u64 = 0b00011011u64;
 
     fn new(value: u64) -> Self {
@@ -186,12 +187,18 @@ impl GalloisField<u64> for GF64 {
     }
 }
 
-//For GF192 and GF256, as u192 and u256 dont exist in rust, we will implement a new trait BigGalloisField, in wich we will also implement basis operations.
+//For GF192 and GF256, as u192 and u256 dont exist in rust, we will implement a new trait BigGaloisField, in wich we will also implement basis operations.
 
-pub trait BigGalloisField: Clone
+pub trait BigGaloisField: Clone
 where
     Self: Sized + Copy,
     Self: for<'a> From<&'a [u8]>,
+    Self: std::ops::Mul<Output = Self>,
+    Self: std::ops::Add<Output = Self>,
+    Self: std::ops::AddAssign,
+    Self: std::ops::Mul<u8, Output = Self>,
+    Self: std::ops::MulAssign<Self>,
+    Self: for<'a> std::ops::MulAssign<&'a Self>,
 {
     const LENGTH: u32;
 
@@ -241,51 +248,6 @@ where
         Self::new(first_res, second_res)
     }
 
-    fn mul(left: &Self, right: &Self) -> Self {
-        let mut leftc = *left; //to avoid side effect
-        let mut result = Self::and(
-            &Self::and(right, &Self::ONE).all_bytes_heavyweight(),
-            &leftc,
-        );
-        for i in 1..Self::LENGTH {
-            let mask = Self::and(
-                &leftc,
-                &Self::new(
-                    (1_u128 - ((Self::LENGTH - 1) / 128) as u128)
-                        * (1_u128 << ((Self::LENGTH - 1) % 128)),
-                    ((Self::LENGTH - 1) as u128 / 128) * (1_u128 << ((Self::LENGTH - 1) % 128)),
-                ),
-            )
-            .all_bytes_heavyweight();
-            leftc = Self::xor(&leftc.switch_left_1(), &Self::and(&mask, &Self::MODULUS));
-            result = Self::xor(
-                &Self::and(
-                    &Self::and(
-                        right,
-                        &Self::new(
-                            (1_u128 - (i as u128 / 128)) * (1_u128 << (i as u128 % 128)),
-                            (i as u128 / 128) * (1_u128 << (i as u128 % 128)),
-                        ),
-                    )
-                    .all_bytes_heavyweight(),
-                    &leftc,
-                ),
-                &result,
-            );
-        }
-        result
-    }
-
-    fn mul_64(self, right: u64) -> Self {
-        let self_right = Self::new(right as u128, 0u128);
-        Self::mul(&self, &self_right)
-    }
-
-    fn mul_bit(self, right: u8) -> Self {
-        let self_right = Self::new((right & 1u8) as u128, 0u128);
-        Self::mul(&self, &self_right)
-    }
-
     fn and(left: &Self, right: &Self) -> Self {
         let (l_first_value, l_second_value) = left.get_value();
         let (r_first_value, r_second_value) = right.get_value();
@@ -295,19 +257,10 @@ where
         )
     }
 
-    fn xor(left: &Self, right: &Self) -> Self {
-        let (l_first_value, l_second_value) = left.get_value();
-        let (r_first_value, r_second_value) = right.get_value();
-        Self::new(
-            l_first_value ^ r_first_value,
-            l_second_value ^ r_second_value,
-        )
-    }
-
     fn byte_combine(x: [Self; 8]) -> Self {
         let mut out = x[0];
         for (i, _) in x.iter().enumerate().skip(1) {
-            out = Self::xor(&out, &Self::mul(&x[i], &Self::ALPHA[i - 1]));
+            out += x[i] * Self::ALPHA[i - 1];
         }
         out
     }
@@ -319,7 +272,7 @@ where
     fn byte_combine_bits(x: u8) -> Self {
         let mut out = Self::from_bit(x);
         for i in 1..8 {
-            out = Self::xor(&out, &Self::ALPHA[i - 1].mul_bit(x >> i));
+            out += Self::ALPHA[i - 1] * (x >> i);
         }
         out
     }
@@ -328,13 +281,13 @@ where
         let mut res = v[0];
         let mut alpha = Self::MODULUS;
         for (i, _) in v.iter().enumerate().skip(1) {
-            res = Self::xor(&res, &Self::mul(&v[i], &alpha));
-            alpha = Self::mul(&alpha, &alpha);
+            res += v[i] * alpha;
+            alpha = alpha * alpha;
         }
         res
     }
 
-    fn to_field(x: Vec<u8>) -> Vec<Self> {
+    fn to_field(x: &[u8]) -> Vec<Self> {
         let n = 8 * x.len() / (Self::LENGTH as usize);
         let mut res = vec![];
         let padding_array = [0u8; 16];
@@ -348,6 +301,18 @@ where
         res
     }
 }
+
+macro_rules! impl_Default {
+    (for $($t:ty),+) => {
+        $(impl Default for $t {
+            fn default() -> Self {
+                return Self::new(0u128, 0u128);
+            }
+        })*
+    }
+}
+
+impl_Default!(for GF128, GF192, GF256);
 
 macro_rules! impl_From {
     (for $($t:ty),+) => {
@@ -365,13 +330,396 @@ macro_rules! impl_From {
 
 impl_From!(for GF128, GF192, GF256);
 
+macro_rules! impl_Add {
+    (for $($t:ty),+) => {
+        $(impl Add for $t {
+            type Output = Self;
+            fn add(self, other: Self) -> Self::Output{
+                let (l_first_value, l_second_value) = self.get_value();
+                let (r_first_value, r_second_value) = other.get_value();
+                Self::new(
+                    l_first_value ^ r_first_value,
+                    l_second_value ^ r_second_value,
+                )
+            }
+        })*
+    }
+}
+
+impl_Add!(for GF128, GF192, GF256);
+
+macro_rules! impl_AddRef {
+    (for $($t:ty),+) => {
+        $(impl Add<&Self> for $t {
+            type Output = Self;
+            fn add(self, other: &Self) -> Self::Output{
+                let (l_first_value, l_second_value) = self.get_value();
+                let (r_first_value, r_second_value) = other.get_value();
+                Self::new(
+                    l_first_value ^ r_first_value,
+                    l_second_value ^ r_second_value,
+                )
+            }
+        })*
+    }
+}
+
+impl_AddRef!(for GF128, GF192, GF256);
+
+macro_rules! impl_RefAdd {
+    (for $($t:ty),+) => {
+        $(impl<'a, 'b> Add<&'b $t> for &'a $t {
+            type Output = $t;
+            fn add(self, other: &'b $t) -> $t{
+                let (l_first_value, l_second_value) = self.get_value();
+                let (r_first_value, r_second_value) = other.get_value();
+                return (<$t>::new(l_first_value ^ r_first_value,
+                    l_second_value ^ r_second_value)
+                );
+            }
+        })*
+    }
+}
+
+impl_RefAdd!(for GF128, GF192, GF256);
+
+macro_rules! impl_Sub {
+    (for $($t:ty),+) => {
+        $(impl Sub for $t {
+            type Output = Self;
+            fn sub(self, other: Self) -> Self::Output{
+                let (l_first_value, l_second_value) = self.get_value();
+                let (r_first_value, r_second_value) = other.get_value();
+                Self::new(
+                    l_first_value ^ r_first_value,
+                    l_second_value ^ r_second_value,
+                )
+            }
+        })*
+    }
+}
+
+impl_Sub!(for GF128, GF192, GF256);
+
+macro_rules! impl_SubRef {
+    (for $($t:ty),+) => {
+        $(impl Sub<&Self> for $t {
+            type Output = Self;
+            fn sub(self, other: &Self) -> Self::Output{
+                let (l_first_value, l_second_value) = self.get_value();
+                let (r_first_value, r_second_value) = other.get_value();
+                Self::new(
+                    l_first_value ^ r_first_value,
+                    l_second_value ^ r_second_value,
+                )
+            }
+        })*
+    }
+}
+
+impl_SubRef!(for GF128, GF192, GF256);
+
+macro_rules! impl_RefSub {
+    (for $($t:ty),+) => {
+        $(impl<'a, 'b> Sub<&'b $t> for &'a $t {
+            type Output = $t;
+            fn sub(self, other: &'b $t) -> $t{
+                let (l_first_value, l_second_value) = self.get_value();
+                let (r_first_value, r_second_value) = other.get_value();
+                return (<$t>::new(l_first_value ^ r_first_value,
+                    l_second_value ^ r_second_value)
+                );
+            }
+        })*
+    }
+}
+
+impl_RefSub!(for GF128, GF192, GF256);
+
+macro_rules! impl_Mul {
+    (for $($t:ty),+) => {
+        $(impl Mul for $t {
+            type Output = Self;
+            fn mul(self, right: Self) -> Self::Output where Self : BigGaloisField{
+                let mut leftc = self; //to avoid side effect
+                let mut result = Self::and(
+                    &Self::and(&right, &Self::ONE).all_bytes_heavyweight(),
+                    &leftc,
+                );
+                for i in 1..Self::LENGTH {
+                    let mask = Self::and(
+                        &leftc,
+                        &Self::new(
+                            (1_u128 - ((Self::LENGTH - 1) / 128) as u128)
+                                * (1_u128 << ((Self::LENGTH - 1) % 128)),
+                            ((Self::LENGTH - 1) as u128 / 128) * (1_u128 << ((Self::LENGTH - 1) % 128)),
+                        ),
+                    )
+                    .all_bytes_heavyweight();
+                    leftc = leftc.switch_left_1() + Self::and(&mask, &Self::MODULUS);
+                    result =
+                        Self::and(
+                            &Self::and(
+                                &right,
+                                &Self::new(
+                                    (1_u128 - (i as u128 / 128)) * (1_u128 << (i as u128 % 128)),
+                                    (i as u128 / 128) * (1_u128 << (i as u128 % 128)),
+                                ),
+                            )
+                            .all_bytes_heavyweight(),
+                            &leftc,
+                        ) +
+                        result
+                    ;
+                }
+                result
+            }
+        })*
+    }
+}
+
+impl_Mul!(for GF128, GF192, GF256);
+
+macro_rules! impl_Mul64 {
+    (for $($t:ty),+) => {
+        $(impl Mul<u64> for $t {
+            type Output = Self;
+            fn mul(self, right: u64) -> Self::Output {
+                let right = <$t>::new(right as u128, 0u128);
+                return self * right
+            }
+        })*
+    }
+}
+
+impl_Mul64!(for GF128, GF192, GF256);
+
+macro_rules! impl_Mul64Ref {
+    (for $($t:ty),+) => {
+        $(impl Mul<&u64> for $t {
+            type Output = Self;
+            fn mul(self, right: &u64) -> Self::Output {
+                let right = <$t>::new(*right as u128, 0u128);
+                return self * right
+            }
+        })*
+    }
+}
+
+impl_Mul64Ref!(for GF128, GF192, GF256);
+
+macro_rules! impl_RefMul64 {
+    (for $($t:ty),+) => {
+        $(impl<'a, 'b> Mul<&'b u64> for &'a $t {
+            type Output = $t;
+            fn mul(self, other: &u64) -> $t{
+                let right = <$t>::new(*other as u128, 0u128);
+                return *self * right
+            }
+        })*
+    }
+}
+
+impl_RefMul64!(for GF128, GF192, GF256);
+
+macro_rules! impl_Mul8 {
+    (for $($t:ty),+) => {
+        $(impl Mul<u8> for $t {
+            type Output = Self;
+            fn mul(self, right: u8) -> Self::Output {
+                let right = <$t>::new(right as u128 & 1, 0u128);
+                return self * right
+            }
+        })*
+    }
+}
+
+impl_Mul8!(for GF128, GF192, GF256);
+
+macro_rules! impl_Mul8Ref {
+    (for $($t:ty),+) => {
+        $(impl Mul<&u8> for $t {
+            type Output = Self;
+            fn mul(self, right: &u8) -> Self::Output {
+                let right = <$t>::new(*right as u128 & 1, 0u128);
+                return self * right
+            }
+        })*
+    }
+}
+
+impl_Mul8Ref!(for GF128, GF192, GF256);
+
+macro_rules! impl_RefMul8 {
+    (for $($t:ty),+) => {
+        $(impl<'a, 'b> Mul<&'a u8> for &'b $t {
+            type Output = $t;
+            fn mul(self, other: &u8) -> $t{
+                let right = <$t>::new(*other as u128 & 1, 0u128);
+                return *self * right
+            }
+        })*
+    }
+}
+
+impl_RefMul8!(for GF128, GF192, GF256);
+
+macro_rules! impl_MulRef {
+    (for $($t:ty),+) => {
+        $(impl Mul<&Self> for $t {
+            type Output = Self;
+            fn mul(self, right: &Self) -> Self::Output {
+                self * *right
+            }
+        })*
+    }
+}
+
+impl_MulRef!(for GF128, GF192, GF256);
+
+macro_rules! impl_RefMul {
+    (for $($t:ty),+) => {
+        $(impl<'a, 'b> Mul<&'b $t> for &'a $t {
+            type Output = $t;
+            fn mul(self, right: &'b $t) -> $t where $t : BigGaloisField{
+                *self * *right
+            }
+        })*
+    }
+}
+
+impl_RefMul!(for GF128, GF192, GF256);
+
+macro_rules! impl_AddAssign {
+    (for $($t:ty),+) => {
+        $(impl AddAssign for $t {
+            fn add_assign(&mut self, other: Self) {
+                *self = (*self + other);
+            }
+        })*
+    }
+}
+
+impl_AddAssign!(for GF128, GF192, GF256);
+
+macro_rules! impl_AddAssignRef {
+    (for $($t:ty),+) => {
+        $(impl AddAssign<&Self> for $t {
+            fn add_assign(&mut self, other: &Self) {
+                let res = *self + *other;
+                *self = res;
+            }
+        })*
+    }
+}
+
+impl_AddAssignRef!(for GF128, GF192, GF256);
+
+macro_rules! impl_SubAssign {
+    (for $($t:ty),+) => {
+        $(impl SubAssign for $t {
+            #[allow(clippy::suspicious_op_assign_impl)]
+            fn sub_assign(&mut self, other: Self) {
+                *self += other;
+            }
+        })*
+    }
+}
+
+impl_SubAssign!(for GF128, GF192, GF256);
+
+macro_rules! impl_SubAssignRef {
+    (for $($t:ty),+) => {
+        $(impl SubAssign<&Self> for $t {
+            #[allow(clippy::suspicious_op_assign_impl)]
+            fn sub_assign(&mut self, other: &Self) {
+                *self += *other;
+            }
+        })*
+    }
+}
+
+impl_SubAssignRef!(for GF128, GF192, GF256);
+
+macro_rules! impl_MulAssign {
+    (for $($t:ty),+) => {
+        $(impl MulAssign for $t {
+            fn mul_assign(&mut self, other: Self) {
+                *self = *self * other;
+            }
+        })*
+    }
+}
+
+impl_MulAssign!(for GF128, GF192, GF256);
+
+macro_rules! impl_MulAssignRef {
+    (for $($t:ty),+) => {
+        $(impl MulAssign<&Self> for $t {
+            fn mul_assign(&mut self, other: &Self) {
+                *self = *self * *other;
+            }
+        })*
+    }
+}
+
+impl_MulAssignRef!(for GF128, GF192, GF256);
+
+macro_rules! impl_MulAssign64 {
+    (for $($t:ty),+) => {
+        $(impl MulAssign<u64> for $t {
+            fn mul_assign(&mut self, other: u64) {
+                *self = *self * other;
+            }
+        })*
+    }
+}
+
+impl_MulAssign64!(for GF128, GF192, GF256);
+
+macro_rules! impl_MulAssign64Ref {
+    (for $($t:ty),+) => {
+        $(impl MulAssign<&u64> for $t {
+            fn mul_assign(&mut self, other: &u64) {
+                *self = *self * *other;
+            }
+        })*
+    }
+}
+
+impl_MulAssign64Ref!(for GF128, GF192, GF256);
+
+macro_rules! impl_MulAssign8 {
+    (for $($t:ty),+) => {
+        $(impl MulAssign<u8> for $t {
+            fn mul_assign(&mut self, other: u8) {
+                *self = *self * other;
+            }
+        })*
+    }
+}
+
+impl_MulAssign8!(for GF128, GF192, GF256);
+
+macro_rules! impl_MulAssign8Ref {
+    (for $($t:ty),+) => {
+        $(impl MulAssign<&u8> for $t {
+            fn mul_assign(&mut self, other: &u8) {
+                *self = *self * *other;
+            }
+        })*
+    }
+}
+
+impl_MulAssign8Ref!(for GF128, GF192, GF256);
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GF128 {
     first_value: u128,
     second_value: u128,
 }
 
-impl BigGalloisField for GF128 {
+impl BigGaloisField for GF128 {
     const LENGTH: u32 = 128u32;
 
     const MODULUS: Self = GF128 {
@@ -441,13 +789,82 @@ impl BigGalloisField for GF128 {
             left.second_value & right.second_value,
         )
     }
-
-    fn xor(left: &Self, right: &Self) -> Self {
+    
+    fn all_bytes_heavyweight(self) -> Self {
+        let (first_value, second_value) = self.get_value();
+        let c_1 = (first_value & ((1u128 << 127).wrapping_shr(first_value.leading_zeros())))
+            .wrapping_shl(first_value.leading_zeros())
+            >> 127;
+        let c_2 = (second_value & ((1u128 << 127).wrapping_shr(second_value.leading_zeros())))
+            .wrapping_shl(second_value.leading_zeros())
+            >> 127;
+        let c = c_1 | c_2;
+        Self::new(u128::MAX * c, u128::MAX * c)
+    }
+    
+    fn switch_right(self, int: u32) -> Self {
+        //the int  & 64 is for GF192, in wich the bit worthing 64 would not have been taken into account otherwise.
+        let lim_int = (int & (Self::LENGTH - 1)) | (int & 64);
+        let (first_value, second_value) = self.get_value();
+        let carry = second_value & (u128::MAX.wrapping_shr(128 - lim_int));
         Self::new(
-            left.first_value ^ right.first_value,
-            left.second_value ^ right.second_value,
+            (first_value.wrapping_shr(lim_int)) | (carry.wrapping_shl(128 - lim_int)),
+            second_value.wrapping_shr(lim_int),
         )
     }
+    
+    fn switch_left_1(self) -> Self {
+        let (first_value, second_value) = self.get_value();
+        let carry = (first_value & (1u128 << 127)) >> 127;
+        let first_res = first_value.wrapping_shl(1);
+        let second_res = (second_value.wrapping_shl(1)) | carry;
+        Self::new(first_res, second_res)
+    }
+    
+    fn byte_combine(x: [Self; 8]) -> Self {
+        let mut out = x[0];
+        for (i, _) in x.iter().enumerate().skip(1) {
+            out += x[i] * Self::ALPHA[i - 1];
+        }
+        out
+    }
+    
+    fn from_bit(x: u8) -> Self {
+        Self::new((x & 1) as u128, 0u128)
+    }
+    
+    fn byte_combine_bits(x: u8) -> Self {
+        let mut out = Self::from_bit(x);
+        for i in 1..8 {
+            out += Self::ALPHA[i - 1] * (x >> i);
+        }
+        out
+    }
+    
+    fn sum_poly(v: [Self; 256]) -> Self {
+        let mut res = v[0];
+        let mut alpha = Self::MODULUS;
+        for (i, _) in v.iter().enumerate().skip(1) {
+            res += v[i] * alpha;
+            alpha = alpha * alpha;
+        }
+        res
+    }
+    
+    fn to_field(x: &[u8]) -> Vec<Self> {
+        let n = 8 * x.len() / (Self::LENGTH as usize);
+        let mut res = vec![];
+        let padding_array = [0u8; 16];
+        for i in 0..n {
+            let padded_value = &mut x
+                [(i * (Self::LENGTH as usize) / 8)..((i + 1) * (Self::LENGTH as usize) / 8)]
+                .to_vec();
+            padded_value.append(&mut padding_array[..(32 - (Self::LENGTH as usize) / 8)].to_vec());
+            res.push(Self::from(&padded_value[..]));
+        }
+        res
+    }
+
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -456,7 +873,7 @@ pub struct GF192 {
     second_value: u128,
 }
 
-impl BigGalloisField for GF192 {
+impl BigGaloisField for GF192 {
     const MODULUS: Self = GF192 {
         first_value: 0b10000111u128,
         second_value: 0u128,
@@ -530,7 +947,7 @@ pub struct GF256 {
     second_value: u128,
 }
 
-impl BigGalloisField for GF256 {
+impl BigGaloisField for GF256 {
     const LENGTH: u32 = 256u32;
 
     const MODULUS: Self = GF256 {

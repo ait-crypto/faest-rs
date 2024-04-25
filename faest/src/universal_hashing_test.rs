@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::fields::{BigGalloisField, GF128, GF192, GF256};
+use crate::fields::{BigGaloisField, GF128, GF192, GF256};
 #[cfg(test)]
 use crate::universal_hashing::{volehash, zkhash};
 
@@ -124,12 +124,12 @@ fn test_volehash() {
         ),
     ];
     for data in database {
-        let sd = data.0.to_vec();
+        let sd = &data.0;
         let x = data.1.to_vec();
         let x0 = x[..20].to_vec();
-        let x1 = x[20..].to_vec();
+        let x1 = &x[20..];
         const L: usize = 32;
-        let h = data.3.to_vec().to_vec();
+        let h = GF128::to_field(&data.3)[0];
         let res = volehash::<L, 2, GF128>(sd, x0, x1);
         assert_eq!(h, res);
     }
@@ -278,12 +278,12 @@ fn test_volehash() {
         ),
     ];
     for data in database {
-        let sd = data.0.to_vec();
+        let sd = &data.0;
         let x = data.1.to_vec();
         let x0 = x[..28].to_vec();
-        let x1 = x[28..].to_vec();
+        let x1 = &x[28..];
         const L: usize = 32;
-        let h = data.3.to_vec().to_vec();
+        let h = GF192::to_field(&data.3)[0];
         let res = volehash::<L, 2, GF192>(sd, x0, x1);
         assert_eq!(h, res);
     }
@@ -453,13 +453,13 @@ fn test_volehash() {
         ),
     ];
     for data in database {
-        let sd = data.0.to_vec();
+        let sd = data.0;
         let x = data.1.to_vec();
         let x0 = x[..36].to_vec();
-        let x1 = x[36..].to_vec();
+        let x1 = &x[36..];
         const L: usize = 32;
-        let h = data.3.to_vec().to_vec();
-        let res = volehash::<L, 2, GF256>(sd, x0, x1);
+        let h = GF256::to_field(&data.3)[0];
+        let res = volehash::<L, 2, GF256>(&sd, x0, x1);
         assert_eq!(h, res);
     }
 }
@@ -596,7 +596,7 @@ fn test_zkhash() {
         ),
     ];
     for data in database {
-        let sd = data.0.to_vec();
+        let sd = &data.0;
         let x_val = data.1.to_vec();
         let mut x = [GF128::ONE; 9];
         for i in 0..9 {
@@ -606,7 +606,7 @@ fn test_zkhash() {
         let x1 = x[8..].to_vec();
         const L: usize = 8;
         let h = data.3.to_vec();
-        let res = zkhash::<L, GF128>(sd, x0, x1[0]);
+        let res = zkhash::<L, GF128>(sd, &x0, x1[0]);
         assert_eq!(h, res);
     }
 
@@ -795,7 +795,7 @@ fn test_zkhash() {
         ),
     ];
     for data in database {
-        let sd = data.0.to_vec();
+        let sd = &data.0;
         let x_val = data.1.to_vec();
         let mut x = [GF192::ONE; 9];
         for i in 0..9 {
@@ -805,7 +805,7 @@ fn test_zkhash() {
         let x1 = x[8..].to_vec();
         const L: usize = 8;
         let h = data.3.to_vec();
-        let res = zkhash::<L, GF192>(sd, x0, x1[0]);
+        let res = zkhash::<L, GF192>(sd, &x0, x1[0]);
         assert_eq!(h, res);
     }
 
@@ -1009,7 +1009,7 @@ fn test_zkhash() {
         ),
     ];
     for data in database {
-        let sd = data.0.to_vec();
+        let sd = &data.0;
         let x_val = data.1.to_vec();
         let mut x = [GF256::ONE; 9];
         for i in 0..9 {
@@ -1019,7 +1019,7 @@ fn test_zkhash() {
         let x1 = x[8..].to_vec();
         const L: usize = 8;
         let h = data.3.to_vec();
-        let res = zkhash::<L, GF256>(sd, x0, x1[0]);
+        let res = zkhash::<L, GF256>(sd, &x0, x1[0]);
         assert_eq!(h, res);
     }
 }
