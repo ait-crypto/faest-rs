@@ -2045,9 +2045,6 @@ fn gf128_test_mul_64() {
     assert_eq!(left, result);
     assert_eq!(left_2, result);
 
-
-
-    
     let (first_value, second_value) = res.get_value();
     assert_eq!(first_value, result.get_value().0);
     assert_eq!(second_value, result.get_value().1);
@@ -2055,7 +2052,7 @@ fn gf128_test_mul_64() {
 
 #[test]
 //input : one GF128 and one GF128 restricted to 1 memory bits
-#[allow(clippy::erasing_op)]//output : the product of the two according to the rules of Galois Fields arithmetic
+#[allow(clippy::erasing_op)] //output : the product of the two according to the rules of Galois Fields arithmetic
 fn gf128_test_mul_bit() {
     for _i in 0..1000 {
         //anything * 0 = 0

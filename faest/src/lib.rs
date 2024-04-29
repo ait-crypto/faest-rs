@@ -9,3 +9,6 @@ mod vc_test;
 
 pub mod random_oracles;
 mod random_oracles_test;
+
+pub mod prg;
+pub mod prg_test;

@@ -9,7 +9,6 @@ use rand::{
     random,
 };
 
-
 pub trait GaloisField<T>
 where
     T: Sized
@@ -789,7 +788,7 @@ impl BigGaloisField for GF128 {
             left.second_value & right.second_value,
         )
     }
-    
+
     fn all_bytes_heavyweight(self) -> Self {
         let (first_value, second_value) = self.get_value();
         let c_1 = (first_value & ((1u128 << 127).wrapping_shr(first_value.leading_zeros())))
@@ -801,7 +800,7 @@ impl BigGaloisField for GF128 {
         let c = c_1 | c_2;
         Self::new(u128::MAX * c, u128::MAX * c)
     }
-    
+
     fn switch_right(self, int: u32) -> Self {
         //the int  & 64 is for GF192, in wich the bit worthing 64 would not have been taken into account otherwise.
         let lim_int = (int & (Self::LENGTH - 1)) | (int & 64);
@@ -812,7 +811,7 @@ impl BigGaloisField for GF128 {
             second_value.wrapping_shr(lim_int),
         )
     }
-    
+
     fn switch_left_1(self) -> Self {
         let (first_value, second_value) = self.get_value();
         let carry = (first_value & (1u128 << 127)) >> 127;
@@ -820,7 +819,7 @@ impl BigGaloisField for GF128 {
         let second_res = (second_value.wrapping_shl(1)) | carry;
         Self::new(first_res, second_res)
     }
-    
+
     fn byte_combine(x: [Self; 8]) -> Self {
         let mut out = x[0];
         for (i, _) in x.iter().enumerate().skip(1) {
@@ -828,11 +827,11 @@ impl BigGaloisField for GF128 {
         }
         out
     }
-    
+
     fn from_bit(x: u8) -> Self {
         Self::new((x & 1) as u128, 0u128)
     }
-    
+
     fn byte_combine_bits(x: u8) -> Self {
         let mut out = Self::from_bit(x);
         for i in 1..8 {
@@ -840,7 +839,7 @@ impl BigGaloisField for GF128 {
         }
         out
     }
-    
+
     fn sum_poly(v: [Self; 256]) -> Self {
         let mut res = v[0];
         let mut alpha = Self::MODULUS;
@@ -850,7 +849,7 @@ impl BigGaloisField for GF128 {
         }
         res
     }
-    
+
     fn to_field(x: &[u8]) -> Vec<Self> {
         let n = 8 * x.len() / (Self::LENGTH as usize);
         let mut res = vec![];
@@ -864,7 +863,6 @@ impl BigGaloisField for GF128 {
         }
         res
     }
-
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

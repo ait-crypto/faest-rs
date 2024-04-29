@@ -24,8 +24,7 @@ where
     let mut h0 = T::new(0u128, 0u128);
     let mut s_add = T::ONE;
     for i in 0..(l_p / (T::LENGTH as usize)) {
-        h0 += s_add * y_h[(l_p / (T::LENGTH as usize)) - 1 - i]
-        ;
+        h0 += s_add * y_h[(l_p / (T::LENGTH as usize)) - 1 - i];
         s_add *= s;
     }
 
@@ -38,10 +37,7 @@ where
 
     let h1_p = T::new(h1.get_value() as u128, 0u128);
 
-    let (h2, h3) = (
-        (r[0] * h0) + (r[1] * h1_p),
-        ((r[2]*h0) + (r[3] * h1_p))
-    );
+    let (h2, h3) = ((r[0] * h0) + (r[1] * h1_p), ((r[2] * h0) + (r[3] * h1_p)));
 
     let mut h = h2.get_value().0.to_le_bytes().to_vec();
     h.append(&mut h2.get_value().1.to_le_bytes()[..((T::LENGTH as usize) / 8) - 16].to_vec());
