@@ -17,3 +17,7 @@ mod random_oracles_test;
 pub mod prg;
 #[cfg(test)]
 pub mod prg_test;
+
+pub mod vole;
+#[cfg(test)]
+pub mod vole_test;
