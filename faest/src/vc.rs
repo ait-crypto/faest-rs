@@ -28,7 +28,7 @@ where
     let mut sd = vec![Vec::new(); n.try_into().unwrap()];
     let mut com = vec![Vec::new(); n.try_into().unwrap()];
     let mut pre_h = Vec::new();
-    for j in 0..(n) as usize {
+    for j in 0..n as usize {
         let mut seed = k[(n - 1) as usize + j].clone();
         seed.append(&mut iv.to_be_bytes().to_vec());
         let mut hash = vec![0u8; 3 * length];
@@ -38,7 +38,6 @@ where
         pre_h.append(&mut com[j].to_vec());
     }
     //step 6
-
     let mut h = vec![0u8; 2 * length];
     R::h1(&pre_h, &mut h[..]);
     (h, (k, com), sd)
@@ -46,19 +45,20 @@ where
 
 pub fn open(decom: (Vec<Vec<u8>>, Vec<Vec<u8>>), b: Vec<u8>) -> (Vec<Vec<u8>>, Vec<u8>) {
     let mut a = 0;
-    let d = (usize::BITS - decom.0.len().leading_zeros()) as usize;
+    let d = (usize::BITS - decom.0.len().leading_zeros() - 1) as usize;
     let mut cop = vec![Vec::new(); d];
     //step 4
-    for i in 1..d {
-        let b_d_i = ((b[(d - i - 1) / 8]) as u32 >> ((d - i - 1) % 8)) & 1;
-        cop[i] = decom.0[((1 << i) + 2 * a + (1 - b_d_i) - 1) as usize].clone();
-        a = 2 * a + b_d_i;
+
+    for i in 0..d {
+        cop[i] =
+            decom.0[((1_u32 << (i + 1)) + 2 * a + (1 - b[d - i - 1]) as u32 - 1) as usize].clone();
+        a = 2 * a + b[d - i - 1] as u32;
     }
-    (cop, decom.1[a as usize].clone()) //js as usize].clone())
+    (cop, decom.1[a as usize].clone())
 }
 
 #[allow(clippy::type_complexity)]
-fn reconstruct<T, R>(
+pub fn reconstruct<T, R>(
     mut pdecom: (Vec<Vec<u8>>, Vec<u8>),
     b: Vec<u8>,
     iv: u128,
@@ -71,13 +71,14 @@ where
     let length = T::LENGTH as usize / 8;
     let mut a = 0;
     let d = pdecom.0.len() as u32;
-    let mut k = vec![Option::<Vec<u8>>::None; (1 << (d)) - 1];
+    let mut k = vec![Option::<Vec<u8>>::None; (1 << (d + 1)) - 1];
     k[0] = None;
     //step 4
-    for i in 1..d {
-        let b_d_i = ((b[((d - i - 1) / 8) as usize] >> ((d - i - 1) % 8)) & 1) as u32;
-        k[((1 << (i)) - 1 + (2 * a) + (1 - b_d_i)) as usize] = Some(pdecom.0[(i) as usize].clone());
-        k[((1 << (i)) - 1 + (2 * a) + b_d_i) as usize] = None;
+    for i in 1..d + 1 {
+        let b_d_i = b[(d - i) as usize] as u16;
+        k[((1_u16 << (i)) - 1 + (2 * a) + (1_u16 - b_d_i)) as usize] =
+            Some(pdecom.0[(i - 1) as usize].clone());
+        k[((1_u16 << (i)) - 1 + (2 * a) + b_d_i) as usize] = None;
         //step 7
         for j in 0..1 << (i - 1) {
             if j != a {
@@ -91,14 +92,13 @@ where
         }
         a = 2 * a + b_d_i;
     }
-    //println!("{:?}", k);
-    let mut sd = vec![Vec::new(); 1 << (d - 1)];
-    let mut com = vec![Vec::new(); 1 << (d - 1)];
+    let mut sd = vec![Vec::new(); 1 << d];
+    let mut com = vec![Vec::new(); 1 << d];
     let mut pre_h = Vec::new();
     //step 11
-    for j in 0..(1 << (d - 1)) {
+    for j in 0..(1_u16 << d) {
         if j != a {
-            let mut seed: Vec<u8> = k[(1 << (d - 1)) - 1 + j as usize].clone().unwrap();
+            let mut seed: Vec<u8> = k[(1 << d) - 1 + j as usize].clone().unwrap();
             seed.append(&mut iv.to_be_bytes().to_vec());
             let mut hash = vec![0u8; 3 * length];
             R::h0(&seed, &mut hash[..]);
@@ -106,7 +106,7 @@ where
             com[j as usize] = hash[length..].to_vec();
             pre_h.append(&mut com[j as usize].to_vec());
         } else {
-            pre_h.append(&mut pdecom.1)
+            pre_h.append(&mut pdecom.1);
         }
     }
     let mut h = vec![0u8; 2 * length];
@@ -133,3 +133,5 @@ where
         0
     }
 }
+
+//reconstruct is tested in the integration_test_vc test_commitment_and_decomitment() function.
