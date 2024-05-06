@@ -40,3 +40,23 @@ pub fn convert_to_vole(
     let u = r[d][0].clone().to_vec();
     (u, v)
 }
+
+//constant time checking the value of i : if i is not correct, then the output will be an empty vec
+pub fn chaldec(chal : Vec<u8>, k0 : u16, t0 : u16, k1 : u16, t1 : u16, i : u16) -> Vec<u8> {
+    let mut lo = 1_u16;
+    let mut hi = 0_u16;
+    if i < t0 {
+        lo = i*k0;
+        hi = (i+1)*k0 -1 ;
+    }
+    else if i < t0 + t1 {
+        let t = i - t0;
+        lo = t0*k0 + t*k1 ;
+        hi = t0*k0 + (t+1)*k1 - 1;
+    }
+    let mut res = vec![(chal[(lo/8) as usize]>>(lo%8)) & 1];
+    for j in 1..hi-lo + 1 {
+        res.push((chal[((lo + j)/8) as usize]>>((lo +j)%8)) & 1)
+    }
+    res
+}
