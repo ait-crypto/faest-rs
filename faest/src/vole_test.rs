@@ -78,20 +78,19 @@ fn convert_to_vole_test() {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DataChalDec {
-    
     chal: Vec<u8>,
 
-    i: [u16;1],
+    i: [u16; 1],
 
-    k0: [u16;1],
+    k0: [u16; 1],
 
-    t0: [u16;1],
+    t0: [u16; 1],
 
-    k1: [u16;1],
+    k1: [u16; 1],
 
-    t1: [u16;1],
+    t1: [u16; 1],
 
-    res: Vec<u8>
+    res: Vec<u8>,
 }
 
 #[test]
@@ -100,7 +99,9 @@ fn chaldec_test() {
     let database: Vec<DataChalDec> =
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
-        let res = chaldec(data.chal, data.k0[0], data.t0[0], data.k1[0], data.t1[0], data.i[0]);
+        let res = chaldec(
+            data.chal, data.k0[0], data.t0[0], data.k1[0], data.t1[0], data.i[0],
+        );
         assert_eq!(res, data.res);
     }
 }
