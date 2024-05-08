@@ -4,8 +4,10 @@ use std::fs::File;
 use serde::Deserialize;
 
 use crate::{
+    fields::{GF128, GF192, GF256},
     prg::{prg_128, prg_192, prg_256},
-    vole::{chaldec, convert_to_vole},
+    random_oracles::{RandomOracleShake128, RandomOracleShake256},
+    vole::{chaldec, convert_to_vole, volecommit},
 };
 
 #[derive(Debug, Deserialize)]
@@ -103,5 +105,105 @@ fn chaldec_test() {
             data.chal, data.k0[0], data.t0[0], data.k1[0], data.t1[0], data.i[0],
         );
         assert_eq!(res, data.res);
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DataVoleCommit {
+    r: Vec<u8>,
+
+    iv: [u8; 16],
+
+    lh: [usize; 1],
+
+    lambdabytes: [u16; 1],
+
+    tau: [usize; 1],
+
+    k0: [u8; 1],
+
+    k1: [u8; 1],
+
+    hcom: Vec<u8>,
+
+    k: Vec<Vec<Vec<u8>>>,
+
+    com: Vec<Vec<Vec<u8>>>,
+
+    c: Vec<Vec<u8>>,
+
+    u: Vec<u8>,
+
+    v: Vec<Vec<Vec<u8>>>,
+}
+
+#[test]
+fn volecommit_test() {
+    let file = File::open("DataVoleCommit.json").unwrap();
+    let database: Vec<DataVoleCommit> =
+        serde_json::from_reader(file).expect("error while reading or parsing");
+    for data in database {
+        if data.lambdabytes[0] == 16 {
+            let res = volecommit::<GF128, RandomOracleShake128>(
+                &data.r,
+                u128::from_be_bytes(data.iv),
+                data.lh[0],
+                data.tau[0],
+                &prg_128,
+                data.k0[0],
+                data.k1[0],
+            );
+            assert_eq!(res.0, data.hcom);
+            for i in 0..res.1.len() {
+                assert_eq!(res.1[i], (data.k[i].clone(), data.com[i].clone()));
+            }
+            for i in 0..data.com.len() {
+                assert_eq!(res.1[i], (data.k[i].clone(), data.com[i].clone()));
+            }
+            assert_eq!(res.2, data.c);
+            assert_eq!(res.3, data.u);
+            assert_eq!(res.4, data.v);
+        } else if data.lambdabytes[0] == 24 {
+            let res = volecommit::<GF192, RandomOracleShake256>(
+                &data.r,
+                u128::from_be_bytes(data.iv),
+                data.lh[0],
+                data.tau[0],
+                &prg_192,
+                data.k0[0],
+                data.k1[0],
+            );
+            assert_eq!(res.0, data.hcom);
+            for i in 0..res.1.len() {
+                assert_eq!(res.1[i], (data.k[i].clone(), data.com[i].clone()));
+            }
+            for i in 0..data.com.len() {
+                assert_eq!(res.1[i], (data.k[i].clone(), data.com[i].clone()));
+            }
+            assert_eq!(res.2, data.c);
+            assert_eq!(res.3, data.u);
+            assert_eq!(res.4, data.v);
+        } else {
+            let res = volecommit::<GF256, RandomOracleShake256>(
+                &data.r,
+                u128::from_be_bytes(data.iv),
+                data.lh[0],
+                data.tau[0],
+                &prg_256,
+                data.k0[0],
+                data.k1[0],
+            );
+            assert_eq!(res.0, data.hcom);
+            for i in 0..res.1.len() {
+                assert_eq!(res.1[i], (data.k[i].clone(), data.com[i].clone()));
+            }
+            for i in 0..data.com.len() {
+                assert_eq!(res.1[i], (data.k[i].clone(), data.com[i].clone()));
+            }
+            assert_eq!(res.2, data.c);
+            assert_eq!(res.3, data.u);
+            assert_eq!(res.4, data.v);
+        }
     }
 }

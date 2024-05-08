@@ -1,3 +1,10 @@
+use crate::random_oracles::Hasher;
+use crate::{
+    fields::BigGaloisField,
+    random_oracles::RandomOracle,
+    vc::commit,
+};
+
 #[allow(clippy::type_complexity)]
 pub fn convert_to_vole(
     sd: &[Option<Vec<u8>>],
@@ -29,7 +36,7 @@ pub fn convert_to_vole(
                 .collect();
             r[j + 1][i] = r[j][2 * i]
                 .iter()
-                .zip(r[j][2 * i + 1].clone())
+                .zip(r[j][2 * i + 1].iter())
                 .map(|(&x1, x2)| x1 ^ x2)
                 .collect();
         }
@@ -58,4 +65,58 @@ pub fn chaldec(chal: Vec<u8>, k0: u16, t0: u16, k1: u16, t1: u16, i: u16) -> Vec
         res.push((chal[((lo + j) / 8) as usize] >> ((lo + j) % 8)) & 1)
     }
     res
+}
+
+#[allow(clippy::type_complexity)]
+pub fn volecommit<T, R>(
+    r: &[u8],
+    iv: u128,
+    lh: usize,
+    tau: usize,
+    prg: &dyn Fn(&[u8], u128, usize) -> Vec<u8>,
+    k0: u8,
+    k1: u8,
+) -> (
+    Vec<u8>,
+    Vec<(Vec<Vec<u8>>, Vec<Vec<u8>>)>,
+    Vec<Vec<u8>>,
+    Vec<u8>,
+    Vec<Vec<Vec<u8>>>,
+)
+where
+    T: BigGaloisField + std::default::Default + std::fmt::Debug,
+    R: RandomOracle,
+{
+    let tau_res = prg(r, iv, tau * (T::LENGTH) as usize);
+    let mut r = vec![T::default(); tau];
+    let mut com = vec![Vec::new(); tau];
+    let mut decom = vec![(vec![Vec::new()], vec![Vec::new()]); tau];
+    let mut sd = vec![Vec::new(); tau];
+    let mut u = vec![vec![0; lh]; tau];
+    let mut v = vec![Vec::new(); tau];
+    let mut c = vec![vec![0; lh]; tau - 1];
+    for i in 0..tau {
+        //ok
+        r[i] = T::from(&tau_res[i * (T::LENGTH / 8) as usize..(i + 1) * (T::LENGTH / 8) as usize]);
+    }
+    let tau_0 = T::LENGTH % (tau as u32);
+    let mut hasher = R::h1_init();
+    for i in 0..tau {
+        let b = 1 - (i < tau_0.try_into().unwrap()) as u8;
+        let k = (((1 - b) * k0) + b * k1) as u16;
+        (com[i], decom[i], sd[i]) = commit::<T, R>(r[i], iv, 1u32 << k, prg);
+        hasher.h1_update(&com[i]);
+        v[i] = vec![vec![0; lh]; k.into()];
+        (u[i], v[i]) = convert_to_vole(&sd[i], iv, lh, prg);
+    }
+    for i in 1..tau {
+        c[i - 1] = u[0]
+            .iter()
+            .zip(u[i].iter())
+            .map(|(&x1, &x2)| x1 ^ x2)
+            .collect();
+    }
+    let mut hcom = vec![0; (T::LENGTH / 4).try_into().unwrap()];
+    hasher.h1_finish(&mut hcom);
+    (hcom, decom, c, u[0].clone(), v)
 }

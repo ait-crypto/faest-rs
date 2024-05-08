@@ -319,8 +319,10 @@ macro_rules! impl_From {
             fn from(value: &[u8]) -> Self {
                 let mut array_1 = [0u8; 16];
                 let mut array_2 = [0u8; 16];
-                array_1.copy_from_slice(&value[..16]);
-                array_2.copy_from_slice(&value[16..]);
+                let mut data = value.to_vec();
+                data.append(&mut vec![0u8; 32 - value.len()]);
+                array_1.copy_from_slice(&data[..16]);
+                array_2.copy_from_slice(&data[16..]);
                 Self::new(u128::from_le_bytes(array_1), u128::from_le_bytes(array_2))
             }
         })*

@@ -73,10 +73,14 @@ fn commit_test() {
                 1 << data.depth,
                 &prg_128,
             );
+            let mut sd = Vec::new();
+            for val in data.sd {
+                sd.push(Some(val));
+            }
             assert_eq!(res.0, data.h);
             assert_eq!(res.1 .0, data.k);
             assert_eq!(res.1 .1, data.com);
-            assert_eq!(res.2, data.sd);
+            assert_eq!(res.2, sd);
         } else if lamdabytes == 24 {
             data.keyroot.append(&mut vec![0; 8]);
             let res = commit::<GF192, RandomOracleShake256>(
@@ -85,10 +89,14 @@ fn commit_test() {
                 1 << data.depth,
                 &prg_192,
             );
+            let mut sd = Vec::new();
+            for val in data.sd {
+                sd.push(Some(val));
+            }
             assert_eq!(res.0, data.h);
             assert_eq!(res.1 .0, data.k);
             assert_eq!(res.1 .1, data.com);
-            assert_eq!(res.2, data.sd);
+            assert_eq!(res.2, sd);
         } else {
             let res = commit::<GF256, RandomOracleShake256>(
                 GF256::from(&data.keyroot[0..32]),
@@ -96,10 +104,14 @@ fn commit_test() {
                 1 << data.depth,
                 &prg_256,
             );
+            let mut sd = Vec::new();
+            for val in data.sd {
+                sd.push(Some(val));
+            }
             assert_eq!(res.0, data.h);
             assert_eq!(res.1 .0, data.k);
             assert_eq!(res.1 .1, data.com);
-            assert_eq!(res.2, data.sd);
+            assert_eq!(res.2, sd);
         }
     }
 }

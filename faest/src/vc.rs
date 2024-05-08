@@ -9,7 +9,7 @@ pub fn commit<T, R>(
     iv: u128,
     n: u32,
     prg: &dyn Fn(&[u8], u128, usize) -> Vec<u8>,
-) -> (Vec<u8>, (Vec<Vec<u8>>, Vec<Vec<u8>>), Vec<Vec<u8>>)
+) -> (Vec<u8>, (Vec<Vec<u8>>, Vec<Vec<u8>>), Vec<Option<Vec<u8>>>)
 where
     T: BigGaloisField,
     R: RandomOracle,
@@ -25,7 +25,7 @@ where
             (new_ks[..length].to_vec(), new_ks[length..].to_vec());
     }
     //step 4..5
-    let mut sd = vec![Vec::new(); n.try_into().unwrap()];
+    let mut sd = vec![Some(Vec::new()); n.try_into().unwrap()];
     let mut com = vec![Vec::new(); n.try_into().unwrap()];
     let mut pre_h = Vec::new();
     for j in 0..n as usize {
@@ -33,7 +33,7 @@ where
         seed.append(&mut iv.to_be_bytes().to_vec());
         let mut hash = vec![0u8; 3 * length];
         R::h0(&seed, &mut hash[..]);
-        sd[j] = hash[..length].to_vec();
+        sd[j] = Some(hash[..length].to_vec());
         com[j] = hash[length..].to_vec();
         pre_h.append(&mut com[j].to_vec());
     }
