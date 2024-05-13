@@ -7,7 +7,7 @@ use crate::{
     fields::{GF128, GF192, GF256},
     prg::{prg_128, prg_192, prg_256},
     random_oracles::{RandomOracleShake128, RandomOracleShake256},
-    vole::{chaldec, convert_to_vole, volecommit},
+    vole::{chaldec, convert_to_vole, volecommit, volereconstruct},
 };
 
 #[derive(Debug, Deserialize)]
@@ -204,6 +204,100 @@ fn volecommit_test() {
             assert_eq!(res.2, data.c);
             assert_eq!(res.3, data.u);
             assert_eq!(res.4, data.v);
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DataVoleReconstruct {
+    chal: Vec<u8>,
+
+    pdec: Vec<Vec<Vec<u8>>>,
+
+    com: Vec<Vec<u8>>,
+
+    iv: [u8; 16],
+
+    tau: usize,
+
+    tau0: u16,
+
+    tau1: u16,
+
+    k0: u8,
+
+    k1: u8,
+
+    lh: usize,
+
+    lambdabytes: usize,
+
+    hcom: Vec<u8>,
+
+    q: Vec<Vec<Vec<u8>>>,
+}
+
+#[test]
+fn volereconstruct_test() {
+    let file = File::open("DataVoleReconstruct.json").unwrap();
+    let database: Vec<DataVoleReconstruct> =
+        serde_json::from_reader(file).expect("error while reading or parsing");
+    for data in database {
+        let mut pdecom = Vec::new();
+        for i in 0..data.pdec.len() {
+            pdecom.push((data.pdec[i].clone(), data.com[i].clone()));
+        }
+        if data.lambdabytes == 16 {
+            let res = volereconstruct::<GF128, RandomOracleShake128>(
+                &data.chal,
+                pdecom,
+                u128::from_be_bytes(data.iv),
+                data.lh,
+                data.tau,
+                data.tau0,
+                data.tau1,
+                data.k0,
+                data.k1,
+                &prg_128,
+                data.lambdabytes,
+            );
+            assert_eq!(res.0, data.hcom);
+            for i in 0..res.1.len() {
+                assert_eq!(res.1[i].len(), data.q[i].len());
+            }
+        } else if data.lambdabytes == 24 {
+            let res = volereconstruct::<GF192, RandomOracleShake256>(
+                &data.chal,
+                pdecom,
+                u128::from_be_bytes(data.iv),
+                data.lh,
+                data.tau,
+                data.tau0,
+                data.tau1,
+                data.k0,
+                data.k1,
+                &prg_192,
+                data.lambdabytes,
+            );
+            assert_eq!(res.0, data.hcom);
+            assert_eq!(res.1, data.q);
+        } else {
+            let res = volereconstruct::<GF256, RandomOracleShake256>(
+                &data.chal,
+                pdecom,
+                u128::from_be_bytes(data.iv),
+                data.lh,
+                data.tau,
+                data.tau0,
+                data.tau1,
+                data.k0,
+                data.k1,
+                &prg_256,
+                data.lambdabytes,
+            );
+            assert_eq!(res.0, data.hcom);
+            assert_eq!(res.1, data.q);
         }
     }
 }

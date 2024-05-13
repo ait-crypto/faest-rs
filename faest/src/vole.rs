@@ -1,9 +1,6 @@
 use crate::random_oracles::Hasher;
-use crate::{
-    fields::BigGaloisField,
-    random_oracles::RandomOracle,
-    vc::commit,
-};
+use crate::vc;
+use crate::{fields::BigGaloisField, random_oracles::RandomOracle, vc::commit};
 
 #[allow(clippy::type_complexity)]
 pub fn convert_to_vole(
@@ -12,6 +9,7 @@ pub fn convert_to_vole(
     lh: usize,
     prg: &dyn Fn(&[u8], u128, usize) -> Vec<u8>,
 ) -> (Vec<u8>, Vec<Vec<u8>>) {
+    for _i in 0..100 {}
     let n = sd.len();
     let d = (u128::BITS - (n as u128).leading_zeros() - 1) as usize;
     let mut r = vec![vec![vec![0u8; lh]; n]; d + 1];
@@ -96,7 +94,6 @@ where
     let mut v = vec![Vec::new(); tau];
     let mut c = vec![vec![0; lh]; tau - 1];
     for i in 0..tau {
-        //ok
         r[i] = T::from(&tau_res[i * (T::LENGTH / 8) as usize..(i + 1) * (T::LENGTH / 8) as usize]);
     }
     let tau_0 = T::LENGTH % (tau as u32);
@@ -119,4 +116,57 @@ where
     let mut hcom = vec![0; (T::LENGTH / 4).try_into().unwrap()];
     hasher.h1_finish(&mut hcom);
     (hcom, decom, c, u[0].clone(), v)
+}
+
+#[allow(clippy::too_many_arguments)]
+#[allow(clippy::type_complexity)]
+pub fn volereconstruct<T, R>(
+    chal: &[u8],
+    pdecom: Vec<(Vec<Vec<u8>>, Vec<u8>)>,
+    iv: u128,
+    lh: usize,
+    tau: usize,
+    tau0: u16,
+    tau1: u16,
+    k0: u8,
+    k1: u8,
+    prg: &dyn Fn(&[u8], u128, usize) -> Vec<u8>,
+    lambdabytes: usize,
+) -> (Vec<u8>, Vec<Vec<Vec<u8>>>)
+where
+    T: BigGaloisField + std::default::Default + std::fmt::Debug,
+    R: RandomOracle,
+{
+    let mut com = vec![vec![0; lambdabytes]; tau];
+    let mut s = vec![Vec::new(); tau];
+    let mut sd = vec![Vec::new(); tau];
+    let mut delta = vec![0_u16; tau];
+    let mut q = vec![Vec::new(); tau];
+    let mut hasher = R::h1_init();
+    for i in 0..tau {
+        let b: u8 = (i < tau0.into()).into();
+        let k = b * k0 + (1 - b) * k1;
+        let delta_p = chaldec(
+            chal.to_vec(),
+            k0.into(),
+            tau0,
+            k1.into(),
+            tau1,
+            i.try_into().unwrap(),
+        );
+        #[allow(clippy::needless_range_loop)]
+        for j in 0..delta_p.len() {
+            delta[i] += (delta_p[j] as u16) << j;
+        }
+        (com[i], s[i]) = vc::reconstruct::<T, R>(pdecom[i].clone(), delta_p.clone(), iv, prg);
+        hasher.h1_update(&com[i]);
+        for j in 0..(1_u16 << (k)) as usize {
+            sd[i].push(Some(s[i][j ^ delta[i] as usize].clone()));
+        }
+        sd[i][0] = None;
+        (_, q[i]) = convert_to_vole(&sd[i], iv, lh, prg);
+    }
+    let mut hcom = vec![0; 2 * lambdabytes];
+    hasher.h1_finish(&mut hcom);
+    (hcom, q)
 }

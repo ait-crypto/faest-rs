@@ -70,7 +70,7 @@ where
 {
     let length = T::LENGTH as usize / 8;
     let mut a = 0;
-    let d = pdecom.0.len() as u32;
+    let d = b.len() as u32;
     let mut k = vec![Option::<Vec<u8>>::None; (1 << (d + 1)) - 1];
     k[0] = None;
     //step 4
