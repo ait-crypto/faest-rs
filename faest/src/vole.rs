@@ -140,7 +140,7 @@ where
     let mut com = vec![vec![0; lambdabytes]; tau];
     let mut s = vec![Vec::new(); tau];
     let mut sd = vec![Vec::new(); tau];
-    let mut delta = vec![0_u16; tau];
+    let mut delta = vec![0_u32; tau];
     let mut q = vec![Vec::new(); tau];
     let mut hasher = R::h1_init();
     for i in 0..tau {
@@ -156,7 +156,7 @@ where
         );
         #[allow(clippy::needless_range_loop)]
         for j in 0..delta_p.len() {
-            delta[i] += (delta_p[j] as u16) << j;
+            delta[i] += (delta_p[j] as u32) << j;
         }
         (com[i], s[i]) = vc::reconstruct::<T, R>(pdecom[i].clone(), delta_p.clone(), iv, prg);
         hasher.h1_update(&com[i]);
