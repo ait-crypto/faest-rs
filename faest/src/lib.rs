@@ -21,3 +21,13 @@ pub mod prg_test;
 pub mod vole;
 #[cfg(test)]
 pub mod vole_test;
+
+/* pub mod aes;
+#[cfg(test)]
+pub mod aes_test; */
+
+pub mod rijndael_32;
+#[cfg(test)]
+pub mod rijndael_32_test;
+
+pub mod parameter;
