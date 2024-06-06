@@ -1,7 +1,7 @@
 #[cfg(test)]
 use rand::Rng;
 use serde::Deserialize;
-use std::fs::File;
+use std::{cmp::max, fs::File};
 
 use crate::rijndael_32::{
     bitslice, inv_bitslice, mix_columns_0, rijndael_decrypt, rijndael_encrypt,
@@ -115,8 +115,9 @@ fn rijndael_test() {
     for data in database {
         let mut input = [0u8; 32];
         input[..data.text.len()].copy_from_slice(&data.text[..]);
-        let rkeys = rijndael_key_schedule(&data.key, data.bc, data.kc);
-        let res = rijndael_encrypt(&rkeys, input, data.kc, data.bc);
+        let r = max(data.bc, data.kc) + 6;
+        let rkeys = rijndael_key_schedule(&data.key, data.bc, data.kc, r);
+        let res = rijndael_encrypt(&rkeys, input, data.bc, r);
         let mut input = [0u32; 8];
         let mut output = [0u32; 8];
         for i in 0..data.bc {
@@ -133,19 +134,19 @@ fn rijndael_test() {
 #[test]
 fn rijndael_decrypt_test() {
     for k in 2..5 {
-        let  kc = 2 * k;
+        let kc = 2 * k;
         for b in 2..5 {
             let bc = 2 * b;
             for _i in 0..1000 {
-                let key : Vec<u8> = (0..4*kc).map(|_| rand::thread_rng().gen()).collect();
-                let text : Vec<u8> = (0..4*bc).map(|_| rand::thread_rng().gen()).collect();
+                let key: Vec<u8> = (0..4 * kc).map(|_| rand::thread_rng().gen()).collect();
+                let text: Vec<u8> = (0..4 * bc).map(|_| rand::thread_rng().gen()).collect();
                 let mut padded_text = [0u8; 32];
                 padded_text[..text.len()].copy_from_slice(&text[..]);
-
+                let r = max(kc, bc) + 6;
                 let mut state_text = State::default();
-                let rkeys = rijndael_key_schedule(&key, bc as u8, kc as u8);
-                let crypted = rijndael_encrypt(&rkeys, padded_text, kc as u8, bc as u8);
-                let res = rijndael_decrypt(&rkeys, &crypted, kc as u8, bc as u8);
+                let rkeys = rijndael_key_schedule(&key, bc, kc, r);
+                let crypted = rijndael_encrypt(&rkeys, padded_text, bc, r);
+                let res = rijndael_decrypt(&rkeys, &crypted, bc, r);
                 bitslice(&mut state_text, &padded_text[..16], &padded_text[16..]);
                 assert_eq!(res, inv_bitslice(&state_text));
             }

@@ -13,7 +13,6 @@
 
 #![allow(clippy::unreadable_literal)]
 
-use std::cmp::max;
 
 use aes::Block;
 use cipher::{array::Array, consts::U2};
@@ -28,10 +27,8 @@ pub(crate) type State = [u32; 8];
 
 /// Fully bitsliced Rijndael key schedule to match the fully-fixsliced representation.
 #[allow(dead_code)]
-pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8) -> Vec<u32> {
-    let r = max(nst, nk) + 6;
+pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8, r: u8) -> Vec<u32> {
     let mut rkeys = vec![0u32; (((nst.div_ceil(nk)) * 8 * (r + 1)) + 8).into()];
-    //println!("{:?}", rkeys.len());
     let mut sd_part = [0u8; 16];
     for i in 0..(nk * 4) - 16 {
         sd_part[i as usize] = key[(16 + i) as usize];
@@ -45,7 +42,8 @@ pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8) -> Vec<u32> {
         sub_bytes(&mut rkeys[rk_off..(rk_off + 8)]);
         sub_bytes_nots(&mut rkeys[rk_off..(rk_off + 8)]);
 
-        let table = [1, 2, 4, 8, 16, 32, 64, 128, 27, 54, 108, 216, 171, 77, 154, 47, 94, 188, 99, 198, 151,
+        let table = [
+            1, 2, 4, 8, 16, 32, 64, 128, 27, 54, 108, 216, 171, 77, 154, 47, 94, 188, 99, 198, 151,
             53, 106, 212, 179, 125, 250, 239, 197, 145,
         ];
         let ind = nk * 4;
@@ -61,7 +59,7 @@ pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8) -> Vec<u32> {
             rkeys[rk_off + j] ^= bitsliced_rcon[j];
         }
 
-        let idx_ror :u32;
+        let idx_ror: u32;
 
         if nk == 4 {
             idx_ror = 14;
@@ -267,27 +265,23 @@ pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8) -> Vec<u32> {
 ///
 /// Decrypts four blocks in-place and in parallel.
 #[allow(dead_code)]
-pub(crate) fn rijndael_decrypt(rkeys: &[u32], blocks: &BatchBlocks, kc: u8, bc: u8) -> BatchBlocks {
+pub(crate) fn rijndael_decrypt(
+    rkeys: &[u32],
+    blocks: &BatchBlocks,
+    bc: u8,
+    r: u8,
+) -> BatchBlocks {
     let mut state = State::default();
-    let r = max(kc, bc) + 6;
     bitslice(&mut state, &blocks[0], &blocks[1]);
 
-    rijndael_add_round_key(
-        &mut state,
-        &rkeys[(r * 8) as usize..((r + 1) * 8) as usize],
-        8,
-    );
+    rijndael_add_round_key(&mut state, &rkeys[(r * 8) as usize..((r + 1) * 8) as usize]);
     rijndael_inv_shift_rows_1(&mut state, bc);
     sub_bytes_nots(&mut state);
     inv_sub_bytes(&mut state);
-    
+
     let mut rk_off = (r - 1) * 8;
     loop {
-        rijndael_add_round_key(
-            &mut state,
-            &rkeys[(rk_off) as usize..(rk_off + 8) as usize],
-            8,
-        );
+        rijndael_add_round_key(&mut state, &rkeys[(rk_off) as usize..(rk_off + 8) as usize]);
         inv_mix_columns_0(&mut state);
         rijndael_inv_shift_rows_1(&mut state, bc);
         sub_bytes_nots(&mut state);
@@ -300,7 +294,7 @@ pub(crate) fn rijndael_decrypt(rkeys: &[u32], blocks: &BatchBlocks, kc: u8, bc: 
         }
     }
 
-    rijndael_add_round_key(&mut state, &rkeys[..8], 8);
+    rijndael_add_round_key(&mut state, &rkeys[..8]);
 
     inv_bitslice(&state)
 }
@@ -309,18 +303,22 @@ pub(crate) fn rijndael_decrypt(rkeys: &[u32], blocks: &BatchBlocks, kc: u8, bc: 
 ///
 /// Encrypts four blocks in-place and in parallel.
 #[allow(dead_code)]
-pub(crate) fn rijndael_encrypt(rkeys: &[u32], input: [u8; 32], kc: u8, bc: u8) -> BatchBlocks {
-    let r = max(kc, bc) + 6;
+pub(crate) fn rijndael_encrypt(
+    rkeys: &[u32],
+    input: [u8; 32],
+    bc: u8,
+    r: u8,
+) -> BatchBlocks {
     let mut state = State::default();
     bitslice(&mut state, &input[..16], &input[16..]);
-    rijndael_add_round_key(&mut state, &rkeys[..8], 8);
+    rijndael_add_round_key(&mut state, &rkeys[..8]);
     let mut rk_off = 8;
     loop {
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, bc);
         mix_columns_0(&mut state);
-        rijndael_add_round_key(&mut state, &rkeys[rk_off..(rk_off + 8)], 8);
+        rijndael_add_round_key(&mut state, &rkeys[rk_off..(rk_off + 8)]);
         rk_off += 8;
 
         if rk_off == 8 * r as usize {
@@ -330,11 +328,7 @@ pub(crate) fn rijndael_encrypt(rkeys: &[u32], input: [u8; 32], kc: u8, bc: u8) -
     sub_bytes(&mut state);
     sub_bytes_nots(&mut state);
     rijndael_shift_rows_1(&mut state, bc);
-    rijndael_add_round_key(
-        &mut state,
-        &rkeys[(r * 8) as usize..((r * 8) + 8) as usize],
-        8,
-    );
+    rijndael_add_round_key(&mut state, &rkeys[(r * 8) as usize..((r * 8) + 8) as usize]);
     inv_bitslice(&state)
 }
 
@@ -846,7 +840,6 @@ define_mix_columns!(
     rotate_rows_and_columns_2_2
 );
 
-
 #[inline]
 fn delta_swap_1(a: &mut u32, shift: u32, mask: u32) {
     let t = (*a ^ ((*a) >> shift)) & mask;
@@ -1120,6 +1113,18 @@ pub fn inv_bitslice(input: &[u32]) -> BatchBlocks {
     output
 }
 
+pub fn convert_from_batchblocks(input: BatchBlocks) -> Vec<u32> {
+    let mut output = Vec::<u32>::new();
+    for i in 0..2 {
+        for j in 0..4 {
+            output.push(u32::from_le_bytes(
+                input[i][j * 4..(j + 1) * 4].try_into().unwrap(),
+            ));
+        }
+    }
+    output
+}
+
 /// Copy 32-bytes within the provided slice to an 8-byte offset
 fn memshift32(buffer: &mut [u32], src_offset: usize) {
     debug_assert_eq!(src_offset % 8, 0);
@@ -1135,8 +1140,8 @@ fn memshift32(buffer: &mut [u32], src_offset: usize) {
 /// XOR the round key to the internal state. The round keys are expected to be
 /// pre-computed and to be packed in the fixsliced representation.
 #[inline]
-pub fn rijndael_add_round_key(state: &mut State, rkey: &[u32], nst: u8) {
-    debug_assert_eq!(rkey.len(), nst as usize);
+pub fn rijndael_add_round_key(state: &mut State, rkey: &[u32]) {
+    debug_assert_eq!(rkey.len(), 8);
     for (a, b) in state.iter_mut().zip(rkey) {
         *a ^= b;
     }
