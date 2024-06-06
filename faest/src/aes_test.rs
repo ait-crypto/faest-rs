@@ -1,4 +1,4 @@
-use crate::aes::extendedwitness;
+use crate::aes::{aes_key_exp_fwd, extendedwitness};
 use crate::parameter::Param;
 use crate::parameter::{self};
 #[cfg(test)]
@@ -61,5 +61,30 @@ fn aes_extended_witness_test() {
                 }
             }
         }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AesKeyExpFwd {
+    lambda: u16,
+
+    r: u8,
+
+    nwd: u8,
+
+    x: Vec<u8>,
+
+    out: Vec<u8>,
+}
+
+#[test]
+fn aes_key_exp_fwd_test() {
+    let file = File::open("AesKeyExpFwd.json").unwrap();
+    let database: Vec<AesKeyExpFwd> =
+        serde_json::from_reader(file).expect("error while reading or parsing");
+    for data in database {
+        let res = aes_key_exp_fwd(data.x, data.r, data.lambda as usize, data.nwd);
+        assert_eq!(res, data.out);
     }
 }
