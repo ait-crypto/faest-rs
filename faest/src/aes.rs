@@ -1,10 +1,12 @@
 use std::iter::zip;
 
 use crate::{
-    fields::BigGaloisField, parameter::{Param, ParamOWF}, rijndael_32::{
+    fields::BigGaloisField,
+    parameter::{Param, ParamOWF},
+    rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
-    }
+    },
 };
 
 pub fn extendedwitness(k: &[u8], pk: &[u8], param: Param, paramowf: ParamOWF) -> Vec<u32> {
@@ -142,36 +144,73 @@ pub fn aes_key_exp_fwd(x: Vec<u8>, r: u8, lambda: usize, kc: u8) -> Vec<u8> {
 }
 
 ///Beware when calling it : if Mtag = 1 ∧ Mkey = 1 or Mkey = 1 ∧ ∆ = ⊥ return ⊥
-pub fn aes_key_exp_bwd<T>(x : Vec<T>, xk : Vec<T>, mtag : bool, mkey : bool, delta : T, ske: u16) -> Vec<T> where
-T: BigGaloisField + std::default::Default + std::marker::Sized + std::fmt::Debug, T: std::ops::Add<T>{
+pub fn aes_key_exp_bwd<T>(
+    x: Vec<T>,
+    xk: Vec<T>,
+    mtag: bool,
+    mkey: bool,
+    delta: T,
+    ske: u16,
+) -> Vec<T>
+where
+    T: BigGaloisField + std::default::Default + std::marker::Sized + std::fmt::Debug,
+    T: std::ops::Add<T>,
+{
     let rcon_table = [
-            1, 2, 4, 8, 16, 32, 64, 128, 27, 54, 108, 216, 171, 77, 154, 47, 94, 188, 99, 198, 151,
-            53, 106, 212, 179, 125, 250, 239, 197, 145
-        ];
-    let mut out = Vec::with_capacity((8*ske).into());
+        1, 2, 4, 8, 16, 32, 64, 128, 27, 54, 108, 216, 171, 77, 154, 47, 94, 188, 99, 198, 151, 53,
+        106, 212, 179, 125, 250, 239, 197, 145,
+    ];
+    let mut out = Vec::with_capacity((8 * ske).into());
     let mut index = 0u16;
     let mut c = 0u8;
     let mut rmvrcon = true;
     let mut ircon = 0;
+    //Step 6
     for j in 0..ske {
-        let mut x_tilde : Vec<T> = zip(x.iter().skip((8*j).into()).take(8), xk.iter().skip((index + 8*(c as u16)).into()).take(8)).map(|(x, xk)| *x + *xk).collect();
+        //Step 7
+        let mut x_tilde: Vec<T> = zip(
+            x.iter().skip((8 * j).into()).take(8),
+            xk.iter().skip((index + 8 * (c as u16)).into()).take(8),
+        )
+        .map(|(x, xk)| *x + *xk)
+        .collect();
+        //Step 8
         if !mtag && rmvrcon && (c == 0) {
             let rcon = rcon_table[ircon];
-            ircon  += 1;
-            let mut r = [T::default() ; 8];
+            ircon += 1;
+            let mut r = [T::default(); 8];
+            //Step 11
             for i in 0..8 {
-                r[i] = if mkey {delta * ((rcon>>i)&1)} else {T::ONE * ((rcon>>i)&1)};
-                x_tilde[i] += r[i];  
+                r[i] = if mkey {
+                    delta * ((rcon >> i) & 1)
+                } else {
+                    T::ONE * ((rcon >> i) & 1)
+                };
+                x_tilde[i] += r[i];
             }
         }
-        let mut y_tilde = [T::default() ; 8];
+        let mut y_tilde = [T::default(); 8];
+        //Step 15
         for i in 0..8 {
-            y_tilde[i] = x_tilde[(i + 7)%8] + x_tilde[(i + 5)%8] + x_tilde[(i + 2)%8];
+            y_tilde[i] = x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8];
         }
-        y_tilde[0] += if mtag {T::default()} else if mkey {delta} else {T::ONE};
-        y_tilde[2] += if mtag {T::default()} else if mkey {delta} else {T::ONE};
+        y_tilde[0] += if mtag {
+            T::default()
+        } else if mkey {
+            delta
+        } else {
+            T::ONE
+        };
+        y_tilde[2] += if mtag {
+            T::default()
+        } else if mkey {
+            delta
+        } else {
+            T::ONE
+        };
         out.append(&mut y_tilde.to_vec());
         c += 1;
+        //Step 21
         if c == 4 {
             c = 0;
             if T::LENGTH == 192 {
@@ -179,10 +218,10 @@ T: BigGaloisField + std::default::Default + std::marker::Sized + std::fmt::Debug
             } else {
                 index += 128;
                 if T::LENGTH == 256 {
-                rmvrcon = !rmvrcon;
+                    rmvrcon = !rmvrcon;
                 }
             }
-        }   
+        }
     }
     out
 }
