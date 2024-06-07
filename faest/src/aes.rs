@@ -1,9 +1,10 @@
+use std::iter::zip;
+
 use crate::{
-    parameter::{Param, ParamOWF},
-    rijndael_32::{
+    fields::BigGaloisField, parameter::{Param, ParamOWF}, rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
-    },
+    }
 };
 
 pub fn extendedwitness(k: &[u8], pk: &[u8], param: Param, paramowf: ParamOWF) -> Vec<u32> {
@@ -123,7 +124,7 @@ fn round_with_save(
 pub fn aes_key_exp_fwd(x: Vec<u8>, r: u8, lambda: usize, kc: u8) -> Vec<u8> {
     //Step 1 is ok by construction
     let mut out = Vec::with_capacity(((r + 1) as u16 * 128).into());
-    for i in x.iter().take(lambda/8).cloned() {
+    for i in x.iter().take(lambda / 8).cloned() {
         out.push(i);
     }
     let mut index = lambda / 8;
@@ -136,6 +137,52 @@ pub fn aes_key_exp_fwd(x: Vec<u8>, r: u8, lambda: usize, kc: u8) -> Vec<u8> {
                 out.push(out[((4 * (j - kc)) + i) as usize] ^ out[((4 * (j - 1)) + i) as usize]);
             }
         }
+    }
+    out
+}
+
+///Beware when calling it : if Mtag = 1 ∧ Mkey = 1 or Mkey = 1 ∧ ∆ = ⊥ return ⊥
+pub fn aes_key_exp_bwd<T>(x : Vec<T>, xk : Vec<T>, mtag : bool, mkey : bool, delta : T, ske: u16) -> Vec<T> where
+T: BigGaloisField + std::default::Default + std::marker::Sized + std::fmt::Debug, T: std::ops::Add<T>{
+    let rcon_table = [
+            1, 2, 4, 8, 16, 32, 64, 128, 27, 54, 108, 216, 171, 77, 154, 47, 94, 188, 99, 198, 151,
+            53, 106, 212, 179, 125, 250, 239, 197, 145
+        ];
+    let mut out = Vec::with_capacity((8*ske).into());
+    let mut index = 0u16;
+    let mut c = 0u8;
+    let mut rmvrcon = true;
+    let mut ircon = 0;
+    for j in 0..ske {
+        let mut x_tilde : Vec<T> = zip(x.iter().skip((8*j).into()).take(8), xk.iter().skip((index + 8*(c as u16)).into()).take(8)).map(|(x, xk)| *x + *xk).collect();
+        if !mtag && rmvrcon && (c == 0) {
+            let rcon = rcon_table[ircon];
+            ircon  += 1;
+            let mut r = [T::default() ; 8];
+            for i in 0..8 {
+                r[i] = if mkey {delta * ((rcon>>i)&1)} else {T::ONE * ((rcon>>i)&1)};
+                x_tilde[i] += r[i];  
+            }
+        }
+        let mut y_tilde = [T::default() ; 8];
+        for i in 0..8 {
+            y_tilde[i] = x_tilde[(i + 7)%8] + x_tilde[(i + 5)%8] + x_tilde[(i + 2)%8];
+        }
+        y_tilde[0] += if mtag {T::default()} else if mkey {delta} else {T::ONE};
+        y_tilde[2] += if mtag {T::default()} else if mkey {delta} else {T::ONE};
+        out.append(&mut y_tilde.to_vec());
+        c += 1;
+        if c == 4 {
+            c = 0;
+            if T::LENGTH == 192 {
+                index += 192;
+            } else {
+                index += 128;
+                if T::LENGTH == 256 {
+                rmvrcon = !rmvrcon;
+                }
+            }
+        }   
     }
     out
 }

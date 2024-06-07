@@ -1,4 +1,5 @@
-use crate::aes::{aes_key_exp_fwd, extendedwitness};
+use crate::aes::{aes_key_exp_bwd, aes_key_exp_fwd, extendedwitness};
+use crate::fields::{BigGaloisField, GF128, GF192, GF256};
 use crate::parameter::Param;
 use crate::parameter::{self};
 #[cfg(test)]
@@ -86,5 +87,107 @@ fn aes_key_exp_fwd_test() {
     for data in database {
         let res = aes_key_exp_fwd(data.x, data.r, data.lambda as usize, data.nwd);
         assert_eq!(res, data.out);
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AesKeyExpBwd {
+    lambda: u16,
+
+    mtag: u8,
+
+    mkey: u8,
+
+    ske: u16,
+
+    delta: [u128; 4],
+
+    x: Vec<[u128; 4]>,
+
+    xk: Vec<[u128; 4]>,
+
+    out: Vec<[u128; 4]>,
+}
+
+#[test]
+fn aes_key_exp_bwd_test() {
+    let file = File::open("AesKeyExpBwd.json").unwrap();
+    let database: Vec<AesKeyExpBwd> =
+        serde_json::from_reader(file).expect("error while reading or parsing");
+    for data in database {
+        if data.lambda == 128 {
+            let mtag = data.mtag != 0;
+            let mkey = data.mkey != 0;
+            let delta = GF128::new(data.delta[0] + (data.delta[1] << 64), 0);
+            let x: Vec<GF128> = data
+                .x
+                .iter()
+                .map(|x| GF128::new(x[0] + (x[1] << 64), 0))
+                .collect();
+            let xk: Vec<GF128> = data
+                .xk
+                .iter()
+                .map(|xk| GF128::new(xk[0] + (xk[1] << 64), 0))
+                .collect();
+            let out: Vec<GF128> = data
+                .out
+                .iter()
+                .map(|out| GF128::new(out[0] + (out[1] << 64), 0))
+                .collect();
+            let res = aes_key_exp_bwd::<GF128>(x, xk.clone(), mtag, mkey, delta, data.ske);
+            for i in 0..res.len() {
+                assert_eq!(res[i], out[i]);
+            }
+        } else if data.lambda == 192 {
+            let mtag = data.mtag != 0;
+            let mkey = data.mkey != 0;
+            let delta = GF192::new(data.delta[0] + (data.delta[1] << 64), data.delta[2]);
+            let x: Vec<GF192> = data
+                .x
+                .iter()
+                .map(|x| GF192::new(x[0] + (x[1] << 64), x[2]))
+                .collect();
+            let xk = data
+                .xk
+                .iter()
+                .map(|xk| GF192::new(xk[0] + (xk[1] << 64), xk[2]))
+                .collect();
+            let out: Vec<GF192> = data
+                .out
+                .iter()
+                .map(|out| GF192::new(out[0] + (out[1] << 64), out[2]))
+                .collect();
+            let res = aes_key_exp_bwd::<GF192>(x, xk, mtag, mkey, delta, data.ske);
+            for i in 0..res.len() {
+                assert_eq!(res[i], out[i]);
+            }
+        } else {
+            let mtag = data.mtag != 0;
+            let mkey = data.mkey != 0;
+            let delta = GF256::new(
+                data.delta[0] + (data.delta[1] << 64),
+                data.delta[2] + (data.delta[3] << 64),
+            );
+            let x: Vec<GF256> = data
+                .x
+                .iter()
+                .map(|x| GF256::new(x[0] + (x[1] << 64), x[2] + (x[3] << 64)))
+                .collect();
+            let xk = data
+                .xk
+                .iter()
+                .map(|xk| GF256::new(xk[0] + (xk[1] << 64), xk[2] + (xk[3] << 64)))
+                .collect();
+            let out: Vec<GF256> = data
+                .out
+                .iter()
+                .map(|out| GF256::new(out[0] + (out[1] << 64), out[2] + (out[3] << 64)))
+                .collect();
+            let res = aes_key_exp_bwd::<GF256>(x, xk, mtag, mkey, delta, data.ske);
+            for i in 0..res.len() {
+                assert_eq!(res[i], out[i]);
+            }
+        }
     }
 }
