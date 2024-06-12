@@ -9,6 +9,19 @@ use crate::{
     },
 };
 
+pub fn convert_to_bit<T>(input: &Vec<u8>) -> Vec<T>
+where
+    T: BigGaloisField,
+{
+    let mut res: Vec<T> = Vec::with_capacity(8 * input.len());
+    for i in input {
+        for j in 0..8 {
+            res.push(T::new(((i >> j) & 1) as u128, 0))
+        }
+    }
+    res
+}
+
 pub fn extendedwitness(k: &[u8], pk: &[u8], param: Param, paramowf: ParamOWF) -> Vec<u32> {
     let lke = paramowf.get_lke();
     //lke as a value only in classical aes use. testing on it give which is used between rijndael and aes
@@ -123,30 +136,43 @@ fn round_with_save(
     }
 }
 
-pub fn aes_key_exp_fwd(x: Vec<u8>, r: u8, lambda: usize, kc: u8) -> Vec<u8> {
+///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
+///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
+///One of the first path to optimize the code could be to do the distinction
+#[allow(clippy::ptr_arg)]
+pub fn aes_key_exp_fwd<T>(x: &Vec<T>, r: u8, lambda: usize, kc: u8) -> Vec<T>
+where
+    T: BigGaloisField + std::ops::Add<Output = T>,
+{
     //Step 1 is ok by construction
     let mut out = Vec::with_capacity(((r + 1) as u16 * 128).into());
-    for i in x.iter().take(lambda / 8).cloned() {
+    for i in x.iter().take(lambda).cloned() {
         out.push(i);
     }
-    let mut index = lambda / 8;
-    for j in kc..4 * (r + 1) {
-        if (j % kc == 0) || ((kc > 6) && (j % kc == 4)) {
-            out.append(&mut x[index..index + 4].to_vec());
-            index += 4;
+    let mut index = lambda;
+    for j in kc as u16..(4 * (r + 1)) as u16 {
+        if (j % (kc as u16) == 0) || ((kc > 6) && (j % (kc as u16) == 4)) {
+            out.append(&mut x[index..index + 32].to_vec());
+            index += 32;
         } else {
-            for i in 0..4 {
-                out.push(out[((4 * (j - kc)) + i) as usize] ^ out[((4 * (j - 1)) + i) as usize]);
+            for i in 0..32 {
+                out.push(
+                    out[((32 * (j - kc as u16)) + i) as usize] + out[((32 * (j - 1)) + i) as usize],
+                );
             }
         }
     }
     out
 }
 
+///Choice is made to treat bits as element of GFlambda(that is, m=lambda anyway, while in the paper we can have m = 1),
+///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
+///One of the first path to optimize the code could be to do the distinction
 ///Beware when calling it : if Mtag = 1 ∧ Mkey = 1 or Mkey = 1 ∧ ∆ = ⊥ return ⊥
+#[allow(clippy::ptr_arg)]
 pub fn aes_key_exp_bwd<T>(
     x: Vec<T>,
-    xk: Vec<T>,
+    xk: &Vec<T>,
     mtag: bool,
     mkey: bool,
     delta: T,
@@ -174,6 +200,7 @@ where
         )
         .map(|(x, xk)| *x + *xk)
         .collect();
+
         //Step 8
         if !mtag && rmvrcon && (c == 0) {
             let rcon = rcon_table[ircon];
@@ -224,4 +251,124 @@ where
         }
     }
     out
+}
+
+///Make sure you have 8 element into input before calling this function
+fn into_array<T>(input: &[T]) -> [T; 8]
+where
+    T: std::default::Default + std::marker::Copy,
+{
+    let mut res = [T::default(); 8];
+    res.copy_from_slice(&input[..8]);
+    res
+}
+
+///Choice is made to treat bits (that is, m=lambda anyway, while in the paper we can have m = 1) as element of GFlambda,
+///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
+///One of the first path to optimize the code could be to do the distinction
+pub fn aes_key_exp_cstrnts<T>(
+    w: Vec<u8>,
+    v: Vec<T>,
+    mkey: bool,
+    q: Vec<T>,
+    delta: T,
+    paramowf: ParamOWF,
+) -> (Vec<T>, Vec<T>, Vec<T>, Vec<T>)
+where
+    T: BigGaloisField
+        + std::default::Default
+        + std::marker::Sized
+        + std::fmt::Debug
+        + std::ops::Add<T>
+        + std::ops::Sub<Output = T>,
+{
+    let lambda = T::LENGTH as usize;
+    let kc = paramowf.get_nk();
+    let ske = paramowf.get_ske() as u16;
+    let mut iwd: u16 = 32 * (kc - 1) as u16;
+    let mut dorotword = true;
+    if !mkey {
+        let mut a = (
+            Vec::<T>::with_capacity(ske.into()),
+            Vec::<T>::with_capacity(ske.into()),
+        );
+        let k = aes_key_exp_fwd(&convert_to_bit(&w), paramowf.get_r(), lambda, kc);
+        let vk = aes_key_exp_fwd(&v, paramowf.get_r(), lambda, kc);
+        let w_b = aes_key_exp_bwd::<T>(
+            convert_to_bit(&w)[lambda..].to_vec(),
+            &k,
+            false,
+            false,
+            delta,
+            ske,
+        );
+        let v_w_b = aes_key_exp_bwd::<T>(v[lambda..].to_vec(), &vk, true, false, delta, ske);
+        for j in 0..ske / 4 {
+            let mut k_hat = [T::default(); 4];
+            let mut v_k_hat = [T::default(); 4];
+            let mut w_hat = [T::default(); 4];
+            let mut v_w_hat = [T::default(); 4];
+            for r in 0..4 {
+                let r_p = if dorotword { (r + 3) % 4 } else { r };
+                k_hat[r_p] = T::byte_combine(into_array::<T>(
+                    &k[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
+                ));
+                v_k_hat[r_p] = T::byte_combine(into_array::<T>(
+                    &vk[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
+                ));
+                w_hat[r] = T::byte_combine(into_array::<T>(
+                    &w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
+                ));
+                v_w_hat[r] = T::byte_combine(into_array::<T>(
+                    &v_w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
+                ));
+            }
+            for r in 0..4 {
+                a.0.push(v_k_hat[r] * v_w_hat[r]);
+                a.1.push(
+                    ((k_hat[r] + v_k_hat[r]) * (w_hat[r] + v_w_hat[r]))
+                        + T::ONE
+                        + a.0[(4 * j as usize) + r],
+                );
+            }
+            if lambda == 256 {
+                dorotword = !dorotword;
+                iwd += 128;
+            } else if lambda == 192 {
+                iwd += 192;
+            } else {
+                iwd += 128;
+            }
+        }
+        (a.0, a.1, k, vk)
+    } else {
+        let mut b = Vec::<T>::with_capacity(ske.into());
+        let q_k = aes_key_exp_fwd(&q, paramowf.get_r(), lambda, kc);
+        let q_w_b = aes_key_exp_bwd::<T>(q[lambda..].to_vec(), &q_k, false, true, delta, ske);
+        for j in 0..ske / 4 {
+            let mut q_h_k = [T::default(); 4];
+            let mut q_h_w_b = [T::default(); 4];
+            for r in 0..4 {
+                let r_p = if dorotword { (r + 3) % 4 } else { r };
+                q_h_k[r_p] = T::byte_combine(into_array::<T>(
+                    &q_k[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
+                ));
+                q_h_w_b[r] = T::byte_combine(into_array::<T>(
+                    &q_w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
+                ));
+            }
+            for r in 0..4 {
+                b.push(q_h_k[r] * q_h_w_b[r] - delta * delta);
+            }
+            if lambda == 128 {
+                iwd += 128;
+            } else if lambda == 192 {
+                iwd += 192;
+            } else {
+                iwd += 128;
+                dorotword = !dorotword;
+            }
+        }
+        (b, vec![T::default()], vec![T::default()], q_k)
+    }
 }

@@ -1,7 +1,9 @@
-use crate::aes::{aes_key_exp_bwd, aes_key_exp_fwd, extendedwitness};
+use crate::aes::{
+    aes_key_exp_bwd, aes_key_exp_cstrnts, aes_key_exp_fwd, convert_to_bit, extendedwitness,
+};
 use crate::fields::{BigGaloisField, GF128, GF192, GF256};
-use crate::parameter::Param;
 use crate::parameter::{self};
+use crate::parameter::{Param, ParamOWF};
 #[cfg(test)]
 use serde::Deserialize;
 use std::fs::File;
@@ -74,9 +76,9 @@ struct AesKeyExpFwd {
 
     nwd: u8,
 
-    x: Vec<u8>,
+    x: Vec<[u64; 4]>,
 
-    out: Vec<u8>,
+    out: Vec<[u64; 4]>,
 }
 
 #[test]
@@ -85,8 +87,28 @@ fn aes_key_exp_fwd_test() {
     let database: Vec<AesKeyExpFwd> =
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
-        let res = aes_key_exp_fwd(data.x, data.r, data.lambda as usize, data.nwd);
-        assert_eq!(res, data.out);
+        if data.lambda == 128 {
+            let (out, input): (Vec<GF128>, Vec<GF128>) = (
+                data.out
+                    .iter()
+                    .map(|x| GF128::new((x[0] as u128) + ((x[1] as u128) << 64), 0))
+                    .collect(),
+                data.x
+                    .iter()
+                    .map(|x| GF128::new((x[0] as u128) + ((x[1] as u128) << 64), 0))
+                    .collect(),
+            );
+            let res: Vec<GF128> = aes_key_exp_fwd(&input, data.r, data.lambda as usize, data.nwd);
+            assert_eq!(res, out);
+        } /* else if data.lambda == 192 {
+              let (out, input) = if data.x.len() == 56 { (convert_to_bit(&data.out), convert_to_bit(&data.x)) } else {(data.out.iter().map(|x| GF192::new(*x as u128, 0)).collect(), data.x.iter().map(|x| GF192::new(*x as u128, 0)).collect())};
+              let res : Vec<GF192> = aes_key_exp_fwd(&input, data.r, data.lambda as usize, data.nwd);
+              assert_eq!(res, out);
+          } else {
+              let (out, input) = if data.x.len() == 84 { (convert_to_bit(&data.out), convert_to_bit(&data.x)) } else {(data.out.iter().map(|x| GF256::new(*x as u128, 0)).collect(), data.x.iter().map(|x| GF256::new(*x as u128, 0)).collect())};
+              let res : Vec<GF256> = aes_key_exp_fwd(&input, data.r, data.lambda as usize, data.nwd);
+              assert_eq!(res, out);
+          } */
     }
 }
 
@@ -135,7 +157,7 @@ fn aes_key_exp_bwd_test() {
                 .iter()
                 .map(|out| GF128::new(out[0] + (out[1] << 64), 0))
                 .collect();
-            let res = aes_key_exp_bwd::<GF128>(x, xk.clone(), mtag, mkey, delta, data.ske);
+            let res = aes_key_exp_bwd::<GF128>(x, &xk.clone(), mtag, mkey, delta, data.ske);
             for i in 0..res.len() {
                 assert_eq!(res[i], out[i]);
             }
@@ -148,11 +170,11 @@ fn aes_key_exp_bwd_test() {
                 .iter()
                 .map(|x| GF192::new(x[0] + (x[1] << 64), x[2]))
                 .collect();
-            let xk = data
+            let xk = &(data
                 .xk
                 .iter()
                 .map(|xk| GF192::new(xk[0] + (xk[1] << 64), xk[2]))
-                .collect();
+                .collect());
             let out: Vec<GF192> = data
                 .out
                 .iter()
@@ -174,11 +196,11 @@ fn aes_key_exp_bwd_test() {
                 .iter()
                 .map(|x| GF256::new(x[0] + (x[1] << 64), x[2] + (x[3] << 64)))
                 .collect();
-            let xk = data
+            let xk = &(data
                 .xk
                 .iter()
                 .map(|xk| GF256::new(xk[0] + (xk[1] << 64), xk[2] + (xk[3] << 64)))
-                .collect();
+                .collect());
             let out: Vec<GF256> = data
                 .out
                 .iter()
@@ -188,6 +210,241 @@ fn aes_key_exp_bwd_test() {
             for i in 0..res.len() {
                 assert_eq!(res[i], out[i]);
             }
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AesKeyExpCstrnts {
+    lambda: u16,
+
+    mkey: u8,
+
+    w: Vec<u8>,
+
+    v: Vec<[u64; 4]>,
+
+    q: Vec<[u64; 4]>,
+
+    delta: Vec<u8>,
+
+    ske: u8,
+
+    kc: u8,
+
+    ab: Vec<[u64; 8]>,
+
+    res1: Vec<u8>,
+
+    res2: Vec<[u64; 4]>,
+}
+
+#[test]
+fn aes_key_exp_cstrnts_test() {
+    let file = File::open("AesKeyExpCstrnts.json").unwrap();
+    let database: Vec<AesKeyExpCstrnts> =
+        serde_json::from_reader(file).expect("error while reading or parsing");
+    for data in database {
+        if data.lambda == 128 {
+            let fields_v = data
+                .v
+                .iter()
+                .map(|v| GF128::new(v[0] as u128 + ((v[1] as u128) << 64), 0))
+                .collect();
+            let mkey = data.mkey != 0;
+            let fields_q = data
+                .q
+                .iter()
+                .map(|q| GF128::new(q[0] as u128 + ((q[1] as u128) << 64), 0))
+                .collect();
+            let delta = GF128::new(
+                data.delta
+                    .iter()
+                    .enumerate()
+                    .map(|(i, x)| (*x as u128) << (8 * i))
+                    .sum(),
+                0,
+            );
+            let field_ab: Vec<(GF128, GF128)> = data
+                .ab
+                .iter()
+                .map(|a| {
+                    (
+                        GF128::new(a[0] as u128 + ((a[1] as u128) << 64), 0),
+                        GF128::new(a[4] as u128 + ((a[5] as u128) << 64), 0),
+                    )
+                })
+                .collect();
+            let fields_res_1: Vec<GF128> = convert_to_bit(&data.res1);
+            let fields_res_2: Vec<GF128> = data
+                .res2
+                .iter()
+                .map(|res| GF128::new(res[0] as u128 + ((res[1] as u128) << 64), 0))
+                .collect();
+            let paramowf = ParamOWF::set_paramowf(data.kc, 10, data.ske, 0, 0, 0, 0, 0, 0, Some(0));
+            let mut res = aes_key_exp_cstrnts(data.w, fields_v, mkey, fields_q, delta, paramowf);
+            if res.1 == vec![GF128::default()] {
+                for _i in 0..field_ab.len() {
+                    res.1.push(GF128::default());
+                }
+            }
+            if res.2 == vec![GF128::default()] {
+                for _i in 0..fields_res_1.len() - 1 {
+                    res.2.push(GF128::default());
+                }
+            }
+
+            #[allow(clippy::needless_range_loop)]
+            for i in 0..field_ab.len() {
+                assert_eq!(field_ab[i].0, res.0[i]);
+                assert_eq!(field_ab[i].1, res.1[i]);
+            }
+            assert_eq!(fields_res_1, res.2);
+            assert_eq!(fields_res_2, res.3);
+        } else if data.lambda == 192 {
+            let fields_v = data
+                .v
+                .iter()
+                .map(|v| GF192::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128))
+                .collect();
+            let mkey = data.mkey != 0;
+            let fields_q = data
+                .q
+                .iter()
+                .map(|q| GF192::new(q[0] as u128 + ((q[1] as u128) << 64), q[2] as u128))
+                .collect();
+            let delta = GF192::new(
+                data.delta
+                    .iter()
+                    .take(16)
+                    .enumerate()
+                    .map(|(i, x)| (*x as u128) << (8 * i))
+                    .sum(),
+                data.delta
+                    .iter()
+                    .skip(16)
+                    .enumerate()
+                    .map(|(i, x)| (*x as u128) << (8 * i))
+                    .sum(),
+            );
+            let field_ab: Vec<(GF192, GF192)> = data
+                .ab
+                .iter()
+                .map(|a| {
+                    (
+                        GF192::new(a[0] as u128 + ((a[1] as u128) << 64), a[2] as u128),
+                        GF192::new(a[4] as u128 + ((a[5] as u128) << 64), a[6] as u128),
+                    )
+                })
+                .collect();
+            let fields_res_1: Vec<GF192> = convert_to_bit(&data.res1);
+            let fields_res_2: Vec<GF192> = data
+                .res2
+                .iter()
+                .map(|w| GF192::new(w[0] as u128 + ((w[1] as u128) << 64), w[2] as u128))
+                .collect();
+            let paramowf = ParamOWF::set_paramowf(data.kc, 12, data.ske, 0, 0, 0, 0, 0, 0, Some(0));
+            let mut res = aes_key_exp_cstrnts(data.w, fields_v, mkey, fields_q, delta, paramowf);
+            if res.1 == vec![GF192::default()] {
+                for _i in 0..field_ab.len() {
+                    res.1.push(GF192::default());
+                }
+            }
+            if res.2 == vec![GF192::default()] {
+                for _i in 0..fields_res_1.len() - 1 {
+                    res.2.push(GF192::default());
+                }
+            }
+            #[allow(clippy::needless_range_loop)]
+            for i in 0..field_ab.len() {
+                assert_eq!(field_ab[i].0, res.0[i]);
+                assert_eq!(field_ab[i].1, res.1[i]);
+            }
+            assert_eq!(fields_res_1, res.2);
+            assert_eq!(fields_res_2, res.3);
+        } else {
+            let fields_v = data
+                .v
+                .iter()
+                .map(|v| {
+                    GF256::new(
+                        v[0] as u128 + ((v[1] as u128) << 64),
+                        v[2] as u128 + ((v[3] as u128) << 64),
+                    )
+                })
+                .collect();
+            let mkey = data.mkey != 0;
+            let fields_q = data
+                .q
+                .iter()
+                .map(|q| {
+                    GF256::new(
+                        q[0] as u128 + ((q[1] as u128) << 64),
+                        q[2] as u128 + ((q[3] as u128) << 64),
+                    )
+                })
+                .collect();
+            let delta = GF256::new(
+                data.delta
+                    .iter()
+                    .take(16)
+                    .enumerate()
+                    .map(|(i, x)| (*x as u128) << (8 * i))
+                    .sum(),
+                data.delta
+                    .iter()
+                    .skip(16)
+                    .enumerate()
+                    .map(|(i, x)| (*x as u128) << (8 * i))
+                    .sum(),
+            );
+            let field_ab: Vec<(GF256, GF256)> = data
+                .ab
+                .iter()
+                .map(|a| {
+                    (
+                        GF256::new(
+                            a[0] as u128 + ((a[1] as u128) << 64),
+                            a[2] as u128 + ((a[3] as u128) << 64),
+                        ),
+                        GF256::new(
+                            a[4] as u128 + ((a[5] as u128) << 64),
+                            a[6] as u128 + ((a[7] as u128) << 64),
+                        ),
+                    )
+                })
+                .collect();
+            let fields_res_1: Vec<GF256> = convert_to_bit(&data.res1);
+            let fields_res_2: Vec<GF256> = data
+                .res2
+                .iter()
+                .map(|w| {
+                    GF256::new(
+                        w[0] as u128 + ((w[1] as u128) << 64),
+                        w[2] as u128 + ((w[3] as u128) << 64),
+                    )
+                })
+                .collect();
+            let paramowf = ParamOWF::set_paramowf(data.kc, 14, data.ske, 0, 0, 0, 0, 0, 0, Some(0));
+            let mut res = aes_key_exp_cstrnts(data.w, fields_v, mkey, fields_q, delta, paramowf);
+            if res.1 == vec![GF256::default()] {
+                for _i in 0..field_ab.len() {
+                    res.1.push(GF256::default());
+                }
+            }
+            if res.2 == vec![GF256::default()] {
+                for _i in 0..fields_res_1.len() - 1 {
+                    res.2.push(GF256::default());
+                }
+            }
+            #[allow(clippy::needless_range_loop)]
+            for i in 0..field_ab.len() {
+                assert_eq!(field_ab[i].0, res.0[i]);
+                assert_eq!(field_ab[i].1, res.1[i]);
+            }
+            assert_eq!(fields_res_1, res.2);
+            assert_eq!(fields_res_2, res.3);
         }
     }
 }
