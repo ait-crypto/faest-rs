@@ -1,4 +1,3 @@
-
 use std::iter::zip;
 
 use crate::{
@@ -394,6 +393,7 @@ where
         + std::ops::Add<T>,
 {
     let mut res = Vec::with_capacity(paramowf.get_senc().into());
+    //Step 2-5
     for i in 0..16 {
         let mut xin = [T::default(); 8];
         for (j, xin_item) in xin.iter_mut().enumerate() {
@@ -412,6 +412,7 @@ where
                 + T::byte_combine(xk[8 * i..(8 * i) + 8].try_into().unwrap()),
         );
     }
+    //Step 6
     for j in 1..paramowf.get_r() as usize {
         for c in 0..4 {
             let ix: usize = 128 * (j - 1) + 32 * c;
@@ -445,10 +446,73 @@ where
                     T::default(),
                 ]),
             );
+            //Step 16
             res.push(x_hat[0] * b + x_hat[1] * c + x_hat[2] * a + x_hat[3] * a + x_hat_k[0]);
             res.push(x_hat[0] * a + x_hat[1] * b + x_hat[2] * c + x_hat[3] * a + x_hat_k[1]);
             res.push(x_hat[0] * a + x_hat[1] * a + x_hat[2] * b + x_hat[3] * c + x_hat_k[2]);
             res.push(x_hat[0] * c + x_hat[1] * a + x_hat[2] * a + x_hat[3] * b + x_hat_k[3]);
+        }
+    }
+    res
+}
+
+///Choice is made to treat bits (that is, m=lambda anyway, while in the paper we can have m = 1) as element of GFlambda,
+///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
+///One of the first path to optimize the code could be to do the distinction
+pub fn aes_key_enc_bkwd<T>(
+    x: Vec<T>,
+    xk: Vec<T>,
+    mkey: bool,
+    mtag: bool,
+    out: Vec<u8>,
+    delta: T,
+    paramowf: ParamOWF,
+) -> Vec<T>
+where
+    T: BigGaloisField
+        + std::default::Default
+        + std::marker::Sized
+        + std::fmt::Debug
+        + std::ops::Add<T>,
+{
+    let mut res = Vec::with_capacity(paramowf.get_senc().into());
+    let r = paramowf.get_r() as usize;
+    let immut = if mtag {
+        T::default()
+    } else if mkey {
+        delta
+    } else {
+        T::ONE
+    };
+    //Step 2
+    for j in 0..r {
+        for c in 0..4 {
+            //Step 4
+            for k in 0..4 {
+                let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
+                let x_t : [T; 8];
+                if j < r - 1 {
+                    x_t = x[ird..ird + 8].try_into().unwrap();
+                } else {
+                    let mut x_out = [T::default(); 8];
+                    for i in 0..8 {
+                        x_out[i] = immut
+                            * ((out[(ird - 128 * j + i) / 8] >> ((ird - 128 * j + i) % 8)) & 1);
+                    }
+                    x_t = zip(x_out, &xk[128 + ird..136 + ird])
+                        .map(|(out, &k)| out + k)
+                        .collect::<Vec<T>>()
+                        .try_into()
+                        .unwrap();
+                }
+                let mut y_t = [T::default(); 8];
+                for i in 0..8 {
+                    y_t[i] = x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8];
+                }
+                y_t[0] += immut;
+                y_t[2] += immut;
+                res.push(T::byte_combine(y_t));
+            }
         }
     }
     res
