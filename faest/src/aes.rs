@@ -1,3 +1,4 @@
+
 use std::iter::zip;
 
 use crate::{
@@ -371,4 +372,84 @@ where
         }
         (b, vec![T::default()], vec![T::default()], q_k)
     }
+}
+
+///Choice is made to treat bits (that is, m=lambda anyway, while in the paper we can have m = 1) as element of GFlambda,
+///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
+///One of the first path to optimize the code could be to do the distinction
+pub fn aes_key_enc_fwd<T>(
+    x: Vec<T>,
+    xk: Vec<T>,
+    mkey: bool,
+    mtag: bool,
+    input: Vec<u8>,
+    delta: T,
+    paramowf: ParamOWF,
+) -> Vec<T>
+where
+    T: BigGaloisField
+        + std::default::Default
+        + std::marker::Sized
+        + std::fmt::Debug
+        + std::ops::Add<T>,
+{
+    let mut res = Vec::with_capacity(paramowf.get_senc().into());
+    for i in 0..16 {
+        let mut xin = [T::default(); 8];
+        for (j, xin_item) in xin.iter_mut().enumerate() {
+            let bit = (input[i] >> j) & 1;
+            let temp_xin = if mtag {
+                T::default()
+            } else if mkey {
+                delta * bit
+            } else {
+                T::ONE * bit
+            };
+            *xin_item = temp_xin;
+        }
+        res.push(
+            T::byte_combine(xin[0..8].try_into().unwrap())
+                + T::byte_combine(xk[8 * i..(8 * i) + 8].try_into().unwrap()),
+        );
+    }
+    for j in 1..paramowf.get_r() as usize {
+        for c in 0..4 {
+            let ix: usize = 128 * (j - 1) + 32 * c;
+            let ik: usize = 128 * j + 32 * c;
+            let mut x_hat: [T; 4] = [T::default(); 4];
+            let mut x_hat_k: [T; 4] = [T::default(); 4];
+            for r in 0..4 {
+                x_hat[r] = T::byte_combine(x[ix + 8 * r..ix + 8 * r + 8].try_into().unwrap());
+                x_hat_k[r] = T::byte_combine(xk[ik + 8 * r..ik + 8 * r + 8].try_into().unwrap());
+            }
+            let (a, b, c) = (
+                T::ONE,
+                T::byte_combine([
+                    T::default(),
+                    T::ONE,
+                    T::default(),
+                    T::default(),
+                    T::default(),
+                    T::default(),
+                    T::default(),
+                    T::default(),
+                ]),
+                T::byte_combine([
+                    T::ONE,
+                    T::ONE,
+                    T::default(),
+                    T::default(),
+                    T::default(),
+                    T::default(),
+                    T::default(),
+                    T::default(),
+                ]),
+            );
+            res.push(x_hat[0] * b + x_hat[1] * c + x_hat[2] * a + x_hat[3] * a + x_hat_k[0]);
+            res.push(x_hat[0] * a + x_hat[1] * b + x_hat[2] * c + x_hat[3] * a + x_hat_k[1]);
+            res.push(x_hat[0] * a + x_hat[1] * a + x_hat[2] * b + x_hat[3] * c + x_hat_k[2]);
+            res.push(x_hat[0] * c + x_hat[1] * a + x_hat[2] * a + x_hat[3] * b + x_hat_k[3]);
+        }
+    }
+    res
 }
