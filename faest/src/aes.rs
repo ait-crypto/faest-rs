@@ -1,5 +1,6 @@
 use std::iter::zip;
 
+
 use crate::{
     fields::BigGaloisField,
     parameter::{Param, ParamOWF},
@@ -9,7 +10,7 @@ use crate::{
     },
 };
 
-pub fn convert_to_bit<T>(input: &Vec<u8>) -> Vec<T>
+pub fn convert_to_bit<T>(input: &[u8]) -> Vec<T>
 where
     T: BigGaloisField,
 {
@@ -170,14 +171,7 @@ where
 ///One of the first path to optimize the code could be to do the distinction
 ///Beware when calling it : if Mtag = 1 ∧ Mkey = 1 or Mkey = 1 ∧ ∆ = ⊥ return ⊥
 #[allow(clippy::ptr_arg)]
-pub fn aes_key_exp_bwd<T>(
-    x: Vec<T>,
-    xk: &Vec<T>,
-    mtag: bool,
-    mkey: bool,
-    delta: T,
-    ske: u16,
-) -> Vec<T>
+pub fn aes_key_exp_bwd<T>(x: &[T], xk: &[T], mtag: bool, mkey: bool, delta: T, ske: u16) -> Vec<T>
 where
     T: BigGaloisField + std::default::Default + std::marker::Sized + std::fmt::Debug,
     T: std::ops::Add<T>,
@@ -267,10 +261,10 @@ where
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
 pub fn aes_key_exp_cstrnts<T>(
-    w: Vec<u8>,
-    v: Vec<T>,
+    w: &[u8],
+    v: &[T],
     mkey: bool,
-    q: Vec<T>,
+    q: &[T],
     delta: T,
     paramowf: ParamOWF,
 ) -> (Vec<T>, Vec<T>, Vec<T>, Vec<T>)
@@ -292,17 +286,10 @@ where
             Vec::<T>::with_capacity(ske.into()),
             Vec::<T>::with_capacity(ske.into()),
         );
-        let k = aes_key_exp_fwd(&convert_to_bit(&w), paramowf.get_r(), lambda, kc);
-        let vk = aes_key_exp_fwd(&v, paramowf.get_r(), lambda, kc);
-        let w_b = aes_key_exp_bwd::<T>(
-            convert_to_bit(&w)[lambda..].to_vec(),
-            &k,
-            false,
-            false,
-            delta,
-            ske,
-        );
-        let v_w_b = aes_key_exp_bwd::<T>(v[lambda..].to_vec(), &vk, true, false, delta, ske);
+        let k = aes_key_exp_fwd(&convert_to_bit(w), paramowf.get_r(), lambda, kc);
+        let vk = aes_key_exp_fwd(&v.to_vec(), paramowf.get_r(), lambda, kc);
+        let w_b = aes_key_exp_bwd::<T>(&convert_to_bit(w)[lambda..], &k, false, false, delta, ske);
+        let v_w_b = aes_key_exp_bwd::<T>(&v[lambda..], &vk, true, false, delta, ske);
         for j in 0..ske / 4 {
             let mut k_hat = [T::default(); 4];
             let mut v_k_hat = [T::default(); 4];
@@ -343,8 +330,8 @@ where
         (a.0, a.1, k, vk)
     } else {
         let mut b = Vec::<T>::with_capacity(ske.into());
-        let q_k = aes_key_exp_fwd(&q, paramowf.get_r(), lambda, kc);
-        let q_w_b = aes_key_exp_bwd::<T>(q[lambda..].to_vec(), &q_k, false, true, delta, ske);
+        let q_k = aes_key_exp_fwd(&q.to_vec(), paramowf.get_r(), lambda, kc);
+        let q_w_b = aes_key_exp_bwd::<T>(&q[lambda..], &q_k, false, true, delta, ske);
         for j in 0..ske / 4 {
             let mut q_h_k = [T::default(); 4];
             let mut q_h_w_b = [T::default(); 4];
@@ -377,13 +364,13 @@ where
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
 pub fn aes_key_enc_fwd<T>(
-    x: Vec<T>,
-    xk: Vec<T>,
+    x: &[T],
+    xk: &[T],
     mkey: bool,
     mtag: bool,
-    input: Vec<u8>,
+    input: [u8; 16],
     delta: T,
-    paramowf: ParamOWF,
+    paramowf: &ParamOWF,
 ) -> Vec<T>
 where
     T: BigGaloisField
@@ -460,13 +447,13 @@ where
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
 pub fn aes_key_enc_bkwd<T>(
-    x: Vec<T>,
-    xk: Vec<T>,
+    x: &[T],
+    xk: &[T],
     mkey: bool,
     mtag: bool,
-    out: Vec<u8>,
+    out: [u8; 16],
     delta: T,
-    paramowf: ParamOWF,
+    paramowf: &ParamOWF,
 ) -> Vec<T>
 where
     T: BigGaloisField
@@ -490,7 +477,7 @@ where
             //Step 4
             for k in 0..4 {
                 let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
-                let x_t : [T; 8];
+                let x_t: [T; 8];
                 if j < r - 1 {
                     x_t = x[ird..ird + 8].try_into().unwrap();
                 } else {
@@ -516,4 +503,51 @@ where
         }
     }
     res
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn aes_key_enc_cstrnts<T>(
+    input: [u8; 16],
+    output: [u8; 16],
+    w: &[T],
+    v: &[T],
+    k: &[T],
+    vk: &[T],
+    mkey: bool,
+    q: &[T],
+    qk: &[T],
+    delta: T,
+    paramowf: ParamOWF,
+) -> Vec<T>
+where
+    T: BigGaloisField
+        + std::default::Default
+        + std::marker::Sized
+        + std::fmt::Debug
+        + std::ops::Add<T>,
+{
+    let senc = paramowf.get_senc() as usize;
+    if !mkey {
+        let s: Vec<T> = aes_key_enc_fwd(w, k, false, false, input, T::default(), &paramowf);
+        let vs = aes_key_enc_fwd(v, vk, false, true, input, T::default(), &paramowf);
+        let s_b = aes_key_enc_bkwd(w, k, false, false, output, T::default(), &paramowf);
+        let v_s_b = aes_key_enc_bkwd(v, vk, false, true, output, T::default(), &paramowf);
+        let mut a0 = Vec::with_capacity(2 * senc);
+        let mut a1 = Vec::with_capacity(senc);
+        for j in 0..senc {
+            a0.push(vs[j] * v_s_b[j]);
+            a1.push((s[j] + vs[j]) * (s_b[j] + v_s_b[j]) + T::ONE + a0[j]);
+        }
+        a0.append(&mut a1);
+        a0
+    } else {
+        let qs = aes_key_enc_fwd(q, qk, true, false, input, delta, &paramowf);
+        let q_s_b = aes_key_enc_bkwd(q, qk, true, false, output, delta, &paramowf);
+        let mut b = Vec::with_capacity(senc);
+        let delta_square = delta * delta;
+        for j in 0..senc {
+            b.push((qs[j] * q_s_b[j]) + delta_square);
+        }
+        b
+    }
 }
