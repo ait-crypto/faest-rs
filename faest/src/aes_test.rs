@@ -1,4 +1,4 @@
-use crate::aes::{aes_key_enc_bkwd, aes_key_enc_cstrnts, aes_prove};
+use crate::aes::{aes_key_enc_bkwd, aes_key_enc_cstrnts, aes_prove, aes_verify};
 use crate::aes::{
     aes_key_enc_fwd, aes_key_exp_bwd, aes_key_exp_cstrnts, aes_key_exp_fwd, convert_to_bit,
     extendedwitness,
@@ -1148,6 +1148,101 @@ fn aes_prove_test() {
                 aes_prove::<GF256>(&data.w, &data.u, &data.gv, &pk, &data.chall, paramowf);
             assert_eq!(res.0, data.at);
             assert_eq!(res.1, data.bt);
+        }
+    }
+}
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AesVerify {
+    lambda: u16,
+
+    gq: Vec<Vec<u8>>,
+
+    d: Vec<u8>,
+
+    chall2: Vec<u8>,
+
+    chall3: Vec<u8>,
+
+    at: Vec<u8>,
+
+    input: Vec<u8>,
+
+    output: Vec<u8>,
+
+    tau: u8,
+
+    t0: u8,
+
+    k0: u8,
+
+    t1: u8,
+
+    k1: u8,
+
+    res: Vec<u8>,
+}
+
+#[test]
+fn aes_verify_test() {
+    let file = File::open("AesVerify.json").unwrap();
+    let database: Vec<AesVerify> =
+        serde_json::from_reader(file).expect("error while reading or parsing");
+    for data in database {
+        if data.lambda == 128 {
+            let param = Param::set_param(
+                128, 1600, data.tau, data.k0, data.k1, data.t0, data.t1, 16, 1,
+            );
+            let paramowf = ParamOWF::set_paramowf(4, 10, 40, 160, 1600, 448, 1152, 1, 200, None);
+            let mut pk = data.input.to_vec();
+            pk.append(&mut data.output.to_vec());
+            let out = aes_verify::<GF128>(
+                &data.d[..],
+                data.gq,
+                &data.chall2[..],
+                &data.chall3[..],
+                GF128::to_field(&data.at)[0],
+                &pk[..],
+                paramowf,
+                param,
+            );
+            assert_eq!(data.res, out);
+        } else if data.lambda == 192 {
+            let param = Param::set_param(
+                192, 3264, data.tau, data.k0, data.k1, data.t0, data.t1, 16, 2,
+            );
+            let paramowf = ParamOWF::set_paramowf(6, 12, 32, 192, 3264, 448, 1408, 2, 416, None);
+            let mut pk = data.input.to_vec();
+            pk.append(&mut data.output.to_vec());
+            let out = aes_verify::<GF192>(
+                &data.d[..],
+                data.gq,
+                &data.chall2[..],
+                &data.chall3[..],
+                GF192::to_field(&data.at)[0],
+                &pk[..],
+                paramowf,
+                param,
+            );
+            assert_eq!(data.res, out);
+        } else {
+            let param = Param::set_param(
+                256, 4000, data.tau, data.k0, data.k1, data.t0, data.t1, 16, 2,
+            );
+            let paramowf = ParamOWF::set_paramowf(8, 14, 52, 224, 4000, 672, 1664, 2, 500, None);
+            let mut pk = data.input.to_vec();
+            pk.append(&mut data.output.to_vec());
+            let out = aes_verify::<GF256>(
+                &data.d[..],
+                data.gq,
+                &data.chall2[..],
+                &data.chall3[..],
+                GF256::to_field(&data.at)[0],
+                &pk[..],
+                paramowf,
+                param,
+            );
+            assert_eq!(data.res, out);
         }
     }
 }

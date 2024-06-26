@@ -268,6 +268,8 @@ where
         Self::new((x & 1) as u128, 0u128)
     }
 
+    fn to_bytes(input: Self) -> Vec<u8>;
+
     fn byte_combine_bits(x: u8) -> Self {
         let mut out = Self::from_bit(x);
         for i in 1..8 {
@@ -855,6 +857,12 @@ impl BigGaloisField for GF128 {
         }
         res
     }
+
+    fn to_bytes(input: Self) -> Vec<u8> {
+        let mut res = Vec::with_capacity(Self::LENGTH as usize / 8);
+        res.append(&mut input.get_value().0.to_le_bytes().to_vec());
+        res
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -929,6 +937,13 @@ impl BigGaloisField for GF192 {
             second_value: random::<u128>() & (u64::MAX as u128),
         }
     }
+
+    fn to_bytes(input: Self) -> Vec<u8> {
+        let mut res = Vec::with_capacity(Self::LENGTH as usize / 8);
+        res.append(&mut input.get_value().0.to_le_bytes().to_vec());
+        res.append(&mut input.get_value().1.to_le_bytes()[..8].to_vec());
+        res
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -999,5 +1014,12 @@ impl BigGaloisField for GF256 {
 
     fn rand() -> Self {
         Self::new(random(), random())
+    }
+
+    fn to_bytes(input: Self) -> Vec<u8> {
+        let mut res = Vec::with_capacity(Self::LENGTH as usize / 8);
+        res.append(&mut input.get_value().0.to_le_bytes().to_vec());
+        res.append(&mut input.get_value().1.to_le_bytes().to_vec());
+        res
     }
 }
