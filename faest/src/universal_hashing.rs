@@ -51,32 +51,33 @@ where
 }
 
 #[allow(dead_code)]
-pub fn zkhash<const L: usize, T>(sd: &[u8], x0: &[T], x1: T) -> Vec<u8>
+pub fn zkhash<T>(sd: &[u8], x0: &[T], x1: T, l: usize) -> Vec<u8>
 where
-    T: fields::BigGaloisField,
+    T: fields::BigGaloisField + std::default::Default,
 {
-    let r0 = T::to_field(&sd[..(T::LENGTH as usize) / 8])[0];
-    let r1 = T::to_field(&sd[(T::LENGTH as usize) / 8..2 * ((T::LENGTH as usize) / 8)])[0];
-    let s = T::to_field(&sd[2 * ((T::LENGTH as usize) / 8)..3 * ((T::LENGTH as usize) / 8)])[0];
-    let mut t_vec = sd[3 * ((T::LENGTH as usize) / 8)..].to_vec();
-    t_vec.append(&mut vec![0u8; ((T::LENGTH as usize) / 8) - 8]);
+    let lambda = T::LENGTH as usize / 8;
+    let r0 = T::to_field(&sd[..lambda])[0];
+    let r1 = T::to_field(&sd[lambda..2 * lambda])[0];
+    let s = T::to_field(&sd[2 * lambda..3 * lambda])[0];
+    let mut t_vec = sd[3 * lambda..].to_vec();
+    t_vec.append(&mut vec![0u8; lambda - 8]);
     let t = T::to_field(&t_vec)[0];
-    let mut h0 = T::new(0u128, 0u128);
+    let mut h0 = T::default();
     let mut s_add = T::ONE;
-    for i in 0..L {
-        h0 += x0[L - 1 - i] * s_add;
+    for i in 0..l {
+        h0 += x0[l - 1 - i] * s_add;
         s_add *= s;
     }
 
-    let mut h1 = T::new(0u128, 0u128);
+    let mut h1 = T::default();
     let mut t_add = T::ONE;
-    for i in 0..L {
-        h1 += x0[L - 1 - i] * t_add;
+    for i in 0..l {
+        h1 += x0[l - 1 - i] * t_add;
         t_add *= t;
     }
 
     let gf_h = ((r0 * h0) + (r1 * h1)) + x1;
     let mut h = gf_h.get_value().0.to_le_bytes().to_vec();
-    h.append(&mut gf_h.get_value().1.to_le_bytes()[..((T::LENGTH as usize) / 8) - 16].to_vec());
+    h.append(&mut gf_h.get_value().1.to_le_bytes()[..lambda - 16].to_vec());
     h
 }

@@ -276,18 +276,18 @@ where
         out
     }
 
-    fn sum_poly(v: [Self; 256]) -> Self {
+    fn sum_poly(v: Vec<Self>) -> Self {
         let mut res = v[0];
-        let mut alpha = Self::MODULUS;
-        for (i, _) in v.iter().enumerate().skip(1) {
-            res += v[i] * alpha;
-            alpha = alpha * alpha;
+        let mut alpha = Self::ALPHA[0];
+        for v_val in v.iter().skip(1) {
+            res += *v_val * alpha;
+            alpha *= Self::ALPHA[0];
         }
         res
     }
 
     fn to_field(x: &[u8]) -> Vec<Self> {
-        let n = 8 * x.len() / (Self::LENGTH as usize);
+        let n = (8 * x.len()) / (Self::LENGTH as usize);
         let mut res = vec![];
         let padding_array = [0u8; 16];
         for i in 0..n {
@@ -840,16 +840,6 @@ impl BigGaloisField for GF128 {
             out += Self::ALPHA[i - 1] * (x >> i);
         }
         out
-    }
-
-    fn sum_poly(v: [Self; 256]) -> Self {
-        let mut res = v[0];
-        let mut alpha = Self::MODULUS;
-        for (i, _) in v.iter().enumerate().skip(1) {
-            res += v[i] * alpha;
-            alpha = alpha * alpha;
-        }
-        res
     }
 
     fn to_field(x: &[u8]) -> Vec<Self> {

@@ -1,6 +1,5 @@
 use std::iter::zip;
 
-
 use crate::{
     fields::BigGaloisField,
     parameter::{Param, ParamOWF},
@@ -8,6 +7,7 @@ use crate::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     },
+    universal_hashing::zkhash,
 };
 
 pub fn convert_to_bit<T>(input: &[u8]) -> Vec<T>
@@ -266,15 +266,14 @@ pub fn aes_key_exp_cstrnts<T>(
     mkey: bool,
     q: &[T],
     delta: T,
-    paramowf: ParamOWF,
+    paramowf: &ParamOWF,
 ) -> (Vec<T>, Vec<T>, Vec<T>, Vec<T>)
 where
     T: BigGaloisField
         + std::default::Default
         + std::marker::Sized
         + std::fmt::Debug
-        + std::ops::Add<T>
-        + std::ops::Sub<Output = T>,
+        + std::ops::Add<T>,
 {
     let lambda = T::LENGTH as usize;
     let kc = paramowf.get_nk();
@@ -312,6 +311,15 @@ where
             }
             for r in 0..4 {
                 a.0.push(v_k_hat[r] * v_w_hat[r]);
+                /*println!("{:?}, {:?},", (
+                    ((k_hat[r] + v_k_hat[r]) * (w_hat[r] + v_w_hat[r]))
+                        + T::ONE
+                        + a.0[(4 * j as usize) + r]
+                ).get_value().0 & (u64::MAX) as u128, ((
+                    ((k_hat[r] + v_k_hat[r]) * (w_hat[r] + v_w_hat[r]))
+                        + T::ONE
+                        + a.0[(4 * j as usize) + r]
+                ).get_value().0) >> 64 );*/
                 a.1.push(
                     ((k_hat[r] + v_k_hat[r]) * (w_hat[r] + v_w_hat[r]))
                         + T::ONE
@@ -345,7 +353,7 @@ where
                 ));
             }
             for r in 0..4 {
-                b.push(q_h_k[r] * q_h_w_b[r] - delta * delta);
+                b.push(q_h_k[r] * q_h_w_b[r] + delta * delta);
             }
             if lambda == 128 {
                 iwd += 128;
@@ -509,7 +517,7 @@ where
 pub fn aes_key_enc_cstrnts<T>(
     input: [u8; 16],
     output: [u8; 16],
-    w: &[T],
+    w: &[u8],
     v: &[T],
     k: &[T],
     vk: &[T],
@@ -517,7 +525,7 @@ pub fn aes_key_enc_cstrnts<T>(
     q: &[T],
     qk: &[T],
     delta: T,
-    paramowf: ParamOWF,
+    paramowf: &ParamOWF,
 ) -> Vec<T>
 where
     T: BigGaloisField
@@ -528,10 +536,14 @@ where
 {
     let senc = paramowf.get_senc() as usize;
     if !mkey {
-        let s: Vec<T> = aes_key_enc_fwd(w, k, false, false, input, T::default(), &paramowf);
-        let vs = aes_key_enc_fwd(v, vk, false, true, input, T::default(), &paramowf);
-        let s_b = aes_key_enc_bkwd(w, k, false, false, output, T::default(), &paramowf);
-        let v_s_b = aes_key_enc_bkwd(v, vk, false, true, output, T::default(), &paramowf);
+        let field_w = &(w
+            .iter()
+            .flat_map(|w| convert_to_bit(&[*w]))
+            .collect::<Vec<T>>())[..];
+        let s = aes_key_enc_fwd(field_w, k, false, false, input, T::default(), paramowf);
+        let vs = aes_key_enc_fwd(v, vk, false, true, input, T::default(), paramowf);
+        let s_b = aes_key_enc_bkwd(field_w, k, false, false, output, T::default(), paramowf);
+        let v_s_b = aes_key_enc_bkwd(v, vk, false, true, output, T::default(), paramowf);
         let mut a0 = Vec::with_capacity(2 * senc);
         let mut a1 = Vec::with_capacity(senc);
         for j in 0..senc {
@@ -541,8 +553,8 @@ where
         a0.append(&mut a1);
         a0
     } else {
-        let qs = aes_key_enc_fwd(q, qk, true, false, input, delta, &paramowf);
-        let q_s_b = aes_key_enc_bkwd(q, qk, true, false, output, delta, &paramowf);
+        let qs = aes_key_enc_fwd(q, qk, true, false, input, delta, paramowf);
+        let q_s_b = aes_key_enc_bkwd(q, qk, true, false, output, delta, paramowf);
         let mut b = Vec::with_capacity(senc);
         let delta_square = delta * delta;
         for j in 0..senc {
@@ -550,4 +562,95 @@ where
         }
         b
     }
+}
+
+///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
+pub fn aes_prove<T>(
+    w: &[u8],
+    u: &[u8],
+    gv: &[Vec<u8>],
+    pk: &[u8],
+    chall: &[u8],
+    paramowf: ParamOWF,
+) -> (Vec<u8>, Vec<u8>)
+where
+    T: BigGaloisField + std::default::Default + std::fmt::Debug + std::ops::Sub,
+{
+    let l = ParamOWF::get_l(&paramowf) as usize;
+    let c = ParamOWF::get_c(&paramowf) as usize;
+    let lke = ParamOWF::get_lke(&paramowf) as usize;
+    let lenc = ParamOWF::get_lenc(&paramowf) as usize;
+    let senc = ParamOWF::get_senc(&paramowf) as usize;
+    let lambda = T::LENGTH as usize;
+    let new_w = &w[..l / 8];
+    let mut temp_v = Vec::with_capacity((l + lambda) * lambda / 8);
+    for i in 0..(l + lambda) / 8 {
+        for k in 0..8 {
+            for j in 0..lambda / 8 {
+                let mut temp = 0;
+                for l in 0..8 {
+                    temp += ((gv[(j * 8) + l][i] >> k) & 1) << l;
+                }
+                temp_v.push(temp);
+            }
+        }
+    }
+    let new_v = T::to_field(&temp_v);
+    let (input, output) = if lambda == 192 {
+        (&pk[..256 / 8], &pk[256 / 8..])
+    } else {
+        (&pk[..lambda / 8], &pk[lambda / 8..])
+    };
+    let (mut a0, mut a1, k, vk) = aes_key_exp_cstrnts::<T>(
+        &new_w[..lke / 8],
+        &new_v[..lke],
+        false,
+        &[],
+        T::default(),
+        &paramowf,
+    );
+    let a_01 = aes_key_enc_cstrnts::<T>(
+        input[..16].try_into().unwrap(),
+        output[..16].try_into().unwrap(),
+        &new_w[lke / 8..(lke + lenc) / 8],
+        &new_v[lke..lke + lenc],
+        &k,
+        &vk,
+        false,
+        &[],
+        &[],
+        T::default(),
+        &paramowf,
+    );
+    a0.append(&mut a_01[..senc].to_vec());
+    a1.append(&mut a_01[senc..].to_vec());
+    if lambda > 128 {
+        let a_01 = aes_key_enc_cstrnts(
+            input[16..].try_into().unwrap(),
+            output[16..].try_into().unwrap(),
+            &new_w[(lke + lenc) / 8..l / 8],
+            &new_v[(lke + lenc)..l],
+            &k,
+            &vk,
+            false,
+            &[],
+            &[],
+            T::default(),
+            &paramowf,
+        );
+        a0.append(&mut a_01[..senc].to_vec());
+        a1.append(&mut a_01[senc..].to_vec());
+    }
+    let u_s: T = T::to_field(&u[l / 8..])[0];
+
+    let mut v_s = new_v[l];
+    let alpha = T::new(2, 0);
+    let mut cur_alpha = alpha;
+    for i in 1..lambda {
+        v_s += new_v[l + i] * cur_alpha;
+        cur_alpha *= alpha;
+    }
+    let a_t = zkhash::<T>(chall, &a1, u_s, c);
+    let b_t = zkhash::<T>(chall, &a0, v_s, c);
+    (a_t, b_t)
 }

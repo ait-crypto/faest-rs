@@ -604,9 +604,9 @@ fn test_zkhash() {
         }
         let x0 = x[..8].to_vec();
         let x1 = x[8..].to_vec();
-        const L: usize = 8;
+        let l: usize = 8;
         let h = data.3.to_vec();
-        let res = zkhash::<L, GF128>(sd, &x0, x1[0]);
+        let res = zkhash::<GF128>(sd, &x0, x1[0], l);
         assert_eq!(h, res);
     }
 
@@ -803,9 +803,9 @@ fn test_zkhash() {
         }
         let x0 = x[..8].to_vec();
         let x1 = x[8..].to_vec();
-        const L: usize = 8;
+        let l: usize = 8;
         let h = data.3.to_vec();
-        let res = zkhash::<L, GF192>(sd, &x0, x1[0]);
+        let res = zkhash::<GF192>(sd, &x0, x1[0], l);
         assert_eq!(h, res);
     }
 
@@ -1017,9 +1017,9 @@ fn test_zkhash() {
         }
         let x0 = x[..8].to_vec();
         let x1 = x[8..].to_vec();
-        const L: usize = 8;
+        let l: usize = 8;
         let h = data.3.to_vec();
-        let res = zkhash::<L, GF256>(sd, &x0, x1[0]);
+        let res = zkhash::<GF256>(sd, &x0, x1[0], l);
         assert_eq!(h, res);
     }
 }
