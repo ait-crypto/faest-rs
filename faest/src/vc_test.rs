@@ -122,7 +122,7 @@ fn open_test() {
     let database: Vec<DataOpen> =
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
-        let res = open((data.k, data.com), data.b);
+        let res = open(&(data.k, data.com), data.b);
         assert_eq!(res.0, data.cop);
         assert_eq!(res.1, data.com_j);
     }

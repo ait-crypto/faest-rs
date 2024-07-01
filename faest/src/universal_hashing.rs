@@ -1,7 +1,7 @@
 use crate::fields::{self, GaloisField, GF64};
 
 #[allow(dead_code)]
-pub fn volehash<const L: usize, const B: usize, T>(sd: &[u8], mut x0: Vec<u8>, x1: &[u8]) -> T
+pub fn volehash<T>(sd: &[u8], mut x0: Vec<u8>, x1: &[u8], l:usize, b:usize) -> Vec<u8>
 where
     T: fields::BigGaloisField,
 {
@@ -13,8 +13,8 @@ where
     let s = T::to_field(&sd[4 * (T::LENGTH as usize) / 8..5 * (T::LENGTH as usize) / 8])[0];
     let t =
         &GF64::to_field(&sd[5 * (T::LENGTH as usize) / 8..(5 * (T::LENGTH as usize) / 8) + 8])[0];
-    let l_p = (T::LENGTH as usize) * (L + (T::LENGTH as usize)).div_ceil(T::LENGTH as usize);
-    for _i in 1..(l_p - (L + (T::LENGTH as usize))) {
+    let l_p = (T::LENGTH as usize) * (l + (T::LENGTH as usize)).div_ceil(T::LENGTH as usize);
+    for _i in 1..(l_p - (l + (T::LENGTH as usize))) {
         x0.push(0u8);
     }
     //use resize to get rid of the vec
@@ -43,11 +43,11 @@ where
     h.append(&mut h2.get_value().1.to_le_bytes()[..((T::LENGTH as usize) / 8) - 16].to_vec());
     //taking the B first bytes of h3
     h.append(
-        &mut h3.get_value().0.to_le_bytes()[..16 * (B / 16) + (1 - B / 16) * (B % 16)].to_vec(),
+        &mut h3.get_value().0.to_le_bytes()[..16 * (b / 16) + (1 - b / 16) * (b % 16)].to_vec(),
     );
-    h.append(&mut h3.get_value().1.to_le_bytes()[..(B / 16) * (B % 16)].to_vec());
+    h.append(&mut h3.get_value().1.to_le_bytes()[..(b / 16) * (b % 16)].to_vec());
     h.iter_mut().zip(x1.iter()).for_each(|(x1, x2)| *x1 ^= *x2);
-    T::to_field(&h)[0]
+    h
 }
 
 #[allow(dead_code)]

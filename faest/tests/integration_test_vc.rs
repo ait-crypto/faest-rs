@@ -16,7 +16,7 @@ fn test_commitment_and_decomitment() {
         for _i in 0..8 {
             b.append(&mut vec![random::<u8>() & 1]);
         }
-        let pdecom = faest::vc::open(decom, b.clone());
+        let pdecom = faest::vc::open(&decom, b.clone());
         let res = faest::vc::verify::<GF128, RandomOracleShake128>(com, pdecom, b, iv, &prg_128);
         assert_eq!(res, 1);
     }
@@ -31,7 +31,7 @@ fn test_commitment_and_decomitment() {
         for _i in 0..8 {
             b.append(&mut vec![random::<u8>() & 1]);
         }
-        let pdecom = faest::vc::open(decom, b.clone());
+        let pdecom = faest::vc::open(&decom, b.clone());
         let res = faest::vc::verify::<GF192, RandomOracleShake256>(com, pdecom, b, iv, &prg_192);
         assert_eq!(res, 1);
     }
@@ -46,7 +46,7 @@ fn test_commitment_and_decomitment() {
         for _i in 0..8 {
             b.append(&mut vec![random::<u8>() & 1]);
         }
-        let pdecom = faest::vc::open(decom, b.clone());
+        let pdecom = faest::vc::open(&decom, b.clone());
         let res = faest::vc::verify::<GF256, RandomOracleShake256>(com, pdecom, b, iv, &prg_256);
         assert_eq!(res, 1);
     }

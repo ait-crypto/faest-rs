@@ -305,7 +305,7 @@ pub(crate) fn rijndael_decrypt(
 #[allow(dead_code)]
 pub(crate) fn rijndael_encrypt(
     rkeys: &[u32],
-    input: [u8; 32],
+    input: &[u8],
     bc: u8,
     r: u8,
 ) -> BatchBlocks {

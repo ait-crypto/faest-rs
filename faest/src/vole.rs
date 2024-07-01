@@ -11,7 +11,7 @@ pub fn convert_to_vole(
 ) -> (Vec<u8>, Vec<Vec<u8>>) {
     for _i in 0..100 {}
     let n = sd.len();
-    let d = (u128::BITS - (n as u128).leading_zeros() - 1) as usize;
+    let d = (128 - (n as u128).leading_zeros() - 1) as usize;
     let mut r = vec![vec![vec![0u8; lh]; n]; d + 1];
     match &sd[0] {
         None => r[0][0] = vec![0; lh],
@@ -47,7 +47,7 @@ pub fn convert_to_vole(
 }
 
 //constant time checking the value of i : if i is not correct, then the output will be an empty vec
-pub fn chaldec(chal: Vec<u8>, k0: u16, t0: u16, k1: u16, t1: u16, i: u16) -> Vec<u8> {
+pub fn chaldec(chal: &[u8], k0: u16, t0: u16, k1: u16, t1: u16, i: u16) -> Vec<u8> {
     let mut lo = 1_u16;
     let mut hi = 0_u16;
     if i < t0 {
@@ -72,8 +72,8 @@ pub fn volecommit<T, R>(
     lh: usize,
     tau: usize,
     prg: &dyn Fn(&[u8], u128, usize) -> Vec<u8>,
-    k0: u8,
-    k1: u8,
+    k0: u16,
+    k1: u16,
 ) -> (
     Vec<u8>,
     Vec<(Vec<Vec<u8>>, Vec<Vec<u8>>)>,
@@ -82,7 +82,7 @@ pub fn volecommit<T, R>(
     Vec<Vec<Vec<u8>>>,
 )
 where
-    T: BigGaloisField + std::default::Default + std::fmt::Debug,
+    T: BigGaloisField + std::default::Default,
     R: RandomOracle,
 {
     let tau_res = prg(r, iv, tau * (T::LENGTH) as usize);
@@ -99,8 +99,8 @@ where
     let tau_0 = T::LENGTH % (tau as u32);
     let mut hasher = R::h1_init();
     for i in 0..tau {
-        let b = 1 - (i < tau_0.try_into().unwrap()) as u8;
-        let k = (((1 - b) * k0) + b * k1) as u16;
+        let b = 1 - (i < tau_0.try_into().unwrap()) as u16;
+        let k = ((1 - b) * k0) + b * k1;
         (com[i], decom[i], sd[i]) = commit::<T, R>(r[i], iv, 1u32 << k, prg);
         hasher.h1_update(&com[i]);
         v[i] = vec![vec![0; lh]; k.into()];
@@ -128,8 +128,8 @@ pub fn volereconstruct<T, R>(
     tau: usize,
     tau0: u16,
     tau1: u16,
-    k0: u8,
-    k1: u8,
+    k0: u16,
+    k1: u16,
     prg: &dyn Fn(&[u8], u128, usize) -> Vec<u8>,
     lambdabytes: usize,
 ) -> (Vec<u8>, Vec<Vec<Vec<u8>>>)
@@ -144,13 +144,13 @@ where
     let mut q = vec![Vec::new(); tau];
     let mut hasher = R::h1_init();
     for i in 0..tau {
-        let b: u8 = (i < tau0.into()).into();
+        let b: u16 = (i < tau0.into()).into();
         let k = b * k0 + (1 - b) * k1;
         let delta_p = chaldec(
-            chal.to_vec(),
-            k0.into(),
+            chal,
+            k0,
             tau0,
-            k1.into(),
+            k1,
             tau1,
             i.try_into().unwrap(),
         );

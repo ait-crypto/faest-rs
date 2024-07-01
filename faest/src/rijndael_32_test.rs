@@ -117,7 +117,7 @@ fn rijndael_test() {
         input[..data.text.len()].copy_from_slice(&data.text[..]);
         let r = max(data.bc, data.kc) + 6;
         let rkeys = rijndael_key_schedule(&data.key, data.bc, data.kc, r);
-        let res = rijndael_encrypt(&rkeys, input, data.bc, r);
+        let res = rijndael_encrypt(&rkeys, &input, data.bc, r);
         let mut input = [0u32; 8];
         let mut output = [0u32; 8];
         for i in 0..data.bc {
@@ -145,7 +145,7 @@ fn rijndael_decrypt_test() {
                 let r = max(kc, bc) + 6;
                 let mut state_text = State::default();
                 let rkeys = rijndael_key_schedule(&key, bc, kc, r);
-                let crypted = rijndael_encrypt(&rkeys, padded_text, bc, r);
+                let crypted = rijndael_encrypt(&rkeys, &padded_text, bc, r);
                 let res = rijndael_decrypt(&rkeys, &crypted, bc, r);
                 bitslice(&mut state_text, &padded_text[..16], &padded_text[16..]);
                 assert_eq!(res, inv_bitslice(&state_text));

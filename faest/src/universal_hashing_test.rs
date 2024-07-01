@@ -130,7 +130,7 @@ fn test_volehash() {
         let x1 = &x[20..];
         const L: usize = 32;
         let h = GF128::to_field(&data.3)[0];
-        let res = volehash::<L, 2, GF128>(sd, x0, x1);
+        let res = volehash::<GF128>(sd, x0, x1, L, 2);
         assert_eq!(h, res);
     }
 
@@ -284,7 +284,7 @@ fn test_volehash() {
         let x1 = &x[28..];
         const L: usize = 32;
         let h = GF192::to_field(&data.3)[0];
-        let res = volehash::<L, 2, GF192>(sd, x0, x1);
+        let res = volehash::<GF192>(sd, x0, x1, L, 2);
         assert_eq!(h, res);
     }
 
@@ -459,7 +459,7 @@ fn test_volehash() {
         let x1 = &x[36..];
         const L: usize = 32;
         let h = GF256::to_field(&data.3)[0];
-        let res = volehash::<L, 2, GF256>(&sd, x0, x1);
+        let res = volehash::<GF256>(&sd, x0, x1, L, 2);
         assert_eq!(h, res);
     }
 }

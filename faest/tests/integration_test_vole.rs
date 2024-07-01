@@ -38,20 +38,20 @@ fn test_commitment_and_construction() {
             lh,
             tau,
             prg,
-            k0.try_into().unwrap(),
-            k1.try_into().unwrap(),
+            k0,
+            k1,
         );
         let mut pdecom = vec![(Vec::new(), Vec::new()); tau];
         for i in 0..tau {
             let b = chaldec(
-                chal.clone(),
+                &chal.clone(),
                 k0,
                 tau0.try_into().unwrap(),
                 k1,
                 tau1.try_into().unwrap(),
                 i.try_into().unwrap(),
             );
-            pdecom[i] = open(decom[i].clone(), b);
+            pdecom[i] = open(&decom[i].clone(), b);
         }
         let (h2, _q) = volereconstruct::<GF128, RandomOracleShake128>(
             &chal,
@@ -61,8 +61,8 @@ fn test_commitment_and_construction() {
             tau,
             tau0.try_into().unwrap(),
             tau1.try_into().unwrap(),
-            k0.try_into().unwrap(),
-            k1.try_into().unwrap(),
+            k0,
+            k1,
             prg,
             lambdabytes,
         );
@@ -97,20 +97,20 @@ fn test_commitment_and_construction() {
             lh,
             tau,
             prg,
-            k0.try_into().unwrap(),
-            k1.try_into().unwrap(),
+            k0,
+            k1,
         );
         let mut pdecom = vec![(Vec::new(), Vec::new()); tau];
         for i in 0..tau {
             let b = chaldec(
-                chal.clone(),
+                &chal.clone(),
                 k0,
                 tau0.try_into().unwrap(),
                 k1,
                 tau1.try_into().unwrap(),
                 i.try_into().unwrap(),
             );
-            pdecom[i] = open(decom[i].clone(), b);
+            pdecom[i] = open(&decom[i].clone(), b);
         }
         let (h2, _q) = volereconstruct::<GF192, RandomOracleShake256>(
             &chal,
@@ -120,8 +120,8 @@ fn test_commitment_and_construction() {
             tau,
             tau0.try_into().unwrap(),
             tau1.try_into().unwrap(),
-            k0.try_into().unwrap(),
-            k1.try_into().unwrap(),
+            k0,
+            k1,
             prg,
             lambdabytes,
         );
@@ -156,20 +156,20 @@ fn test_commitment_and_construction() {
             lh,
             tau,
             prg,
-            k0.try_into().unwrap(),
-            k1.try_into().unwrap(),
+            k0,
+            k1,
         );
         let mut pdecom = vec![(Vec::new(), Vec::new()); tau];
         for i in 0..tau {
             let b = chaldec(
-                chal.clone(),
+                &chal.clone(),
                 k0,
                 tau0.try_into().unwrap(),
                 k1,
                 tau1.try_into().unwrap(),
                 i.try_into().unwrap(),
             );
-            pdecom[i] = open(decom[i].clone(), b);
+            pdecom[i] = open(&decom[i].clone(), b);
         }
         let (h2, _q) = volereconstruct::<GF256, RandomOracleShake256>(
             &chal,
@@ -179,8 +179,8 @@ fn test_commitment_and_construction() {
             tau,
             tau0.try_into().unwrap(),
             tau1.try_into().unwrap(),
-            k0.try_into().unwrap(),
-            k1.try_into().unwrap(),
+            k0,
+            k1,
             prg,
             lambdabytes,
         );

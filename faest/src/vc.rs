@@ -43,7 +43,7 @@ where
     (h, (k, com), sd)
 }
 
-pub fn open(decom: (Vec<Vec<u8>>, Vec<Vec<u8>>), b: Vec<u8>) -> (Vec<Vec<u8>>, Vec<u8>) {
+pub fn open(decom: &(Vec<Vec<u8>>, Vec<Vec<u8>>), b: Vec<u8>) -> (Vec<Vec<u8>>, Vec<u8>) {
     let mut a = 0;
     let d = (usize::BITS - decom.0.len().leading_zeros() - 1) as usize;
     let mut cop = vec![Vec::new(); d];

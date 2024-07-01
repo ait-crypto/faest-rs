@@ -102,7 +102,7 @@ fn chaldec_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         let res = chaldec(
-            data.chal, data.k0[0], data.t0[0], data.k1[0], data.t1[0], data.i[0],
+            &data.chal, data.k0[0], data.t0[0], data.k1[0], data.t1[0], data.i[0],
         );
         assert_eq!(res, data.res);
     }
@@ -151,9 +151,9 @@ fn volecommit_test() {
                 data.lh[0],
                 data.tau[0],
                 &prg_128,
-                data.k0[0],
-                data.k1[0],
-            );
+                data.k0[0] as u16,
+                data.k1[0] as u16,
+            ); 
             assert_eq!(res.0, data.hcom);
             for i in 0..res.1.len() {
                 assert_eq!(res.1[i], (data.k[i].clone(), data.com[i].clone()));
@@ -171,8 +171,8 @@ fn volecommit_test() {
                 data.lh[0],
                 data.tau[0],
                 &prg_192,
-                data.k0[0],
-                data.k1[0],
+                data.k0[0] as u16,
+                data.k1[0] as u16,
             );
             assert_eq!(res.0, data.hcom);
             for i in 0..res.1.len() {
@@ -191,8 +191,8 @@ fn volecommit_test() {
                 data.lh[0],
                 data.tau[0],
                 &prg_256,
-                data.k0[0],
-                data.k1[0],
+                data.k0[0] as u16,
+                data.k1[0] as u16,
             );
             assert_eq!(res.0, data.hcom);
             for i in 0..res.1.len() {
@@ -257,8 +257,8 @@ fn volereconstruct_test() {
                 data.tau,
                 data.tau0,
                 data.tau1,
-                data.k0,
-                data.k1,
+                data.k0 as u16,
+                data.k1 as u16,
                 &prg_128,
                 data.lambdabytes,
             );
@@ -275,8 +275,8 @@ fn volereconstruct_test() {
                 data.tau,
                 data.tau0,
                 data.tau1,
-                data.k0,
-                data.k1,
+                data.k0 as u16,
+                data.k1 as u16,
                 &prg_192,
                 data.lambdabytes,
             );
@@ -291,8 +291,8 @@ fn volereconstruct_test() {
                 data.tau,
                 data.tau0,
                 data.tau1,
-                data.k0,
-                data.k1,
+                data.k0 as u16,
+                data.k1 as u16,
                 &prg_256,
                 data.lambdabytes,
             );

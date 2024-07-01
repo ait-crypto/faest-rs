@@ -24,7 +24,7 @@ where
     res
 }
 
-pub fn extendedwitness(k: &[u8], pk: &[u8], param: Param, paramowf: ParamOWF) -> Vec<u32> {
+pub fn extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) -> Vec<u32> {
     let lke = paramowf.get_lke();
     //lke as a value only in classical aes use. testing on it give which is used between rijndael and aes
     let mut beta = 0;
@@ -563,10 +563,10 @@ pub fn aes_prove<T>(
     gv: &[Vec<u8>],
     pk: &[u8],
     chall: &[u8],
-    paramowf: ParamOWF,
+    paramowf: &ParamOWF,
 ) -> (Vec<u8>, Vec<u8>)
 where
-    T: BigGaloisField + std::default::Default + std::fmt::Debug + std::ops::Sub,
+    T: BigGaloisField + std::default::Default + std::fmt::Debug,
 {
     let l = paramowf.get_l() as usize;
     let c = paramowf.get_c() as usize;
@@ -599,7 +599,7 @@ where
         false,
         &[],
         T::default(),
-        &paramowf,
+        paramowf,
     );
     let a_01 = aes_key_enc_cstrnts::<T>(
         input[..16].try_into().unwrap(),
@@ -612,7 +612,7 @@ where
         &[],
         &[],
         T::default(),
-        &paramowf,
+        paramowf,
     );
     a0.append(&mut a_01[..senc].to_vec());
     a1.append(&mut a_01[senc..].to_vec());
@@ -628,7 +628,7 @@ where
             &[],
             &[],
             T::default(),
-            &paramowf,
+            paramowf,
         );
         a0.append(&mut a_01[..senc].to_vec());
         a1.append(&mut a_01[senc..].to_vec());
@@ -656,8 +656,8 @@ pub fn aes_verify<T>(
     chall3: &[u8],
     a_t: T,
     pk: &[u8],
-    paramowf: ParamOWF,
-    param: Param,
+    paramowf: &ParamOWF,
+    param: &Param,
 ) -> Vec<u8>
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
@@ -677,9 +677,10 @@ where
     } else {
         (&pk[..32], &pk[32..])
     };
+    println!("{:?} {:?}", input, output);
     for i in 0..t0 {
         let sdelta = chaldec(
-            chall3.to_vec(),
+            chall3,
             k0 as u16,
             t0 as u16,
             k1 as u16,
@@ -696,7 +697,7 @@ where
     }
     for i in 0..t1 {
         let sdelta = chaldec(
-            chall3.to_vec(),
+            chall3,
             k0 as u16,
             t0 as u16,
             k1 as u16,
@@ -725,7 +726,7 @@ where
     }
     let new_q = T::to_field(&temp_q);
     let mut b = Vec::with_capacity(c);
-    let (mut b1, _, _, qk) = aes_key_exp_cstrnts(&[], &[], true, &new_q[0..lke], delta, &paramowf);
+    let (mut b1, _, _, qk) = aes_key_exp_cstrnts(&[], &[], true, &new_q[0..lke], delta, paramowf);
     let mut b2 = aes_key_enc_cstrnts(
         input[..16].try_into().unwrap(),
         output[..16].try_into().unwrap(),
@@ -737,7 +738,7 @@ where
         &new_q[lke..lke + lenc],
         &qk[..],
         delta,
-        &paramowf,
+        paramowf,
     );
     b.append(&mut b1);
     b.append(&mut b2);
@@ -753,7 +754,7 @@ where
             &new_q[lke + lenc..l],
             &qk[..],
             delta,
-            &paramowf,
+            paramowf,
         );
         b.append(&mut b3);
     }
@@ -764,5 +765,6 @@ where
         q_s += new_q[l + i] * cur_alpha;
         cur_alpha *= alpha;
     }
+
     T::to_bytes(T::to_field(&zkhash::<T>(chall2, &b, q_s, c))[0] + a_t * delta)
 }
