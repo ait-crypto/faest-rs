@@ -1,3 +1,5 @@
+use std::iter::zip;
+
 use crate::{
     fields::BigGaloisField,
     parameter::{Param, ParamOWF},
@@ -43,7 +45,7 @@ pub fn extendedwitness(k: &[u8], pk: (&[u8], &[u8]), param: Param, paramowf: Par
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
-pub fn em_key_enc_fwd<T>(z: &[T], x: &[T], paramowf: &ParamOWF) -> Vec<T>
+pub fn em_enc_fwd<T>(z: &[T], x: &[T], paramowf: &ParamOWF) -> Vec<T>
 where
     T: BigGaloisField
         + std::default::Default
@@ -98,6 +100,72 @@ where
             res.push(z_hat[0] * a + z_hat[1] * b + z_hat[2] * c + z_hat[3] * a + x_hat[1]);
             res.push(z_hat[0] * a + z_hat[1] * a + z_hat[2] * b + z_hat[3] * c + x_hat[2]);
             res.push(z_hat[0] * c + z_hat[1] * a + z_hat[2] * a + z_hat[3] * b + x_hat[3]);
+        }
+    }
+    res
+}
+
+///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
+///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
+///One of the first path to optimize the code could be to do the distinction
+#[allow(clippy::too_many_arguments)]
+pub fn em_enc_bkwd<T>(
+    x: &[T],
+    z: &[T],
+    z_out: &[T],
+    mkey: bool,
+    mtag: bool,
+    delta: T,
+    paramowf: &ParamOWF,
+    param: &Param,
+) -> Vec<T>
+where
+    T: BigGaloisField
+        + std::default::Default
+        + std::marker::Sized
+        + std::fmt::Debug
+        + std::ops::Add<T>,
+{
+    let mut res = Vec::with_capacity(paramowf.get_senc().into());
+    let r = paramowf.get_r() as usize;
+    let nst = paramowf.get_nst() as usize;
+    let lambda = param.get_lambda() as usize;
+    let immut = if !mtag {
+        if mkey {
+            delta
+        } else {
+            T::ONE
+        }
+    } else {
+        T::default()
+    };
+    //Step 2
+    for j in 0..r {
+        for c in 0..nst {
+            //Step 4
+            for k in 0..4 {
+                let mut icol = (c + nst - k) % nst;
+                if nst == 8 && k >= 2 {
+                    icol = (icol + nst - 1) % nst;
+                }
+                let ird = lambda + 32 * nst * j + 32 * icol + 8 * k;
+                let z_t = 
+                if j < r - 1 {
+                    z[ird..ird + 8].to_vec()
+                } else {
+                    let z_out_t = &z_out[ird - 32 * nst * (j + 1)..ird - 32 * nst * (j + 1) + 8];
+                    zip(z_out_t, &x[ird..ird + 8])
+                        .map(|(z, x)| *z + *x)
+                        .collect::<Vec<T>>()
+                };
+                let mut y_t = [T::default(); 8];
+                for i in 0..8 {
+                    y_t[i] = z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]
+                }
+                y_t[0] += immut;
+                y_t[2] += immut;
+                res.push(T::byte_combine(y_t));
+            }
         }
     }
     res

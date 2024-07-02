@@ -1,12 +1,23 @@
 pub const PARAMOWF128 : ParamOWF = ParamOWF { nk : 4, r : 10, ske : 40, senc : 160, l : 1600, lke : 448, lenc : 1152, beta : 1, c : 200, nst : Some(4)};
 pub const PARAMOWF192 : ParamOWF = ParamOWF { nk : 6, r : 12, ske : 32, senc : 192, l : 3264, lke : 448, lenc : 1408, beta : 2, c : 416, nst : Some(6)};
 pub const PARAMOWF256 : ParamOWF = ParamOWF { nk : 8, r : 14, ske : 52, senc : 224, l : 4000, lke : 672, lenc : 1664, beta : 2, c : 500, nst : Some(8)};
+pub const PARAMOWF128EM : ParamOWF = ParamOWF { nk : 4, r : 10, ske : 40, senc : 160, l : 1280, lke : 448, lenc : 1152, beta : 1, c : 200, nst : Some(4)};
+pub const PARAMOWF192EM : ParamOWF = ParamOWF { nk : 6, r : 12, ske : 32, senc : 288, l : 2304, lke : 448, lenc : 1408, beta : 2, c : 416, nst : Some(6)};
+pub const PARAMOWF256EM : ParamOWF = ParamOWF { nk : 8, r : 14, ske : 52, senc : 448, l : 3584, lke : 672, lenc : 1664, beta : 2, c : 500, nst : Some(8)};
+
+pub const PARAM128S : Param = Param{lambda : 128, l : 1600, tau : 11, k0 : 12, k1 : 11, tau0 : 7, tau1 : 4, b : 16, beta : 1};
+pub const PARAM128F : Param = Param{lambda : 128, l : 1600, tau : 16, k0 : 8, k1 : 8, tau0 : 8, tau1 : 8, b : 16, beta : 1};
+pub const PARAM192S : Param = Param{lambda : 192, l : 3264, tau : 16, k0 : 12, k1 : 12, tau0 : 8, tau1 : 8, b : 16, beta : 2};
+pub const PARAM192F : Param = Param{lambda : 192, l : 3264, tau : 24, k0 : 8, k1 : 8, tau0 : 12, tau1 : 12, b : 16, beta : 2};
+pub const PARAM256S : Param = Param{lambda : 256, l : 4000, tau : 22, k0 : 12, k1 : 11, tau0 : 14, tau1 : 8, b : 16, beta : 2};
+pub const PARAM256F : Param = Param{lambda : 256, l : 4000, tau : 32, k0 : 8, k1 : 8, tau0 : 16, tau1 : 16, b : 16, beta : 2};
+
 
 pub struct ParamOWF {
     nk : u8,
     r : u8,
     ske : u8,
-    senc : u8,
+    senc : u16,
     l : u16,
     lke : u16,
     lenc : u16,
@@ -20,7 +31,7 @@ impl ParamOWF {
     pub fn set_paramowf(nk : u8,
         r : u8,
         ske : u8,
-        senc : u8,
+        senc : u16,
         l : u16,
         lke : u16,
         lenc : u16,
@@ -42,7 +53,7 @@ impl ParamOWF {
         self.ske
     }
 
-    pub fn get_senc(&self) -> u8 {
+    pub fn get_senc(&self) -> u16 {
         self.senc
     }
 
@@ -82,7 +93,7 @@ impl ParamOWF {
         self.ske = value
     }
 
-    pub fn set_senc(&mut self, value : u8) {
+    pub fn set_senc(&mut self, value : u16) {
         self.senc = value
     }
 

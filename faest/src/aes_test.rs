@@ -1,6 +1,6 @@
-use crate::aes::{aes_key_enc_bkwd, aes_key_enc_cstrnts, aes_prove, aes_verify};
+use crate::aes::{aes_enc_bkwd, aes_key_enc_cstrnts, aes_prove, aes_verify};
 use crate::aes::{
-    aes_key_enc_fwd, aes_key_exp_bwd, aes_key_exp_cstrnts, aes_key_exp_fwd, convert_to_bit,
+    aes_enc_fwd, aes_key_exp_bwd, aes_key_exp_cstrnts, aes_key_exp_fwd, convert_to_bit,
     aes_extendedwitness,
 };
 use crate::fields::{BigGaloisField, GF128, GF192, GF256};
@@ -590,7 +590,7 @@ fn aes_enc_fwd_test() {
                 )
             };
             let paramowf = parameter::PARAMOWF128;
-            let res = aes_key_enc_fwd::<GF128>(
+            let res = aes_enc_fwd::<GF128>(
                 &x[..],
                 &xk[..],
                 data.mkey != 0,
@@ -638,7 +638,7 @@ fn aes_enc_fwd_test() {
                 )
             };
             let paramowf = parameter::PARAMOWF192;
-            let res = aes_key_enc_fwd::<GF192>(
+            let res = aes_enc_fwd::<GF192>(
                 &x[..],
                 &xk[..],
                 data.mkey != 0,
@@ -686,7 +686,7 @@ fn aes_enc_fwd_test() {
                 )
             };
             let paramowf = parameter::PARAMOWF256;
-            let res = aes_key_enc_fwd::<GF256>(
+            let res = aes_enc_fwd::<GF256>(
                 &x[..],
                 &xk[..],
                 data.mkey != 0,
@@ -767,7 +767,7 @@ fn aes_enc_bkwd_test() {
                 )
             };
             let paramowf = parameter::PARAMOWF128;
-            let res = aes_key_enc_bkwd::<GF128>(
+            let res = aes_enc_bkwd::<GF128>(
                 &x[..],
                 &xk[..],
                 data.mkey != 0,
@@ -815,7 +815,7 @@ fn aes_enc_bkwd_test() {
                 )
             };
             let paramowf = parameter::PARAMOWF192;
-            let res = aes_key_enc_bkwd::<GF192>(
+            let res = aes_enc_bkwd::<GF192>(
                 &x[..],
                 &xk[..],
                 data.mkey != 0,
@@ -863,7 +863,7 @@ fn aes_enc_bkwd_test() {
                 )
             };
             let paramowf = parameter::PARAMOWF256;
-            let res = aes_key_enc_bkwd::<GF256>(
+            let res = aes_enc_bkwd::<GF256>(
                 &x[..],
                 &xk[..],
                 data.mkey != 0,

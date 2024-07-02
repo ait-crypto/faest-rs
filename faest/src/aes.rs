@@ -320,7 +320,7 @@ where
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
-pub fn aes_key_enc_fwd<T>(
+pub fn aes_enc_fwd<T>(
     x: &[T],
     xk: &[T],
     mkey: bool,
@@ -403,7 +403,7 @@ where
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
-pub fn aes_key_enc_bkwd<T>(
+pub fn aes_enc_bkwd<T>(
     x: &[T],
     xk: &[T],
     mkey: bool,
@@ -489,10 +489,10 @@ where
             .iter()
             .flat_map(|w| convert_to_bit(&[*w]))
             .collect::<Vec<T>>())[..];
-        let s = aes_key_enc_fwd(field_w, k, false, false, input, T::default(), paramowf);
-        let vs = aes_key_enc_fwd(v, vk, false, true, input, T::default(), paramowf);
-        let s_b = aes_key_enc_bkwd(field_w, k, false, false, output, T::default(), paramowf);
-        let v_s_b = aes_key_enc_bkwd(v, vk, false, true, output, T::default(), paramowf);
+        let s = aes_enc_fwd(field_w, k, false, false, input, T::default(), paramowf);
+        let vs = aes_enc_fwd(v, vk, false, true, input, T::default(), paramowf);
+        let s_b = aes_enc_bkwd(field_w, k, false, false, output, T::default(), paramowf);
+        let v_s_b = aes_enc_bkwd(v, vk, false, true, output, T::default(), paramowf);
         let mut a0 = Vec::with_capacity(2 * senc);
         let mut a1 = Vec::with_capacity(senc);
         for j in 0..senc {
@@ -502,8 +502,8 @@ where
         a0.append(&mut a1);
         a0
     } else {
-        let qs = aes_key_enc_fwd(q, qk, true, false, input, delta, paramowf);
-        let q_s_b = aes_key_enc_bkwd(q, qk, true, false, output, delta, paramowf);
+        let qs = aes_enc_fwd(q, qk, true, false, input, delta, paramowf);
+        let q_s_b = aes_enc_bkwd(q, qk, true, false, output, delta, paramowf);
         let mut b = Vec::with_capacity(senc);
         let delta_square = delta * delta;
         for j in 0..senc {

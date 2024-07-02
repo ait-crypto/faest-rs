@@ -3,7 +3,10 @@ use std::fs::File;
 use serde::Deserialize;
 
 use crate::{
-    aes::convert_to_bit, em::{em_key_enc_fwd, extendedwitness}, fields::{BigGaloisField, GF128, GF192, GF256}, parameter::{self, Param, PARAMOWF128, PARAMOWF192, PARAMOWF256}
+    aes::convert_to_bit,
+    em::{em_enc_bkwd, em_enc_fwd, extendedwitness},
+    fields::{BigGaloisField, GF128, GF192, GF256},
+    parameter::{self, Param, PARAM128S, PARAM192S, PARAM256S, PARAMOWF128, PARAMOWF128EM, PARAMOWF192, PARAMOWF192EM, PARAMOWF256, PARAMOWF256EM},
 };
 
 #[derive(Debug, Deserialize)]
@@ -65,7 +68,6 @@ fn em_extended_witness_test() {
     }
 }
 
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EmEncFwd {
@@ -88,19 +90,246 @@ fn aes_enc_fwd_test() {
     for data in database {
         if data.lambda == 128 {
             let paramowf = PARAMOWF128;
-            let (input_x, input_z) : (Vec<GF128>, Vec<GF128>) = if data.m == 1 {(data.x.iter().flat_map(|x| convert_to_bit(&x[0].to_le_bytes()[..1])).collect(), data.z.iter().flat_map(|z| convert_to_bit(&z[0].to_le_bytes()[..1])).collect())} else {(data.x.iter().map(|x| GF128::new(x[0] as u128 + ((x[1] as u128)<<64), 0)).collect(), data.z.iter().map(|z| GF128::new(z[0] as u128 + ((z[1] as u128)<<64), 0)).collect())};
-            let res = em_key_enc_fwd(&input_z, &input_x, &paramowf);
-            assert_eq!(res, data.res.iter().map(|z| GF128::new(z[0] as u128 + ((z[1] as u128)<<64), 0)).collect::<Vec<GF128>>())
+            let (input_x, input_z): (Vec<GF128>, Vec<GF128>) = if data.m == 1 {
+                (
+                    data.x
+                        .iter()
+                        .flat_map(|x| convert_to_bit(&x[0].to_le_bytes()[..1]))
+                        .collect(),
+                    data.z
+                        .iter()
+                        .flat_map(|z| convert_to_bit(&z[0].to_le_bytes()[..1]))
+                        .collect(),
+                )
+            } else {
+                (
+                    data.x
+                        .iter()
+                        .map(|x| GF128::new(x[0] as u128 + ((x[1] as u128) << 64), 0))
+                        .collect(),
+                    data.z
+                        .iter()
+                        .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
+                        .collect(),
+                )
+            };
+            let res = em_enc_fwd(&input_z, &input_x, &paramowf);
+            assert_eq!(
+                res,
+                data.res
+                    .iter()
+                    .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
+                    .collect::<Vec<GF128>>()
+            )
         } else if data.lambda == 192 {
             let paramowf = PARAMOWF192;
-            let (input_x, input_z) : (Vec<GF192>, Vec<GF192>) = if data.m == 1 {(data.x.iter().flat_map(|x| convert_to_bit(&x[0].to_le_bytes()[..1])).collect(), data.z.iter().flat_map(|z| convert_to_bit(&z[0].to_le_bytes()[..1])).collect())} else {(data.x.iter().map(|x| GF192::new(x[0] as u128 + ((x[1] as u128)<<64), x[2] as u128 )).collect(), data.z.iter().map(|z| GF192::new(z[0] as u128 + ((z[1] as u128)<<64), z[2] as u128)).collect())};
-            let res = em_key_enc_fwd(&input_z, &input_x, &paramowf);
-            assert_eq!(res, data.res.iter().map(|z| GF192::new(z[0] as u128 + ((z[1] as u128)<<64), z[2] as u128)).collect::<Vec<GF192>>())
+            let (input_x, input_z): (Vec<GF192>, Vec<GF192>) = if data.m == 1 {
+                (
+                    data.x
+                        .iter()
+                        .flat_map(|x| convert_to_bit(&x[0].to_le_bytes()[..1]))
+                        .collect(),
+                    data.z
+                        .iter()
+                        .flat_map(|z| convert_to_bit(&z[0].to_le_bytes()[..1]))
+                        .collect(),
+                )
+            } else {
+                (
+                    data.x
+                        .iter()
+                        .map(|x| GF192::new(x[0] as u128 + ((x[1] as u128) << 64), x[2] as u128))
+                        .collect(),
+                    data.z
+                        .iter()
+                        .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
+                        .collect(),
+                )
+            };
+            let res = em_enc_fwd(&input_z, &input_x, &paramowf);
+            assert_eq!(
+                res,
+                data.res
+                    .iter()
+                    .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
+                    .collect::<Vec<GF192>>()
+            )
         } else {
             let paramowf = PARAMOWF256;
-            let (input_x, input_z) : (Vec<GF256>, Vec<GF256>) = if data.m == 1 {(data.x.iter().flat_map(|x| convert_to_bit(&x[0].to_le_bytes()[..1])).collect(), data.z.iter().flat_map(|z| convert_to_bit(&z[0].to_le_bytes()[..1])).collect())} else {(data.x.iter().map(|x| GF256::new(x[0] as u128 + ((x[1] as u128)<<64), x[2] as u128 + ((x[3] as u128)<<64))).collect(), data.z.iter().map(|z| GF256::new(z[0] as u128 + ((z[1] as u128)<<64), z[2] as u128 + ((z[3] as u128)<<64))).collect())};
-            let res = em_key_enc_fwd(&input_z, &input_x, &paramowf);
-            assert_eq!(res, data.res.iter().map(|z| GF256::new(z[0] as u128 + ((z[1] as u128)<<64), z[2] as u128 + ((z[3] as u128)<<64))).collect::<Vec<GF256>>())
+            let (input_x, input_z): (Vec<GF256>, Vec<GF256>) = if data.m == 1 {
+                (
+                    data.x
+                        .iter()
+                        .flat_map(|x| convert_to_bit(&x[0].to_le_bytes()[..1]))
+                        .collect(),
+                    data.z
+                        .iter()
+                        .flat_map(|z| convert_to_bit(&z[0].to_le_bytes()[..1]))
+                        .collect(),
+                )
+            } else {
+                (
+                    data.x
+                        .iter()
+                        .map(|x| {
+                            GF256::new(
+                                x[0] as u128 + ((x[1] as u128) << 64),
+                                x[2] as u128 + ((x[3] as u128) << 64),
+                            )
+                        })
+                        .collect(),
+                    data.z
+                        .iter()
+                        .map(|z| {
+                            GF256::new(
+                                z[0] as u128 + ((z[1] as u128) << 64),
+                                z[2] as u128 + ((z[3] as u128) << 64),
+                            )
+                        })
+                        .collect(),
+                )
+            };
+            let res = em_enc_fwd(&input_z, &input_x, &paramowf);
+            assert_eq!(
+                res,
+                data.res
+                    .iter()
+                    .map(|z| GF256::new(
+                        z[0] as u128 + ((z[1] as u128) << 64),
+                        z[2] as u128 + ((z[3] as u128) << 64)
+                    ))
+                    .collect::<Vec<GF256>>()
+            )
+        }
+    }
+}
+
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EmEncBkwd {
+    lambda: u16,
+
+    m: u8,
+
+    x: Vec<[u64; 4]>,
+
+    z: Vec<[u64; 4]>,
+    
+    zout: Vec<[u64; 4]>,
+
+    mtag : u8, 
+
+    mkey : u8,
+
+    delta : Vec<u8>,
+
+    res: Vec<[u64; 4]>,
+}
+
+#[test]
+fn aes_enc_bkwd_test() {
+    let file = File::open("EmEncBkwd.json").unwrap();
+    let database: Vec<EmEncBkwd> =
+        serde_json::from_reader(file).expect("error while reading or parsing");
+    for data in database { 
+        if data.lambda == 128 {
+            let paramowf = PARAMOWF128EM;
+            let param  = PARAM128S;
+            let (x_in, z_in, z_out_in) = if data.m == 1 {(data.x
+                .iter()
+                .flat_map(|x| convert_to_bit::<GF128>(&x[0].to_le_bytes()[..1]))
+                .collect::<Vec<GF128>>(),
+                data.z
+                .iter()
+                .flat_map(|z| convert_to_bit::<GF128>(&z[0].to_le_bytes()[..1]))
+                .collect::<Vec<GF128>>(), data.zout
+                .iter()
+                .flat_map(|z| convert_to_bit::<GF128>(&z[0].to_le_bytes()[..1]))
+                .collect::<Vec<GF128>>())} else {(data.x
+                    .iter()
+                    .map(|x| GF128::new(x[0] as u128 + ((x[1] as u128) << 64), 0))
+                    .collect(),
+                data.z
+                    .iter()
+                    .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
+                    .collect(), data.zout
+                    .iter()
+                    .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
+                    .collect())};
+            let res = em_enc_bkwd::<GF128>(&x_in, &z_in, &z_out_in, data.mkey != 0, data.mtag != 0, GF128::from(&data.delta[..]), &paramowf, &param);
+            assert_eq!(
+                res,
+                data.res
+                    .iter()
+                    .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
+                    .collect::<Vec<GF128>>()
+            )
+        } else if data.lambda == 192 {
+            let paramowf = PARAMOWF192EM;
+            let param  = PARAM192S;
+            let (x_in, z_in, z_out_in) = if data.m == 1 {(data.x
+                .iter()
+                .flat_map(|x| convert_to_bit::<GF192>(&x[0].to_le_bytes()[..1]))
+                .collect::<Vec<GF192>>(),
+            data.z
+                .iter()
+                .flat_map(|z| convert_to_bit::<GF192>(&z[0].to_le_bytes()[..1]))
+                .collect::<Vec<GF192>>(), data.zout
+                .iter()
+                .flat_map(|z| convert_to_bit::<GF192>(&z[0].to_le_bytes()[..1]))
+                .collect::<Vec<GF192>>())} else {(data.x
+                    .iter()
+                    .map(|x| GF192::new(x[0] as u128 + ((x[1] as u128) << 64), x[2] as u128))
+                    .collect(),
+                data.z
+                    .iter()
+                    .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
+                    .collect(), data.zout
+                    .iter()
+                    .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
+                    .collect())};
+            let res = em_enc_bkwd::<GF192>(&x_in, &z_in, &z_out_in, data.mkey != 0, data.mtag != 0, GF192::from(&data.delta[..]), &paramowf, &param);
+            assert_eq!(
+                res,
+                data.res
+                    .iter()
+                    .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
+                    .collect::<Vec<GF192>>()
+            )
+        } else {
+            let paramowf = PARAMOWF256EM;
+            let param  = PARAM256S;
+            let (x_in, z_in, z_out_in) = if data.m == 1 {(data.x
+                .iter()
+                .flat_map(|x| convert_to_bit::<GF256>(&x[0].to_le_bytes()[..1]))
+                .collect::<Vec<GF256>>(),
+            data.z
+                .iter()
+                .flat_map(|z| convert_to_bit::<GF256>(&z[0].to_le_bytes()[..1]))
+                .collect::<Vec<GF256>>(), data.zout
+                .iter()
+                .flat_map(|z| convert_to_bit::<GF256>(&z[0].to_le_bytes()[..1]))
+                .collect::<Vec<GF256>>())} else {(data.x
+                    .iter()
+                    .map(|x| GF256::new(x[0] as u128 + ((x[1] as u128) << 64), x[2] as u128 + ((x[3] as u128) << 64)))
+                    .collect(),
+                data.z
+                    .iter()
+                    .map(|z| GF256::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128 + ((z[3] as u128) << 64)))
+                    .collect(), data.zout
+                    .iter()
+                    .map(|z| GF256::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128 + ((z[3] as u128) << 64)))
+                    .collect())};
+            let res = em_enc_bkwd::<GF256>(&x_in, &z_in, &z_out_in, data.mkey != 0, data.mtag != 0, GF256::from(&data.delta[..]), &paramowf, &param);
+            assert_eq!(
+                res,
+                data.res
+                    .iter()
+                    .map(|z| GF256::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128 + ((z[3] as u128) << 64)))
+                    .collect::<Vec<GF256>>()
+            )
+
         }
     }
 }
