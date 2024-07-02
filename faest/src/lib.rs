@@ -4,7 +4,7 @@ mod fields_test;
 
 mod universal_hashing;
 //#[cfg(test)]
-//mod universal_hashing_test;
+mod universal_hashing_test;
 
 pub mod vc;
 #[cfg(test)]
@@ -30,8 +30,12 @@ pub mod rijndael_32;
 #[cfg(test)]
 pub mod rijndael_32_test;
 
-pub mod faest;
+/* pub mod faest;
 #[cfg(test)]
-pub mod faest_test;
+pub mod faest_test; */
+
+pub mod em;
+#[cfg(test)]
+pub mod em_test;
 
 pub mod parameter;

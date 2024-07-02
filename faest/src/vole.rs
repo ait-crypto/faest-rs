@@ -146,14 +146,7 @@ where
     for i in 0..tau {
         let b: u16 = (i < tau0.into()).into();
         let k = b * k0 + (1 - b) * k1;
-        let delta_p = chaldec(
-            chal,
-            k0,
-            tau0,
-            k1,
-            tau1,
-            i.try_into().unwrap(),
-        );
+        let delta_p = chaldec(chal, k0, tau0, k1, tau1, i.try_into().unwrap());
         #[allow(clippy::needless_range_loop)]
         for j in 0..delta_p.len() {
             delta[i] += (delta_p[j] as u32) << j;

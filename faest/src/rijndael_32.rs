@@ -13,7 +13,6 @@
 
 #![allow(clippy::unreadable_literal)]
 
-
 use aes::Block;
 use cipher::{array::Array, consts::U2};
 
@@ -265,12 +264,7 @@ pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8, r: u8) -> Vec<u
 ///
 /// Decrypts four blocks in-place and in parallel.
 #[allow(dead_code)]
-pub(crate) fn rijndael_decrypt(
-    rkeys: &[u32],
-    blocks: &BatchBlocks,
-    bc: u8,
-    r: u8,
-) -> BatchBlocks {
+pub(crate) fn rijndael_decrypt(rkeys: &[u32], blocks: &BatchBlocks, bc: u8, r: u8) -> BatchBlocks {
     let mut state = State::default();
     bitslice(&mut state, &blocks[0], &blocks[1]);
 
@@ -287,7 +281,6 @@ pub(crate) fn rijndael_decrypt(
         sub_bytes_nots(&mut state);
         inv_sub_bytes(&mut state);
         rk_off -= 8;
-        //println!("{:?}", inv_bitslice(&state));
 
         if rk_off == 0 {
             break;
@@ -303,12 +296,7 @@ pub(crate) fn rijndael_decrypt(
 ///
 /// Encrypts four blocks in-place and in parallel.
 #[allow(dead_code)]
-pub(crate) fn rijndael_encrypt(
-    rkeys: &[u32],
-    input: &[u8],
-    bc: u8,
-    r: u8,
-) -> BatchBlocks {
+pub(crate) fn rijndael_encrypt(rkeys: &[u32], input: &[u8], bc: u8, r: u8) -> BatchBlocks {
     let mut state = State::default();
     bitslice(&mut state, &input[..16], &input[16..]);
     rijndael_add_round_key(&mut state, &rkeys[..8]);

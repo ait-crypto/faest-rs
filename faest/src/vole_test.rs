@@ -153,7 +153,7 @@ fn volecommit_test() {
                 &prg_128,
                 data.k0[0] as u16,
                 data.k1[0] as u16,
-            ); 
+            );
             assert_eq!(res.0, data.hcom);
             for i in 0..res.1.len() {
                 assert_eq!(res.1[i], (data.k[i].clone(), data.com[i].clone()));

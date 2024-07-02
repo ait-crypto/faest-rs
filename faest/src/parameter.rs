@@ -1,6 +1,6 @@
-pub const PARAMOWF128 : ParamOWF = ParamOWF { nk : 4, r : 10, ske : 40, senc : 160, l : 1600, lke : 448, lenc : 1152, beta : 1, c : 200, nst : None};
-pub const PARAMOWF192 : ParamOWF = ParamOWF { nk : 6, r : 12, ske : 32, senc : 192, l : 3264, lke : 448, lenc : 1408, beta : 2, c : 416, nst : None};
-pub const PARAMOWF256 : ParamOWF = ParamOWF { nk : 8, r : 14, ske : 52, senc : 224, l : 4000, lke : 672, lenc : 1664, beta : 2, c : 500, nst : None};
+pub const PARAMOWF128 : ParamOWF = ParamOWF { nk : 4, r : 10, ske : 40, senc : 160, l : 1600, lke : 448, lenc : 1152, beta : 1, c : 200, nst : Some(4)};
+pub const PARAMOWF192 : ParamOWF = ParamOWF { nk : 6, r : 12, ske : 32, senc : 192, l : 3264, lke : 448, lenc : 1408, beta : 2, c : 416, nst : Some(6)};
+pub const PARAMOWF256 : ParamOWF = ParamOWF { nk : 8, r : 14, ske : 52, senc : 224, l : 4000, lke : 672, lenc : 1664, beta : 2, c : 500, nst : Some(8)};
 
 pub struct ParamOWF {
     nk : u8,

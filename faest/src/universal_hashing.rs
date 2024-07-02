@@ -1,7 +1,7 @@
 use crate::fields::{self, GaloisField, GF64};
 
 #[allow(dead_code)]
-pub fn volehash<T>(sd: &[u8], mut x0: Vec<u8>, x1: &[u8], l:usize, b:usize) -> Vec<u8>
+pub fn volehash<T>(sd: &[u8], mut x0: Vec<u8>, x1: &[u8], l: usize, b: usize) -> Vec<u8>
 where
     T: fields::BigGaloisField,
 {

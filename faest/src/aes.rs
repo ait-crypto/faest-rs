@@ -24,38 +24,19 @@ where
     res
 }
 
-pub fn extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) -> Vec<u32> {
-    let lke = paramowf.get_lke();
-    //lke as a value only in classical aes use. testing on it give which is used between rijndael and aes
-    let mut beta = 0;
-    let bc;
-    let mut key = k;
-    if lke != 0 {
-        beta = param.get_beta() as usize;
-        bc = 4;
-    } else {
-        bc = paramowf.get_nst();
-    }
+pub fn aes_extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) -> Vec<u32> {
+    let key = k;
+    let beta = param.get_beta() as usize;
+    let bc = 4;
     let r = paramowf.get_r();
     let kc = paramowf.get_nk() as usize;
-    let mut input = vec![0u8; 32];
+    let mut input = [0u8; 32];
     //step 0
-    if lke != 0 {
-        input[..16 * beta].clone_from_slice(&pk[..16 * beta]);
-    } else {
-        input = k.to_vec();
-        input.append(&mut vec![0; 32 - k.len()]);
-        key = &pk[..4 * bc as usize];
-    }
+    input[..16 * beta].clone_from_slice(&pk[..16 * beta]);
     let mut w = Vec::with_capacity((param.get_l() / 32).into());
     //step 3
-    let kb = if lke != 0 {
-        rijndael_key_schedule(key, bc, kc as u8, r)
-    } else {
-        rijndael_key_schedule(key, kc as u8, kc as u8, r)
-    };
+    let kb = rijndael_key_schedule(key, bc, kc as u8, r);
     //step 4
-    if lke != 0 {
         w.append(&mut convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4].to_vec());
         w.append(
             &mut convert_from_batchblocks(inv_bitslice(&kb[8..16]))[..kc / 2 - (4 - (kc / 2))]
@@ -76,15 +57,7 @@ pub fn extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) 
                 w.push(key[0]);
             }
         }
-    } else {
-        for i in 0..k.len() / 4 {
-            w.push(u32::from_le_bytes(
-                k[i * 4..(i + 1) * 4].try_into().unwrap(),
-            ));
-        }
-    }
     //step 5
-    if lke != 0 {
         for b in 0..beta {
             round_with_save(
                 input[16 * b..16 * (b + 1)].try_into().unwrap(),
@@ -92,21 +65,8 @@ pub fn extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) 
                 &kb,
                 r,
                 &mut w,
-                kc as u8,
-                lke,
             );
         }
-    } else {
-        round_with_save(
-            input[..16].try_into().unwrap(),
-            input[16..].try_into().unwrap(),
-            &kb,
-            r,
-            &mut w,
-            kc as u8,
-            lke,
-        );
-    }
     w
 }
 
@@ -117,20 +77,17 @@ fn round_with_save(
     kb: &[u32],
     r: u8,
     w: &mut Vec<u32>,
-    kc: u8,
-    lke: u16,
 ) {
-    let bc_int = if lke != 0 { 4 } else { kc };
     let mut state = State::default();
     bitslice(&mut state, &input1, &input2);
     rijndael_add_round_key(&mut state, &kb[..8]);
     for j in 1..r as usize {
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
-        rijndael_shift_rows_1(&mut state, bc_int);
+        rijndael_shift_rows_1(&mut state, 4);
         w.append(
-            &mut convert_from_batchblocks(inv_bitslice(&state))[..bc_int as usize]
-                [..bc_int as usize]
+            &mut convert_from_batchblocks(inv_bitslice(&state))[..4]
+                [..4]
                 .to_vec(),
         );
         mix_columns_0(&mut state);
@@ -677,16 +634,8 @@ where
     } else {
         (&pk[..32], &pk[32..])
     };
-    println!("{:?} {:?}", input, output);
     for i in 0..t0 {
-        let sdelta = chaldec(
-            chall3,
-            k0 as u16,
-            t0 as u16,
-            k1 as u16,
-            t1 as u16,
-            i as u16,
-        );
+        let sdelta = chaldec(chall3, k0 as u16, t0 as u16, k1 as u16, t1 as u16, i as u16);
         for j in 0..k0 {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate().take(l / 8) {
