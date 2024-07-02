@@ -215,7 +215,7 @@ where
     res
 }
 
-///Choice is made to treat bits (that is, m=lambda anyway, while in the paper we can have m = 1) as element of GFlambda,
+///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
 pub fn aes_key_exp_cstrnts<T>(
@@ -317,7 +317,7 @@ where
     }
 }
 
-///Choice is made to treat bits (that is, m=lambda anyway, while in the paper we can have m = 1) as element of GFlambda,
+///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
 pub fn aes_key_enc_fwd<T>(
@@ -400,7 +400,7 @@ where
     res
 }
 
-///Choice is made to treat bits (that is, m=lambda anyway, while in the paper we can have m = 1) as element of GFlambda,
+///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
 pub fn aes_key_enc_bkwd<T>(

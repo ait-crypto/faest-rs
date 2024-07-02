@@ -542,15 +542,15 @@ struct AesEncFwd {
 
     mtag: u8,
 
-    x: Vec<[u128; 4]>,
+    x: Vec<[u64; 4]>,
 
-    xk: Vec<[u128; 4]>,
+    xk: Vec<[u64; 4]>,
 
     input: [u8; 16],
 
-    delta: [u128; 4],
+    delta: [u64; 4],
 
-    reslambda: Vec<[u128; 4]>,
+    reslambda: Vec<[u64; 4]>,
 }
 
 #[test]
@@ -580,12 +580,12 @@ fn aes_enc_fwd_test() {
                     (data
                         .x
                         .iter()
-                        .map(|v| GF128::new(v[0] + ((v[1]) << 64), 0))
+                        .map(|v| GF128::new(v[0] as u128 + ((v[1] as u128) << 64), 0))
                         .collect::<Vec<GF128>>()),
                     (data
                         .xk
                         .iter()
-                        .map(|v| GF128::new(v[0] + ((v[1]) << 64), 0))
+                        .map(|v| GF128::new(v[0] as u128 + ((v[1] as u128) << 64), 0))
                         .collect::<Vec<GF128>>()),
                 )
             };
@@ -596,13 +596,13 @@ fn aes_enc_fwd_test() {
                 data.mkey != 0,
                 data.mtag != 0,
                 data.input,
-                GF128::new(data.delta[0] + ((data.delta[1]) << 64), 0),
+                GF128::new(data.delta[0] as u128 + ((data.delta[1] as u128) << 64), 0),
                 &paramowf,
             );
             let out = data
                 .reslambda
                 .iter()
-                .map(|v| GF128::new(v[0] + ((v[1]) << 64), 0))
+                .map(|v| GF128::new(v[0] as u128 + ((v[1] as u128) << 64), 0))
                 .collect::<Vec<GF128>>();
             for i in 0..out.len() {
                 assert_eq!(out[i], res[i]);
@@ -628,12 +628,12 @@ fn aes_enc_fwd_test() {
                     (data
                         .x
                         .iter()
-                        .map(|v| GF192::new(v[0] + ((v[1]) << 64), v[2]))
+                        .map(|v| GF192::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128))
                         .collect::<Vec<GF192>>()),
                     (data
                         .xk
                         .iter()
-                        .map(|v| GF192::new(v[0] + ((v[1]) << 64), v[2]))
+                        .map(|v| GF192::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128))
                         .collect::<Vec<GF192>>()),
                 )
             };
@@ -644,13 +644,13 @@ fn aes_enc_fwd_test() {
                 data.mkey != 0,
                 data.mtag != 0,
                 data.input,
-                GF192::new(data.delta[0] + ((data.delta[1]) << 64), data.delta[2]),
+                GF192::new(data.delta[0] as u128 + ((data.delta[1] as u128) << 64), data.delta[2] as u128),
                 &paramowf,
             );
             let out = data
                 .reslambda
                 .iter()
-                .map(|v| GF192::new(v[0] + ((v[1]) << 64), v[2]))
+                .map(|v| GF192::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128))
                 .collect::<Vec<GF192>>();
             for i in 0..out.len() {
                 assert_eq!(out[i], res[i]);
@@ -676,12 +676,12 @@ fn aes_enc_fwd_test() {
                     (data
                         .x
                         .iter()
-                        .map(|v| GF256::new(v[0] + ((v[1]) << 64), v[2] + ((v[3]) << 64)))
+                        .map(|v| GF256::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128 + ((v[3] as u128) << 64)))
                         .collect::<Vec<GF256>>()),
                     (data
                         .xk
                         .iter()
-                        .map(|v| GF256::new(v[0] + ((v[1]) << 64), v[2] + ((v[3]) << 64)))
+                        .map(|v| GF256::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128 + ((v[3] as u128) << 64)))
                         .collect::<Vec<GF256>>()),
                 )
             };
@@ -693,15 +693,15 @@ fn aes_enc_fwd_test() {
                 data.mtag != 0,
                 data.input,
                 GF256::new(
-                    data.delta[0] + ((data.delta[1]) << 64),
-                    data.delta[2] + (data.delta[3] << 64),
+                    data.delta[0] as u128 + ((data.delta[1] as u128) << 64),
+                    data.delta[2] as u128 + ((data.delta[3] as u128) << 64),
                 ),
                 &paramowf,
             );
             let out = data
                 .reslambda
                 .iter()
-                .map(|v| GF256::new(v[0] + (v[1] << 64), v[2] + (v[3] << 64)))
+                .map(|v| GF256::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128 + ((v[3] as u128) << 64)))
                 .collect::<Vec<GF256>>();
             for i in 0..out.len() {
                 assert_eq!(out[i], res[i]);
