@@ -1,45 +1,183 @@
-pub const PARAMOWF128 : ParamOWF = ParamOWF { nk : 4, r : 10, ske : 40, senc : 160, l : 1600, lke : 448, lenc : 1152, beta : 1, c : 200, nst : Some(4)};
-pub const PARAMOWF192 : ParamOWF = ParamOWF { nk : 6, r : 12, ske : 32, senc : 192, l : 3264, lke : 448, lenc : 1408, beta : 2, c : 416, nst : Some(6)};
-pub const PARAMOWF256 : ParamOWF = ParamOWF { nk : 8, r : 14, ske : 52, senc : 224, l : 4000, lke : 672, lenc : 1664, beta : 2, c : 500, nst : Some(8)};
-pub const PARAMOWF128EM : ParamOWF = ParamOWF { nk : 4, r : 10, ske : 40, senc : 160, l : 1280, lke : 448, lenc : 1152, beta : 1, c : 200, nst : Some(4)};
-pub const PARAMOWF192EM : ParamOWF = ParamOWF { nk : 6, r : 12, ske : 32, senc : 288, l : 2304, lke : 448, lenc : 1408, beta : 2, c : 416, nst : Some(6)};
-pub const PARAMOWF256EM : ParamOWF = ParamOWF { nk : 8, r : 14, ske : 52, senc : 448, l : 3584, lke : 672, lenc : 1664, beta : 2, c : 500, nst : Some(8)};
+pub const PARAMOWF128: ParamOWF = ParamOWF {
+    nk: 4,
+    r: 10,
+    ske: 40,
+    senc: 160,
+    l: 1600,
+    lke: 448,
+    lenc: 1152,
+    beta: 1,
+    c: 200,
+    nst: Some(4),
+};
+pub const PARAMOWF192: ParamOWF = ParamOWF {
+    nk: 6,
+    r: 12,
+    ske: 32,
+    senc: 192,
+    l: 3264,
+    lke: 448,
+    lenc: 1408,
+    beta: 2,
+    c: 416,
+    nst: Some(6),
+};
+pub const PARAMOWF256: ParamOWF = ParamOWF {
+    nk: 8,
+    r: 14,
+    ske: 52,
+    senc: 224,
+    l: 4000,
+    lke: 672,
+    lenc: 1664,
+    beta: 2,
+    c: 500,
+    nst: Some(8),
+};
+pub const PARAMOWF128EM: ParamOWF = ParamOWF {
+    nk: 4,
+    r: 10,
+    ske: 40,
+    senc: 160,
+    l: 1280,
+    lke: 448,
+    lenc: 1152,
+    beta: 1,
+    c: 200,
+    nst: Some(4),
+};
+pub const PARAMOWF192EM: ParamOWF = ParamOWF {
+    nk: 6,
+    r: 12,
+    ske: 32,
+    senc: 288,
+    l: 2304,
+    lke: 448,
+    lenc: 1408,
+    beta: 2,
+    c: 416,
+    nst: Some(6),
+};
+pub const PARAMOWF256EM: ParamOWF = ParamOWF {
+    nk: 8,
+    r: 14,
+    ske: 52,
+    senc: 448,
+    l: 3584,
+    lke: 672,
+    lenc: 1664,
+    beta: 2,
+    c: 500,
+    nst: Some(8),
+};
 
-pub const PARAM128S : Param = Param{lambda : 128, l : 1600, tau : 11, k0 : 12, k1 : 11, tau0 : 7, tau1 : 4, b : 16, beta : 1};
-pub const PARAM128F : Param = Param{lambda : 128, l : 1600, tau : 16, k0 : 8, k1 : 8, tau0 : 8, tau1 : 8, b : 16, beta : 1};
-pub const PARAM192S : Param = Param{lambda : 192, l : 3264, tau : 16, k0 : 12, k1 : 12, tau0 : 8, tau1 : 8, b : 16, beta : 2};
-pub const PARAM192F : Param = Param{lambda : 192, l : 3264, tau : 24, k0 : 8, k1 : 8, tau0 : 12, tau1 : 12, b : 16, beta : 2};
-pub const PARAM256S : Param = Param{lambda : 256, l : 4000, tau : 22, k0 : 12, k1 : 11, tau0 : 14, tau1 : 8, b : 16, beta : 2};
-pub const PARAM256F : Param = Param{lambda : 256, l : 4000, tau : 32, k0 : 8, k1 : 8, tau0 : 16, tau1 : 16, b : 16, beta : 2};
-
+pub const PARAM128S: Param = Param {
+    lambda: 128,
+    l: 1600,
+    tau: 11,
+    k0: 12,
+    k1: 11,
+    tau0: 7,
+    tau1: 4,
+    b: 16,
+    beta: 1,
+};
+pub const PARAM128F: Param = Param {
+    lambda: 128,
+    l: 1600,
+    tau: 16,
+    k0: 8,
+    k1: 8,
+    tau0: 8,
+    tau1: 8,
+    b: 16,
+    beta: 1,
+};
+pub const PARAM192S: Param = Param {
+    lambda: 192,
+    l: 3264,
+    tau: 16,
+    k0: 12,
+    k1: 12,
+    tau0: 8,
+    tau1: 8,
+    b: 16,
+    beta: 2,
+};
+pub const PARAM192F: Param = Param {
+    lambda: 192,
+    l: 3264,
+    tau: 24,
+    k0: 8,
+    k1: 8,
+    tau0: 12,
+    tau1: 12,
+    b: 16,
+    beta: 2,
+};
+pub const PARAM256S: Param = Param {
+    lambda: 256,
+    l: 4000,
+    tau: 22,
+    k0: 12,
+    k1: 11,
+    tau0: 14,
+    tau1: 8,
+    b: 16,
+    beta: 2,
+};
+pub const PARAM256F: Param = Param {
+    lambda: 256,
+    l: 4000,
+    tau: 32,
+    k0: 8,
+    k1: 8,
+    tau0: 16,
+    tau1: 16,
+    b: 16,
+    beta: 2,
+};
 
 pub struct ParamOWF {
-    nk : u8,
-    r : u8,
-    ske : u8,
-    senc : u16,
-    l : u16,
-    lke : u16,
-    lenc : u16,
-    beta : u8,
-    c : u16,
-    nst : Option<u8>,
+    nk: u8,
+    r: u8,
+    ske: u8,
+    senc: u16,
+    l: u16,
+    lke: u16,
+    lenc: u16,
+    beta: u8,
+    c: u16,
+    nst: Option<u8>,
 }
 
 impl ParamOWF {
     #[allow(clippy::too_many_arguments)]
-    pub fn set_paramowf(nk : u8,
-        r : u8,
-        ske : u8,
-        senc : u16,
-        l : u16,
-        lke : u16,
-        lenc : u16,
-        beta : u8,
-        c : u16,
-        nst : Option<u8>) -> ParamOWF {
-            ParamOWF { nk, r, ske, senc, l, lke, lenc, beta, c, nst }
+    pub fn set_paramowf(
+        nk: u8,
+        r: u8,
+        ske: u8,
+        senc: u16,
+        l: u16,
+        lke: u16,
+        lenc: u16,
+        beta: u8,
+        c: u16,
+        nst: Option<u8>,
+    ) -> ParamOWF {
+        ParamOWF {
+            nk,
+            r,
+            ske,
+            senc,
+            l,
+            lke,
+            lenc,
+            beta,
+            c,
+            nst,
         }
+    }
 
     pub fn get_nk(&self) -> u8 {
         self.nk
@@ -81,75 +219,84 @@ impl ParamOWF {
         self.nst.unwrap()
     }
 
-    pub fn set_nk(&mut self, value : u8) {
+    pub fn set_nk(&mut self, value: u8) {
         self.nk = value
     }
 
-    pub fn set_r(&mut self, value : u8) {
+    pub fn set_r(&mut self, value: u8) {
         self.r = value
     }
 
-    pub fn set_ske(&mut self, value : u8) {
+    pub fn set_ske(&mut self, value: u8) {
         self.ske = value
     }
 
-    pub fn set_senc(&mut self, value : u16) {
+    pub fn set_senc(&mut self, value: u16) {
         self.senc = value
     }
 
-    pub fn set_l(&mut self, value : u16) {
+    pub fn set_l(&mut self, value: u16) {
         self.l = value
     }
 
-    pub fn set_lke(&mut self, value : u16) {
+    pub fn set_lke(&mut self, value: u16) {
         self.lke = value
     }
 
-    pub fn set_lenc(&mut self, value : u16) {
+    pub fn set_lenc(&mut self, value: u16) {
         self.lenc = value
     }
 
-    pub fn set_beta(&mut self, value : u8) {
+    pub fn set_beta(&mut self, value: u8) {
         self.beta = value
     }
 
-    pub fn set_c(&mut self, value : u16) {
+    pub fn set_c(&mut self, value: u16) {
         self.c = value
     }
 
-    pub fn set_nst(&mut self, value : u8){
+    pub fn set_nst(&mut self, value: u8) {
         self.nst = Some(value)
     }
-
 }
-
 
 pub struct Param {
-    lambda : u16, 
-    l : u16,
-    tau : u8,
-    k0 : u8,
+    lambda: u16,
+    l: u16,
+    tau: u8,
+    k0: u8,
     k1: u8,
-    tau0 : u8,
-    tau1 : u8,
-    b : u8,
-    beta : u8
+    tau0: u8,
+    tau1: u8,
+    b: u8,
+    beta: u8,
 }
-
 
 impl Param {
     #[allow(clippy::too_many_arguments)]
-    pub fn set_param ( lambda : u16, 
-        l : u16,
-        tau : u8,
-        k0 : u8,
+    pub fn set_param(
+        lambda: u16,
+        l: u16,
+        tau: u8,
+        k0: u8,
         k1: u8,
-        tau0 : u8,
-        tau1 : u8,
-        b : u8,
-        beta : u8 ) -> Param {
-            Param { lambda, l, tau, k0, k1, tau0, tau1, b, beta }
+        tau0: u8,
+        tau1: u8,
+        b: u8,
+        beta: u8,
+    ) -> Param {
+        Param {
+            lambda,
+            l,
+            tau,
+            k0,
+            k1,
+            tau0,
+            tau1,
+            b,
+            beta,
         }
+    }
 
     pub fn get_lambda(&self) -> u16 {
         self.lambda
@@ -187,42 +334,39 @@ impl Param {
         self.beta
     }
 
-    pub fn set_lambda(&mut self, value : u16) {
+    pub fn set_lambda(&mut self, value: u16) {
         self.lambda = value
     }
 
-    pub fn set_l(&mut self, value : u16) {
+    pub fn set_l(&mut self, value: u16) {
         self.l = value
     }
 
-    pub fn set_tau(&mut self, value : u8){
+    pub fn set_tau(&mut self, value: u8) {
         self.tau = value
     }
 
-    pub fn set_k0(&mut self, value : u8){
+    pub fn set_k0(&mut self, value: u8) {
         self.k0 = value
     }
 
-    pub fn set_k1(&mut self, value : u8){
+    pub fn set_k1(&mut self, value: u8) {
         self.k1 = value
     }
 
-    pub fn set_tau0(&mut self, value : u8) {
+    pub fn set_tau0(&mut self, value: u8) {
         self.tau0 = value
     }
 
-    pub fn set_tau1(&mut self, value : u8)  {
+    pub fn set_tau1(&mut self, value: u8) {
         self.tau1 = value
     }
 
-    pub fn set_b(&mut self, value : u8) {
+    pub fn set_b(&mut self, value: u8) {
         self.b = value
     }
 
-    pub fn set_beta(&mut self, value : u8) {
+    pub fn set_beta(&mut self, value: u8) {
         self.beta = value
     }
-
 }
-
-

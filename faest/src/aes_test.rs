@@ -1,11 +1,11 @@
-use crate::aes::{aes_enc_bkwd, aes_key_enc_cstrnts, aes_prove, aes_verify};
+use crate::aes::{aes_enc_bkwd, aes_enc_cstrnts, aes_prove, aes_verify};
 use crate::aes::{
-    aes_enc_fwd, aes_key_exp_bwd, aes_key_exp_cstrnts, aes_key_exp_fwd, convert_to_bit,
-    aes_extendedwitness,
+    aes_enc_fwd, aes_extendedwitness, aes_key_exp_bwd, aes_key_exp_cstrnts, aes_key_exp_fwd,
+    convert_to_bit,
 };
 use crate::fields::{BigGaloisField, GF128, GF192, GF256};
-use crate::parameter::{self};
 use crate::parameter::Param;
+use crate::parameter::{self};
 #[cfg(test)]
 use serde::Deserialize;
 #[allow(unused_imports)]
@@ -644,7 +644,10 @@ fn aes_enc_fwd_test() {
                 data.mkey != 0,
                 data.mtag != 0,
                 data.input,
-                GF192::new(data.delta[0] as u128 + ((data.delta[1] as u128) << 64), data.delta[2] as u128),
+                GF192::new(
+                    data.delta[0] as u128 + ((data.delta[1] as u128) << 64),
+                    data.delta[2] as u128,
+                ),
                 &paramowf,
             );
             let out = data
@@ -676,12 +679,22 @@ fn aes_enc_fwd_test() {
                     (data
                         .x
                         .iter()
-                        .map(|v| GF256::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128 + ((v[3] as u128) << 64)))
+                        .map(|v| {
+                            GF256::new(
+                                v[0] as u128 + ((v[1] as u128) << 64),
+                                v[2] as u128 + ((v[3] as u128) << 64),
+                            )
+                        })
                         .collect::<Vec<GF256>>()),
                     (data
                         .xk
                         .iter()
-                        .map(|v| GF256::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128 + ((v[3] as u128) << 64)))
+                        .map(|v| {
+                            GF256::new(
+                                v[0] as u128 + ((v[1] as u128) << 64),
+                                v[2] as u128 + ((v[3] as u128) << 64),
+                            )
+                        })
                         .collect::<Vec<GF256>>()),
                 )
             };
@@ -701,7 +714,12 @@ fn aes_enc_fwd_test() {
             let out = data
                 .reslambda
                 .iter()
-                .map(|v| GF256::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128 + ((v[3] as u128) << 64)))
+                .map(|v| {
+                    GF256::new(
+                        v[0] as u128 + ((v[1] as u128) << 64),
+                        v[2] as u128 + ((v[3] as u128) << 64),
+                    )
+                })
                 .collect::<Vec<GF256>>();
             for i in 0..out.len() {
                 assert_eq!(out[i], res[i]);
@@ -950,7 +968,7 @@ fn aes_enc_cstrnts_test() {
                     )
                 })
                 .collect();
-            let res = aes_key_enc_cstrnts::<GF128>(
+            let res = aes_enc_cstrnts::<GF128>(
                 data.input,
                 data.output,
                 &w,
@@ -1004,7 +1022,7 @@ fn aes_enc_cstrnts_test() {
                     )
                 })
                 .collect();
-            let res = aes_key_enc_cstrnts::<GF192>(
+            let res = aes_enc_cstrnts::<GF192>(
                 data.input,
                 data.output,
                 &w,
@@ -1059,7 +1077,7 @@ fn aes_enc_cstrnts_test() {
                     )
                 })
                 .collect();
-            let res = aes_key_enc_cstrnts::<GF256>(
+            let res = aes_enc_cstrnts::<GF256>(
                 data.input,
                 data.output,
                 &w,

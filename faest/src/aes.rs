@@ -37,47 +37,39 @@ pub fn aes_extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamO
     //step 3
     let kb = rijndael_key_schedule(key, bc, kc as u8, r);
     //step 4
-        w.append(&mut convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4].to_vec());
-        w.append(
-            &mut convert_from_batchblocks(inv_bitslice(&kb[8..16]))[..kc / 2 - (4 - (kc / 2))]
-                .to_vec(),
-        );
-        for j in 1 + (kc / 8)
-            ..1 + (kc / 8)
-                + ((paramowf.get_ske() as usize) * ((2 - (kc % 4)) * 2 + (kc % 4) * 3)) / 16
-        {
-            let key = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]));
-            if kc == 6 {
-                if j % 3 == 1 {
-                    w.push(key[2]);
-                } else if j % 3 == 0 {
-                    w.push(key[0]);
-                }
-            } else {
+    w.append(&mut convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4].to_vec());
+    w.append(
+        &mut convert_from_batchblocks(inv_bitslice(&kb[8..16]))[..kc / 2 - (4 - (kc / 2))].to_vec(),
+    );
+    for j in 1 + (kc / 8)
+        ..1 + (kc / 8) + ((paramowf.get_ske() as usize) * ((2 - (kc % 4)) * 2 + (kc % 4) * 3)) / 16
+    {
+        let key = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]));
+        if kc == 6 {
+            if j % 3 == 1 {
+                w.push(key[2]);
+            } else if j % 3 == 0 {
                 w.push(key[0]);
             }
+        } else {
+            w.push(key[0]);
         }
+    }
     //step 5
-        for b in 0..beta {
-            round_with_save(
-                input[16 * b..16 * (b + 1)].try_into().unwrap(),
-                [0; 16],
-                &kb,
-                r,
-                &mut w,
-            );
-        }
+    for b in 0..beta {
+        round_with_save(
+            input[16 * b..16 * (b + 1)].try_into().unwrap(),
+            [0; 16],
+            &kb,
+            r,
+            &mut w,
+        );
+    }
     w
 }
 
 #[allow(clippy::too_many_arguments)]
-fn round_with_save(
-    input1: [u8; 16],
-    input2: [u8; 16],
-    kb: &[u32],
-    r: u8,
-    w: &mut Vec<u32>,
-) {
+fn round_with_save(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mut Vec<u32>) {
     let mut state = State::default();
     bitslice(&mut state, &input1, &input2);
     rijndael_add_round_key(&mut state, &kb[..8]);
@@ -85,11 +77,7 @@ fn round_with_save(
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, 4);
-        w.append(
-            &mut convert_from_batchblocks(inv_bitslice(&state))[..4]
-                [..4]
-                .to_vec(),
-        );
+        w.append(&mut convert_from_batchblocks(inv_bitslice(&state))[..4][..4].to_vec());
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
     }
@@ -463,7 +451,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn aes_key_enc_cstrnts<T>(
+pub fn aes_enc_cstrnts<T>(
     input: [u8; 16],
     output: [u8; 16],
     w: &[u8],
@@ -558,7 +546,7 @@ where
         T::default(),
         paramowf,
     );
-    let a_01 = aes_key_enc_cstrnts::<T>(
+    let a_01 = aes_enc_cstrnts::<T>(
         input[..16].try_into().unwrap(),
         output[..16].try_into().unwrap(),
         &new_w[lke / 8..(lke + lenc) / 8],
@@ -574,7 +562,7 @@ where
     a0.append(&mut a_01[..senc].to_vec());
     a1.append(&mut a_01[senc..].to_vec());
     if lambda > 128 {
-        let a_01 = aes_key_enc_cstrnts(
+        let a_01 = aes_enc_cstrnts(
             input[16..].try_into().unwrap(),
             output[16..].try_into().unwrap(),
             &new_w[(lke + lenc) / 8..l / 8],
@@ -676,7 +664,7 @@ where
     let new_q = T::to_field(&temp_q);
     let mut b = Vec::with_capacity(c);
     let (mut b1, _, _, qk) = aes_key_exp_cstrnts(&[], &[], true, &new_q[0..lke], delta, paramowf);
-    let mut b2 = aes_key_enc_cstrnts(
+    let mut b2 = aes_enc_cstrnts(
         input[..16].try_into().unwrap(),
         output[..16].try_into().unwrap(),
         &[],
@@ -692,7 +680,7 @@ where
     b.append(&mut b1);
     b.append(&mut b2);
     if lambda > 128 {
-        let mut b3 = aes_key_enc_cstrnts(
+        let mut b3 = aes_enc_cstrnts(
             input[16..].try_into().unwrap(),
             output[16..].try_into().unwrap(),
             &[],

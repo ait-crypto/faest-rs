@@ -1,12 +1,10 @@
 use std::iter::zip;
 
 use crate::{
-    fields::BigGaloisField,
-    parameter::{Param, ParamOWF},
-    rijndael_32::{
+    aes::convert_to_bit, fields::BigGaloisField, parameter::{Param, ParamOWF}, rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
-    },
+    }
 };
 
 pub fn extendedwitness(k: &[u8], pk: (&[u8], &[u8]), param: Param, paramowf: ParamOWF) -> Vec<u8> {
@@ -169,4 +167,67 @@ where
         }
     }
     res
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn em_enc_cstrnts<T>(
+    output: &[u8],
+    x: &[u8],
+    w: &[u8],
+    v: &[T],
+    q: &[T],
+    mkey: bool,
+    delta: T,
+    paramowf: &ParamOWF,
+    param: &Param,
+) -> (Vec<T>, Vec<T>)
+where
+    T: BigGaloisField
+        + std::default::Default
+        + std::marker::Sized
+        + std::fmt::Debug
+        + std::ops::Add<T>,
+{
+    let lambda = param.get_lambda() as usize;
+    let senc = paramowf.get_senc() as usize;
+    let nst = paramowf.get_nst() as usize;
+    let r = paramowf.get_r() as usize;
+    if !mkey {
+        let new_w = &convert_to_bit::<T>(w);
+        let new_x = convert_to_bit::<T>(&x[..4*nst*(r+1)]);
+        let mut w_out = Vec::with_capacity(lambda);
+        for i in 0..lambda/8 {
+            for j in 0..8 {
+                w_out.push(T::ONE * ((output[i]>>j)&1) + new_w[i*8 + j]);
+            }
+        }
+        let v_out = &v[0..lambda];
+        let s = em_enc_fwd::<T>(new_w, &new_x, paramowf);
+        let vs = em_enc_fwd::<T>(v, &vec![T::default(); lambda*(r+1)], paramowf);
+        let s_b = em_enc_bkwd::<T>(&new_x, new_w, &w_out, false, false, T::default(), paramowf, param);
+        let v_s_b = em_enc_bkwd::<T>(&vec![T::default(); lambda*(r+1)], v, v_out, false, true, T::default(), paramowf, param);
+        let (mut a0, mut a1) =(Vec::with_capacity(senc), Vec::with_capacity(senc));
+        for j in 0..senc {
+            a0.push(v_s_b[j] * vs[j]);
+            a1.push(((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + T::ONE + a0[j]);
+        }
+        (a0, a1)
+    } else {
+        let new_output = &convert_to_bit::<T>(output);
+        let mut new_x = Vec::with_capacity(32*nst*(r+1));
+        for i in 0..4*nst*(r+1) {
+            for j in 0..8 {
+                new_x.push(delta * ((x[i] >> j) & 1));
+            } 
+        }
+        let mut q_out = Vec::with_capacity(lambda);
+        for i in 0..lambda {
+            q_out.push(T::ONE * (&[new_output[i]])[0] * delta + q[i]);
+        }
+        let qs = em_enc_fwd(q, &new_x, paramowf);
+        let qs_b = em_enc_bkwd::<T>(&new_x, q, &q_out, true, false, delta, paramowf, param);
+        let immut = delta * delta;
+        let b = zip(qs, qs_b).map(|(q, qb)| (q*qb) + immut).collect();
+        (b, vec![T::default(); senc])
+    }
 }
