@@ -4,11 +4,11 @@ use serde::Deserialize;
 
 use crate::{
     aes::convert_to_bit,
-    em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_prove, extendedwitness},
+    em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_prove, em_verify, extendedwitness},
     fields::{BigGaloisField, GF128, GF192, GF256},
     parameter::{
-        self, Param, PARAM128S, PARAM192S, PARAM256S, PARAMOWF128, PARAMOWF128EM, PARAMOWF192,
-        PARAMOWF192EM, PARAMOWF256, PARAMOWF256EM,
+        self, Param, PARAM128F, PARAM128S, PARAM192F, PARAM192S, PARAM256F, PARAM256S, PARAMOWF128,
+        PARAMOWF128EM, PARAMOWF192, PARAMOWF192EM, PARAMOWF256, PARAMOWF256EM,
     },
 };
 
@@ -431,7 +431,7 @@ struct EmEncCstrnts {
 }
 
 #[test]
-fn aes_enc_cstrnts_test() {
+fn em_enc_cstrnts_test() {
     let file = File::open("EmEncCstrnts.json").unwrap();
     let database: Vec<EmEncCstrnts> =
         serde_json::from_reader(file).expect("error while reading or parsing");
@@ -538,7 +538,6 @@ fn aes_enc_cstrnts_test() {
     }
 }
 
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EmProve {
@@ -546,18 +545,18 @@ struct EmProve {
 
     gv: Vec<Vec<u8>>,
 
-    w: Vec<u8>, 
+    w: Vec<u8>,
 
     u: Vec<u8>,
-    
+
     input: Vec<u8>,
-    
+
     output: Vec<u8>,
-    
+
     chall: Vec<u8>,
-    
+
     at: Vec<u8>,
-    
+
     bt: Vec<u8>,
 }
 
@@ -568,14 +567,147 @@ fn em_prove_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let res = em_prove::<GF128>(&data.w, &data.u, &data.gv, &[data.input, data.output].concat(), &data.chall, &PARAMOWF128EM, &PARAM128S);
+            let res = em_prove::<GF128>(
+                &data.w,
+                &data.u,
+                &data.gv,
+                &[data.input, data.output].concat(),
+                &data.chall,
+                &PARAMOWF128EM,
+                &PARAM128S,
+            );
             assert_eq!((data.at, data.bt), res);
         } else if data.lambda == 192 {
-            let res = em_prove::<GF192>(&data.w, &data.u, &data.gv, &[data.input, data.output].concat(), &data.chall, &PARAMOWF192EM, &PARAM192S);
+            let res = em_prove::<GF192>(
+                &data.w,
+                &data.u,
+                &data.gv,
+                &[data.input, data.output].concat(),
+                &data.chall,
+                &PARAMOWF192EM,
+                &PARAM192S,
+            );
             assert_eq!((data.at, data.bt), res);
         } else {
-            let res = em_prove::<GF256>(&data.w, &data.u, &data.gv, &[data.input, data.output].concat(), &data.chall, &PARAMOWF256EM, &PARAM256S);
+            let res = em_prove::<GF256>(
+                &data.w,
+                &data.u,
+                &data.gv,
+                &[data.input, data.output].concat(),
+                &data.chall,
+                &PARAMOWF256EM,
+                &PARAM256S,
+            );
             assert_eq!((data.at, data.bt), res);
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EmVerify {
+    lambda: u16,
+
+    tau: u8,
+
+    d: Vec<u8>,
+
+    gq: Vec<Vec<u8>>,
+
+    at: Vec<u8>,
+
+    chall2: Vec<u8>,
+
+    chall3: Vec<u8>,
+
+    input: Vec<u8>,
+
+    output: Vec<u8>,
+
+    qt: Vec<u8>,
+}
+
+#[test]
+fn em_verify_test() {
+    let file = File::open("EmVerify.json").unwrap();
+    let database: Vec<EmVerify> =
+        serde_json::from_reader(file).expect("error while reading or parsing");
+    for data in database {
+        if data.lambda == 128 {
+            let res = if data.tau == 11 {
+                em_verify::<GF128>(
+                    &data.d,
+                    data.gq,
+                    GF128::to_field(&data.at)[0],
+                    &data.chall2,
+                    &data.chall3,
+                    &[data.input, data.output].concat(),
+                    &PARAMOWF128EM,
+                    &PARAM128S,
+                )
+            } else {
+                em_verify::<GF128>(
+                    &data.d,
+                    data.gq,
+                    GF128::to_field(&data.at)[0],
+                    &data.chall2,
+                    &data.chall3,
+                    &[data.input, data.output].concat(),
+                    &PARAMOWF128EM,
+                    &PARAM128F,
+                )
+            };
+            assert_eq!(res, data.qt);
+        } else if data.lambda == 192 {
+            let res = if data.tau == 16 {
+                em_verify::<GF192>(
+                    &data.d,
+                    data.gq,
+                    GF192::to_field(&data.at)[0],
+                    &data.chall2,
+                    &data.chall3,
+                    &[data.input, data.output].concat(),
+                    &PARAMOWF192EM,
+                    &PARAM192S,
+                )
+            } else {
+                em_verify::<GF192>(
+                    &data.d,
+                    data.gq,
+                    GF192::to_field(&data.at)[0],
+                    &data.chall2,
+                    &data.chall3,
+                    &[data.input, data.output].concat(),
+                    &PARAMOWF192EM,
+                    &PARAM192F,
+                )
+            };
+            assert_eq!(res, data.qt);
+        } else {
+            let res = if data.tau == 22 {
+                em_verify::<GF256>(
+                    &data.d,
+                    data.gq,
+                    GF256::to_field(&data.at)[0],
+                    &data.chall2,
+                    &data.chall3,
+                    &[data.input, data.output].concat(),
+                    &PARAMOWF256EM,
+                    &PARAM256S,
+                )
+            } else {
+                em_verify::<GF256>(
+                    &data.d,
+                    data.gq,
+                    GF256::to_field(&data.at)[0],
+                    &data.chall2,
+                    &data.chall3,
+                    &[data.input, data.output].concat(),
+                    &PARAMOWF256EM,
+                    &PARAM256F,
+                )
+            };
+            assert_eq!(res, data.qt);
         }
     }
 }

@@ -7,7 +7,9 @@ use crate::{
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
-    }, universal_hashing::zkhash,
+    },
+    universal_hashing::zkhash,
+    vole::chaldec,
 };
 
 pub fn extendedwitness(k: &[u8], pk: (&[u8], &[u8]), param: Param, paramowf: ParamOWF) -> Vec<u8> {
@@ -235,7 +237,11 @@ where
     } else {
         let new_output = &convert_to_bit::<T>(output);
         let mut new_x = Vec::with_capacity(32 * nst * (r + 1));
-        let _ = x.iter().take(4 * nst * (r + 1)).map(|x| for j in 0..8 {new_x.push(delta * ((x >> j) & 1))});
+        for byte in x.iter().take(4 * nst * (r + 1)) {
+            for j in 0..8 {
+                new_x.push(delta * ((byte >> j) & 1));
+            }
+        }
         let mut q_out = Vec::with_capacity(lambda);
         for i in 0..lambda {
             q_out.push(T::ONE * (&[new_output[i]])[0] * delta + q[i]);
@@ -247,8 +253,6 @@ where
         (b, vec![T::default(); senc])
     }
 }
-
-
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 pub fn em_prove<T>(
@@ -283,8 +287,26 @@ where
         }
     }
     let new_v = T::to_field(&temp_v);
-    let  x = rijndael_key_schedule(&pk[..lambda/8], nst, nk, r);
-    let (a0, a1) = em_enc_cstrnts(&pk[lambda/8..], &x.chunks(8).flat_map(|x| convert_from_batchblocks(inv_bitslice(x)).iter().flat_map(|x| u32::to_le_bytes(*x)).take(lambda/8).collect::<Vec<u8>>()).collect::<Vec<u8>>(), new_w, &new_v, &[], false, T::default(), paramowf, param);
+    let x = rijndael_key_schedule(&pk[..lambda / 8], nst, nk, r);
+    let (a0, a1) = em_enc_cstrnts(
+        &pk[lambda / 8..],
+        &x.chunks(8)
+            .flat_map(|x| {
+                convert_from_batchblocks(inv_bitslice(x))
+                    .iter()
+                    .flat_map(|x| u32::to_le_bytes(*x))
+                    .take(lambda / 8)
+                    .collect::<Vec<u8>>()
+            })
+            .collect::<Vec<u8>>(),
+        new_w,
+        &new_v,
+        &[],
+        false,
+        T::default(),
+        paramowf,
+        param,
+    );
     let u_s: T = T::to_field(u)[0];
     let mut v_s = new_v[l];
     let alpha = T::new(2, 0);
@@ -298,4 +320,98 @@ where
     (a_t, b_t)
 }
 
-    
+///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
+#[allow(clippy::too_many_arguments)]
+pub fn em_verify<T>(
+    d: &[u8],
+    mut gq: Vec<Vec<u8>>,
+    a_t: T,
+    chall2: &[u8],
+    chall3: &[u8],
+    pk: &[u8],
+    paramowf: &ParamOWF,
+    param: &Param,
+) -> Vec<u8>
+where
+    T: BigGaloisField + std::default::Default + std::fmt::Debug,
+{
+    let lambda = param.get_lambda() as usize;
+    let k0 = param.get_k0() as usize;
+    let k1 = param.get_k1() as usize;
+    let t0 = param.get_tau0() as usize;
+    let t1 = param.get_tau1() as usize;
+    let l = paramowf.get_l() as usize;
+    let c = paramowf.get_c() as usize;
+    let delta = T::to_field(chall3)[0];
+    let nst = paramowf.get_nst();
+    let nk = paramowf.get_nk();
+    let r = paramowf.get_r();
+    for i in 0..t0 {
+        let sdelta = chaldec(chall3, k0 as u16, t0 as u16, k1 as u16, t1 as u16, i as u16);
+        for j in 0..k0 {
+            if sdelta[j] != 0 {
+                for (k, _) in d.iter().enumerate().take(l / 8) {
+                    gq[k0 * i + j][k] ^= d[k];
+                }
+            }
+        }
+    }
+    for i in 0..t1 {
+        let sdelta = chaldec(
+            chall3,
+            k0 as u16,
+            t0 as u16,
+            k1 as u16,
+            t1 as u16,
+            (t0 + i) as u16,
+        );
+        for j in 0..k1 {
+            if sdelta[j] != 0 {
+                for (k, _) in d.iter().enumerate().take(l / 8) {
+                    gq[t0 * k0 + k1 * i + j][k] ^= d[k];
+                }
+            }
+        }
+    }
+    let mut temp_q = Vec::with_capacity((l + lambda) * lambda / 8);
+    for i in 0..(l + lambda) / 8 {
+        for k in 0..8 {
+            for j in 0..lambda / 8 {
+                let mut temp = 0;
+                for l in 0..8_usize {
+                    temp += ((gq[(j * 8) + l][i] >> k) & 1) << l;
+                }
+                temp_q.push(temp);
+            }
+        }
+    }
+    let new_q = T::to_field(&temp_q);
+    let x = rijndael_key_schedule(&pk[..lambda / 8], nst, nk, r);
+    let (b, _) = em_enc_cstrnts(
+        &pk[lambda / 8..],
+        &x.chunks(8)
+            .flat_map(|x| {
+                convert_from_batchblocks(inv_bitslice(x))
+                    .iter()
+                    .flat_map(|x| u32::to_le_bytes(*x))
+                    .take(lambda / 8)
+                    .collect::<Vec<u8>>()
+            })
+            .collect::<Vec<u8>>(),
+        &[],
+        &[],
+        &new_q,
+        true,
+        delta,
+        paramowf,
+        param,
+    );
+    let mut q_s = new_q[l];
+    let alpha = T::new(2, 0);
+    let mut cur_alpha = alpha;
+    for i in 1..lambda {
+        q_s += new_q[l + i] * cur_alpha;
+        cur_alpha *= alpha;
+    }
+    T::to_bytes(T::to_field(&zkhash::<T>(chall2, &b, q_s, c))[0] + a_t * delta)
+}
