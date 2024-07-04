@@ -43,7 +43,7 @@ pub const PARAMOWF128EM: ParamOWF = ParamOWF {
     lke: 448,
     lenc: 1152,
     beta: 1,
-    c: 200,
+    c: 160,
     nst: Some(4),
 };
 pub const PARAMOWF192EM: ParamOWF = ParamOWF {
@@ -55,7 +55,7 @@ pub const PARAMOWF192EM: ParamOWF = ParamOWF {
     lke: 448,
     lenc: 1408,
     beta: 2,
-    c: 416,
+    c: 288,
     nst: Some(6),
 };
 pub const PARAMOWF256EM: ParamOWF = ParamOWF {
@@ -67,7 +67,7 @@ pub const PARAMOWF256EM: ParamOWF = ParamOWF {
     lke: 672,
     lenc: 1664,
     beta: 2,
-    c: 500,
+    c: 448,
     nst: Some(8),
 };
 

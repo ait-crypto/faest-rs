@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::{
     aes::convert_to_bit,
-    em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, extendedwitness},
+    em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_prove, extendedwitness},
     fields::{BigGaloisField, GF128, GF192, GF256},
     parameter::{
         self, Param, PARAM128S, PARAM192S, PARAM256S, PARAMOWF128, PARAMOWF128EM, PARAMOWF192,
@@ -410,7 +410,6 @@ fn aes_enc_bkwd_test() {
     }
 }
 
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EmEncCstrnts {
@@ -419,16 +418,16 @@ struct EmEncCstrnts {
     mkey: u8,
 
     x: Vec<u8>,
-    
+
     w: Vec<u8>,
-    
+
     out: Vec<u8>,
-    
+
     delta: Vec<u8>,
 
     vq: Vec<[u64; 4]>,
 
-    ab : Vec<[u64; 8]>,
+    ab: Vec<[u64; 8]>,
 }
 
 #[test]
@@ -438,41 +437,145 @@ fn aes_enc_cstrnts_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let vq = &data.vq.iter().map(|v| GF128::new(v[0] as u128 + ((v[1] as u128) << 64), 0)).collect::<Vec<GF128>>()[..];
-            let res = em_enc_cstrnts::<GF128>(&data.out, &data.x, &data.w, vq, vq, data.mkey != 0, GF128::to_field(&data.delta)[0], &PARAMOWF128EM, &PARAM128S);
+            let vq = &data
+                .vq
+                .iter()
+                .map(|v| GF128::new(v[0] as u128 + ((v[1] as u128) << 64), 0))
+                .collect::<Vec<GF128>>()[..];
+            let res = em_enc_cstrnts::<GF128>(
+                &data.out,
+                &data.x,
+                &data.w,
+                vq,
+                vq,
+                data.mkey != 0,
+                GF128::to_field(&data.delta)[0],
+                &PARAMOWF128EM,
+                &PARAM128S,
+            );
             let (mut a0, mut a1) = (vec![], vec![]);
             for i in 0..data.ab.len() {
-                a0.push(GF128::new(data.ab[i][0] as u128 + ((data.ab[i][1] as u128) << 64), 0));
-                a1.push(GF128::new(data.ab[i][4] as u128 + ((data.ab[i][5] as u128) << 64), 0));
+                a0.push(GF128::new(
+                    data.ab[i][0] as u128 + ((data.ab[i][1] as u128) << 64),
+                    0,
+                ));
+                a1.push(GF128::new(
+                    data.ab[i][4] as u128 + ((data.ab[i][5] as u128) << 64),
+                    0,
+                ));
             }
-            for i in 0..res.0.len() {
+            for i in 0..a0.len() {
                 assert_eq!((res.0[i], res.1[i]), (a0[i], a1[i]));
             }
-            
-
-        }
-        else if data.lambda == 192 {
-            let vq = &data.vq.iter().map(|v| GF192::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128)).collect::<Vec<GF192>>()[..];
-            let res = em_enc_cstrnts::<GF192>(&data.out, &data.x, &data.w, vq, vq, data.mkey != 0, GF192::to_field(&data.delta)[0], &PARAMOWF192EM, &PARAM192S);
+        } else if data.lambda == 192 {
+            let vq = &data
+                .vq
+                .iter()
+                .map(|v| GF192::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128))
+                .collect::<Vec<GF192>>()[..];
+            let res = em_enc_cstrnts::<GF192>(
+                &data.out,
+                &data.x,
+                &data.w,
+                vq,
+                vq,
+                data.mkey != 0,
+                GF192::to_field(&data.delta)[0],
+                &PARAMOWF192EM,
+                &PARAM192S,
+            );
             let (mut a0, mut a1) = (vec![], vec![]);
             for i in 0..data.ab.len() {
-                a0.push(GF192::new(data.ab[i][0] as u128 + ((data.ab[i][1] as u128) << 64), data.ab[i][2] as u128));
-                a1.push(GF192::new(data.ab[i][4] as u128 + ((data.ab[i][5] as u128) << 64), data.ab[i][6] as u128));
+                a0.push(GF192::new(
+                    data.ab[i][0] as u128 + ((data.ab[i][1] as u128) << 64),
+                    data.ab[i][2] as u128,
+                ));
+                a1.push(GF192::new(
+                    data.ab[i][4] as u128 + ((data.ab[i][5] as u128) << 64),
+                    data.ab[i][6] as u128,
+                ));
             }
             for i in 0..res.0.len() {
                 assert_eq!((res.0[i], res.1[i]), (a0[i], a1[i]));
             }
         } else {
-            let vq = &data.vq.iter().map(|v| GF256::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128 + ((v[3] as u128) << 64))).collect::<Vec<GF256>>()[..];
-            let res = em_enc_cstrnts::<GF256>(&data.out, &data.x, &data.w, vq, vq, data.mkey != 0, GF256::to_field(&data.delta)[0], &PARAMOWF256EM, &PARAM256S);
+            let vq = &data
+                .vq
+                .iter()
+                .map(|v| {
+                    GF256::new(
+                        v[0] as u128 + ((v[1] as u128) << 64),
+                        v[2] as u128 + ((v[3] as u128) << 64),
+                    )
+                })
+                .collect::<Vec<GF256>>()[..];
+            let res = em_enc_cstrnts::<GF256>(
+                &data.out,
+                &data.x,
+                &data.w,
+                vq,
+                vq,
+                data.mkey != 0,
+                GF256::to_field(&data.delta)[0],
+                &PARAMOWF256EM,
+                &PARAM256S,
+            );
             let (mut a0, mut a1) = (vec![], vec![]);
             for i in 0..data.ab.len() {
-                a0.push(GF256::new(data.ab[i][0] as u128 + ((data.ab[i][1] as u128) << 64), data.ab[i][2] as u128 + ((data.ab[i][3] as u128) << 64)));
-                a1.push(GF256::new(data.ab[i][4] as u128 + ((data.ab[i][5] as u128) << 64), data.ab[i][6] as u128 + ((data.ab[i][7] as u128) << 64)));
+                a0.push(GF256::new(
+                    data.ab[i][0] as u128 + ((data.ab[i][1] as u128) << 64),
+                    data.ab[i][2] as u128 + ((data.ab[i][3] as u128) << 64),
+                ));
+                a1.push(GF256::new(
+                    data.ab[i][4] as u128 + ((data.ab[i][5] as u128) << 64),
+                    data.ab[i][6] as u128 + ((data.ab[i][7] as u128) << 64),
+                ));
             }
             for i in 0..res.0.len() {
                 assert_eq!((res.0[i], res.1[i]), (a0[i], a1[i]));
             }
-        } 
-     }
+        }
+    }
+}
+
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EmProve {
+    lambda: u16,
+
+    gv: Vec<Vec<u8>>,
+
+    w: Vec<u8>, 
+
+    u: Vec<u8>,
+    
+    input: Vec<u8>,
+    
+    output: Vec<u8>,
+    
+    chall: Vec<u8>,
+    
+    at: Vec<u8>,
+    
+    bt: Vec<u8>,
+}
+
+#[test]
+fn em_prove_test() {
+    let file = File::open("EmProve.json").unwrap();
+    let database: Vec<EmProve> =
+        serde_json::from_reader(file).expect("error while reading or parsing");
+    for data in database {
+        if data.lambda == 128 {
+            let res = em_prove::<GF128>(&data.w, &data.u, &data.gv, &[data.input, data.output].concat(), &data.chall, &PARAMOWF128EM, &PARAM128S);
+            assert_eq!((data.at, data.bt), res);
+        } else if data.lambda == 192 {
+            let res = em_prove::<GF192>(&data.w, &data.u, &data.gv, &[data.input, data.output].concat(), &data.chall, &PARAMOWF192EM, &PARAM192S);
+            assert_eq!((data.at, data.bt), res);
+        } else {
+            let res = em_prove::<GF256>(&data.w, &data.u, &data.gv, &[data.input, data.output].concat(), &data.chall, &PARAMOWF256EM, &PARAM256S);
+            assert_eq!((data.at, data.bt), res);
+        }
+    }
 }
