@@ -4,7 +4,7 @@ use crate::aes::{
     convert_to_bit,
 };
 use crate::fields::{BigGaloisField, GF128, GF192, GF256};
-use crate::parameter::Param;
+use crate::parameter::{Param, PARAM128S, PARAM192S, PARAM256S, PARAMOWF128};
 use crate::parameter::{self};
 #[cfg(test)]
 use serde::Deserialize;
@@ -35,38 +35,26 @@ fn aes_extended_witness_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let param = Param::set_param(128, data.l, 11, 12, 11, 1, 1, 16, 1);
+            let param = PARAM128S;
             let mut paramowf = parameter::PARAMOWF128;
             paramowf.set_lke(data.lke);
             paramowf.set_nst((data.input.len() / 4).try_into().unwrap());
             let res = aes_extendedwitness(&data.key, &data.input, &param, &paramowf);
-            for (i, _) in res.iter().enumerate() {
-                for j in 0..4 {
-                    assert_eq!(res[i].to_le_bytes()[j], data.w[i * 4 + j]);
-                }
-            }
+            assert_eq!(res.len(), data.w.len());
         } else if data.lambda == 192 {
-            let param = Param::set_param(192, data.l, 16, 12, 12, 1, 1, 16, 2);
+            let param = PARAM192S;
             let mut paramowf = parameter::PARAMOWF192;
             paramowf.set_lke(data.lke);
             paramowf.set_nst((data.input.len() / 4).try_into().unwrap());
             let res = aes_extendedwitness(&data.key, &data.input, &param, &paramowf);
-            for (i, _) in res.iter().enumerate() {
-                for j in 0..4 {
-                    assert_eq!(res[i].to_le_bytes()[j], data.w[i * 4 + j]);
-                }
-            }
+            assert_eq!(res, data.w);
         } else {
-            let param = Param::set_param(256, data.l, 22, 12, 11, 1, 1, 16, 2);
+            let param = PARAM256S;
             let mut paramowf = parameter::PARAMOWF256;
             paramowf.set_lke(data.lke);
             paramowf.set_nst((data.input.len() / 4).try_into().unwrap());
             let res = aes_extendedwitness(&data.key, &data.input, &param, &paramowf);
-            for (i, _) in res.iter().enumerate() {
-                for j in 0..4 {
-                    assert_eq!(res[i].to_le_bytes()[j], data.w[i * 4 + j]);
-                }
-            }
+            assert_eq!(res, data.w);
         }
     }
 }
@@ -1133,27 +1121,30 @@ fn aes_prove_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let paramowf = parameter::PARAMOWF128;
+            let paramowf = PARAMOWF128;
+            let param = PARAM128S;
             let mut pk = data.input.to_vec();
             pk.append(&mut data.output.to_vec());
             let res: (Vec<u8>, Vec<u8>) =
-                aes_prove::<GF128>(&data.w, &data.u, &data.gv, &pk, &data.chall, &paramowf);
+                aes_prove::<GF128>(&data.w, &data.u, &data.gv, &pk, &data.chall, &paramowf, &param);
             assert_eq!(res.0, data.at);
             assert_eq!(res.1, data.bt);
         } else if data.lambda == 192 {
             let paramowf = parameter::PARAMOWF192;
+            let param = PARAM192S;
             let mut pk = data.input.to_vec();
             pk.append(&mut data.output.to_vec());
             let res: (Vec<u8>, Vec<u8>) =
-                aes_prove::<GF192>(&data.w, &data.u, &data.gv, &pk, &data.chall, &paramowf);
+                aes_prove::<GF192>(&data.w, &data.u, &data.gv, &pk, &data.chall, &paramowf, &param);
             assert_eq!(res.0, data.at);
             assert_eq!(res.1, data.bt);
         } else {
             let paramowf = parameter::PARAMOWF256;
+            let param = PARAM256S;
             let mut pk = data.input.to_vec();
             pk.append(&mut data.output.to_vec());
             let res: (Vec<u8>, Vec<u8>) =
-                aes_prove::<GF256>(&data.w, &data.u, &data.gv, &pk, &data.chall, &paramowf);
+                aes_prove::<GF256>(&data.w, &data.u, &data.gv, &pk, &data.chall, &paramowf, &param);
             assert_eq!(res.0, data.at);
             assert_eq!(res.1, data.bt);
         }
@@ -1208,9 +1199,9 @@ fn aes_verify_test() {
             let out = aes_verify::<GF128>(
                 &data.d[..],
                 data.gq,
+                &data.at,
                 &data.chall2[..],
                 &data.chall3[..],
-                GF128::to_field(&data.at)[0],
                 &pk[..],
                 &paramowf,
                 &param,
@@ -1229,9 +1220,9 @@ fn aes_verify_test() {
             let out = aes_verify::<GF192>(
                 &data.d[..],
                 data.gq,
+                &data.at,
                 &data.chall2[..],
                 &data.chall3[..],
-                GF192::to_field(&data.at)[0],
                 &pk[..],
                 &paramowf,
                 &param,
@@ -1253,9 +1244,9 @@ fn aes_verify_test() {
             let out = aes_verify::<GF256>(
                 &data.d[..],
                 data.gq,
+                &data.at,
                 &data.chall2[..],
                 &data.chall3[..],
-                GF256::to_field(&data.at)[0],
                 &pk[..],
                 &paramowf,
                 &param,

@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::{
     aes::convert_to_bit,
-    em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_prove, em_verify, extendedwitness},
+    em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_prove, em_verify, em_extendedwitness},
     fields::{BigGaloisField, GF128, GF192, GF256},
     parameter::{
         self, Param, PARAM128F, PARAM128S, PARAM192F, PARAM192S, PARAM256F, PARAM256S, PARAMOWF128,
@@ -38,33 +38,33 @@ fn em_extended_witness_test() {
             let param = Param::set_param(128, data.l, 11, 12, 11, 1, 1, 16, 1);
             let mut paramowf = parameter::PARAMOWF128;
             paramowf.set_lke(data.lke);
-            let res = extendedwitness(
+            let res = em_extendedwitness(
                 &data.key,
-                (&data.input[..16], &data.input[16..]),
-                param,
-                paramowf,
+                &data.input,
+                &param,
+                &paramowf,
             );
             assert_eq!(res, data.w);
         } else if data.lambda == 192 {
             let param = Param::set_param(192, data.l, 16, 12, 12, 1, 1, 16, 2);
             let mut paramowf = parameter::PARAMOWF192;
             paramowf.set_lke(data.lke);
-            let res = extendedwitness(
+            let res = em_extendedwitness(
                 &data.key,
-                (&data.input[..24], &data.input[24..]),
-                param,
-                paramowf,
+                &data.input,
+                &param,
+                &paramowf,
             );
             assert_eq!(res, data.w);
         } else {
             let param = Param::set_param(256, data.l, 22, 12, 11, 1, 1, 16, 2);
             let mut paramowf = parameter::PARAMOWF256;
             paramowf.set_lke(data.lke);
-            let res = extendedwitness(
+            let res = em_extendedwitness(
                 &data.key,
-                (&data.input[..32], &data.input[32..]),
-                param,
-                paramowf,
+                &data.input,
+                &param,
+                &paramowf,
             );
             assert_eq!(res, data.w);
         }
@@ -638,7 +638,7 @@ fn em_verify_test() {
                 em_verify::<GF128>(
                     &data.d,
                     data.gq,
-                    GF128::to_field(&data.at)[0],
+                    &data.at,
                     &data.chall2,
                     &data.chall3,
                     &[data.input, data.output].concat(),
@@ -649,7 +649,7 @@ fn em_verify_test() {
                 em_verify::<GF128>(
                     &data.d,
                     data.gq,
-                    GF128::to_field(&data.at)[0],
+                    &data.at,
                     &data.chall2,
                     &data.chall3,
                     &[data.input, data.output].concat(),
@@ -663,7 +663,7 @@ fn em_verify_test() {
                 em_verify::<GF192>(
                     &data.d,
                     data.gq,
-                    GF192::to_field(&data.at)[0],
+                    &data.at,
                     &data.chall2,
                     &data.chall3,
                     &[data.input, data.output].concat(),
@@ -674,7 +674,7 @@ fn em_verify_test() {
                 em_verify::<GF192>(
                     &data.d,
                     data.gq,
-                    GF192::to_field(&data.at)[0],
+                    &data.at,
                     &data.chall2,
                     &data.chall3,
                     &[data.input, data.output].concat(),
@@ -688,7 +688,7 @@ fn em_verify_test() {
                 em_verify::<GF256>(
                     &data.d,
                     data.gq,
-                    GF256::to_field(&data.at)[0],
+                    &data.at,
                     &data.chall2,
                     &data.chall3,
                     &[data.input, data.output].concat(),
@@ -699,7 +699,7 @@ fn em_verify_test() {
                 em_verify::<GF256>(
                     &data.d,
                     data.gq,
-                    GF256::to_field(&data.at)[0],
+                    &data.at,
                     &data.chall2,
                     &data.chall3,
                     &[data.input, data.output].concat(),

@@ -12,14 +12,13 @@ use crate::{
     vole::chaldec,
 };
 
-pub fn extendedwitness(k: &[u8], pk: (&[u8], &[u8]), param: Param, paramowf: ParamOWF) -> Vec<u8> {
+pub fn em_extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) -> Vec<u8> {
     let lambda = (param.get_lambda() / 8) as usize;
     let nst = paramowf.get_nst() as usize;
     let r = paramowf.get_r() as usize;
     let kc = paramowf.get_nk();
-    let input = &pk.0[..lambda];
     let mut res = Vec::with_capacity((paramowf.get_l() / 8) as usize);
-    let x = rijndael_key_schedule(input, nst as u8, kc, r as u8);
+    let x = rijndael_key_schedule(&pk[..lambda], nst as u8, kc, r as u8);
     res.append(&mut k.to_vec());
     let mut state = State::default();
     bitslice(
@@ -325,7 +324,7 @@ where
 pub fn em_verify<T>(
     d: &[u8],
     mut gq: Vec<Vec<u8>>,
-    a_t: T,
+    a_t: &[u8],
     chall2: &[u8],
     chall3: &[u8],
     pk: &[u8],
@@ -413,5 +412,6 @@ where
         q_s += new_q[l + i] * cur_alpha;
         cur_alpha *= alpha;
     }
-    T::to_bytes(T::to_field(&zkhash::<T>(chall2, &b, q_s, c))[0] + a_t * delta)
+    println!("qt = {:?}", &zkhash::<T>(chall2, &b, q_s, c));
+    T::to_bytes(T::to_field(&zkhash::<T>(chall2, &b, q_s, c))[0] + T::to_field(a_t)[0] * delta)
 }

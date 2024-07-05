@@ -24,7 +24,7 @@ where
     res
 }
 
-pub fn aes_extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) -> Vec<u32> {
+pub fn aes_extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) -> Vec<u8> {
     let key = k;
     let beta = param.get_beta() as usize;
     let bc = 4;
@@ -33,13 +33,23 @@ pub fn aes_extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamO
     let mut input = [0u8; 32];
     //step 0
     input[..16 * beta].clone_from_slice(&pk[..16 * beta]);
-    let mut w = Vec::with_capacity((param.get_l() / 32).into());
+    let mut w = Vec::with_capacity((param.get_l() / 8).into());
     //step 3
     let kb = rijndael_key_schedule(key, bc, kc as u8, r);
     //step 4
-    w.append(&mut convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4].to_vec());
     w.append(
-        &mut convert_from_batchblocks(inv_bitslice(&kb[8..16]))[..kc / 2 - (4 - (kc / 2))].to_vec(),
+        &mut convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4 as usize]
+            .to_vec()
+            .iter()
+            .flat_map(|x| x.to_le_bytes())
+            .collect::<Vec<u8>>(),
+    );
+    w.append(
+        &mut convert_from_batchblocks(inv_bitslice(&kb[8..16]))[..kc / 2 - (4 - (kc / 2))]
+            .to_vec()
+            .iter()
+            .flat_map(|x| x.to_le_bytes())
+            .collect::<Vec<u8>>(),
     );
     for j in 1 + (kc / 8)
         ..1 + (kc / 8) + ((paramowf.get_ske() as usize) * ((2 - (kc % 4)) * 2 + (kc % 4) * 3)) / 16
@@ -47,12 +57,12 @@ pub fn aes_extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamO
         let key = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]));
         if kc == 6 {
             if j % 3 == 1 {
-                w.push(key[2]);
+                w.append(&mut key[2].to_le_bytes().to_vec());
             } else if j % 3 == 0 {
-                w.push(key[0]);
+                w.append(&mut key[0].to_le_bytes().to_vec());
             }
         } else {
-            w.push(key[0]);
+            w.append(&mut key[0].to_le_bytes().to_vec());
         }
     }
     //step 5
@@ -69,7 +79,7 @@ pub fn aes_extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamO
 }
 
 #[allow(clippy::too_many_arguments)]
-fn round_with_save(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mut Vec<u32>) {
+fn round_with_save(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mut Vec<u8>) {
     let mut state = State::default();
     bitslice(&mut state, &input1, &input2);
     rijndael_add_round_key(&mut state, &kb[..8]);
@@ -77,7 +87,13 @@ fn round_with_save(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mu
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, 4);
-        w.append(&mut convert_from_batchblocks(inv_bitslice(&state))[..4][..4].to_vec());
+        w.append(
+            &mut convert_from_batchblocks(inv_bitslice(&state))[..4 as usize][..4 as usize]
+                .to_vec()
+                .iter()
+                .flat_map(|x| x.to_le_bytes())
+                .collect::<Vec<u8>>(),
+        );
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
     }
@@ -509,6 +525,7 @@ pub fn aes_prove<T>(
     pk: &[u8],
     chall: &[u8],
     paramowf: &ParamOWF,
+    param: &Param,
 ) -> (Vec<u8>, Vec<u8>)
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
@@ -518,7 +535,7 @@ where
     let lke = paramowf.get_lke() as usize;
     let lenc = paramowf.get_lenc() as usize;
     let senc = paramowf.get_senc() as usize;
-    let lambda = T::LENGTH as usize;
+    let lambda = param.get_lambda() as usize;
     let new_w = &w[..l / 8];
     let mut temp_v = Vec::with_capacity((l + lambda) * lambda / 8);
     for i in 0..(l + lambda) / 8 {
@@ -597,9 +614,9 @@ where
 pub fn aes_verify<T>(
     d: &[u8],
     mut gq: Vec<Vec<u8>>,
+    a_t: &[u8],
     chall2: &[u8],
     chall3: &[u8],
-    a_t: T,
     pk: &[u8],
     paramowf: &ParamOWF,
     param: &Param,
@@ -703,5 +720,5 @@ where
         cur_alpha *= alpha;
     }
 
-    T::to_bytes(T::to_field(&zkhash::<T>(chall2, &b, q_s, c))[0] + a_t * delta)
+    T::to_bytes(T::to_field(&zkhash::<T>(chall2, &b, q_s, c))[0] + T::to_field(a_t)[0] * delta)
 }

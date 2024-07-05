@@ -30,9 +30,9 @@ pub mod rijndael_32;
 #[cfg(test)]
 pub mod rijndael_32_test;
 
-/* pub mod faest;
+pub mod faest;
 #[cfg(test)]
-pub mod faest_test; */
+pub mod faest_test;
 
 pub mod em;
 #[cfg(test)]
