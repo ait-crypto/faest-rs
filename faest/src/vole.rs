@@ -3,22 +3,21 @@ use crate::vc;
 use crate::{fields::BigGaloisField, random_oracles::RandomOracle, vc::commit};
 
 #[allow(clippy::type_complexity)]
-pub fn convert_to_vole(
+pub fn convert_to_vole<R>(
     sd: &[Option<Vec<u8>>],
     iv: u128,
     lh: usize,
-    prg: &dyn Fn(&[u8], u128, usize) -> Vec<u8>,
-) -> (Vec<u8>, Vec<Vec<u8>>) {
+) -> (Vec<u8>, Vec<Vec<u8>>) where R : RandomOracle{
     for _i in 0..100 {}
     let n = sd.len();
     let d = (128 - (n as u128).leading_zeros() - 1) as usize;
     let mut r = vec![vec![vec![0u8; lh]; n]; d + 1];
     match &sd[0] {
         None => r[0][0] = vec![0; lh],
-        Some(sd0) => r[0][0] = prg(&sd0[..], iv, lh)[..].to_vec(),
+        Some(sd0) => r[0][0] = R::prg(&sd0[..], iv, lh)[..].to_vec(),
     }
     for (i, _) in sd.iter().enumerate().skip(1).take(n) {
-        r[0][i] = prg(
+        r[0][i] = R::prg(
             &<std::option::Option<std::vec::Vec<u8>> as Clone>::clone(&sd[i]).unwrap(),
             iv,
             lh,
@@ -71,7 +70,6 @@ pub fn volecommit<T, R>(
     iv: u128,
     lh: usize,
     tau: usize,
-    prg: &dyn Fn(&[u8], u128, usize) -> Vec<u8>,
     k0: u16,
     k1: u16,
 ) -> (
@@ -85,7 +83,7 @@ where
     T: BigGaloisField + std::default::Default,
     R: RandomOracle,
 {
-    let tau_res = prg(r, iv, tau * (T::LENGTH) as usize);
+    /* ok */let tau_res = R::prg(r, iv, tau * ((T::LENGTH)/8) as usize);
     let mut r = vec![T::default(); tau];
     let mut com = vec![Vec::new(); tau];
     let mut decom = vec![(vec![Vec::new()], vec![Vec::new()]); tau];
@@ -95,16 +93,32 @@ where
     let mut c = vec![vec![0; lh]; tau - 1];
     for i in 0..tau {
         r[i] = T::from(&tau_res[i * (T::LENGTH / 8) as usize..(i + 1) * (T::LENGTH / 8) as usize]);
+        /* println!("ri = {:?}", r[i]); */
     }
     let tau_0 = T::LENGTH % (tau as u32);
     let mut hasher = R::h1_init();
     for i in 0..tau {
         let b = 1 - (i < tau_0.try_into().unwrap()) as u16;
         let k = ((1 - b) * k0) + b * k1;
-        (com[i], decom[i], sd[i]) = commit::<T, R>(r[i], iv, 1u32 << k, prg);
+        (com[i], decom[i], sd[i]) = commit::<T, R>(r[i], iv, 1u32 << k);
         hasher.h1_update(&com[i]);
         v[i] = vec![vec![0; lh]; k.into()];
-        (u[i], v[i]) = convert_to_vole(&sd[i], iv, lh, prg);
+        (u[i], v[i]) = convert_to_vole::<R>(&sd[i], iv, lh);
+        /* println!(" ");
+        println!(" ");
+        println!("ui");
+        for un in &u[i] {
+            print!("0x{:02x}, ", un);
+        }
+        println!(" "); */
+        /* println!("vi");
+        for un in &v[i] {
+            for deux in un{
+                print!("0x{:02x}, ", deux);
+            }
+        }
+        println!(" ");
+        println!(" "); */
     }
     for i in 1..tau {
         c[i - 1] = u[0]
@@ -130,7 +144,6 @@ pub fn volereconstruct<T, R>(
     tau1: u16,
     k0: u16,
     k1: u16,
-    prg: &dyn Fn(&[u8], u128, usize) -> Vec<u8>,
     lambdabytes: usize,
 ) -> (Vec<u8>, Vec<Vec<Vec<u8>>>)
 where
@@ -151,13 +164,14 @@ where
         for j in 0..delta_p.len() {
             delta[i] += (delta_p[j] as u32) << j;
         }
-        (com[i], s[i]) = vc::reconstruct::<T, R>(pdecom[i].clone(), delta_p.clone(), iv, prg);
+        (com[i], s[i]) = vc::reconstruct::<T, R>(pdecom[i].clone(), delta_p.clone(), iv);
         hasher.h1_update(&com[i]);
         for j in 0..(1_u16 << (k)) as usize {
             sd[i].push(Some(s[i][j ^ delta[i] as usize].clone()));
         }
         sd[i][0] = None;
-        (_, q[i]) = convert_to_vole(&sd[i], iv, lh, prg);
+        (_, q[i]) = convert_to_vole::<R>(&sd[i], iv, lh);
+        
     }
     let mut hcom = vec![0; 2 * lambdabytes];
     hasher.h1_finish(&mut hcom);

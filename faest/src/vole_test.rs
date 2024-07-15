@@ -5,8 +5,7 @@ use serde::Deserialize;
 
 use crate::{
     fields::{GF128, GF192, GF256},
-    prg::{prg_128, prg_192, prg_256},
-    random_oracles::{RandomOracleShake128, RandomOracleShake256},
+    random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
     vole::{chaldec, convert_to_vole, volecommit, volereconstruct},
 };
 
@@ -39,11 +38,10 @@ fn convert_to_vole_test() {
             if data.sd0[0] == 1 {
                 opt_sd[0] = None;
             }
-            let res = convert_to_vole(
+            let res = convert_to_vole::<RandomOracleShake128>(
                 &opt_sd[..],
                 u128::from_be_bytes(data.iv),
                 data.lh[0],
-                &prg_128,
             );
             assert_eq!(res.0, data.u);
             assert_eq!(res.1, data.v)
@@ -52,11 +50,10 @@ fn convert_to_vole_test() {
             if data.sd0[0] == 1 {
                 opt_sd[0] = None;
             }
-            let res = convert_to_vole(
+            let res = convert_to_vole::<RandomOracleShake192>(
                 &opt_sd[..],
                 u128::from_be_bytes(data.iv),
                 data.lh[0],
-                &prg_192,
             );
             assert_eq!(res.0, data.u);
             assert_eq!(res.1, data.v)
@@ -65,11 +62,10 @@ fn convert_to_vole_test() {
             if data.sd0[0] == 1 {
                 opt_sd[0] = None;
             }
-            let res = convert_to_vole(
+            let res = convert_to_vole::<RandomOracleShake256>(
                 &opt_sd[..],
                 u128::from_be_bytes(data.iv),
                 data.lh[0],
-                &prg_256,
             );
             assert_eq!(res.0, data.u);
             assert_eq!(res.1, data.v)
@@ -150,7 +146,6 @@ fn volecommit_test() {
                 u128::from_be_bytes(data.iv),
                 data.lh[0],
                 data.tau[0],
-                &prg_128,
                 data.k0[0] as u16,
                 data.k1[0] as u16,
             );
@@ -165,12 +160,11 @@ fn volecommit_test() {
             assert_eq!(res.3, data.u);
             assert_eq!(res.4, data.v);
         } else if data.lambdabytes[0] == 24 {
-            let res = volecommit::<GF192, RandomOracleShake256>(
+            let res = volecommit::<GF192, RandomOracleShake192>(
                 &data.r,
                 u128::from_be_bytes(data.iv),
                 data.lh[0],
                 data.tau[0],
-                &prg_192,
                 data.k0[0] as u16,
                 data.k1[0] as u16,
             );
@@ -190,7 +184,6 @@ fn volecommit_test() {
                 u128::from_be_bytes(data.iv),
                 data.lh[0],
                 data.tau[0],
-                &prg_256,
                 data.k0[0] as u16,
                 data.k1[0] as u16,
             );
@@ -259,7 +252,6 @@ fn volereconstruct_test() {
                 data.tau1,
                 data.k0 as u16,
                 data.k1 as u16,
-                &prg_128,
                 data.lambdabytes,
             );
             assert_eq!(res.0, data.hcom);
@@ -267,7 +259,7 @@ fn volereconstruct_test() {
                 assert_eq!(res.1[i].len(), data.q[i].len());
             }
         } else if data.lambdabytes == 24 {
-            let res = volereconstruct::<GF192, RandomOracleShake256>(
+            let res = volereconstruct::<GF192, RandomOracleShake192>(
                 &data.chal,
                 pdecom,
                 u128::from_be_bytes(data.iv),
@@ -277,7 +269,6 @@ fn volereconstruct_test() {
                 data.tau1,
                 data.k0 as u16,
                 data.k1 as u16,
-                &prg_192,
                 data.lambdabytes,
             );
             assert_eq!(res.0, data.hcom);
@@ -293,11 +284,20 @@ fn volereconstruct_test() {
                 data.tau1,
                 data.k0 as u16,
                 data.k1 as u16,
-                &prg_256,
                 data.lambdabytes,
             );
             assert_eq!(res.0, data.hcom);
             assert_eq!(res.1, data.q);
         }
     }
+}
+
+
+#[test]
+fn revolecommit_test() {
+ let res = volecommit::<GF128, RandomOracleShake128>(&[0xfa, 0xbd, 0xe8, 0x29, 0x95, 0xc1, 0xf5, 0xce, 0x05, 0xcf, 0x83, 0x4f, 0x1c, 0x23, 0x5f, 0x61], u128::from_be_bytes([0x0f, 0xee, 0x3d, 0xd4, 0x66, 0x94, 0x59, 0x09, 0x60, 0x7f, 0x5b, 0x74, 0x17, 0xe3, 0xce, 0xec]), 234, 11, 12, 11);
+ println!("u : ");
+ for un in res.3 {
+        print!("0x{:02x}, ", un);
+ }
 }

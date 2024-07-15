@@ -3,10 +3,17 @@ use sha3::{
     Shake128, Shake256,
 };
 
+use aes::cipher::{KeyIvInit, StreamCipher};
+type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
+type Aes192Ctr128BE = ctr::Ctr128BE<aes::Aes192>;
+type Aes256Ctr128BE = ctr::Ctr128BE<aes::Aes256>;
+
 use crate::random_oracles;
 
 pub trait RandomOracle {
     type Hasher: Hasher;
+
+    fn prg(k: &[u8], iv: u128, ll: usize) -> Vec<u8>;
 
     fn h0(data: &[u8], dest: &mut [u8]) {
         let mut hasher = Self::h0_init();
@@ -91,6 +98,13 @@ impl RandomOracle for RandomOracleShake128 {
             hasher: Shake128::default(),
         }
     }
+    
+    fn prg(k: &[u8], iv: u128, ll: usize) -> Vec<u8> {
+        let mut buf = vec![0u8; ll];
+        let mut cipher = Aes128Ctr128BE::new(k.into(), &iv.to_be_bytes().into());
+        cipher.apply_keystream(&mut buf);
+        buf
+    }
 }
 
 impl Hasher for Hasher128 {
@@ -143,13 +157,9 @@ impl Hasher for Hasher128 {
     }
 }
 
-pub struct RandomOracleShake256 {}
+pub struct RandomOracleShake192 {}
 
-pub struct Hasher256 {
-    hasher: CoreWrapper<sha3::Shake256Core>,
-}
-
-impl RandomOracle for RandomOracleShake256 {
+impl RandomOracle for RandomOracleShake192 {
     type Hasher = Hasher256;
 
     fn h0_init() -> random_oracles::Hasher256 {
@@ -174,6 +184,13 @@ impl RandomOracle for RandomOracleShake256 {
         Hasher256 {
             hasher: Shake256::default(),
         }
+    }
+    
+    fn prg(k: &[u8], iv: u128, ll: usize) -> Vec<u8> {
+        let mut buf = vec![0; ll];
+        let mut cipher = Aes192Ctr128BE::new(k.into(), &iv.to_be_bytes().into());
+        cipher.apply_keystream(&mut buf);
+        buf
     }
 }
 
@@ -224,5 +241,48 @@ impl Hasher for Hasher256 {
             <sha3::digest::core_api::CoreWrapper<sha3::Shake256Core> as Clone>::clone(&self.hasher)
                 .finalize_xof();
         reader.read(dest);
+    }
+}
+
+
+
+pub struct RandomOracleShake256 {}
+
+pub struct Hasher256 {
+    hasher: CoreWrapper<sha3::Shake256Core>,
+}
+
+impl RandomOracle for RandomOracleShake256 {
+    type Hasher = Hasher256;
+
+    fn h0_init() -> random_oracles::Hasher256 {
+        Hasher256 {
+            hasher: Shake256::default(),
+        }
+    }
+
+    fn h1_init() -> random_oracles::Hasher256 {
+        Hasher256 {
+            hasher: Shake256::default(),
+        }
+    }
+
+    fn h2_init() -> random_oracles::Hasher256 {
+        Hasher256 {
+            hasher: Shake256::default(),
+        }
+    }
+
+    fn h3_init() -> random_oracles::Hasher256 {
+        Hasher256 {
+            hasher: Shake256::default(),
+        }
+    }
+    
+    fn prg(k: &[u8], iv: u128, ll: usize) -> Vec<u8> {
+        let mut buf = vec![0; ll];
+        let mut cipher = Aes256Ctr128BE::new(k.into(), &iv.to_be_bytes().into());
+        cipher.apply_keystream(&mut buf);
+        buf
     }
 }

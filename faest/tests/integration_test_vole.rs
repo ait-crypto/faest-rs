@@ -1,7 +1,6 @@
 use faest::{
     fields::{BigGaloisField, GF128, GF192, GF256},
-    prg::{prg_128, prg_192, prg_256},
-    random_oracles::{RandomOracleShake128, RandomOracleShake256},
+    random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
     vc::open,
     vole::{chaldec, volecommit, volereconstruct},
 };
@@ -13,7 +12,7 @@ fn test_commitment_and_construction() {
     for _i in 0..1 {
         let lambdabytes = 16_usize;
         let lh = 234;
-        let prg = &prg_128;
+        let prg = RandomOracleShake128::prg;
         let iv: u128 = random();
         let mut rng = thread_rng();
         let choice = rng.gen_range(0..2);
@@ -37,7 +36,6 @@ fn test_commitment_and_construction() {
             iv,
             lh,
             tau,
-            prg,
             k0,
             k1,
         );
@@ -63,7 +61,6 @@ fn test_commitment_and_construction() {
             tau1.try_into().unwrap(),
             k0,
             k1,
-            prg,
             lambdabytes,
         );
         assert_eq!(h1, h2);
@@ -72,7 +69,7 @@ fn test_commitment_and_construction() {
     for _i in 0..1 {
         let lambdabytes = 24_usize;
         let lh = 458;
-        let prg = &prg_192;
+        let prg = RandomOracleShake192::prg;
         let iv: u128 = random();
         let mut rng = thread_rng();
         let choice = rng.gen_range(0..2);
@@ -91,12 +88,11 @@ fn test_commitment_and_construction() {
         let chall = GF192::rand();
         let mut chal = chall.get_value().0.to_le_bytes().to_vec();
         chal.append(&mut chall.get_value().1.to_le_bytes().to_vec()[..lambdabytes - 16].to_vec());
-        let (h1, decom, _c, _u, _v) = volecommit::<GF192, RandomOracleShake256>(
+        let (h1, decom, _c, _u, _v) = volecommit::<GF192, RandomOracleShake192>(
             &r,
             iv,
             lh,
             tau,
-            prg,
             k0,
             k1,
         );
@@ -112,7 +108,7 @@ fn test_commitment_and_construction() {
             );
             pdecom[i] = open(&decom[i].clone(), b);
         }
-        let (h2, _q) = volereconstruct::<GF192, RandomOracleShake256>(
+        let (h2, _q) = volereconstruct::<GF192, RandomOracleShake192>(
             &chal,
             pdecom,
             iv,
@@ -122,7 +118,6 @@ fn test_commitment_and_construction() {
             tau1.try_into().unwrap(),
             k0,
             k1,
-            prg,
             lambdabytes,
         );
         assert_eq!(h1, h2);
@@ -131,7 +126,7 @@ fn test_commitment_and_construction() {
     for _i in 0..1 {
         let lambdabytes = 32_usize;
         let lh = 566;
-        let prg = &prg_256;
+        let prg = RandomOracleShake256::prg;
         let iv: u128 = random();
         let mut rng = thread_rng();
         let choice = rng.gen_range(0..2);
@@ -155,7 +150,6 @@ fn test_commitment_and_construction() {
             iv,
             lh,
             tau,
-            prg,
             k0,
             k1,
         );
@@ -181,7 +175,6 @@ fn test_commitment_and_construction() {
             tau1.try_into().unwrap(),
             k0,
             k1,
-            prg,
             lambdabytes,
         );
         assert_eq!(h1, h2);

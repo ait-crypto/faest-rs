@@ -5,8 +5,7 @@ use serde::Deserialize;
 
 use crate::{
     fields::{GF128, GF192, GF256},
-    prg::{prg_128, prg_192, prg_256},
-    random_oracles::{RandomOracleShake128, RandomOracleShake256},
+    random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
     vc::{commit, open, reconstruct},
 };
 
@@ -71,7 +70,6 @@ fn commit_test() {
                 GF128::from(&data.keyroot[..]),
                 data.iv,
                 1 << data.depth,
-                &prg_128,
             );
             let mut sd = Vec::new();
             for val in data.sd {
@@ -83,11 +81,10 @@ fn commit_test() {
             assert_eq!(res.2, sd);
         } else if lamdabytes == 24 {
             data.keyroot.append(&mut vec![0; 8]);
-            let res = commit::<GF192, RandomOracleShake256>(
+            let res = commit::<GF192, RandomOracleShake192>(
                 GF192::from(&data.keyroot[..]),
                 data.iv,
                 1 << data.depth,
-                &prg_192,
             );
             let mut sd = Vec::new();
             for val in data.sd {
@@ -102,7 +99,7 @@ fn commit_test() {
                 GF256::from(&data.keyroot[0..32]),
                 data.iv,
                 1 << data.depth,
-                &prg_256,
+                
             );
             let mut sd = Vec::new();
             for val in data.sd {
@@ -140,16 +137,15 @@ fn reconstruct_test() {
                 (data.cop, data.com_j),
                 data.b,
                 u128::from_be_bytes(data.iv),
-                &prg_128,
             );
             assert_eq!(res.0, data.h);
             assert_eq!(res.1, data.sd);
         } else if lambdabyte == 48 {
-            let res = reconstruct::<GF192, RandomOracleShake256>(
+            let res = reconstruct::<GF192, RandomOracleShake192>(
                 (data.cop, data.com_j),
                 data.b,
                 u128::from_be_bytes(data.iv),
-                &prg_192,
+                
             );
             assert_eq!(res.0, data.h);
             assert_eq!(res.1, data.sd);
@@ -158,7 +154,7 @@ fn reconstruct_test() {
                 (data.cop, data.com_j),
                 data.b,
                 u128::from_be_bytes(data.iv),
-                &prg_256,
+                
             );
             assert_eq!(res.0, data.h);
             assert_eq!(res.1, data.sd);

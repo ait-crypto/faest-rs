@@ -14,10 +14,6 @@ pub mod random_oracles;
 #[cfg(test)]
 mod random_oracles_test;
 
-pub mod prg;
-#[cfg(test)]
-pub mod prg_test;
-
 pub mod vole;
 #[cfg(test)]
 pub mod vole_test;
@@ -39,3 +35,5 @@ pub mod em;
 pub mod em_test;
 
 pub mod parameter;
+
+//pub mod signature;

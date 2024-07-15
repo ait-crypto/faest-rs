@@ -412,6 +412,6 @@ where
         q_s += new_q[l + i] * cur_alpha;
         cur_alpha *= alpha;
     }
-    println!("qt = {:?}", &zkhash::<T>(chall2, &b, q_s, c));
+    //println!("qt = {:?}", &zkhash::<T>(chall2, &b, q_s, c));
     T::to_bytes(T::to_field(&zkhash::<T>(chall2, &b, q_s, c))[0] + T::to_field(a_t)[0] * delta)
 }

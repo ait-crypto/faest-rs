@@ -8,7 +8,6 @@ pub fn commit<T, R>(
     r: T,
     iv: u128,
     n: u32,
-    prg: &dyn Fn(&[u8], u128, usize) -> Vec<u8>,
 ) -> (Vec<u8>, (Vec<Vec<u8>>, Vec<Vec<u8>>), Vec<Option<Vec<u8>>>)
 where
     T: BigGaloisField,
@@ -20,7 +19,7 @@ where
     k[0] = r.get_value().0.to_le_bytes().to_vec();
     k[0].append(&mut r.get_value().1.to_le_bytes()[..length - 16_usize].to_vec());
     for i in 0..n - 1 {
-        let new_ks = prg(&k[i as usize], iv, length * 2);
+        let new_ks = &R::prg(&k[i as usize], iv, length * 2);
         (k[((2 * i) + 1) as usize], k[((2 * i) + 2) as usize]) =
             (new_ks[..length].to_vec(), new_ks[length..].to_vec());
     }
@@ -62,7 +61,6 @@ pub fn reconstruct<T, R>(
     mut pdecom: (Vec<Vec<u8>>, Vec<u8>),
     b: Vec<u8>,
     iv: u128,
-    prg: &dyn Fn(&[u8], u128, usize) -> Vec<u8>,
 ) -> (Vec<u8>, Vec<Vec<u8>>)
 where
     R: RandomOracle,
@@ -83,7 +81,7 @@ where
         for j in 0..1 << (i - 1) {
             if j != a {
                 let rank = (1 << (i - 1)) - 1 + j;
-                let new_ks = prg(&k[rank as usize].as_ref().unwrap()[..], iv, length * 2);
+                let new_ks = R::prg(&k[rank as usize].as_ref().unwrap()[..], iv, length * 2);
                 (k[(rank * 2 + 1) as usize], k[(rank * 2 + 2) as usize]) = (
                     Some(new_ks[..length].to_vec()),
                     Some(new_ks[length..].to_vec()),
@@ -120,13 +118,12 @@ pub fn verify<T, R>(
     pdecom: (Vec<Vec<u8>>, Vec<u8>),
     b: Vec<u8>,
     iv: u128,
-    prg: &dyn Fn(&[u8], u128, usize) -> Vec<u8>,
 ) -> u8
 where
     R: RandomOracle,
     T: BigGaloisField,
 {
-    let (com_b, _sd) = reconstruct::<T, R>(pdecom, b, iv, prg);
+    let (com_b, _sd) = reconstruct::<T, R>(pdecom, b, iv);
     if com_b == com {
         1
     } else {
