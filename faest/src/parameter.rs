@@ -8,7 +8,7 @@ pub const PARAMOWF128: ParamOWF = ParamOWF {
     lenc: 1152,
     beta: 1,
     c: 200,
-    nst: Some(4),
+    nst: None,
 };
 pub const PARAMOWF192: ParamOWF = ParamOWF {
     nk: 6,
@@ -20,7 +20,7 @@ pub const PARAMOWF192: ParamOWF = ParamOWF {
     lenc: 1408,
     beta: 2,
     c: 416,
-    nst: Some(6),
+    nst: None,
 };
 pub const PARAMOWF256: ParamOWF = ParamOWF {
     nk: 8,
@@ -32,7 +32,7 @@ pub const PARAMOWF256: ParamOWF = ParamOWF {
     lenc: 1664,
     beta: 2,
     c: 500,
-    nst: Some(8),
+    nst: None,
 };
 pub const PARAMOWF128EM: ParamOWF = ParamOWF {
     nk: 4,
@@ -215,8 +215,8 @@ impl ParamOWF {
         self.c
     }
 
-    pub fn get_nst(&self) -> u8 {
-        self.nst.unwrap()
+    pub fn get_nst(&self) -> Option<u8> {
+        self.nst
     }
 
     pub fn set_nk(&mut self, value: u8) {

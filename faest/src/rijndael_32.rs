@@ -296,7 +296,7 @@ pub(crate) fn rijndael_decrypt(rkeys: &[u32], blocks: &BatchBlocks, bc: u8, r: u
 ///
 /// Encrypts four blocks in-place and in parallel.
 #[allow(dead_code)]
-pub(crate) fn rijndael_encrypt(rkeys: &[u32], input: &[u8], bc: u8, r: u8) -> BatchBlocks {
+pub(crate) fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst:u8,  bc: u8, r: u8) -> BatchBlocks {
     let mut state = State::default();
     bitslice(&mut state, &input[..16], &input[16..]);
     rijndael_add_round_key(&mut state, &rkeys[..8]);
@@ -304,7 +304,7 @@ pub(crate) fn rijndael_encrypt(rkeys: &[u32], input: &[u8], bc: u8, r: u8) -> Ba
     loop {
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
-        rijndael_shift_rows_1(&mut state, bc);
+        rijndael_shift_rows_1(&mut state, nst);
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &rkeys[rk_off..(rk_off + 8)]);
         rk_off += 8;
@@ -315,7 +315,7 @@ pub(crate) fn rijndael_encrypt(rkeys: &[u32], input: &[u8], bc: u8, r: u8) -> Ba
     }
     sub_bytes(&mut state);
     sub_bytes_nots(&mut state);
-    rijndael_shift_rows_1(&mut state, bc);
+    rijndael_shift_rows_1(&mut state, nst);
     rijndael_add_round_key(&mut state, &rkeys[(r * 8) as usize..((r * 8) + 8) as usize]);
     inv_bitslice(&state)
 }

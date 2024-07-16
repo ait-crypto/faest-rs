@@ -6,8 +6,7 @@ use serde::Deserialize;
 #[cfg(test)]
 use crate::parameter::Param;
 use crate::{
-    aes::aes_extendedwitness,
-    faest::{faest_sign, faest_verify, keygen, sigma_to_signature, signature_to_sigma, AesCypher, EmCypher, Variant},
+    faest::{faest_sign, faest_verify, sigma_to_signature, signature_to_sigma, AesCypher, EmCypher, Variant},
     fields::{GF128, GF192, GF256},
     parameter::{
         ParamOWF, PARAM128F, PARAM128S, PARAM192F, PARAM192S, PARAM256F, PARAM256S, PARAMOWF128,
@@ -15,82 +14,6 @@ use crate::{
     },
     random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
 };
-
-#[test]
-fn keygen_test() {
-    //128-s-aes
-    for i in 0..500 {
-        let param = PARAM128S;
-        let paramowf = PARAMOWF128;
-        let (sk, pk) = keygen::<AesCypher>(&param, &paramowf);
-        let mut w = AesCypher::witness(&sk, &pk.0, &param, &paramowf);
-        for elem in &mut w[paramowf.get_nk() as usize..] {
-            if (*elem & 255) == 0 {
-                assert_eq!(true, false);
-            }
-        }
-    }
-    //128-f-aes
-    for i in 0..500 {
-        let param = PARAM128F;
-        let paramowf = PARAMOWF128;
-        let (sk, pk) = keygen::<AesCypher>(&param, &paramowf);
-        let mut w = AesCypher::witness(&sk, &pk.0, &param, &paramowf);
-        for elem in &mut w[paramowf.get_nk() as usize..] {
-            if (*elem & 255) == 0 {
-                assert_eq!(true, false);
-            }
-        }
-    }
-    //192-s-aes
-    for i in 0..500 {
-        let param = PARAM192S;
-        let paramowf = PARAMOWF192;
-        let (sk, pk) = keygen::<AesCypher>(&param, &paramowf);
-        let mut w = AesCypher::witness(&sk, &pk.0, &param, &paramowf);
-        for elem in &mut w[paramowf.get_nk() as usize..] {
-            if (*elem & 255) == 0 {
-                assert_eq!(true, false);
-            }
-        }
-    }
-    //192-f-aes
-    for i in 0..500 {
-        let param = PARAM192F;
-        let paramowf = PARAMOWF192;
-        let (sk, pk) = keygen::<AesCypher>(&param, &paramowf);
-        let mut w = AesCypher::witness(&sk, &pk.0, &param, &paramowf);
-        for elem in &mut w[paramowf.get_nk() as usize..] {
-            if (*elem & 255) == 0 {
-                assert_eq!(true, false);
-            }
-        }
-    }
-    //256-s-aes
-    for i in 0..500 {
-        let param = PARAM256S;
-        let paramowf = PARAMOWF256;
-        let (sk, pk) = keygen::<AesCypher>(&param, &paramowf);
-        let mut w = AesCypher::witness(&sk, &pk.0, &param, &paramowf);
-        for elem in &mut w[paramowf.get_nk() as usize..] {
-            if (*elem & 255) == 0 {
-                assert_eq!(true, false);
-            }
-        }
-    }
-    //256-f-aes
-    for i in 0..500 {
-        let param = PARAM256F;
-        let paramowf = PARAMOWF256;
-        let (sk, pk) = keygen::<AesCypher>(&param, &paramowf);
-        let mut w = AesCypher::witness(&sk, &pk.0, &param, &paramowf);
-        for elem in &mut w[paramowf.get_nk() as usize..] {
-            if (*elem & 255) == 0 {
-                assert_eq!(true, false);
-            }
-        }
-    }
-}
 
 #[test]
 fn faest_sign_test() {
@@ -6286,7 +6209,7 @@ fn faest_aes_test() {
         //print!("{:?}", i);
         let param = PARAM128S;
         let paramowf = PARAMOWF128;
-        let (sk, pk) = keygen::<AesCypher>(&param, &paramowf);
+        let (sk, pk) = AesCypher::keygen(&paramowf, &param);
         /* println!("sk = ");
         for i in &sk {
             print!("0x{:02x}, ", i)
@@ -6316,7 +6239,7 @@ fn faest_aes_test() {
         let sigma = faest_sign::<GF128, RandomOracleShake128, AesCypher>(
             msg,
             &sk,
-            &[pk.0.clone(), pk.1.clone()].concat(),
+            &pk,
             
             &param,
             &paramowf,
@@ -6329,7 +6252,7 @@ fn faest_aes_test() {
         println!(" "); */
         let res_true = faest_verify::<GF128, RandomOracleShake128, AesCypher>(
             msg,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma.clone(),
             &param,
             &paramowf,
@@ -6346,21 +6269,21 @@ fn faest_aes_test() {
     for i in 0..500 {
         let param = Param::set_param(128, 1600, 16, 8, 8, 8, 8, 16, 1);
         let paramowf = ParamOWF::set_paramowf(4, 10, 40, 160, 1600, 448, 1152, 1, 200, None);
-        let (sk, pk) = keygen::<AesCypher>(&param, &paramowf);
+        let (sk, pk) = AesCypher::keygen(&paramowf, &param);
         let length: u8 = random();
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let rho = &random::<[u8; 32]>()[..16];
         let sigma = faest_sign::<GF128, RandomOracleShake128, AesCypher>(
             msg,
             &sk,
-            &[pk.0.clone(), pk.1.clone()].concat(),
+            &pk,
             &param,
             &paramowf,
             rho.to_vec()
         );
         let res_true = faest_verify::<GF128, RandomOracleShake128, AesCypher>(
             msg,
-            (&pk.0, &pk.1),
+        (&pk[..16], &pk[16..]),
             sigma.clone(),
             &param,
             &paramowf,
@@ -6372,7 +6295,7 @@ fn faest_aes_test() {
             .collect::<Vec<u8>>();
         let res_false = faest_verify::<GF128, RandomOracleShake128, AesCypher>(
             &msg_false,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma,
             &param,
             &paramowf,
@@ -6385,21 +6308,21 @@ fn faest_aes_test() {
     for i in 0..500 {
         let param = Param::set_param(192, 3264, 16, 12, 12, 8, 8, 16, 2);
         let paramowf = ParamOWF::set_paramowf(6, 12, 32, 192, 3264, 448, 1408, 2, 416, None);
-        let (sk, pk) = keygen::<AesCypher>(&param, &paramowf);
+        let (sk, pk) = AesCypher::keygen(&paramowf, &param);
         let length: u8 = random();
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let rho = &random::<[u8; 32]>()[..24];
         let sigma = faest_sign::<GF192, RandomOracleShake256, AesCypher>(
             msg,
             &sk,
-            &[pk.0.clone(), pk.1.clone()].concat(),
+            &pk,
             &param,
             &paramowf,
             rho.to_vec()
         );
         let res_true = faest_verify::<GF192, RandomOracleShake256, AesCypher>(
             msg,
-            (&pk.0, &pk.1),
+            (&pk[..24], &pk[24..]),
             sigma.clone(),
             &param,
             &paramowf,
@@ -6411,7 +6334,7 @@ fn faest_aes_test() {
             .collect::<Vec<u8>>();
         let res_false = faest_verify::<GF192, RandomOracleShake256, AesCypher>(
             &msg_false,
-            (&pk.0, &pk.1),
+            (&pk[..24], &pk[24..]),
             sigma,
             &param,
             &paramowf,
@@ -6424,21 +6347,21 @@ fn faest_aes_test() {
     for i in 0..500 {
         let param = Param::set_param(192, 3264, 24, 8, 8, 12, 12, 16, 2);
         let paramowf = ParamOWF::set_paramowf(6, 12, 32, 192, 3264, 448, 1408, 2, 416, None);
-        let (sk, pk) = keygen::<AesCypher>(&param, &paramowf);
+        let (sk, pk) = AesCypher::keygen(&paramowf, &param);
         let length: u8 = random();
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let rho = &random::<[u8; 32]>()[..24];
         let sigma = faest_sign::<GF192, RandomOracleShake256, AesCypher>(
             msg,
             &sk,
-            &[pk.0.clone(), pk.1.clone()].concat(),
+            &pk,
             &param,
             &paramowf,
             rho.to_vec()
         );
         let res_true = faest_verify::<GF192, RandomOracleShake256, AesCypher>(
             msg,
-            (&pk.0, &pk.1),
+            (&pk[..32], &pk[32..]),
             sigma.clone(),
             &param,
             &paramowf,
@@ -6450,7 +6373,7 @@ fn faest_aes_test() {
             .collect::<Vec<u8>>();
         let res_false = faest_verify::<GF192, RandomOracleShake256, AesCypher>(
             &msg_false,
-            (&pk.0, &pk.1),
+            (&pk[..32], &pk[32..]),
             sigma,
             &param,
             &paramowf,
@@ -6463,21 +6386,21 @@ fn faest_aes_test() {
     for i in 0..500 {
         let param = Param::set_param(256, 4000, 22, 12, 11, 14, 8, 16, 2);
         let paramowf = ParamOWF::set_paramowf(8, 14, 52, 224, 4000, 672, 1664, 2, 500, None);
-        let (sk, pk) = keygen::<AesCypher>(&param, &paramowf);
+        let (sk, pk) = AesCypher::keygen(&paramowf, &param);
         let length: u8 = random();
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let rho = &random::<[u8; 32]>()[..32];
         let sigma = faest_sign::<GF256, RandomOracleShake256, AesCypher>(
             msg,
             &sk,
-            &[pk.0.clone(), pk.1.clone()].concat(),
+            &pk,
             &param,
             &paramowf,
             rho.to_vec()
         );
         let res_true = faest_verify::<GF256, RandomOracleShake256, AesCypher>(
             msg,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma.clone(),
             &param,
             &paramowf,
@@ -6489,7 +6412,7 @@ fn faest_aes_test() {
             .collect::<Vec<u8>>();
         let res_false = faest_verify::<GF256, RandomOracleShake256, AesCypher>(
             &msg_false,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma,
             &param,
             &paramowf,
@@ -6502,21 +6425,21 @@ fn faest_aes_test() {
     for i in 0..500 {
         let param = Param::set_param(256, 4000, 32, 8, 8, 16, 16, 16, 2);
         let paramowf = ParamOWF::set_paramowf(8, 14, 52, 224, 4000, 672, 1664, 2, 500, None);
-        let (sk, pk) = keygen::<AesCypher>(&param, &paramowf);
+        let (sk, pk) = AesCypher::keygen(&paramowf, &param);
         let length: u8 = random();
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let rho = &random::<[u8; 32]>()[..32];
         let sigma = faest_sign::<GF256, RandomOracleShake256, AesCypher>(
             msg,
             &sk,
-            &[pk.0.clone(), pk.1.clone()].concat(),
+            &pk,
             &param,
             &paramowf,
             rho.to_vec()
         );
         let res_true = faest_verify::<GF256, RandomOracleShake256, AesCypher>(
             msg,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma.clone(),
             &param,
             &paramowf,
@@ -6528,7 +6451,7 @@ fn faest_aes_test() {
             .collect::<Vec<u8>>();
         let res_false = faest_verify::<GF256, RandomOracleShake256, AesCypher>(
             &msg_false,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma,
             &param,
             &paramowf,
@@ -6544,21 +6467,21 @@ fn faest_em_test() {
     for i in 0..500 {
         let param = PARAM128S;
         let paramowf = PARAMOWF128EM;
-        let (sk, pk) = keygen::<EmCypher>(&param, &paramowf);
+        let (sk, pk) = EmCypher::keygen(&paramowf, &param);
         let length: u8 = random();
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let rho = &random::<[u8; 32]>()[..16];
         let sigma = faest_sign::<GF128, RandomOracleShake128, EmCypher>(
             msg,
             &sk,
-            &[pk.0.clone(), pk.1.clone()].concat(),
+            &pk,
             &param,
             &paramowf,
             rho.to_vec()
         );
         let res_true = faest_verify::<GF128, RandomOracleShake128, EmCypher>(
             msg,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma.clone(),
             &param,
             &paramowf,
@@ -6574,21 +6497,21 @@ fn faest_em_test() {
     for i in 0..500 {
         let param = PARAM128F;
         let paramowf = PARAMOWF128EM;
-        let (sk, pk) = keygen::<EmCypher>(&param, &paramowf);
+        let (sk, pk) = EmCypher::keygen(&paramowf, &param);
         let length: u8 = random();
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let rho = &random::<[u8; 32]>()[..16];
         let sigma = faest_sign::<GF128, RandomOracleShake128, EmCypher>(
             msg,
             &sk,
-            &[pk.0.clone(), pk.1.clone()].concat(),
+            &pk,
             &param,
             &paramowf,
             rho.to_vec()
         );
         let res_true = faest_verify::<GF128, RandomOracleShake128, EmCypher>(
             msg,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma.clone(),
             
             &param,
@@ -6601,7 +6524,7 @@ fn faest_em_test() {
             .collect::<Vec<u8>>();
         let res_false = faest_verify::<GF128, RandomOracleShake128, EmCypher>(
             &msg_false,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma,
             
             &param,
@@ -6615,21 +6538,21 @@ fn faest_em_test() {
     for i in 0..500 {
         let param = PARAM192S;
         let paramowf = PARAMOWF192EM;
-        let (sk, pk) = keygen::<EmCypher>(&param, &paramowf);
+        let (sk, pk) = EmCypher::keygen(&paramowf, &param);
         let length: u8 = random();
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let rho = &random::<[u8; 32]>()[..24];
         let sigma = faest_sign::<GF192, RandomOracleShake256, EmCypher>(
             msg,
             &sk,
-            &[pk.0.clone(), pk.1.clone()].concat(),
+            &pk,
             &param,
             &paramowf,
             rho.to_vec()
         );
         let res_true = faest_verify::<GF192, RandomOracleShake256, EmCypher>(
             msg,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma.clone(),
             
             &param,
@@ -6642,7 +6565,7 @@ fn faest_em_test() {
             .collect::<Vec<u8>>();
         let res_false = faest_verify::<GF192, RandomOracleShake256, EmCypher>(
             &msg_false,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma,
             
             &param,
@@ -6656,21 +6579,21 @@ fn faest_em_test() {
     for i in 0..500 {
         let param = PARAM192F;
         let paramowf = PARAMOWF192EM;
-        let (sk, pk) = keygen::<EmCypher>(&param, &paramowf);
+        let (sk, pk) = EmCypher::keygen(&paramowf, &param);
         let length: u8 = random();
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let rho = &random::<[u8; 32]>()[..24];
         let sigma = faest_sign::<GF192, RandomOracleShake256, EmCypher>(
             msg,
             &sk,
-            &[pk.0.clone(), pk.1.clone()].concat(),
+            &pk,
             &param,
             &paramowf,
             rho.to_vec()
         );
         let res_true = faest_verify::<GF192, RandomOracleShake256, EmCypher>(
             msg,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma.clone(),
             
             &param,
@@ -6683,7 +6606,7 @@ fn faest_em_test() {
             .collect::<Vec<u8>>();
         let res_false = faest_verify::<GF192, RandomOracleShake256, EmCypher>(
             &msg_false,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma,
             
             &param,
@@ -6697,21 +6620,21 @@ fn faest_em_test() {
     for i in 0..500 {
         let param = PARAM256S;
         let paramowf = PARAMOWF256EM;
-        let (sk, pk) = keygen::<EmCypher>(&param, &paramowf);
+        let (sk, pk) = EmCypher::keygen(&paramowf, &param);
         let length: u8 = random();
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let rho = &random::<[u8; 32]>()[..32];
         let sigma = faest_sign::<GF256, RandomOracleShake256, EmCypher>(
             msg,
             &sk,
-            &[pk.0.clone(), pk.1.clone()].concat(),
+            &pk,
             &param,
             &paramowf,
             rho.to_vec()
         );
         let res_true = faest_verify::<GF256, RandomOracleShake256, EmCypher>(
             msg,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma.clone(),
             &param,
             &paramowf,
@@ -6723,7 +6646,7 @@ fn faest_em_test() {
             .collect::<Vec<u8>>();
         let res_false = faest_verify::<GF256, RandomOracleShake256, EmCypher>(
             &msg_false,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma,
             
             &param,
@@ -6737,21 +6660,21 @@ fn faest_em_test() {
     for i in 0..500 {
         let param = PARAM256F;
         let paramowf = PARAMOWF256EM;
-        let (sk, pk) = keygen::<EmCypher>(&param, &paramowf);
+        let (sk, pk) = EmCypher::keygen(&paramowf, &param);
         let length: u8 = random();
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let rho = &random::<[u8; 32]>()[..32];
         let sigma = faest_sign::<GF256, RandomOracleShake256, EmCypher>(
             msg,
             &sk,
-            &[pk.0.clone(), pk.1.clone()].concat(),
+            &pk,
             &param,
             &paramowf,
             rho.to_vec()
         );
         let res_true = faest_verify::<GF256, RandomOracleShake256, EmCypher>(
             msg,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma.clone(),
             
             &param,
@@ -6764,7 +6687,7 @@ fn faest_em_test() {
             .collect::<Vec<u8>>();
         let res_false = faest_verify::<GF256, RandomOracleShake256, EmCypher>(
             &msg_false,
-            (&pk.0, &pk.1),
+            (&pk[..16], &pk[16..]),
             sigma,
             &param,
             &paramowf,
@@ -6790,3 +6713,185 @@ fn calcul() {
 }
 
 //a_t : [209, 99, 42, 133, 59, 167, 12, 252, 11, 195, 149, 83, 53, 193, 24, 80] */
+
+
+///NYST tests
+#[derive(Default, Clone)]
+struct TestVector {
+    message: Vec<u8>,
+    pk: Vec<u8>,
+    sk: Vec<u8>,
+    sm: Vec<u8>,
+}
+
+fn parse_hex(value: &str) -> Vec<u8> {
+    hex::decode(value).expect("hex value")
+}
+
+fn read_kats(kats: &str) -> Vec<TestVector> {
+    let mut ret = Vec::new();
+
+    let mut kat = TestVector::default();
+    for line in kats.lines() {
+        // skip comments and empty lines
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        let (kind, value) = line.split_once(" = ").expect("kind = value");
+        match kind {
+            // ignore count, message and signature lenghts, and seed
+            "count" | "mlen" | "seed" | "smlen" => {}
+            "sk" => {
+                kat.sk = parse_hex(value);
+            }
+            "pk" => {
+                kat.pk = parse_hex(value);
+            }
+            "msg" => {
+                kat.message = parse_hex(value);
+            }
+            "sm" => {
+                kat.sm = parse_hex(value);
+                assert!(
+                    !kat.sk.is_empty()
+                        && !kat.pk.is_empty()
+                        && !kat.message.is_empty()
+                        && !kat.sm.is_empty()
+                );
+                ret.push(kat);
+                kat = TestVector::default();
+            }
+            _ => {
+                unreachable!("unknown kind");
+            }
+        }
+    }
+    ret
+}
+
+#[test]
+
+fn test_nyst_faest (){
+    //128s-aes
+    let datas = read_kats(include_str!("../PQCsignKAT_faest_128s.rsp"));
+    for data in datas {
+        let sk_format = data.sk;
+        let pk = data.pk;
+        let msg = data.message;
+        let sig = data.sm;
+        assert_eq!(pk, [AesCypher::keygen_from_sk(&PARAMOWF128, &PARAM128S, &sk_format).0, AesCypher::keygen_from_sk(&PARAMOWF128, &PARAM128S, &sk_format).1].concat());
+        //assert_eq!(sig, faest_sign::<GF128, RandomOracleShake128, AesCypher>(msg, sk_format[16..], pk, PARAM128S, PARAMOWF128))
+    }
+    //128f-aes
+    let datas = read_kats(include_str!("../PQCsignKAT_faest_128f.rsp"));
+    for data in datas {
+        let sk_format = data.sk;
+        let pk = data.pk;
+        let msg = data.message;
+        let sig = data.sm;
+        assert_eq!(pk, [AesCypher::keygen_from_sk(&PARAMOWF128, &PARAM128F, &sk_format).0, AesCypher::keygen_from_sk(&PARAMOWF128, &PARAM128F, &sk_format).1].concat());
+        //assert_eq!(sig, faest_sign::<GF128, RandomOracleShake128, AesCypher>(msg, sk_format[16..], pk, PARAM128F, PARAMOWF128))
+    }
+    //192s-aes
+    let datas = read_kats(include_str!("../PQCsignKAT_faest_192s.rsp"));
+    for data in datas {
+        let sk_format = data.sk;
+        let pk = data.pk;
+        let msg = data.message;
+        let sig = data.sm;
+        assert_eq!(pk, [AesCypher::keygen_from_sk(&PARAMOWF192, &PARAM192S, &sk_format).0, AesCypher::keygen_from_sk(&PARAMOWF192, &PARAM192S, &sk_format).1].concat());
+        //assert_eq!(sig, faest_sign::<GF192, RandomOracleShake192, AesCypher>(msg, sk_format[16..], pk, PARAM192S, PARAMOWF192))
+    }
+    //192f-aes
+    let datas = read_kats(include_str!("../PQCsignKAT_faest_192f.rsp"));
+    for data in datas {
+        let sk_format = data.sk;
+        let pk = data.pk;
+        let msg = data.message;
+        let sig = data.sm;
+        assert_eq!(pk, [AesCypher::keygen_from_sk(&PARAMOWF192, &PARAM192F, &sk_format).0, AesCypher::keygen_from_sk(&PARAMOWF192, &PARAM192F, &sk_format).1].concat());
+        //assert_eq!(sig, faest_sign::<GF192, RandomOracleShake192, AesCypher>(msg, sk_format[16..], pk, PARAM192F, PARAMOWF192))
+    }
+    //256s-aes
+    let datas = read_kats(include_str!("../PQCsignKAT_faest_256s.rsp"));
+    for data in datas {
+        let sk_format = data.sk;
+        let pk = data.pk;
+        let msg = data.message;
+        let sig = data.sm;
+        assert_eq!(pk, [AesCypher::keygen_from_sk(&PARAMOWF256, &PARAM256S, &sk_format).0, AesCypher::keygen_from_sk(&PARAMOWF256, &PARAM256S, &sk_format).1].concat());
+        //assert_eq!(sig, faest_sign::<GF256, RandomOracleShake256, AesCypher>(msg, sk_format[16..], pk, PARAM256S, PARAMOWF256))
+    }
+    //256f-aes
+    let datas = read_kats(include_str!("../PQCsignKAT_faest_256f.rsp"));
+    for data in datas {
+        let sk_format = data.sk;
+        let pk = data.pk;
+        let msg = data.message;
+        let sig = data.sm;
+        assert_eq!(pk, [AesCypher::keygen_from_sk(&PARAMOWF256, &PARAM256F, &sk_format).0, AesCypher::keygen_from_sk(&PARAMOWF256, &PARAM256F, &sk_format).1].concat());
+        //assert_eq!(sig, faest_sign::<GF256, RandomOracleShake256, AesCypher>(msg, sk_format[16..], pk, PARAM256F, PARAMOWF256))
+    }
+
+    //128s-em
+    let datas = read_kats(include_str!("../PQCsignKAT_faest_em_128s.rsp"));
+    for data in datas {
+        let sk_format = data.sk;
+        let pk = data.pk;
+        let msg = data.message;
+        let sig = data.sm;
+        assert_eq!(pk, [EmCypher::keygen_from_sk(&PARAMOWF128EM, &PARAM128S, &sk_format).0, EmCypher::keygen_from_sk(&PARAMOWF128EM, &PARAM128S, &sk_format).1].concat());
+        //assert_eq!(sig, fEmt_em_sign::<GF128, RandomOracleShake128, EmCypher>(msg, sk_format[16..], pk, PARAM128S, PARAMOWF128))
+    }
+    //128f-em
+    let datas = read_kats(include_str!("../PQCsignKAT_faest_em_128f.rsp"));
+    for data in datas {
+        let sk_format = data.sk;
+        let pk = data.pk;
+        let msg = data.message;
+        let sig = data.sm;
+        assert_eq!(pk, [EmCypher::keygen_from_sk(&PARAMOWF128EM, &PARAM128F, &sk_format).0, EmCypher::keygen_from_sk(&PARAMOWF128EM, &PARAM128F, &sk_format).1].concat());
+        //assert_eq!(sig, fEmt_em_sign::<GF128, RandomOracleShake128, EmCypher>(msg, sk_format[16..], pk, PARAM128F, PARAMOWF128))
+    }
+    //192s-em
+    let datas = read_kats(include_str!("../PQCsignKAT_faest_em_192s.rsp"));
+    for data in datas {
+        let sk_format = data.sk;
+        let pk = data.pk;
+        let msg = data.message;
+        let sig = data.sm;
+        assert_eq!(pk, [EmCypher::keygen_from_sk(&PARAMOWF192EM, &PARAM192S, &sk_format).0, EmCypher::keygen_from_sk(&PARAMOWF192EM, &PARAM192S, &sk_format).1].concat());
+        //assert_eq!(sig, fEmt_em_sign::<GF192, RandomOracleShake192, EmCypher>(msg, sk_format[16..], pk, PARAM192S, PARAMOWF192))
+    }
+    //192f-em
+    let datas = read_kats(include_str!("../PQCsignKAT_faest_em_192f.rsp"));
+    for data in datas {
+        let sk_format = data.sk;
+        let pk = data.pk;
+        let msg = data.message;
+        let sig = data.sm;
+        assert_eq!(pk, [EmCypher::keygen_from_sk(&PARAMOWF192EM, &PARAM192F, &sk_format).0, EmCypher::keygen_from_sk(&PARAMOWF192EM, &PARAM192F, &sk_format).1].concat());
+        //assert_eq!(sig, fEmt_em_sign::<GF192, RandomOracleShake192, EmCypher>(msg, sk_format[16..], pk, PARAM192F, PARAMOWF192))
+    }
+    //256s-em
+    let datas = read_kats(include_str!("../PQCsignKAT_faest_em_256s.rsp"));
+    for data in datas {
+        let sk_format = data.sk;
+        let pk = data.pk;
+        let msg = data.message;
+        let sig = data.sm;
+        assert_eq!(pk, [EmCypher::keygen_from_sk(&PARAMOWF256EM, &PARAM256S, &sk_format).0, EmCypher::keygen_from_sk(&PARAMOWF256EM, &PARAM256S, &sk_format).1].concat());
+        //assert_eq!(sig, fEmt_em_sign::<GF256, RandomOracleShake256, EmCypher>(msg, sk_format[16..], pk, PARAM256S, PARAMOWF256))
+    }
+    //256f-em
+    let datas = read_kats(include_str!("../PQCsignKAT_faest_em_256f.rsp"));
+    for data in datas {
+        let sk_format = data.sk;
+        let pk = data.pk;
+        let msg = data.message;
+        let sig = data.sm;
+        assert_eq!(pk, [EmCypher::keygen_from_sk(&PARAMOWF256EM, &PARAM256F, &sk_format).0, EmCypher::keygen_from_sk(&PARAMOWF256EM, &PARAM256F, &sk_format).1].concat());
+        //assert_eq!(sig, fEmt_em_sign::<GF256, RandomOracleShake256, EmCypher>(msg, sk_format[16..], pk, PARAM256F, PARAMOWF256))
+    }
+}

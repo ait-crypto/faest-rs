@@ -36,7 +36,7 @@ fn em_extended_witness_test() {
     for data in database {
         if data.lambda == 128 {
             let param = Param::set_param(128, data.l, 11, 12, 11, 1, 1, 16, 1);
-            let mut paramowf = parameter::PARAMOWF128;
+            let mut paramowf = parameter::PARAMOWF128EM;
             paramowf.set_lke(data.lke);
             let res = em_extendedwitness(
                 &data.key,
@@ -47,7 +47,7 @@ fn em_extended_witness_test() {
             assert_eq!(res, data.w);
         } else if data.lambda == 192 {
             let param = Param::set_param(192, data.l, 16, 12, 12, 1, 1, 16, 2);
-            let mut paramowf = parameter::PARAMOWF192;
+            let mut paramowf = parameter::PARAMOWF192EM;
             paramowf.set_lke(data.lke);
             let res = em_extendedwitness(
                 &data.key,
@@ -58,7 +58,7 @@ fn em_extended_witness_test() {
             assert_eq!(res, data.w);
         } else {
             let param = Param::set_param(256, data.l, 22, 12, 11, 1, 1, 16, 2);
-            let mut paramowf = parameter::PARAMOWF256;
+            let mut paramowf = parameter::PARAMOWF256EM;
             paramowf.set_lke(data.lke);
             let res = em_extendedwitness(
                 &data.key,
@@ -86,13 +86,13 @@ struct EmEncFwd {
 }
 
 #[test]
-fn aes_enc_fwd_test() {
+fn em_enc_fwd_test() {
     let file = File::open("EmEncFwd.json").unwrap();
     let database: Vec<EmEncFwd> =
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let paramowf = PARAMOWF128;
+            let paramowf = PARAMOWF128EM;
             let (input_x, input_z): (Vec<GF128>, Vec<GF128>) = if data.m == 1 {
                 (
                     data.x
@@ -125,7 +125,7 @@ fn aes_enc_fwd_test() {
                     .collect::<Vec<GF128>>()
             )
         } else if data.lambda == 192 {
-            let paramowf = PARAMOWF192;
+            let paramowf = PARAMOWF192EM;
             let (input_x, input_z): (Vec<GF192>, Vec<GF192>) = if data.m == 1 {
                 (
                     data.x
@@ -158,7 +158,7 @@ fn aes_enc_fwd_test() {
                     .collect::<Vec<GF192>>()
             )
         } else {
-            let paramowf = PARAMOWF256;
+            let paramowf = PARAMOWF256EM;
             let (input_x, input_z): (Vec<GF256>, Vec<GF256>) = if data.m == 1 {
                 (
                     data.x
@@ -230,7 +230,7 @@ struct EmEncBkwd {
 }
 
 #[test]
-fn aes_enc_bkwd_test() {
+fn em_enc_bkwd_test() {
     let file = File::open("EmEncBkwd.json").unwrap();
     let database: Vec<EmEncBkwd> =
         serde_json::from_reader(file).expect("error while reading or parsing");

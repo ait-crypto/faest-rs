@@ -12,6 +12,7 @@ sha3 = "0.10.8"
 aes = "0.8.4"
 cipher = "=0.5.0-pre.4"
 signature = "2.2.0"
+hex = "0.4.3"
 
 [dev-dependencies]
 num-bigint = "0.4.4"

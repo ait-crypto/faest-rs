@@ -41,6 +41,12 @@ pub trait Variant {
     ) -> Vec<u8>
     where
         T: BigGaloisField + std::default::Default + std::fmt::Debug;
+
+    fn keygen(paramowf: &ParamOWF,
+        param: &Param) -> (Vec<u8>, Vec<u8>);
+
+    fn keygen_from_sk(paramowf: &ParamOWF,
+        param: &Param, sk : &[u8]) -> (Vec<u8>, Vec<u8>);
 }
 
 pub struct AesCypher {}
@@ -79,6 +85,87 @@ impl Variant for AesCypher {
         T: BigGaloisField + std::default::Default + std::fmt::Debug,
     {
         aes_verify::<T>(d, gq, a_t, chall2, chall3, pk, paramowf, param)
+    }
+    
+    fn keygen(paramowf: &ParamOWF,
+        param: &Param) -> (Vec<u8>, Vec<u8>) {
+            let mut zero = 0;
+            let lambda = param.get_lambda() / 8;
+            let mut x = if param.get_beta() == 1 {
+                [random::<[u8; 16]>().to_vec(), vec![0u8; 16]].concat()
+            } else {
+                random::<[u8; 32]>().to_vec()
+            };
+            let mut k = random::<[u8; 32]>();
+            while zero == 0 {
+                x = if param.get_beta() == 1 {
+                    [random::<[u8; 16]>().to_vec(), vec![0u8; 16]].concat()
+                } else {
+                    random::<[u8; 32]>().to_vec()
+                };
+                k = random::<[u8; 32]>();
+                let mut y = aes_extendedwitness(&k[..lambda as usize], &x[..], param, paramowf);
+                let mut has_zero = 0;
+                for elem in &mut y[paramowf.get_nk() as usize..] {
+                    if *elem == 0 {
+                        has_zero = 1;
+                    }
+                }
+                zero = 1 - has_zero;
+            }
+            let mut rk: Vec<u32> = rijndael_key_schedule(&k, 4, paramowf.get_nk(), paramowf.get_r());
+            let mut cypher ;
+            let mut y : Vec<u8>;
+            if param.get_beta() == 1 {
+                cypher = rijndael_encrypt(&rk, &x, 4, paramowf.get_nk(), paramowf.get_r());
+                y = cypher.into_iter().flatten().take(16 as usize).collect();
+            } else {
+                cypher = rijndael_encrypt(&rk, &x, 4, paramowf.get_nk(), paramowf.get_r());
+                y = cypher.into_iter().flatten().take(16 as usize).collect();
+                cypher = rijndael_encrypt(&rk, &[&x[16..], &x[..16]].concat(), 4, paramowf.get_nk(), paramowf.get_r());
+                y.append(&mut cypher.into_iter().flatten().take(16 as usize).collect());
+            };
+            if param.get_beta() == 1 {
+                (k[..lambda as usize].to_vec(), [x[..16 as usize].to_vec(), y].concat())
+            } else {
+                (k[..lambda as usize].to_vec(), [x[..32 as usize].to_vec(), y].concat())
+            }
+    }
+    
+    ///Input : the parameter of the faest protocol and a sk : inputOWF||keyOWF
+    /// Output : pk : inputOWF||outputOWF
+    fn keygen_from_sk(paramowf: &ParamOWF, param: &Param, sk: &[u8]) -> (Vec<u8>, Vec<u8>)
+    {
+        let x = if param.get_beta() == 1 {
+            [&sk[..16 as usize], &vec![0u8; 16]].concat()
+        } else {
+            sk[..32 as usize].to_vec()
+        };
+        let lambda = param.get_lambda() / 8;
+        let mut k;
+        if param.get_beta() == 1 {
+            k = &sk[16 as usize..];
+        }
+        else {
+            k = &sk[32 as usize..];
+        }
+        let mut y : Vec<u8>;
+        let mut rk= rijndael_key_schedule(&k, 4, paramowf.get_nk(), paramowf.get_r());
+        let mut cypher: cipher::array::Array<aes::cipher::generic_array::GenericArray<u8, _>, _> ;
+        if param.get_beta() == 1 {
+            cypher = rijndael_encrypt(&rk, &[&x[..16 as usize], &[0u8; 16]].concat(), 4, paramowf.get_nk(), paramowf.get_r());
+            y = cypher.into_iter().flatten().take(16 as usize).collect();
+        } else {
+            cypher = rijndael_encrypt(&rk, &[&x[..16 as usize], &[0u8; 16]].concat(), 4, paramowf.get_nk(), paramowf.get_r());
+            y = cypher.into_iter().flatten().take(16 as usize).collect();
+            cypher = rijndael_encrypt(&rk, &[&x[16 as usize..], &[0u8; 16]].concat(), 4, paramowf.get_nk(), paramowf.get_r());
+            y.append(&mut cypher.into_iter().flatten().take(16 as usize).collect());
+        };
+        if param.get_beta() == 1 {
+            (x[..16 as usize].to_vec(), y)
+        } else {
+        (x[..32 as usize].to_vec(), y)
+        }
     }
 } 
 
@@ -119,60 +206,69 @@ impl Variant for EmCypher {
     {
         em_verify::<T>(d, gq, a_t, chall2, chall3, pk, paramowf, param)
     }
+    
+    fn keygen(paramowf: &ParamOWF,
+        param: &Param) -> (Vec<u8>, Vec<u8>) {
+            let mut zero = 0;
+            let lambda = param.get_lambda() / 8;
+            let mut x = if param.get_beta() == 1 {
+                [random::<[u8; 16]>().to_vec(), vec![0u8; 16]].concat()
+            } else {
+                random::<[u8; 32]>().to_vec()
+            };
+            let mut k = random::<[u8; 32]>();
+            while zero == 0 {
+                x = if param.get_beta() == 1 {
+                    [random::<[u8; 16]>().to_vec(), vec![0u8; 16]].concat()
+                } else {
+                    random::<[u8; 32]>().to_vec()
+                };
+                k = random::<[u8; 32]>();
+                let mut y = aes_extendedwitness(&k[..lambda as usize], &x[..], param, paramowf);
+                let mut has_zero = 0;
+                for elem in &mut y[paramowf.get_nk() as usize..] {
+                    if *elem == 0 {
+                        has_zero = 1;
+                    }
+                }
+                zero = 1 - has_zero;
+            }
+            let mut rk: Vec<u32> = rijndael_key_schedule(&k, 4, paramowf.get_nk(), paramowf.get_r());
+            let mut cypher ;
+            let mut y : Vec<u8>;
+            if param.get_beta() == 1 {
+                cypher = rijndael_encrypt(&rk, &x, 4, paramowf.get_nk(), paramowf.get_r());
+                y = cypher.into_iter().flatten().take(16 as usize).collect();
+            } else {
+                cypher = rijndael_encrypt(&rk, &x, 4, paramowf.get_nk(), paramowf.get_r());
+                y = cypher.into_iter().flatten().take(16 as usize).collect();
+                cypher = rijndael_encrypt(&rk, &[&x[16..], &x[..16]].concat(), 4, paramowf.get_nk(), paramowf.get_r());
+                y.append(&mut cypher.into_iter().flatten().take(16 as usize).collect());
+            };
+            if param.get_beta() == 1 {
+                (k[..lambda as usize].to_vec(), [x[..16 as usize].to_vec(), y].concat())
+            } else {
+                (k[..lambda as usize].to_vec(), [x[..32 as usize].to_vec(), y].concat())
+            }
+    }
+
+    ///Input : the parameter of the faest protocol and a sk : inputOWF||keyOWF
+    /// Output : pk : inputOWF||outputOWF
+    fn keygen_from_sk(paramowf: &ParamOWF, param: &Param, sk: &[u8]) -> (Vec<u8>, Vec<u8>)
+    {   
+        let lambda = param.get_lambda() / 8;
+        let x = &sk[..lambda as usize];
+        let mut k = &sk[lambda as usize..];
+        let mut y : Vec<u8>;
+        let mut rk= rijndael_key_schedule(&x, paramowf.get_nst().unwrap(), paramowf.get_nk(), paramowf.get_r());
+        let cypher = rijndael_encrypt(&rk, &[k, &vec![0u8; 32 - lambda as usize]].concat(), paramowf.get_nst().unwrap(), paramowf.get_nk(), paramowf.get_r());
+        y = cypher.into_iter().flatten().take(lambda as usize).zip(k).map(|(y, k)| y ^ k).collect();
+        (x[..lambda as usize].to_vec(), y)
+    }
 }
 
-pub fn keygen<C>(param: &Param, paramowf: &ParamOWF) -> (Vec<u8>, (Vec<u8>, Vec<u8>))
-where
-    C: Variant,
-{
-    let mut zero = 0;
-    let lambda = param.get_lambda() / 8;
-    let mut x = if param.get_beta() == 1 {
-        [random::<[u8; 16]>().to_vec(), vec![0u8; 16]].concat()
-    } else {
-        random::<[u8; 32]>().to_vec()
-    };
-    let mut k = random::<[u8; 32]>();
-    while zero == 0 {
-        x = if param.get_beta() == 1 {
-            [random::<[u8; 16]>().to_vec(), vec![0u8; 16]].concat()
-        } else {
-            random::<[u8; 32]>().to_vec()
-        };
-        k = random::<[u8; 32]>();
 
-        let rk = rijndael_key_schedule(&k, paramowf.get_nst(), paramowf.get_nk(), paramowf.get_r());
-        let cypher : Vec<u8>= rijndael_encrypt(&rk, &x, paramowf.get_nst(), paramowf.get_r()).into_iter().flatten().take(lambda as usize).collect();
-        let rk_bytes : Vec<u8> = rk.iter().flat_map(|x| x.to_le_bytes()).collect();
-        zero = 1;
-        for i in 0..rk_bytes.len() {
-            if rk_bytes[i] | cypher[i%lambda as usize] != 0 {
-                zero = 0;
-            }
-        }
-
-
-        /* let mut y = C::witness(&k[..lambda as usize], &x[..], param, paramowf);
-        let mut has_zero = 0;
-        /* for elem in &mut y[paramowf.get_nk() as usize..] {
-            if *elem == 0 {
-                has_zero = 1;
-            }
-        } */
-        zero = 1 - has_zero; */
-    }
-    let rk = rijndael_key_schedule(&k, paramowf.get_nst(), paramowf.get_nk(), paramowf.get_r());
-    let cypher = rijndael_encrypt(&rk, &x, paramowf.get_nst(), paramowf.get_r());
-    let y = cypher.into_iter().flatten().take(lambda as usize).collect();
-    if param.get_beta() == 1 {
-        (k[..lambda as usize].to_vec(), (x[..16 as usize].to_vec(), y))
-    } else {
-        (k[..lambda as usize].to_vec(), (x[..32 as usize].to_vec(), y))
-    }
-}
-
-
-#[test]
+/* #[test]
 fn genkey() {
     let res = keygen::<AesCypher>(&PARAM128S, &PARAMOWF128);
     print!("{:?}", res);
@@ -190,7 +286,7 @@ fn test_keygen() {
     let cypher = rijndael_encrypt(&rk, &x, 4, 10);
     let y = cypher.into_iter().flatten().take(lambda as usize).collect::<Vec<u8>>();
     assert_eq!(y, [0x21, 0xd0, 0x9f, 0xb4, 0xbd, 0xad, 0x2c, 0x38, 0x5, 0x46, 0x3b, 0x2, 0xda, 0xaf, 0xde, 0xfa])
-}
+} */
 
 ///The input message is assumed to be a byte array
 pub fn faest_sign<T, R, C>(

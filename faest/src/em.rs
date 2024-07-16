@@ -14,7 +14,7 @@ use crate::{
 
 pub fn em_extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) -> Vec<u8> {
     let lambda = (param.get_lambda() / 8) as usize;
-    let nst = paramowf.get_nst() as usize;
+    let nst = paramowf.get_nst().unwrap() as usize;
     let r = paramowf.get_r() as usize;
     let kc = paramowf.get_nk();
     let mut res = Vec::with_capacity((paramowf.get_l() / 8) as usize);
@@ -56,7 +56,7 @@ where
         + std::ops::Add<T>,
 {
     let mut res = Vec::with_capacity(paramowf.get_senc().into());
-    let nst = paramowf.get_nst() as usize;
+    let nst = paramowf.get_nst().unwrap() as usize;
     //Step 2-3
     for j in 0..4 * nst {
         res.push(
@@ -130,7 +130,7 @@ where
 {
     let mut res = Vec::with_capacity(paramowf.get_senc().into());
     let r = paramowf.get_r() as usize;
-    let nst = paramowf.get_nst() as usize;
+    let nst = paramowf.get_nst().unwrap() as usize;
     let lambda = param.get_lambda() as usize;
     let immut = if !mtag {
         if mkey {
@@ -193,7 +193,7 @@ where
 {
     let lambda = param.get_lambda() as usize;
     let senc = paramowf.get_senc() as usize;
-    let nst = paramowf.get_nst() as usize;
+    let nst = paramowf.get_nst().unwrap() as usize;
     let r = paramowf.get_r() as usize;
     if !mkey {
         let new_w = &convert_to_bit::<T>(w);
@@ -286,7 +286,7 @@ where
         }
     }
     let new_v = T::to_field(&temp_v);
-    let x = rijndael_key_schedule(&pk[..lambda / 8], nst, nk, r);
+    let x = rijndael_key_schedule(&pk[..lambda / 8], nst.unwrap(), nk, r);
     let (a0, a1) = em_enc_cstrnts(
         &pk[lambda / 8..],
         &x.chunks(8)
@@ -385,7 +385,7 @@ where
         }
     }
     let new_q = T::to_field(&temp_q);
-    let x = rijndael_key_schedule(&pk[..lambda / 8], nst, nk, r);
+    let x = rijndael_key_schedule(&pk[..lambda / 8], nst.unwrap(), nk, r);
     let (b, _) = em_enc_cstrnts(
         &pk[lambda / 8..],
         &x.chunks(8)

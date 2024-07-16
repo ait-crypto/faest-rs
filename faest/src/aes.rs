@@ -79,7 +79,6 @@ pub fn aes_extendedwitness(key: &[u8], pk: &[u8], param: &Param, paramowf: &Para
 
 #[allow(clippy::too_many_arguments)]
 fn round_with_save(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mut Vec<u8>) {
-    println!(" ");
     let mut state = State::default();
     bitslice(&mut state, &input1, &input2);
     rijndael_add_round_key(&mut state, &kb[..8]);
@@ -94,15 +93,10 @@ fn round_with_save(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mu
                 .flat_map(|x| x.to_le_bytes())
                 .collect::<Vec<u8>>(),
         );
-        print!("{:?}, ", &mut convert_from_batchblocks(inv_bitslice(&state))[..4 as usize][..4 as usize]
-        .to_vec()
-        .iter()
-        .flat_map(|x| x.to_le_bytes())
-        .collect::<Vec<u8>>(),);
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
     } 
-    println!(" ");
+    
 }
 
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
