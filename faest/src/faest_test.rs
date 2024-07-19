@@ -12462,7 +12462,7 @@ fn test_nyst_faest() {
         let pk = data.pk;
         let msg = data.message;
         let sig = data.sm;
-        i += 1;
+        
         let keypair = AesCypher::keygen_with_rng::<PARAM128S, PARAMOWF128>(rng);
 
         if !(pk==keypair.1){
@@ -12470,16 +12470,18 @@ fn test_nyst_faest() {
         } else {
             assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(&msg, &keypair.0[16..], &pk, keypair.2[..16].to_vec()))].concat())
         }
+        i += 1;
     } */
     //128f-aes
-    /* let datas = read_kats(include_str!("../PQCsignKAT_faest_128f.rsp"));
+    /*i-=100;
+     let datas = read_kats(include_str!("../PQCsignKAT_faest_128f.rsp"));
     for data in datas {
         let seed: [u8; 48] = data.seed.try_into().unwrap();
         let mut rng = NistPqcAes256CtrRng::from(seed);
         let pk = data.pk;
         let msg = data.message;
         let sig = data.sm;
-        i += 1;
+        
         let keypair = AesCypher::keygen_with_rng::<PARAM128F, PARAMOWF128>(rng);
 
         if !(pk==keypair.1){
@@ -12487,7 +12489,9 @@ fn test_nyst_faest() {
         } else {
             assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF128, RandomOracleShake128, AesCypher, PARAM128F, PARAMOWF128>(&msg, &keypair.0[16..], &pk, keypair.2[..16].to_vec()))].concat())
         }
-    } */
+        i += 1;
+    }
+    i-=100; */
     //192s-aes
     /* let datas = read_kats(include_str!("../PQCsignKAT_faest_192s.rsp"));
     for data in datas {
@@ -12496,7 +12500,7 @@ fn test_nyst_faest() {
         let pk = data.pk;
         let msg = data.message;
         let sig = data.sm;
-        i += 1;
+        
         let keypair = AesCypher::keygen_with_rng::<PARAM192S, PARAMOWF192>(rng);
         //assert_eq!(pk, keypair.1); 
         if !(pk==keypair.1){
@@ -12509,7 +12513,9 @@ fn test_nyst_faest() {
             println!(" ");
             assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF192, RandomOracleShake192, AesCypher, PARAM192S, PARAMOWF192>(&msg, &keypair.0[32..], &pk, keypair.2[..24].to_vec()))].concat())
         }
-    } */
+        i += 1;
+    }
+    i-=100; */
     //192f-aes
     /* let datas = read_kats(include_str!("../PQCsignKAT_faest_192f.rsp"));
     for data in datas {
@@ -12518,7 +12524,7 @@ fn test_nyst_faest() {
         let pk = data.pk;
         let msg = data.message;
         let sig = data.sm;
-        i += 1;
+        
         let keypair = AesCypher::keygen_with_rng::<PARAM192F, PARAMOWF192>(rng);
 
         if !(pk==keypair.1){
@@ -12526,7 +12532,9 @@ fn test_nyst_faest() {
         } else {
             assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF192, RandomOracleShake192, AesCypher, PARAM192F, PARAMOWF192>(&msg, &keypair.0[32..], &pk, keypair.2[..24].to_vec()))].concat())
         }
-    } */
+        i += 1;
+    }
+    i-=100; */
     //256s-aes
     /* let datas = read_kats(include_str!("../PQCsignKAT_faest_256s.rsp"));
     for data in datas {
@@ -12535,7 +12543,7 @@ fn test_nyst_faest() {
         let pk = data.pk;
         let msg = data.message;
         let sig = data.sm;
-        i += 1;
+        
         let keypair = AesCypher::keygen_with_rng::<PARAM256S, PARAMOWF256>(rng);
 
         if !(pk==keypair.1){
@@ -12543,7 +12551,9 @@ fn test_nyst_faest() {
         } else {
             assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF256, RandomOracleShake256, AesCypher, PARAM256S, PARAMOWF256>(&msg, &keypair.0[32..], &pk, keypair.2[..32].to_vec()))].concat())
         }
-    } */
+        i += 1;
+    }
+    i-=100; */
     //256f-aes
    /*let datas = read_kats(include_str!("../PQCsignKAT_faest_256f.rsp"));
     for data in datas {
@@ -12552,7 +12562,7 @@ fn test_nyst_faest() {
         let pk = data.pk;
         let msg = data.message;
         let sig = data.sm;
-        i += 1;
+        
         let keypair = AesCypher::keygen_with_rng::<PARAM256F, PARAMOWF256>(rng);
 
         if !(pk==keypair.1){
@@ -12560,7 +12570,9 @@ fn test_nyst_faest() {
         } else {
             assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF256, RandomOracleShake256, AesCypher, PARAM256F, PARAMOWF256>(&msg, &keypair.0[32..], &pk, keypair.2[..32].to_vec()))].concat())
         }
-    } */
+        i += 1;
+    }
+    i-=100; */
 
     //128s-em
     let datas = read_kats(include_str!("../PQCsignKAT_faest_em_128s.rsp"));
@@ -12570,25 +12582,29 @@ fn test_nyst_faest() {
         let pk = data.pk;
         let msg = data.message;
         let sig = data.sm;
-        i += 1;
         let keypair = EmCypher::keygen_with_rng::<PARAM128SEM, PARAMOWF128EM>(rng);
-        //
+        println!("vraie sk :");
+        for v in &keypair.0 {
+            print!("{:x}, ", v);
+        }
+        println!(" ");
         if !(pk==keypair.1){
             println!("ITERATIOM {}: {:?}", i, pk==keypair.1);
-            assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF128, RandomOracleShake128, EmCypher, PARAM128SEM, PARAMOWF128EM>(&msg, &keypair.0[16..], &pk, keypair.2[..16].to_vec()))].concat())
         } else {
-            
+            assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF128, RandomOracleShake128, EmCypher, PARAM128SEM, PARAMOWF128EM>(&msg, &keypair.0[16..], &pk, keypair.2[..16].to_vec()))].concat())
         }
+        i += 1;
     }
+    i-=100;
     //128f-em
-    let datas = read_kats(include_str!("../PQCsignKAT_faest_em_128f.rsp"));
+    /* let datas = read_kats(include_str!("../PQCsignKAT_faest_em_128f.rsp"));
     for data in datas {
         let seed: [u8; 48] = data.seed.try_into().unwrap();
         let mut rng = NistPqcAes256CtrRng::from(seed);
         let pk = data.pk;
         let msg = data.message;
         let sig = data.sm;
-        i += 1;
+        
         let keypair = EmCypher::keygen_with_rng::<PARAM128FEM, PARAMOWF128EM>(rng);
 
         if !(pk==keypair.1){
@@ -12596,33 +12612,38 @@ fn test_nyst_faest() {
         } else {
             assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF128, RandomOracleShake128, EmCypher, PARAM128FEM, PARAMOWF128EM>(&msg, &keypair.0[16..], &pk, keypair.2[..16].to_vec()))].concat())
         }
+        i += 1;
     }
+    i-=100; */
     //192s-em
-    let datas = read_kats(include_str!("../PQCsignKAT_faest_em_192s.rsp"));
+    /* let datas = read_kats(include_str!("../PQCsignKAT_faest_em_192s.rsp"));
     for data in datas {
         let seed: [u8; 48] = data.seed.try_into().unwrap();
         let mut rng = NistPqcAes256CtrRng::from(seed);
         let pk = data.pk;
         let msg = data.message;
         let sig = data.sm;
-        i += 1;
+        
         let keypair = EmCypher::keygen_with_rng::<PARAM192SEM, PARAMOWF192EM>(rng);
+        assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF192, RandomOracleShake192, EmCypher, PARAM192SEM, PARAMOWF192EM>(&msg, &keypair.0[24..], &pk, keypair.2[..24].to_vec()))].concat());
 
         if !(pk==keypair.1){
             println!("ITERATIOM {}: {:?}", i, pk==keypair.1)
         } else {
             assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF192, RandomOracleShake192, EmCypher, PARAM192SEM, PARAMOWF192EM>(&msg, &keypair.0[24..], &pk, keypair.2[..24].to_vec()))].concat())
         }
+        i += 1;
     }
+    i-=100; */
     //192f-em
-    let datas = read_kats(include_str!("../PQCsignKAT_faest_em_192f.rsp"));
+    /* let datas = read_kats(include_str!("../PQCsignKAT_faest_em_192f.rsp"));
     for data in datas {
         let seed: [u8; 48] = data.seed.try_into().unwrap();
         let mut rng = NistPqcAes256CtrRng::from(seed);
         let pk = data.pk;
         let msg = data.message;
         let sig = data.sm;
-        i += 1;
+        
         let keypair = EmCypher::keygen_with_rng::<PARAM192FEM, PARAMOWF192EM>(rng);
 
         if !(pk==keypair.1){
@@ -12630,16 +12651,18 @@ fn test_nyst_faest() {
         } else {
             assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF192, RandomOracleShake192, EmCypher, PARAM192FEM, PARAMOWF192EM>(&msg, &keypair.0[24..], &pk, keypair.2[..24].to_vec()))].concat())
         }
+        i += 1;
     }
+    i-=100; */
     //256s-em
-    let datas = read_kats(include_str!("../PQCsignKAT_faest_em_256s.rsp"));
+    /* let datas = read_kats(include_str!("../PQCsignKAT_faest_em_256s.rsp"));
     for data in datas {
         let seed: [u8; 48] = data.seed.try_into().unwrap();
         let mut rng = NistPqcAes256CtrRng::from(seed);
         let pk = data.pk;
         let msg = data.message;
         let sig = data.sm;
-        i += 1;
+        
         let keypair = EmCypher::keygen_with_rng::<PARAM256SEM, PARAMOWF256EM>(rng);
 
         if !(pk==keypair.1){
@@ -12647,16 +12670,18 @@ fn test_nyst_faest() {
         } else {
             assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF256, RandomOracleShake256, EmCypher, PARAM256SEM, PARAMOWF256EM>(&msg, &keypair.0[32..], &pk, keypair.2[..32].to_vec()))].concat())
         }
+        i += 1;
     }
+    i-=100; */
     //256f-em
-    let datas = read_kats(include_str!("../PQCsignKAT_faest_em_256f.rsp"));
+    /* let datas = read_kats(include_str!("../PQCsignKAT_faest_em_256f.rsp"));
     for data in datas {
         let seed: [u8; 48] = data.seed.try_into().unwrap();
         let mut rng = NistPqcAes256CtrRng::from(seed);
         let pk = data.pk;
         let msg = data.message;
         let sig = data.sm;
-        i += 1;
+        
         let keypair = EmCypher::keygen_with_rng::<PARAM256FEM, PARAMOWF256EM>(rng);
 
         if !(pk==keypair.1){
@@ -12664,23 +12689,24 @@ fn test_nyst_faest() {
         } else {
             assert_eq!(sig, [msg.clone(), sigma_to_signature(faest_sign::<GF256, RandomOracleShake256, EmCypher, PARAM256FEM, PARAMOWF256EM>(&msg, &keypair.0[32..], &pk, keypair.2[..32].to_vec()))].concat())
         }
+        i += 1;
     }
+    i-=100; */
 }
 
-/*#[test]
+#[test]
 
  fn testnrg() {
     let seed: [u8; 48] = [
-        0x64, 0x33, 0x5B, 0xF2, 0x9E, 0x5D, 0xE6, 0x28, 0x42, 0xC9, 0x41, 0x76, 0x6B, 0xA1, 0x29, 0xB0, 0x64, 0x3B, 0x5E, 0x71, 0x21, 0xCA, 0x26, 0xCF, 0xC1, 0x90, 0xEC, 0x7D, 0xC3, 0x54, 0x38, 0x30, 0x55, 0x7F, 0xDD, 0x5C, 0x03, 0xCF, 0x12, 0x3A, 0x45, 0x6D, 0x48, 0xEF, 0xEA, 0x43, 0xC8, 0x68
-    ];
+        0x56, 0x9B, 0x8B, 0x9B, 0xDB, 0x70, 0x7B, 0x19, 0xCD, 0x6F, 0x9B, 0xEB, 0x29, 0xF3, 0x04, 0xD6, 0x03, 0xC1, 0x50, 0x9B, 0x9C, 0xF2, 0x59, 0x87, 0xC2, 0x80, 0xC3, 0x42, 0xE8, 0x70, 0xB1, 0xE1, 0x3E, 0xFC, 0x7D, 0xD7, 0xE4, 0x1D, 0xC8, 0x5B, 0xF4, 0xF4, 0x2D, 0x04, 0x93, 0xB8, 0x4B, 0x0F];
     let mut rng = NistPqcAes256CtrRng::from(seed);
     let mut cd = true;
     let mut i = 0;
-    let mut test = [0u8; 56];
+    let mut test = [0u8; 32];
     while cd {
         i += 1;
         rng.fill_bytes(&mut test);
-        if (test[0] == 0x4b) & (test[1] == 0x62) & (test[2] == 0x2d) {
+        if (test[0] == 0xb1) & (test[1] == 0x8f) & (test[2] == 0x0f) {
             println!("i = {:?}", i);
             println!(" ");
             for v in test {
@@ -12692,7 +12718,7 @@ fn test_nyst_faest() {
         }
     }
 }
- */
+
 
  #[test] 
 

@@ -204,24 +204,27 @@ impl Variant for EmCypher {
             let mut rho = [0u8; 32];
             let mut sk = vec![0u8; 2*lambda];
             rng.fill_bytes(&mut sk);
-            let mut y = em_witness_has0::<P, O>(&sk[..lambda], &sk[lambda..]);
-            println!("taille de mes temoins : {:?}", y.len());
+            let mut y = em_witness_has0::<P, O>(&sk[lambda..], &sk[..lambda]);
+            println!(" ");
+            println!("temoins :  ");
             for elem in &mut y {
+                print!("{:x}, ", elem);
                 if *elem == 0 {
                     //println!("yolo ??");
                     continue 'boucle;
                 }
             }
             println!(" ");
+            println!(" cle : ");
             for v in &sk {
                 print!("{:x}, ", v);
             }
             println!(" ");
-            let mut rk= rijndael_key_schedule(&sk[lambda..], nst, nk, r);
+            let mut rk= rijndael_key_schedule(&sk[..lambda], nst, nk, r);
             let cypher = rijndael_encrypt(&rk, &[&sk[lambda..], &vec![0u8; 32 - lambda as usize]].concat(), nst, nk, r);
             y = cypher.into_iter().flatten().take(lambda as usize).zip(&sk[lambda..]).map(|(y, k)| y ^ k).collect();
             rng.fill_bytes(&mut rho);
-            return ((&sk).to_vec(), [&sk[lambda..], &y[..]].concat(), rho.to_vec());
+            return ((&sk).to_vec(), [&sk[..lambda], &y[..]].concat(), rho.to_vec());
         }
     }
     

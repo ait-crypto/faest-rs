@@ -57,6 +57,7 @@ pub fn em_witness_has0<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8> where P : PARAM, O 
         &k[..16],
         &[k[16..].to_vec(), vec![0u8; 32 - lambda]].concat(),
     );
+    res.append(&mut k.to_vec());
     rijndael_add_round_key(&mut state, &x[..8]);
     for j in 1..r {
         res.append(&mut inv_bitslice(&state)[0][..].to_vec());
@@ -69,13 +70,6 @@ pub fn em_witness_has0<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8> where P : PARAM, O 
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, nst as u8);
-        res.append(
-            &mut convert_from_batchblocks(inv_bitslice(&state))[..kc as usize][..kc as usize]
-                .to_vec()
-                .iter()
-                .flat_map(|x| x.to_le_bytes())
-                .collect::<Vec<u8>>(),
-        );
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &x[8 * j..8 * (j + 1)]);
     }
