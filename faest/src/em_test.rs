@@ -7,8 +7,8 @@ use crate::{
     em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_prove, em_verify, em_extendedwitness},
     fields::{BigGaloisField, GF128, GF192, GF256},
     parameter::{
-        self, Param, PARAM128F, PARAM128S, PARAM192F, PARAM192S, PARAM256F, PARAM256S, PARAMOWF128,
-        PARAMOWF128EM, PARAMOWF192, PARAMOWF192EM, PARAMOWF256, PARAMOWF256EM,
+        PARAM, PARAM128F, PARAM128S, PARAM192F, PARAM192S, PARAM256F, PARAM256S,
+        PARAMOWF128EM, PARAMOWF192EM, PARAMOWF256EM,
     },
 };
 
@@ -35,36 +35,21 @@ fn em_extended_witness_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let param = Param::set_param(128, data.l, 11, 12, 11, 1, 1, 16, 1);
-            let mut paramowf = parameter::PARAMOWF128EM;
-            paramowf.set_lke(data.lke);
-            let res = em_extendedwitness(
+            let res = em_extendedwitness::<PARAM128S, PARAMOWF128EM>(
                 &data.key,
                 &data.input,
-                &param,
-                &paramowf,
             );
             assert_eq!(res, data.w);
         } else if data.lambda == 192 {
-            let param = Param::set_param(192, data.l, 16, 12, 12, 1, 1, 16, 2);
-            let mut paramowf = parameter::PARAMOWF192EM;
-            paramowf.set_lke(data.lke);
-            let res = em_extendedwitness(
+            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(
                 &data.key,
                 &data.input,
-                &param,
-                &paramowf,
             );
             assert_eq!(res, data.w);
         } else {
-            let param = Param::set_param(256, data.l, 22, 12, 11, 1, 1, 16, 2);
-            let mut paramowf = parameter::PARAMOWF256EM;
-            paramowf.set_lke(data.lke);
-            let res = em_extendedwitness(
+            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(
                 &data.key,
                 &data.input,
-                &param,
-                &paramowf,
             );
             assert_eq!(res, data.w);
         }
@@ -92,7 +77,6 @@ fn em_enc_fwd_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let paramowf = PARAMOWF128EM;
             let (input_x, input_z): (Vec<GF128>, Vec<GF128>) = if data.m == 1 {
                 (
                     data.x
@@ -116,7 +100,7 @@ fn em_enc_fwd_test() {
                         .collect(),
                 )
             };
-            let res = em_enc_fwd(&input_z, &input_x, &paramowf);
+            let res = em_enc_fwd::<GF128, PARAMOWF128EM>(&input_z, &input_x);
             assert_eq!(
                 res,
                 data.res
@@ -149,7 +133,7 @@ fn em_enc_fwd_test() {
                         .collect(),
                 )
             };
-            let res = em_enc_fwd(&input_z, &input_x, &paramowf);
+            let res = em_enc_fwd::<GF192, PARAMOWF192EM>(&input_z, &input_x);
             assert_eq!(
                 res,
                 data.res
@@ -192,7 +176,7 @@ fn em_enc_fwd_test() {
                         .collect(),
                 )
             };
-            let res = em_enc_fwd(&input_z, &input_x, &paramowf);
+            let res = em_enc_fwd::<GF256, PARAMOWF256EM>(&input_z, &input_x);
             assert_eq!(
                 res,
                 data.res
@@ -236,8 +220,6 @@ fn em_enc_bkwd_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let paramowf = PARAMOWF128EM;
-            let param = PARAM128S;
             let (x_in, z_in, z_out_in) = if data.m == 1 {
                 (
                     data.x
@@ -269,15 +251,13 @@ fn em_enc_bkwd_test() {
                         .collect(),
                 )
             };
-            let res = em_enc_bkwd::<GF128>(
+            let res = em_enc_bkwd::<GF128, PARAM128S, PARAMOWF128EM>(
                 &x_in,
                 &z_in,
                 &z_out_in,
                 data.mkey != 0,
                 data.mtag != 0,
                 GF128::from(&data.delta[..]),
-                &paramowf,
-                &param,
             );
             assert_eq!(
                 res,
@@ -320,15 +300,13 @@ fn em_enc_bkwd_test() {
                         .collect(),
                 )
             };
-            let res = em_enc_bkwd::<GF192>(
+            let res = em_enc_bkwd::<GF192, PARAM192S, PARAMOWF192EM>(
                 &x_in,
                 &z_in,
                 &z_out_in,
                 data.mkey != 0,
                 data.mtag != 0,
                 GF192::from(&data.delta[..]),
-                &paramowf,
-                &param,
             );
             assert_eq!(
                 res,
@@ -386,15 +364,13 @@ fn em_enc_bkwd_test() {
                         .collect(),
                 )
             };
-            let res = em_enc_bkwd::<GF256>(
+            let res = em_enc_bkwd::<GF256, PARAM256S, PARAMOWF256EM>(
                 &x_in,
                 &z_in,
                 &z_out_in,
                 data.mkey != 0,
                 data.mtag != 0,
                 GF256::from(&data.delta[..]),
-                &paramowf,
-                &param,
             );
             assert_eq!(
                 res,
@@ -442,7 +418,7 @@ fn em_enc_cstrnts_test() {
                 .iter()
                 .map(|v| GF128::new(v[0] as u128 + ((v[1] as u128) << 64), 0))
                 .collect::<Vec<GF128>>()[..];
-            let res = em_enc_cstrnts::<GF128>(
+            let res = em_enc_cstrnts::<GF128, PARAM128S, PARAMOWF128EM>(
                 &data.out,
                 &data.x,
                 &data.w,
@@ -450,8 +426,6 @@ fn em_enc_cstrnts_test() {
                 vq,
                 data.mkey != 0,
                 GF128::to_field(&data.delta)[0],
-                &PARAMOWF128EM,
-                &PARAM128S,
             );
             let (mut a0, mut a1) = (vec![], vec![]);
             for i in 0..data.ab.len() {
@@ -473,7 +447,7 @@ fn em_enc_cstrnts_test() {
                 .iter()
                 .map(|v| GF192::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128))
                 .collect::<Vec<GF192>>()[..];
-            let res = em_enc_cstrnts::<GF192>(
+            let res = em_enc_cstrnts::<GF192, PARAM192S, PARAMOWF192EM>(
                 &data.out,
                 &data.x,
                 &data.w,
@@ -481,8 +455,6 @@ fn em_enc_cstrnts_test() {
                 vq,
                 data.mkey != 0,
                 GF192::to_field(&data.delta)[0],
-                &PARAMOWF192EM,
-                &PARAM192S,
             );
             let (mut a0, mut a1) = (vec![], vec![]);
             for i in 0..data.ab.len() {
@@ -509,7 +481,7 @@ fn em_enc_cstrnts_test() {
                     )
                 })
                 .collect::<Vec<GF256>>()[..];
-            let res = em_enc_cstrnts::<GF256>(
+            let res = em_enc_cstrnts::<GF256, PARAM256S, PARAMOWF256EM,>(
                 &data.out,
                 &data.x,
                 &data.w,
@@ -517,8 +489,6 @@ fn em_enc_cstrnts_test() {
                 vq,
                 data.mkey != 0,
                 GF256::to_field(&data.delta)[0],
-                &PARAMOWF256EM,
-                &PARAM256S,
             );
             let (mut a0, mut a1) = (vec![], vec![]);
             for i in 0..data.ab.len() {
@@ -567,36 +537,30 @@ fn em_prove_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let res = em_prove::<GF128>(
+            let res = em_prove::<GF128, PARAM128S, PARAMOWF128EM>(
                 &data.w,
                 &data.u,
                 &data.gv,
                 &[data.input, data.output].concat(),
                 &data.chall,
-                &PARAMOWF128EM,
-                &PARAM128S,
             );
             assert_eq!((data.at, data.bt), res);
         } else if data.lambda == 192 {
-            let res = em_prove::<GF192>(
+            let res = em_prove::<GF192, PARAM192S, PARAMOWF192EM>(
                 &data.w,
                 &data.u,
                 &data.gv,
                 &[data.input, data.output].concat(),
                 &data.chall,
-                &PARAMOWF192EM,
-                &PARAM192S,
             );
             assert_eq!((data.at, data.bt), res);
         } else {
-            let res = em_prove::<GF256>(
+            let res = em_prove::<GF256, PARAM256S, PARAMOWF256EM>(
                 &data.w,
                 &data.u,
                 &data.gv,
                 &[data.input, data.output].concat(),
                 &data.chall,
-                &PARAMOWF256EM,
-                &PARAM256S,
             );
             assert_eq!((data.at, data.bt), res);
         }
@@ -635,76 +599,64 @@ fn em_verify_test() {
     for data in database {
         if data.lambda == 128 {
             let res = if data.tau == 11 {
-                em_verify::<GF128>(
+                em_verify::<GF128, PARAM128S, PARAMOWF128EM>(
                     &data.d,
                     data.gq,
                     &data.at,
                     &data.chall2,
                     &data.chall3,
                     &[data.input, data.output].concat(),
-                    &PARAMOWF128EM,
-                    &PARAM128S,
                 )
             } else {
-                em_verify::<GF128>(
+                em_verify::<GF128, PARAM128F, PARAMOWF128EM>(
                     &data.d,
                     data.gq,
                     &data.at,
                     &data.chall2,
                     &data.chall3,
                     &[data.input, data.output].concat(),
-                    &PARAMOWF128EM,
-                    &PARAM128F,
                 )
             };
             assert_eq!(res, data.qt);
         } else if data.lambda == 192 {
             let res = if data.tau == 16 {
-                em_verify::<GF192>(
+                em_verify::<GF192, PARAM192S, PARAMOWF192EM>(
                     &data.d,
                     data.gq,
                     &data.at,
                     &data.chall2,
                     &data.chall3,
                     &[data.input, data.output].concat(),
-                    &PARAMOWF192EM,
-                    &PARAM192S,
                 )
             } else {
-                em_verify::<GF192>(
+                em_verify::<GF192, PARAM192F, PARAMOWF192EM>(
                     &data.d,
                     data.gq,
                     &data.at,
                     &data.chall2,
                     &data.chall3,
                     &[data.input, data.output].concat(),
-                    &PARAMOWF192EM,
-                    &PARAM192F,
                 )
             };
             assert_eq!(res, data.qt);
         } else {
             let res = if data.tau == 22 {
-                em_verify::<GF256>(
+                em_verify::<GF256, PARAM256S, PARAMOWF256EM>(
                     &data.d,
                     data.gq,
                     &data.at,
                     &data.chall2,
                     &data.chall3,
                     &[data.input, data.output].concat(),
-                    &PARAMOWF256EM,
-                    &PARAM256S,
                 )
             } else {
-                em_verify::<GF256>(
+                em_verify::<GF256, PARAM256F, PARAMOWF256EM>(
                     &data.d,
                     data.gq,
                     &data.at,
                     &data.chall2,
                     &data.chall3,
                     &[data.input, data.output].concat(),
-                    &PARAMOWF256EM,
-                    &PARAM256F,
                 )
             };
             assert_eq!(res, data.qt);

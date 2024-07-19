@@ -1,372 +1,439 @@
-pub const PARAMOWF128: ParamOWF = ParamOWF {
-    nk: 4,
-    r: 10,
-    ske: 40,
-    senc: 160,
-    l: 1600,
-    lke: 448,
-    lenc: 1152,
-    beta: 1,
-    c: 200,
-    nst: None,
-};
-pub const PARAMOWF192: ParamOWF = ParamOWF {
-    nk: 6,
-    r: 12,
-    ske: 32,
-    senc: 192,
-    l: 3264,
-    lke: 448,
-    lenc: 1408,
-    beta: 2,
-    c: 416,
-    nst: None,
-};
-pub const PARAMOWF256: ParamOWF = ParamOWF {
-    nk: 8,
-    r: 14,
-    ske: 52,
-    senc: 224,
-    l: 4000,
-    lke: 672,
-    lenc: 1664,
-    beta: 2,
-    c: 500,
-    nst: None,
-};
-pub const PARAMOWF128EM: ParamOWF = ParamOWF {
-    nk: 4,
-    r: 10,
-    ske: 40,
-    senc: 160,
-    l: 1280,
-    lke: 448,
-    lenc: 1152,
-    beta: 1,
-    c: 160,
-    nst: Some(4),
-};
-pub const PARAMOWF192EM: ParamOWF = ParamOWF {
-    nk: 6,
-    r: 12,
-    ske: 32,
-    senc: 288,
-    l: 2304,
-    lke: 448,
-    lenc: 1408,
-    beta: 2,
-    c: 288,
-    nst: Some(6),
-};
-pub const PARAMOWF256EM: ParamOWF = ParamOWF {
-    nk: 8,
-    r: 14,
-    ske: 52,
-    senc: 448,
-    l: 3584,
-    lke: 672,
-    lenc: 1664,
-    beta: 2,
-    c: 448,
-    nst: Some(8),
-};
-
-pub const PARAM128S: Param = Param {
-    lambda: 128,
-    l: 1600,
-    tau: 11,
-    k0: 12,
-    k1: 11,
-    tau0: 7,
-    tau1: 4,
-    b: 16,
-    beta: 1,
-};
-pub const PARAM128F: Param = Param {
-    lambda: 128,
-    l: 1600,
-    tau: 16,
-    k0: 8,
-    k1: 8,
-    tau0: 8,
-    tau1: 8,
-    b: 16,
-    beta: 1,
-};
-pub const PARAM192S: Param = Param {
-    lambda: 192,
-    l: 3264,
-    tau: 16,
-    k0: 12,
-    k1: 12,
-    tau0: 8,
-    tau1: 8,
-    b: 16,
-    beta: 2,
-};
-pub const PARAM192F: Param = Param {
-    lambda: 192,
-    l: 3264,
-    tau: 24,
-    k0: 8,
-    k1: 8,
-    tau0: 12,
-    tau1: 12,
-    b: 16,
-    beta: 2,
-};
-pub const PARAM256S: Param = Param {
-    lambda: 256,
-    l: 4000,
-    tau: 22,
-    k0: 12,
-    k1: 11,
-    tau0: 14,
-    tau1: 8,
-    b: 16,
-    beta: 2,
-};
-pub const PARAM256F: Param = Param {
-    lambda: 256,
-    l: 4000,
-    tau: 32,
-    k0: 8,
-    k1: 8,
-    tau0: 16,
-    tau1: 16,
-    b: 16,
-    beta: 2,
-};
-
-pub struct ParamOWF {
-    nk: u8,
-    r: u8,
-    ske: u8,
-    senc: u16,
-    l: u16,
-    lke: u16,
-    lenc: u16,
-    beta: u8,
-    c: u16,
-    nst: Option<u8>,
+pub trait PARAMOWF {
+    const NK : u8;
+    const R : u8;
+    const SKE : u8;
+    const SENC : u16;
+    const L : u16;
+    const LKE : u16;
+    const LENC : u16;
+    const BETA : u8;
+    const C : u16;
+    const NST : Option<u8>;
 }
 
-impl ParamOWF {
-    #[allow(clippy::too_many_arguments)]
-    pub fn set_paramowf(
-        nk: u8,
-        r: u8,
-        ske: u8,
-        senc: u16,
-        l: u16,
-        lke: u16,
-        lenc: u16,
-        beta: u8,
-        c: u16,
-        nst: Option<u8>,
-    ) -> ParamOWF {
-        ParamOWF {
-            nk,
-            r,
-            ske,
-            senc,
-            l,
-            lke,
-            lenc,
-            beta,
-            c,
-            nst,
-        }
-    }
+pub struct PARAMOWF128;
 
-    pub fn get_nk(&self) -> u8 {
-        self.nk
-    }
-
-    pub fn get_r(&self) -> u8 {
-        self.r
-    }
-
-    pub fn get_ske(&self) -> u8 {
-        self.ske
-    }
-
-    pub fn get_senc(&self) -> u16 {
-        self.senc
-    }
-
-    pub fn get_l(&self) -> u16 {
-        self.l
-    }
-
-    pub fn get_lke(&self) -> u16 {
-        self.lke
-    }
-
-    pub fn get_lenc(&self) -> u16 {
-        self.lenc
-    }
-
-    pub fn get_beta(&self) -> u8 {
-        self.beta
-    }
-
-    pub fn get_c(&self) -> u16 {
-        self.c
-    }
-
-    pub fn get_nst(&self) -> Option<u8> {
-        self.nst
-    }
-
-    pub fn set_nk(&mut self, value: u8) {
-        self.nk = value
-    }
-
-    pub fn set_r(&mut self, value: u8) {
-        self.r = value
-    }
-
-    pub fn set_ske(&mut self, value: u8) {
-        self.ske = value
-    }
-
-    pub fn set_senc(&mut self, value: u16) {
-        self.senc = value
-    }
-
-    pub fn set_l(&mut self, value: u16) {
-        self.l = value
-    }
-
-    pub fn set_lke(&mut self, value: u16) {
-        self.lke = value
-    }
-
-    pub fn set_lenc(&mut self, value: u16) {
-        self.lenc = value
-    }
-
-    pub fn set_beta(&mut self, value: u8) {
-        self.beta = value
-    }
-
-    pub fn set_c(&mut self, value: u16) {
-        self.c = value
-    }
-
-    pub fn set_nst(&mut self, value: u8) {
-        self.nst = Some(value)
-    }
+impl PARAMOWF for PARAMOWF128 {
+    
+    const NK : u8 = 4;
+    
+    const R : u8 = 10;
+    
+    const SKE : u8 = 40;
+    
+    const SENC : u16 = 160;
+    
+    const L : u16 = 1600;
+    
+    const LKE : u16 = 448;
+    
+    const LENC : u16 = 1152;
+    
+    const BETA : u8 = 1;
+    
+    const C : u16 = 200;
+    
+    const NST : Option<u8> = None; 
 }
 
-pub struct Param {
-    lambda: u16,
-    l: u16,
-    tau: u8,
-    k0: u8,
-    k1: u8,
-    tau0: u8,
-    tau1: u8,
-    b: u8,
-    beta: u8,
+pub struct PARAMOWF192;
+
+impl PARAMOWF for PARAMOWF192 {
+    const NK : u8 = 6;
+
+    const R : u8 = 12;
+
+    const SKE : u8 = 32;
+
+    const SENC : u16 = 192;
+
+    const L : u16 = 3264;
+
+    const LKE : u16 = 448;
+
+    const LENC : u16 = 1408;
+
+    const BETA : u8 = 2;
+
+    const C : u16 = 416;
+
+    const NST : Option<u8> = None;
 }
 
-impl Param {
-    #[allow(clippy::too_many_arguments)]
-    pub fn set_param(
-        lambda: u16,
-        l: u16,
-        tau: u8,
-        k0: u8,
-        k1: u8,
-        tau0: u8,
-        tau1: u8,
-        b: u8,
-        beta: u8,
-    ) -> Param {
-        Param {
-            lambda,
-            l,
-            tau,
-            k0,
-            k1,
-            tau0,
-            tau1,
-            b,
-            beta,
-        }
-    }
+pub struct PARAMOWF256;
 
-    pub fn get_lambda(&self) -> u16 {
-        self.lambda
-    }
+impl PARAMOWF for PARAMOWF256 {
+    const NK : u8 = 8;
 
-    pub fn get_l(&self) -> u16 {
-        self.l
-    }
+    const R : u8 = 14;
 
-    pub fn get_tau(&self) -> u8 {
-        self.tau
-    }
+    const SKE : u8 = 52;
 
-    pub fn get_k0(&self) -> u8 {
-        self.k0
-    }
+    const SENC : u16 = 224;
 
-    pub fn get_k1(&self) -> u8 {
-        self.k1
-    }
+    const L : u16 = 4000;
 
-    pub fn get_tau0(&self) -> u8 {
-        self.tau0
-    }
+    const LKE : u16 = 672;
 
-    pub fn get_tau1(&self) -> u8 {
-        self.tau1
-    }
+    const LENC : u16 = 1664;
 
-    pub fn get_b(&self) -> u8 {
-        self.b
-    }
+    const BETA : u8 = 2;
 
-    pub fn get_beta(&self) -> u8 {
-        self.beta
-    }
+    const C : u16 = 500;
 
-    pub fn set_lambda(&mut self, value: u16) {
-        self.lambda = value
-    }
-
-    pub fn set_l(&mut self, value: u16) {
-        self.l = value
-    }
-
-    pub fn set_tau(&mut self, value: u8) {
-        self.tau = value
-    }
-
-    pub fn set_k0(&mut self, value: u8) {
-        self.k0 = value
-    }
-
-    pub fn set_k1(&mut self, value: u8) {
-        self.k1 = value
-    }
-
-    pub fn set_tau0(&mut self, value: u8) {
-        self.tau0 = value
-    }
-
-    pub fn set_tau1(&mut self, value: u8) {
-        self.tau1 = value
-    }
-
-    pub fn set_b(&mut self, value: u8) {
-        self.b = value
-    }
-
-    pub fn set_beta(&mut self, value: u8) {
-        self.beta = value
-    }
+    const NST : Option<u8> = None;
 }
+
+pub struct PARAMOWF128EM;
+
+impl PARAMOWF for PARAMOWF128EM{
+    
+    const NK : u8 = 4;
+
+    const R : u8 = 10;
+
+    const SKE : u8 = 40;
+
+    const SENC : u16 = 160;
+
+    const L : u16 = 1280;
+
+    const LKE : u16 = 448;
+
+    const LENC : u16 = 1152;
+
+    const BETA : u8 = 1;
+
+    const C : u16 = 160;
+
+    const NST : Option<u8> = Some(4);
+}
+
+pub struct PARAMOWF192EM;
+
+impl PARAMOWF for PARAMOWF192EM{
+    
+    const NK : u8 = 6;
+
+    const R : u8 = 12;
+
+    const SKE : u8 = 32;
+
+    const SENC : u16 = 288;
+
+    const L : u16 = 2304;
+
+    const LKE : u16 = 448;
+
+    const LENC : u16 = 1408;
+
+    const BETA : u8 = 2;
+
+    const C : u16 = 288;
+
+    const NST : Option<u8> = Some(6);
+}
+
+pub struct PARAMOWF256EM;
+
+impl PARAMOWF for PARAMOWF256EM{
+    
+    const NK : u8 = 8;
+
+    const R : u8 = 14;
+
+    const SKE : u8 = 52;
+
+    const SENC : u16 = 448;
+
+    const L : u16 = 3584;
+
+    const LKE : u16 = 672;
+
+    const LENC : u16 = 1664;
+
+    const BETA : u8 = 2;
+
+    const C : u16 = 448;
+
+    const NST : Option<u8> = Some(8);
+}
+
+pub trait PARAM {
+    const LAMBDA : usize;
+    const L : u16;
+    const TAU : u8;
+    const K0 : u8;
+    const K1 : u8;
+    const TAU0 : u8;
+    const TAU1 : u8;
+    const B : u8;
+    const BETA : u8;
+}
+
+pub struct PARAM128S;
+
+impl PARAM for PARAM128S {
+    const LAMBDA : usize = 128;
+
+    const L : u16 = 1600;
+
+    const TAU : u8 = 11;
+
+    const K0 : u8 = 12;
+
+    const K1 : u8 = 11;
+
+    const TAU0 : u8 = 7;
+
+    const TAU1 : u8 = 4;
+
+    const B : u8 = 16;
+
+    const BETA : u8 = 1;
+} 
+
+pub struct PARAM128F;
+
+impl PARAM for PARAM128F {
+    const LAMBDA : usize = 128;
+
+    const L : u16 = 1600;
+
+    const TAU : u8 = 16;
+
+    const K0 : u8 = 8;
+
+    const K1 : u8 = 8;
+
+    const TAU0 : u8 = 8;
+
+    const TAU1 : u8 = 8;
+
+    const B : u8 = 16;
+
+    const BETA : u8 = 1;
+} 
+
+pub struct PARAM192S;
+
+impl PARAM for PARAM192S {
+    const LAMBDA : usize = 192;
+
+    const L : u16 = 3264;
+
+    const TAU : u8 = 16;
+
+    const K0 : u8 = 12;
+
+    const K1 : u8 = 12;
+
+    const TAU0 : u8 = 8;
+
+    const TAU1 : u8 = 8;
+
+    const B : u8 = 16;
+
+    const BETA : u8 = 2;
+} 
+
+pub struct PARAM192F;
+
+impl PARAM for PARAM192F {
+    const LAMBDA : usize = 192;
+
+    const L : u16 = 3264;
+
+    const TAU : u8 = 24;
+
+    const K0 : u8 = 8;
+
+    const K1 : u8 = 8;
+
+    const TAU0 : u8 = 12;
+
+    const TAU1 : u8 = 12;
+
+    const B : u8 = 16;
+
+    const BETA : u8 = 2;
+} 
+
+pub struct PARAM256S;
+
+impl PARAM for PARAM256S {
+    const LAMBDA : usize = 256;
+
+    const L : u16 = 4000;
+
+    const TAU : u8 = 22;
+
+    const K0 : u8 = 12;
+
+    const K1 : u8 = 11;
+
+    const TAU0 : u8 = 14;
+
+    const TAU1 : u8 = 8;
+
+    const B : u8 = 16;
+
+    const BETA : u8 = 2;
+} 
+
+pub struct PARAM256F;
+
+impl PARAM for PARAM256F {
+    const LAMBDA : usize = 256;
+
+    const L : u16 = 4000;
+
+    const TAU : u8 = 32;
+
+    const K0 : u8 = 8;
+
+    const K1 : u8 = 8;
+
+    const TAU0 : u8 = 16;
+
+    const TAU1 : u8 = 16;
+
+    const B : u8 = 16;
+
+    const BETA : u8 = 2;
+} 
+
+
+pub struct PARAM128SEM;
+
+impl PARAM for PARAM128SEM {
+    const LAMBDA : usize = 128;
+
+    const L : u16 = 1280;
+
+    const TAU : u8 = 11;
+
+    const K0 : u8 = 12;
+
+    const K1 : u8 = 11;
+
+    const TAU0 : u8 = 7;
+
+    const TAU1 : u8 = 4;
+
+    const B : u8 = 16;
+
+    const BETA : u8 = 1;
+} 
+
+pub struct PARAM128FEM;
+
+impl PARAM for PARAM128FEM {
+    const LAMBDA : usize = 128;
+
+    const L : u16 = 1280;
+
+    const TAU : u8 = 16;
+
+    const K0 : u8 = 8;
+
+    const K1 : u8 = 8;
+
+    const TAU0 : u8 = 8;
+
+    const TAU1 : u8 = 8;
+
+    const B : u8 = 16;
+
+    const BETA : u8 = 1;
+} 
+
+pub struct PARAM192SEM;
+
+impl PARAM for PARAM192SEM {
+    const LAMBDA : usize = 192;
+
+    const L : u16 = 2304;
+
+    const TAU : u8 = 16;
+
+    const K0 : u8 = 12;
+
+    const K1 : u8 = 12;
+
+    const TAU0 : u8 = 8;
+
+    const TAU1 : u8 = 8;
+
+    const B : u8 = 16;
+
+    const BETA : u8 = 2;
+} 
+
+pub struct PARAM192FEM;
+
+impl PARAM for PARAM192FEM {
+    const LAMBDA : usize = 192;
+
+    const L : u16 = 2304;
+
+    const TAU : u8 = 24;
+
+    const K0 : u8 = 8;
+
+    const K1 : u8 = 8;
+
+    const TAU0 : u8 = 12;
+
+    const TAU1 : u8 = 12;
+
+    const B : u8 = 16;
+
+    const BETA : u8 = 2;
+} 
+
+pub struct PARAM256SEM;
+
+impl PARAM for PARAM256SEM {
+    const LAMBDA : usize = 256;
+
+    const L : u16 = 3584;
+
+    const TAU : u8 = 22;
+
+    const K0 : u8 = 12;
+
+    const K1 : u8 = 11;
+
+    const TAU0 : u8 = 14;
+
+    const TAU1 : u8 = 8;
+
+    const B : u8 = 16;
+
+    const BETA : u8 = 2;
+} 
+
+pub struct PARAM256FEM;
+
+impl PARAM for PARAM256FEM {
+    const LAMBDA : usize = 256;
+
+    const L : u16 = 3584;
+
+    const TAU : u8 = 32;
+
+    const K0 : u8 = 8;
+
+    const K1 : u8 = 8;
+
+    const TAU0 : u8 = 16;
+
+    const TAU1 : u8 = 16;
+
+    const B : u8 = 16;
+
+    const BETA : u8 = 2;
+} 
+
+

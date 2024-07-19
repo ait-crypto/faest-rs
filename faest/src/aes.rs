@@ -2,10 +2,9 @@ use std::iter::zip;
 
 use crate::{
     fields::BigGaloisField,
-    parameter::{Param, ParamOWF},
+    parameter::{PARAM, PARAMOWF},
     rijndael_32::{
-        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
-        rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
+        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key, rijndael_key_schedule, rijndael_key_schedule_has0, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State
     },
     universal_hashing::zkhash,
     vole::chaldec,
@@ -24,15 +23,18 @@ where
     res
 }
 
-pub fn aes_extendedwitness(key: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) -> Vec<u8> {
-    let beta = param.get_beta() as usize;
+pub fn aes_extendedwitness<P, O>(key: &[u8], pk: &[u8]) -> Vec<u8> 
+where P : PARAM,
+O : PARAMOWF, 
+{
+    let beta = P::BETA as usize;
     let bc = 4;
-    let r = paramowf.get_r();
-    let kc = paramowf.get_nk() as usize;
+    let r = O::R;
+    let kc = O::NK as usize;
     let mut input = [0u8; 32];
     //step 0
     input[..16 * beta].clone_from_slice(&pk[..16 * beta]);
-    let mut w = Vec::with_capacity((param.get_l() / 8).into());
+    let mut w = Vec::with_capacity((P::L / 8).into());
     //step 3
     let kb = rijndael_key_schedule(key, bc, kc as u8, r);
     //step 4
@@ -51,7 +53,7 @@ pub fn aes_extendedwitness(key: &[u8], pk: &[u8], param: &Param, paramowf: &Para
             .collect::<Vec<u8>>(),
     );
     for j in 1 + (kc / 8)
-        ..1 + (kc / 8) + ((paramowf.get_ske() as usize) * ((2 - (kc % 4)) * 2 + (kc % 4) * 3)) / 16
+        ..1 + (kc / 8) + ((O::SKE as usize) * ((2 - (kc % 4)) * 2 + (kc % 4) * 3)) / 16
     {
         let key = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]));
         if kc == 6 {
@@ -77,6 +79,41 @@ pub fn aes_extendedwitness(key: &[u8], pk: &[u8], param: &Param, paramowf: &Para
     w
 }
 
+///This function allow to get the directs antecedents of subbyte when calling extendwitness to check quicly if the key is valid or not 
+pub fn aes_witness_has0<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8> where P : PARAM,
+O : PARAMOWF {
+    let beta = P::BETA as usize;
+    let bc = 4;
+    let r = O::R;
+    let kc = O::NK as usize;
+    let mut input = [0u8; 32];
+    //step 0
+    input[..16 * beta].clone_from_slice(&pk[..16 * beta]);
+    let mut w = Vec::with_capacity((P::L / 8).into());
+    //step 3
+    let kb = rijndael_key_schedule_has0(k, bc, kc as u8, r, &mut w);
+    //step 4
+    
+    for j in 1 + (kc / 8)
+        ..1 + (kc / 8) + ((O::SKE as usize) * ((2 - (kc % 4)) * 2 + (kc % 4) * 3)) / 16
+    {
+        let key = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]));
+    } 
+    
+    //step 5
+    for b in 0..beta {
+        round_with_save_has0(
+            input[16 * b..16 * (b + 1)].try_into().unwrap(),
+            [0; 16],
+            &kb,
+            r,
+            &mut w,
+        );
+    }
+    w
+}
+
+
 #[allow(clippy::too_many_arguments)]
 fn round_with_save(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mut Vec<u8>) {
     let mut state = State::default();
@@ -98,6 +135,23 @@ fn round_with_save(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mu
     } 
     
 }
+
+#[allow(clippy::too_many_arguments)]
+    fn round_with_save_has0(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mut Vec<u8>) {
+        let mut state = State::default();
+        bitslice(&mut state, &input1, &input2);
+        rijndael_add_round_key(&mut state, &kb[..8]);
+        for j in 1..r as usize {
+            w.append(&mut inv_bitslice(&state)[0][..].to_vec());
+            sub_bytes(&mut state);
+            sub_bytes_nots(&mut state);
+            rijndael_shift_rows_1(&mut state, 4);
+            
+            mix_columns_0(&mut state);
+            rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
+        } 
+        
+    }
 
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
@@ -222,13 +276,12 @@ where
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
-pub fn aes_key_exp_cstrnts<T>(
+pub fn aes_key_exp_cstrnts<T, O>(
     w: &[u8],
     v: &[T],
     mkey: bool,
     q: &[T],
-    delta: T,
-    paramowf: &ParamOWF,
+    delta: T
 ) -> (Vec<T>, Vec<T>, Vec<T>, Vec<T>)
 where
     T: BigGaloisField
@@ -236,10 +289,11 @@ where
         + std::marker::Sized
         + std::fmt::Debug
         + std::ops::Add<T>,
+    O: PARAMOWF
 {
     let lambda = T::LENGTH as usize;
-    let kc = paramowf.get_nk();
-    let ske = paramowf.get_ske() as u16;
+    let kc = O::NK;
+    let ske = O::SKE as u16;
     let mut iwd: u16 = 32 * (kc - 1) as u16;
     let mut dorotword = true;
     if !mkey {
@@ -247,8 +301,8 @@ where
             Vec::<T>::with_capacity(ske.into()),
             Vec::<T>::with_capacity(ske.into()),
         );
-        let k = aes_key_exp_fwd(&convert_to_bit(w), paramowf.get_r(), lambda, kc);
-        let vk = aes_key_exp_fwd(&v.to_vec(), paramowf.get_r(), lambda, kc);
+        let k = aes_key_exp_fwd(&convert_to_bit(w), O::R, lambda, kc);
+        let vk = aes_key_exp_fwd(&v.to_vec(), O::R, lambda, kc);
         let w_b = aes_key_exp_bwd::<T>(&convert_to_bit(w)[lambda..], &k, false, false, delta, ske);
         let v_w_b = aes_key_exp_bwd::<T>(&v[lambda..], &vk, true, false, delta, ske);
         for j in 0..ske / 4 {
@@ -291,7 +345,7 @@ where
         (a.0, a.1, k, vk)
     } else {
         let mut b = Vec::<T>::with_capacity(ske.into());
-        let q_k = aes_key_exp_fwd(&q.to_vec(), paramowf.get_r(), lambda, kc);
+        let q_k = aes_key_exp_fwd(&q.to_vec(), O::R, lambda, kc);
         let q_w_b = aes_key_exp_bwd::<T>(&q[lambda..], &q_k, false, true, delta, ske);
         for j in 0..ske / 4 {
             let mut q_h_k = [T::default(); 4];
@@ -324,14 +378,13 @@ where
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
-pub fn aes_enc_fwd<T>(
+pub fn aes_enc_fwd<T, O>(
     x: &[T],
     xk: &[T],
     mkey: bool,
     mtag: bool,
     input: [u8; 16],
     delta: T,
-    paramowf: &ParamOWF,
 ) -> Vec<T>
 where
     T: BigGaloisField
@@ -339,8 +392,9 @@ where
         + std::marker::Sized
         + std::fmt::Debug
         + std::ops::Add<T>,
+    O: PARAMOWF,
 {
-    let mut res = Vec::with_capacity(paramowf.get_senc().into());
+    let mut res = Vec::with_capacity(O::SENC.into());
     //Step 2-5
     for i in 0..16 {
         let mut xin = [T::default(); 8];
@@ -361,7 +415,7 @@ where
         );
     }
     //Step 6
-    for j in 1..paramowf.get_r() as usize {
+    for j in 1..O::R as usize {
         for c in 0..4 {
             let ix: usize = 128 * (j - 1) + 32 * c;
             let ik: usize = 128 * j + 32 * c;
@@ -407,14 +461,13 @@ where
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
-pub fn aes_enc_bkwd<T>(
+pub fn aes_enc_bkwd<T, O>(
     x: &[T],
     xk: &[T],
     mkey: bool,
     mtag: bool,
     out: [u8; 16],
     delta: T,
-    paramowf: &ParamOWF,
 ) -> Vec<T>
 where
     T: BigGaloisField
@@ -422,9 +475,10 @@ where
         + std::marker::Sized
         + std::fmt::Debug
         + std::ops::Add<T>,
+    O: PARAMOWF
 {
-    let mut res = Vec::with_capacity(paramowf.get_senc().into());
-    let r = paramowf.get_r() as usize;
+    let mut res = Vec::with_capacity(O::SENC.into());
+    let r = O::R as usize;
     let immut = if mtag {
         T::default()
     } else if mkey {
@@ -467,7 +521,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn aes_enc_cstrnts<T>(
+pub fn aes_enc_cstrnts<T, O>(
     input: [u8; 16],
     output: [u8; 16],
     w: &[u8],
@@ -478,7 +532,6 @@ pub fn aes_enc_cstrnts<T>(
     q: &[T],
     qk: &[T],
     delta: T,
-    paramowf: &ParamOWF,
 ) -> Vec<T>
 where
     T: BigGaloisField
@@ -486,17 +539,18 @@ where
         + std::marker::Sized
         + std::fmt::Debug
         + std::ops::Add<T>,
+    O: PARAMOWF
 {
-    let senc = paramowf.get_senc() as usize;
+    let senc = O::SENC as usize;
     if !mkey {
         let field_w = &(w
             .iter()
             .flat_map(|w| convert_to_bit(&[*w]))
             .collect::<Vec<T>>())[..];
-        let s = aes_enc_fwd(field_w, k, false, false, input, T::default(), paramowf);
-        let vs = aes_enc_fwd(v, vk, false, true, input, T::default(), paramowf);
-        let s_b = aes_enc_bkwd(field_w, k, false, false, output, T::default(), paramowf);
-        let v_s_b = aes_enc_bkwd(v, vk, false, true, output, T::default(), paramowf);
+        let s = aes_enc_fwd::<T, O>(field_w, k, false, false, input, T::default());
+        let vs = aes_enc_fwd::<T, O>(v, vk, false, true, input, T::default());
+        let s_b = aes_enc_bkwd::<T, O>(field_w, k, false, false, output, T::default());
+        let v_s_b = aes_enc_bkwd::<T, O>(v, vk, false, true, output, T::default());
         let mut a0 = Vec::with_capacity(2 * senc);
         let mut a1 = Vec::with_capacity(senc);
         for j in 0..senc {
@@ -506,8 +560,8 @@ where
         a0.append(&mut a1);
         a0
     } else {
-        let qs = aes_enc_fwd(q, qk, true, false, input, delta, paramowf);
-        let q_s_b = aes_enc_bkwd(q, qk, true, false, output, delta, paramowf);
+        let qs = aes_enc_fwd::<T, O>(q, qk, true, false, input, delta);
+        let q_s_b = aes_enc_bkwd::<T, O>(q, qk, true, false, output, delta);
         let mut b = Vec::with_capacity(senc);
         let delta_square = delta * delta;
         for j in 0..senc {
@@ -518,24 +572,24 @@ where
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
-pub fn aes_prove<T>(
+pub fn aes_prove<T, P, O>(
     w: &[u8],
     u: &[u8],
     gv: &[Vec<u8>],
     pk: &[u8],
     chall: &[u8],
-    paramowf: &ParamOWF,
-    param: &Param,
 ) -> (Vec<u8>, Vec<u8>)
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
+    P: PARAM,
+    O: PARAMOWF
 {
-    let l = paramowf.get_l() as usize;
-    let c = paramowf.get_c() as usize;
-    let lke = paramowf.get_lke() as usize;
-    let lenc = paramowf.get_lenc() as usize;
-    let senc = paramowf.get_senc() as usize;
-    let lambda = param.get_lambda() as usize;
+    let l = O::L as usize;
+    let c = O::C as usize;
+    let lke = O::LKE as usize;
+    let lenc = O::LENC as usize;
+    let senc = O::SENC as usize;
+    let lambda = P::LAMBDA as usize;
     let new_w = &w[..l / 8];
     let mut temp_v = Vec::with_capacity((l + lambda) * lambda / 8);
     for i in 0..(l + lambda) / 8 {
@@ -555,15 +609,14 @@ where
     } else {
         (&pk[..lambda / 8], &pk[lambda / 8..])
     };
-    let (mut a0, mut a1, k, vk) = aes_key_exp_cstrnts::<T>(
+    let (mut a0, mut a1, k, vk) = aes_key_exp_cstrnts::<T, O>(
         &new_w[..lke / 8],
         &new_v[..lke],
         false,
         &[],
         T::default(),
-        paramowf,
     );
-    let a_01 = aes_enc_cstrnts::<T>(
+    let a_01 = aes_enc_cstrnts::<T, O>(
         input[..16].try_into().unwrap(),
         output[..16].try_into().unwrap(),
         &new_w[lke / 8..(lke + lenc) / 8],
@@ -574,12 +627,11 @@ where
         &[],
         &[],
         T::default(),
-        paramowf,
     );
     a0.append(&mut a_01[..senc].to_vec());
     a1.append(&mut a_01[senc..].to_vec());
     if lambda > 128 {
-        let a_01 = aes_enc_cstrnts(
+        let a_01 = aes_enc_cstrnts::<T, O>(
             input[16..].try_into().unwrap(),
             output[16..].try_into().unwrap(),
             &new_w[(lke + lenc) / 8..l / 8],
@@ -590,7 +642,6 @@ where
             &[],
             &[],
             T::default(),
-            paramowf,
         );
         a0.append(&mut a_01[..senc].to_vec());
         a1.append(&mut a_01[senc..].to_vec());
@@ -611,29 +662,29 @@ where
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 #[allow(clippy::too_many_arguments)]
-pub fn aes_verify<T>(
+pub fn aes_verify<T, P, O>(
     d: &[u8],
     mut gq: Vec<Vec<u8>>,
     a_t: &[u8],
     chall2: &[u8],
     chall3: &[u8],
     pk: &[u8],
-    paramowf: &ParamOWF,
-    param: &Param,
 ) -> Vec<u8>
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
+    P: PARAM,
+    O: PARAMOWF
 {
     let lambda = T::LENGTH as usize;
-    let k0 = param.get_k0() as usize;
-    let k1 = param.get_k1() as usize;
-    let t0 = param.get_tau0() as usize;
-    let t1 = param.get_tau1() as usize;
-    let l = paramowf.get_l() as usize;
-    let c = paramowf.get_c() as usize;
+    let k0 = P::K0 as usize;
+    let k1 = P::K1 as usize;
+    let t0 = P::TAU0 as usize;
+    let t1 = P::TAU1 as usize;
+    let l = P::L as usize;
+    let c = O::C as usize;
     let delta = T::to_field(chall3)[0];
-    let lke = paramowf.get_lke() as usize;
-    let lenc = paramowf.get_lenc() as usize;
+    let lke = O::LKE as usize;
+    let lenc = O::LENC as usize;
     let (input, output) = if lambda == 128 {
         (&pk[..16], &pk[16..])
     } else {
@@ -680,8 +731,8 @@ where
     }
     let new_q = T::to_field(&temp_q);
     let mut b = Vec::with_capacity(c);
-    let (mut b1, _, _, qk) = aes_key_exp_cstrnts(&[], &[], true, &new_q[0..lke], delta, paramowf);
-    let mut b2 = aes_enc_cstrnts(
+    let (mut b1, _, _, qk) = aes_key_exp_cstrnts::<T, O>(&[], &[], true, &new_q[0..lke], delta);
+    let mut b2 = aes_enc_cstrnts::<T, O>(
         input[..16].try_into().unwrap(),
         output[..16].try_into().unwrap(),
         &[],
@@ -691,13 +742,12 @@ where
         true,
         &new_q[lke..lke + lenc],
         &qk[..],
-        delta,
-        paramowf,
+        delta
     );
     b.append(&mut b1);
     b.append(&mut b2);
     if lambda > 128 {
-        let mut b3 = aes_enc_cstrnts(
+        let mut b3 = aes_enc_cstrnts::<T, O>(
             input[16..].try_into().unwrap(),
             output[16..].try_into().unwrap(),
             &[],
@@ -708,7 +758,6 @@ where
             &new_q[lke + lenc..l],
             &qk[..],
             delta,
-            paramowf,
         );
         b.append(&mut b3);
     }

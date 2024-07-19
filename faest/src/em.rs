@@ -3,21 +3,20 @@ use std::iter::zip;
 use crate::{
     aes::convert_to_bit,
     fields::BigGaloisField,
-    parameter::{Param, ParamOWF},
+    parameter::{PARAM, PARAMOWF},
     rijndael_32::{
-        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
-        rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
+        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key, rijndael_key_schedule, rijndael_key_schedule_has0, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State
     },
     universal_hashing::zkhash,
     vole::chaldec,
 };
 
-pub fn em_extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) -> Vec<u8> {
-    let lambda = (param.get_lambda() / 8) as usize;
-    let nst = paramowf.get_nst().unwrap() as usize;
-    let r = paramowf.get_r() as usize;
-    let kc = paramowf.get_nk();
-    let mut res = Vec::with_capacity((paramowf.get_l() / 8) as usize);
+pub fn em_extendedwitness<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8> where P : PARAM, O : PARAMOWF {
+    let lambda = (P::LAMBDA / 8) as usize;
+    let nst = O::NST.unwrap() as usize;
+    let r = O::R as usize;
+    let kc = O::NK;
+    let mut res = Vec::with_capacity((O::L / 8) as usize);
     let x = rijndael_key_schedule(&pk[..lambda], nst as u8, kc, r as u8);
     res.append(&mut k.to_vec());
     let mut state = State::default();
@@ -44,19 +43,58 @@ pub fn em_extendedwitness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOW
     res
 }
 
+
+pub fn em_witness_has0<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8> where P : PARAM, O : PARAMOWF {
+    let lambda = (P::LAMBDA / 8) as usize;
+    let nst = O::NST.unwrap() as usize;
+    let r = O::R as usize;
+    let kc = O::NK;
+    let mut res = Vec::with_capacity((O::L / 8) as usize);
+    let x = rijndael_key_schedule(&pk[..lambda], nst as u8, kc, r as u8);
+    let mut state = State::default();
+    bitslice(
+        &mut state,
+        &k[..16],
+        &[k[16..].to_vec(), vec![0u8; 32 - lambda]].concat(),
+    );
+    rijndael_add_round_key(&mut state, &x[..8]);
+    for j in 1..r {
+        res.append(&mut inv_bitslice(&state)[0][..].to_vec());
+        if nst == 6 {
+            res.append(&mut inv_bitslice(&state)[1][..8].to_vec());
+        } else if nst == 8 {
+            res.append(&mut inv_bitslice(&state)[1][..].to_vec());
+        }
+       
+        sub_bytes(&mut state);
+        sub_bytes_nots(&mut state);
+        rijndael_shift_rows_1(&mut state, nst as u8);
+        res.append(
+            &mut convert_from_batchblocks(inv_bitslice(&state))[..kc as usize][..kc as usize]
+                .to_vec()
+                .iter()
+                .flat_map(|x| x.to_le_bytes())
+                .collect::<Vec<u8>>(),
+        );
+        mix_columns_0(&mut state);
+        rijndael_add_round_key(&mut state, &x[8 * j..8 * (j + 1)]);
+    }
+    res
+}
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
-pub fn em_enc_fwd<T>(z: &[T], x: &[T], paramowf: &ParamOWF) -> Vec<T>
+pub fn em_enc_fwd<T, O>(z: &[T], x: &[T]) -> Vec<T>
 where
     T: BigGaloisField
         + std::default::Default
         + std::marker::Sized
         + std::fmt::Debug
         + std::ops::Add<T>,
+    O: PARAMOWF,
 {
-    let mut res = Vec::with_capacity(paramowf.get_senc().into());
-    let nst = paramowf.get_nst().unwrap() as usize;
+    let mut res = Vec::with_capacity(O::SENC.into());
+    let nst = O::NST.unwrap() as usize;
     //Step 2-3
     for j in 0..4 * nst {
         res.push(
@@ -65,7 +103,7 @@ where
         );
     }
     //Step 4
-    for j in 1..paramowf.get_r() as usize {
+    for j in 1..O::R as usize {
         for c in 0..nst {
             let i: usize = 32 * nst * j + 32 * c;
             let mut z_hat: [T; 4] = [T::default(); 4];
@@ -111,15 +149,13 @@ where
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
 #[allow(clippy::too_many_arguments)]
-pub fn em_enc_bkwd<T>(
+pub fn em_enc_bkwd<T, P, O>(
     x: &[T],
     z: &[T],
     z_out: &[T],
     mkey: bool,
     mtag: bool,
     delta: T,
-    paramowf: &ParamOWF,
-    param: &Param,
 ) -> Vec<T>
 where
     T: BigGaloisField
@@ -127,11 +163,13 @@ where
         + std::marker::Sized
         + std::fmt::Debug
         + std::ops::Add<T>,
+    P: PARAM,
+    O: PARAMOWF,
 {
-    let mut res = Vec::with_capacity(paramowf.get_senc().into());
-    let r = paramowf.get_r() as usize;
-    let nst = paramowf.get_nst().unwrap() as usize;
-    let lambda = param.get_lambda() as usize;
+    let mut res = Vec::with_capacity(O::SENC.into());
+    let r = O::R as usize;
+    let nst = O::NST.unwrap() as usize;
+    let lambda = P::LAMBDA as usize;
     let immut = if !mtag {
         if mkey {
             delta
@@ -173,7 +211,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn em_enc_cstrnts<T>(
+pub fn em_enc_cstrnts<T, P, O>(
     output: &[u8],
     x: &[u8],
     w: &[u8],
@@ -181,8 +219,6 @@ pub fn em_enc_cstrnts<T>(
     q: &[T],
     mkey: bool,
     delta: T,
-    paramowf: &ParamOWF,
-    param: &Param,
 ) -> (Vec<T>, Vec<T>)
 where
     T: BigGaloisField
@@ -190,11 +226,13 @@ where
         + std::marker::Sized
         + std::fmt::Debug
         + std::ops::Add<T>,
+    P: PARAM,
+    O: PARAMOWF,
 {
-    let lambda = param.get_lambda() as usize;
-    let senc = paramowf.get_senc() as usize;
-    let nst = paramowf.get_nst().unwrap() as usize;
-    let r = paramowf.get_r() as usize;
+    let lambda = P::LAMBDA as usize;
+    let senc = O::SENC as usize;
+    let nst = O::NST.unwrap() as usize;
+    let r = O::R as usize;
     if !mkey {
         let new_w = &convert_to_bit::<T>(w);
         let new_x = convert_to_bit::<T>(&x[..4 * nst * (r + 1)]);
@@ -205,27 +243,23 @@ where
             }
         }
         let v_out = &v[0..lambda];
-        let s = em_enc_fwd::<T>(new_w, &new_x, paramowf);
-        let vs = em_enc_fwd::<T>(v, &vec![T::default(); lambda * (r + 1)], paramowf);
-        let s_b = em_enc_bkwd::<T>(
+        let s = em_enc_fwd::<T, O>(new_w, &new_x);
+        let vs = em_enc_fwd::<T, O>(v, &vec![T::default(); lambda * (r + 1)]);
+        let s_b = em_enc_bkwd::<T, P, O>(
             &new_x,
             new_w,
             &w_out,
             false,
             false,
             T::default(),
-            paramowf,
-            param,
         );
-        let v_s_b = em_enc_bkwd::<T>(
+        let v_s_b = em_enc_bkwd::<T, P, O>(
             &vec![T::default(); lambda * (r + 1)],
             v,
             v_out,
             false,
             true,
             T::default(),
-            paramowf,
-            param,
         );
         let (mut a0, mut a1) = (Vec::with_capacity(senc), Vec::with_capacity(senc));
         for j in 0..senc {
@@ -245,8 +279,8 @@ where
         for i in 0..lambda {
             q_out.push(T::ONE * (&[new_output[i]])[0] * delta + q[i]);
         }
-        let qs = em_enc_fwd(q, &new_x, paramowf);
-        let qs_b = em_enc_bkwd::<T>(&new_x, q, &q_out, true, false, delta, paramowf, param);
+        let qs = em_enc_fwd::<T, O>(q, &new_x);
+        let qs_b = em_enc_bkwd::<T, P, O>(&new_x, q, &q_out, true, false, delta);
         let immut = delta * delta;
         let b = zip(qs, qs_b).map(|(q, qb)| (q * qb) + immut).collect();
         (b, vec![T::default(); senc])
@@ -254,23 +288,23 @@ where
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
-pub fn em_prove<T>(
+pub fn em_prove<T, P, O>(
     w: &[u8],
     u: &[u8],
     gv: &[Vec<u8>],
     pk: &[u8],
     chall: &[u8],
-    paramowf: &ParamOWF,
-    param: &Param,
 ) -> (Vec<u8>, Vec<u8>)
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
+    P: PARAM,
+    O: PARAMOWF,
 {
-    let nst = paramowf.get_nst();
-    let nk = paramowf.get_nk();
-    let r = paramowf.get_r();
-    let l = paramowf.get_l() as usize;
-    let c = paramowf.get_c() as usize;
+    let nst = O::NST;
+    let nk = O::NK;
+    let r = O::R;
+    let l = O::L as usize;
+    let c = O::C as usize;
     let lambda = T::LENGTH as usize;
     let new_w = &w[..l / 8];
     let mut temp_v = Vec::with_capacity((l + lambda) * lambda / 8);
@@ -278,8 +312,8 @@ where
         for k in 0..8 {
             for j in 0..lambda / 8 {
                 let mut temp = 0;
-                for l in 0..8 {
-                    temp += ((gv[(j * 8) + l][i] >> k) & 1) << l;
+                for m in 0..8 {
+                    temp += ((gv[(j * 8) + m][i] >> k) & 1) << m;
                 }
                 temp_v.push(temp);
             }
@@ -287,7 +321,7 @@ where
     }
     let new_v = T::to_field(&temp_v);
     let x = rijndael_key_schedule(&pk[..lambda / 8], nst.unwrap(), nk, r);
-    let (a0, a1) = em_enc_cstrnts(
+    let (a0, a1) = em_enc_cstrnts::<T, P, O>(
         &pk[lambda / 8..],
         &x.chunks(8)
             .flat_map(|x| {
@@ -302,11 +336,9 @@ where
         &new_v,
         &[],
         false,
-        T::default(),
-        paramowf,
-        param,
+        T::default()
     );
-    let u_s: T = T::to_field(u)[0];
+    let u_s: T = T::to_field(&u[l / 8..])[0];
     let mut v_s = new_v[l];
     let alpha = T::new(2, 0);
     let mut cur_alpha = alpha;
@@ -321,30 +353,30 @@ where
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 #[allow(clippy::too_many_arguments)]
-pub fn em_verify<T>(
+pub fn em_verify<T, P, O>(
     d: &[u8],
     mut gq: Vec<Vec<u8>>,
     a_t: &[u8],
     chall2: &[u8],
     chall3: &[u8],
     pk: &[u8],
-    paramowf: &ParamOWF,
-    param: &Param,
 ) -> Vec<u8>
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
+    P: PARAM,
+    O: PARAMOWF,
 {
-    let lambda = param.get_lambda() as usize;
-    let k0 = param.get_k0() as usize;
-    let k1 = param.get_k1() as usize;
-    let t0 = param.get_tau0() as usize;
-    let t1 = param.get_tau1() as usize;
-    let l = paramowf.get_l() as usize;
-    let c = paramowf.get_c() as usize;
+    let lambda = P::LAMBDA as usize;
+    let k0 = P::K0 as usize;
+    let k1 = P::K1 as usize;
+    let t0 = P::TAU0 as usize;
+    let t1 = P::TAU1 as usize;
+    let l = O::L as usize;
+    let c = O::C as usize;
     let delta = T::to_field(chall3)[0];
-    let nst = paramowf.get_nst();
-    let nk = paramowf.get_nk();
-    let r = paramowf.get_r();
+    let nst = O::NST;
+    let nk = O::NK;
+    let r = O::R;
     for i in 0..t0 {
         let sdelta = chaldec(chall3, k0 as u16, t0 as u16, k1 as u16, t1 as u16, i as u16);
         for j in 0..k0 {
@@ -386,7 +418,7 @@ where
     }
     let new_q = T::to_field(&temp_q);
     let x = rijndael_key_schedule(&pk[..lambda / 8], nst.unwrap(), nk, r);
-    let (b, _) = em_enc_cstrnts(
+    let (b, _) = em_enc_cstrnts::<T, P, O>(
         &pk[lambda / 8..],
         &x.chunks(8)
             .flat_map(|x| {
@@ -402,8 +434,6 @@ where
         &new_q,
         true,
         delta,
-        paramowf,
-        param,
     );
     let mut q_s = new_q[l];
     let alpha = T::new(2, 0);

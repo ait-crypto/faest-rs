@@ -1,230 +1,170 @@
 use std::{backtrace, collections::VecDeque, iter::zip};
 
-use rand::random;
+use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
+use rand::{random, RngCore};
 
 use crate::{
-    aes::{aes_extendedwitness, aes_prove, aes_verify},
-    em::{em_extendedwitness, em_prove, em_verify},
-    fields::BigGaloisField,
-    parameter::{self, Param, ParamOWF, PARAM128S, PARAMOWF128},
-    random_oracles::RandomOracle,
-    rijndael_32::{rijndael_encrypt, rijndael_key_schedule},
-    universal_hashing::volehash,
-    vc::open,
-    vole::{chaldec, volecommit, volereconstruct},
+    aes::{aes_extendedwitness, aes_prove, aes_verify, aes_witness_has0 }, em::{em_extendedwitness, em_prove, em_verify, em_witness_has0}, fields::BigGaloisField, parameter::{PARAM, PARAMOWF}, random_oracles::RandomOracle, rijndael_32::{rijndael_encrypt, rijndael_key_schedule}, universal_hashing::volehash, vc::open, vole::{chaldec, volecommit, volereconstruct}
 };
 
 pub trait Variant {
-    fn witness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) -> Vec<u8>;
+    fn witness<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8> where P : PARAM,
+                                                            O : PARAMOWF;
 
-    fn prove<T>(
+    fn prove<P, O, T>(
         w: &[u8],
         u: &[u8],
         gv: &[Vec<u8>],
         pk: &[u8],
         chall: &[u8],
-        paramowf: &ParamOWF,
-        param: &Param,
     ) -> (Vec<u8>, Vec<u8>)
-    where
+    where P : PARAM, O : PARAMOWF,
         T: BigGaloisField + std::default::Default + std::fmt::Debug;
 
-    fn verify<T>(
+    fn verify<T, P, O>(
         d: &[u8],
         gq: Vec<Vec<u8>>,
         a_t: &[u8],
         chall2: &[u8],
         chall3: &[u8],
         pk: &[u8],
-        paramowf: &ParamOWF,
-        param: &Param,
     ) -> Vec<u8>
-    where
+    where P : PARAM, O : PARAMOWF,
         T: BigGaloisField + std::default::Default + std::fmt::Debug;
 
-    fn keygen(paramowf: &ParamOWF,
-        param: &Param) -> (Vec<u8>, Vec<u8>);
-
-    fn keygen_from_sk(paramowf: &ParamOWF,
-        param: &Param, sk : &[u8]) -> (Vec<u8>, Vec<u8>);
+    fn keygen_with_rng<P, O>(rng : impl RngCore) -> (Vec<u8>, Vec<u8>, Vec<u8>) where P : PARAM,
+        O : PARAMOWF;
 }
 
 pub struct AesCypher {}
 
 impl Variant for AesCypher {
-    fn witness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) -> Vec<u8> {
-        aes_extendedwitness(k, pk, &param, &paramowf)
+    fn witness<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8> where P : PARAM,
+    O : PARAMOWF{
+        aes_extendedwitness::<P, O>(k, pk)
     }
 
-    fn prove<T>(
+    fn prove<P, O, T>(
         w: &[u8],
         u: &[u8],
         gv: &[Vec<u8>],
         pk: &[u8],
         chall: &[u8],
-        paramowf: &ParamOWF,
-        param: &Param,
     ) -> (Vec<u8>, Vec<u8>)
-    where
+    where P : PARAM,
+    O : PARAMOWF,
         T: BigGaloisField + std::default::Default + std::fmt::Debug,
     {
-        aes_prove::<T>(w, u, gv, pk, chall, paramowf, param)
+        aes_prove::<T, P, O>(w, u, gv, pk, chall)
     }
 
-    fn verify<T>(
+    fn verify<T, P, O>(
         d: &[u8],
         gq: Vec<Vec<u8>>,
         a_t: &[u8],
         chall2: &[u8],
         chall3: &[u8],
         pk: &[u8],
-        paramowf: &ParamOWF,
-        param: &Param,
     ) -> Vec<u8>
-    where
+    where P : PARAM,
+    O : PARAMOWF,
         T: BigGaloisField + std::default::Default + std::fmt::Debug,
     {
-        aes_verify::<T>(d, gq, a_t, chall2, chall3, pk, paramowf, param)
+        aes_verify::<T, P, O>(d, gq, a_t, chall2, chall3, pk)
     }
-    
-    fn keygen(paramowf: &ParamOWF,
-        param: &Param) -> (Vec<u8>, Vec<u8>) {
-            let mut zero = 0;
-            let lambda = param.get_lambda() / 8;
-            let mut x = if param.get_beta() == 1 {
-                [random::<[u8; 16]>().to_vec(), vec![0u8; 16]].concat()
-            } else {
-                random::<[u8; 32]>().to_vec()
-            };
-            let mut k = random::<[u8; 32]>();
-            while zero == 0 {
-                x = if param.get_beta() == 1 {
-                    [random::<[u8; 16]>().to_vec(), vec![0u8; 16]].concat()
-                } else {
-                    random::<[u8; 32]>().to_vec()
-                };
-                k = random::<[u8; 32]>();
-                let mut y = aes_extendedwitness(&k[..lambda as usize], &x[..], param, paramowf);
-                let mut has_zero = 0;
-                for elem in &mut y[paramowf.get_nk() as usize..] {
-                    if *elem == 0 {
-                        has_zero = 1;
-                    }
-                }
-                zero = 1 - has_zero;
-            }
-            let mut rk: Vec<u32> = rijndael_key_schedule(&k, 4, paramowf.get_nk(), paramowf.get_r());
-            let mut cypher ;
+
+    ///Input : the parameter of the faest protocol 
+    /// Output : sk : inputOWF||keyOWF, pk : inputOWF||outputOWF
+    #[allow(clippy::never_loop)]
+    fn keygen_with_rng<P, O>(mut rng : impl RngCore) ->(Vec<u8>, Vec<u8>, Vec<u8>) where P : PARAM, O : PARAMOWF
+    {
+        let nk = O::NK;
+        let r = O::R;
+        let mut i = 0;
+        'boucle : loop {
+            //println!(" ");
+            let mut rho = [0u8; 32];
+            let mut sk : Vec<u8>;
             let mut y : Vec<u8>;
-            if param.get_beta() == 1 {
-                cypher = rijndael_encrypt(&rk, &x, 4, paramowf.get_nk(), paramowf.get_r());
+            if P::BETA == 1 { 
+                sk = vec![0u8; 32];
+                rng.fill_bytes(&mut sk);
+                y = aes_witness_has0::<P, O>(&sk[16..], &sk[..16]);
+            } 
+            else {
+                sk = vec![0u8; 32 + P::LAMBDA/8];
+                rng.fill_bytes(&mut sk);
+                y = aes_witness_has0::<P, O>(&sk[32..], &sk[..32]);
+            };
+
+            for elem in &mut y {
+                if *elem == 0 {
+                    //println!("yolo ??");
+                    continue 'boucle;
+                }
+            }
+
+            let mut cypher: cipher::array::Array<aes::cipher::generic_array::GenericArray<u8, _>, _> ;
+            let mut rk= rijndael_key_schedule(&sk[16*P::BETA as usize..], 4, O::NK, O::R);
+            if P::BETA == 1 {
+                cypher = rijndael_encrypt(&rk, &[&sk[..16], &[0u8; 16]].concat(), 4, nk, r);
                 y = cypher.into_iter().flatten().take(16 as usize).collect();
             } else {
-                cypher = rijndael_encrypt(&rk, &x, 4, paramowf.get_nk(), paramowf.get_r());
+                cypher = rijndael_encrypt(&rk, &[&sk[..16], &[0u8; 16]].concat(), 4, nk, r);
                 y = cypher.into_iter().flatten().take(16 as usize).collect();
-                cypher = rijndael_encrypt(&rk, &[&x[16..], &x[..16]].concat(), 4, paramowf.get_nk(), paramowf.get_r());
+                cypher = rijndael_encrypt(&rk, &[&sk[16 as usize..32], &[0u8; 16]].concat(), 4, nk, r);
                 y.append(&mut cypher.into_iter().flatten().take(16 as usize).collect());
             };
-            if param.get_beta() == 1 {
-                (k[..lambda as usize].to_vec(), [x[..16 as usize].to_vec(), y].concat())
-            } else {
-                (k[..lambda as usize].to_vec(), [x[..32 as usize].to_vec(), y].concat())
-            }
-    }
-    
-    ///Input : the parameter of the faest protocol and a sk : inputOWF||keyOWF
-    /// Output : pk : inputOWF||outputOWF
-    fn keygen_from_sk(paramowf: &ParamOWF, param: &Param, sk: &[u8]) -> (Vec<u8>, Vec<u8>)
-    {
-        let x = if param.get_beta() == 1 {
-            [&sk[..16 as usize], &vec![0u8; 16]].concat()
-        } else {
-            sk[..32 as usize].to_vec()
-        };
-        let lambda = param.get_lambda() / 8;
-        let mut k;
-        if param.get_beta() == 1 {
-            k = &sk[16 as usize..];
-        }
-        else {
-            k = &sk[32 as usize..];
-        }
-        let mut y : Vec<u8>;
-        let mut rk= rijndael_key_schedule(&k, 4, paramowf.get_nk(), paramowf.get_r());
-        let mut cypher: cipher::array::Array<aes::cipher::generic_array::GenericArray<u8, _>, _> ;
-        if param.get_beta() == 1 {
-            cypher = rijndael_encrypt(&rk, &[&x[..16 as usize], &[0u8; 16]].concat(), 4, paramowf.get_nk(), paramowf.get_r());
-            y = cypher.into_iter().flatten().take(16 as usize).collect();
-        } else {
-            cypher = rijndael_encrypt(&rk, &[&x[..16 as usize], &[0u8; 16]].concat(), 4, paramowf.get_nk(), paramowf.get_r());
-            y = cypher.into_iter().flatten().take(16 as usize).collect();
-            cypher = rijndael_encrypt(&rk, &[&x[16 as usize..], &[0u8; 16]].concat(), 4, paramowf.get_nk(), paramowf.get_r());
-            y.append(&mut cypher.into_iter().flatten().take(16 as usize).collect());
-        };
-        if param.get_beta() == 1 {
-            (x[..16 as usize].to_vec(), y)
-        } else {
-        (x[..32 as usize].to_vec(), y)
+            rng.fill_bytes(&mut rho);
+            return((&sk).to_vec(), [&sk[..16*O::BETA as usize], &y[..]].concat(), rho.to_vec());
         }
     }
+
 } 
 
 pub struct EmCypher {}
 
 impl Variant for EmCypher {
-    fn witness(k: &[u8], pk: &[u8], param: &Param, paramowf: &ParamOWF) -> Vec<u8> {
-        em_extendedwitness(k, pk, param, paramowf)
+    fn witness<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8> where P : PARAM, O : PARAMOWF {
+        em_extendedwitness::<P, O>(k, pk)
     }
 
-    fn prove<T>(
+    fn prove<P, O, T>(
         w: &[u8],
         u: &[u8],
         gv: &[Vec<u8>],
         pk: &[u8],
         chall: &[u8],
-        paramowf: &ParamOWF,
-        param: &Param,
     ) -> (Vec<u8>, Vec<u8>)
-    where
+    where P : PARAM, O : PARAMOWF,
         T: BigGaloisField + std::default::Default + std::fmt::Debug,
     {
-        em_prove::<T>(w, u, gv, pk, chall, paramowf, param)
+        em_prove::<T, P, O>(w, u, gv, pk, chall)
     }
 
-    fn verify<T>(
+    fn verify<T, P, O>(
         d: &[u8],
         gq: Vec<Vec<u8>>,
         a_t: &[u8],
         chall2: &[u8],
         chall3: &[u8],
         pk: &[u8],
-        paramowf: &ParamOWF,
-        param: &Param,
     ) -> Vec<u8>
-    where
+    where P : PARAM, O : PARAMOWF,
         T: BigGaloisField + std::default::Default + std::fmt::Debug,
     {
-        em_verify::<T>(d, gq, a_t, chall2, chall3, pk, paramowf, param)
+        em_verify::<T, P, O>(d, gq, a_t, chall2, chall3, pk)
     }
     
-    fn keygen(paramowf: &ParamOWF,
-        param: &Param) -> (Vec<u8>, Vec<u8>) {
+    /* fn keygen() -> (Vec<u8>, Vec<u8>) {
             let mut zero = 0;
             let lambda = param.get_lambda() / 8;
-            let mut x = if param.get_beta() == 1 {
-                [random::<[u8; 16]>().to_vec(), vec![0u8; 16]].concat()
-            } else {
-                random::<[u8; 32]>().to_vec()
-            };
+            let mut x = random::<[u8; 32]>();
             let mut k = random::<[u8; 32]>();
             while zero == 0 {
-                x = if param.get_beta() == 1 {
-                    [random::<[u8; 16]>().to_vec(), vec![0u8; 16]].concat()
-                } else {
-                    random::<[u8; 32]>().to_vec()
-                };
+                x = random::<[u8; 32]>();
                 k = random::<[u8; 32]>();
-                let mut y = aes_extendedwitness(&k[..lambda as usize], &x[..], param, paramowf);
+                let mut y = aes_extendedwitness(&k[..lambda as usize], &x[..lambda as usize], param, paramowf);
                 let mut has_zero = 0;
                 for elem in &mut y[paramowf.get_nk() as usize..] {
                     if *elem == 0 {
@@ -233,26 +173,14 @@ impl Variant for EmCypher {
                 }
                 zero = 1 - has_zero;
             }
-            let mut rk: Vec<u32> = rijndael_key_schedule(&k, 4, paramowf.get_nk(), paramowf.get_r());
-            let mut cypher ;
-            let mut y : Vec<u8>;
-            if param.get_beta() == 1 {
-                cypher = rijndael_encrypt(&rk, &x, 4, paramowf.get_nk(), paramowf.get_r());
-                y = cypher.into_iter().flatten().take(16 as usize).collect();
-            } else {
-                cypher = rijndael_encrypt(&rk, &x, 4, paramowf.get_nk(), paramowf.get_r());
-                y = cypher.into_iter().flatten().take(16 as usize).collect();
-                cypher = rijndael_encrypt(&rk, &[&x[16..], &x[..16]].concat(), 4, paramowf.get_nk(), paramowf.get_r());
-                y.append(&mut cypher.into_iter().flatten().take(16 as usize).collect());
-            };
-            if param.get_beta() == 1 {
-                (k[..lambda as usize].to_vec(), [x[..16 as usize].to_vec(), y].concat())
-            } else {
-                (k[..lambda as usize].to_vec(), [x[..32 as usize].to_vec(), y].concat())
-            }
+            let mut rk= rijndael_key_schedule(&x[..lambda as usize], paramowf.get_nst().unwrap(), paramowf.get_nk(), paramowf.get_r());
+            let cypher = rijndael_encrypt(&rk, &[k, vec![0u8; 32 - lambda as usize].try_into().unwrap()].concat(), paramowf.get_nst().unwrap(), paramowf.get_nk(), paramowf.get_r());
+            let y = cypher.into_iter().flatten().take(lambda as usize).zip(k).map(|(y, k)| y ^ k).collect();
+        ([x[..lambda as usize].to_vec(), k[..lambda as usize].to_vec()].concat(), [x[..lambda as usize].to_vec(), y].concat())
+            
     }
-
-    ///Input : the parameter of the faest protocol and a sk : inputOWF||keyOWF
+ */
+    /* ///Input : the parameter of the faest protocol and a sk : inputOWF||keyOWF
     /// Output : pk : inputOWF||outputOWF
     fn keygen_from_sk(paramowf: &ParamOWF, param: &Param, sk: &[u8]) -> (Vec<u8>, Vec<u8>)
     {   
@@ -264,7 +192,39 @@ impl Variant for EmCypher {
         let cypher = rijndael_encrypt(&rk, &[k, &vec![0u8; 32 - lambda as usize]].concat(), paramowf.get_nst().unwrap(), paramowf.get_nk(), paramowf.get_r());
         y = cypher.into_iter().flatten().take(lambda as usize).zip(k).map(|(y, k)| y ^ k).collect();
         (x[..lambda as usize].to_vec(), y)
+    } */
+    
+    fn keygen_with_rng<P, O>(mut rng : impl RngCore) -> (Vec<u8>, Vec<u8>, Vec<u8>) where P : PARAM,
+        O : PARAMOWF {
+        let lambda = P::LAMBDA/8;
+        let nk = O::NK;
+        let r = O::R;
+        let nst = O::NST.unwrap();
+        'boucle : loop {
+            let mut rho = [0u8; 32];
+            let mut sk = vec![0u8; 2*lambda];
+            rng.fill_bytes(&mut sk);
+            let mut y = em_witness_has0::<P, O>(&sk[..lambda], &sk[lambda..]);
+            println!("taille de mes temoins : {:?}", y.len());
+            for elem in &mut y {
+                if *elem == 0 {
+                    //println!("yolo ??");
+                    continue 'boucle;
+                }
+            }
+            println!(" ");
+            for v in &sk {
+                print!("{:x}, ", v);
+            }
+            println!(" ");
+            let mut rk= rijndael_key_schedule(&sk[lambda..], nst, nk, r);
+            let cypher = rijndael_encrypt(&rk, &[&sk[lambda..], &vec![0u8; 32 - lambda as usize]].concat(), nst, nk, r);
+            y = cypher.into_iter().flatten().take(lambda as usize).zip(&sk[lambda..]).map(|(y, k)| y ^ k).collect();
+            rng.fill_bytes(&mut rho);
+            return ((&sk).to_vec(), [&sk[lambda..], &y[..]].concat(), rho.to_vec());
+        }
     }
+    
 }
 
 
@@ -289,12 +249,10 @@ fn test_keygen() {
 } */
 
 ///The input message is assumed to be a byte array
-pub fn faest_sign<T, R, C>(
+pub fn faest_sign<T, R, C, P, O>(
     msg: &[u8],
     sk: &[u8],
     pk: &[u8],
-    param: &Param,
-    paramowf: &ParamOWF,
     rho : Vec<u8>
 ) -> (
     Vec<Vec<u8>>,
@@ -309,13 +267,15 @@ where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
     C: Variant,
     R: RandomOracle,
+    P: PARAM,
+    O: PARAMOWF,
 {
-    let lambda = (param.get_lambda() / 8) as usize;
-    let l = (param.get_l() / 8) as usize;
-    let b = (param.get_b() / 8) as usize;
-    let tau = param.get_tau() as usize;
-    let k0 = param.get_k0() as u16;
-    let k1 = param.get_k1() as u16;
+    let lambda = (P::LAMBDA / 8) as usize;
+    let l = (P::L / 8) as usize;
+    let b = (P::B / 8) as usize;
+    let tau = P::TAU as usize;
+    let k0 = P::K0 as u16;
+    let k1 = P::K1 as u16;
     let mut mu = vec![0; 2 * lambda];
     R::h1(&[pk, msg].concat(), &mut mu);
     let mut riv = vec![0; lambda + 16]; 
@@ -354,7 +314,7 @@ where
         &gv_t.into_iter().flatten().flatten().collect::<Vec<u8>>()[..],
         &mut hv,
     );
-    let w = C::witness(sk, pk, param, paramowf);
+    let w = C::witness::<P, O>(sk, pk);
     let d = &zip(
         w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
         &mut u[..l],
@@ -373,7 +333,7 @@ where
         })
         .collect::<Vec<Vec<Vec<u8>>>>();
 
-    let (a_t, b_t) = C::prove::<T>(
+    let (a_t, b_t) = C::prove::<P, O, T>(
         &w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
         &new_u,
         &(new_gv.to_vec())
@@ -382,8 +342,6 @@ where
             .collect::<Vec<Vec<u8>>>()[..],
         &pk,
         &chall2,
-        paramowf,
-        param,
     );
     let mut chall3 = vec![0; lambda];
     //println!("chall2 : {:?}", chall2);
@@ -395,13 +353,21 @@ where
         let s = chaldec(
             &chall3.to_vec(),
             k0,
-            param.get_tau0().into(),
+            P::TAU0.into(),
             k1,
-            param.get_tau1().into(),
+            P::TAU1.into(),
             i as u16,
         );
         pdecom.push(open(&decom[i], s));
     }
+    /* println!(" ");
+    for v in &a_t {
+        print!("{:x}, ", v);
+        /* for i in v {
+            print!("{:x}, ", i);
+        } */
+    }
+    println!(" "); */
     (
         c,
         u_t,
@@ -413,7 +379,7 @@ where
     )
 }
 
-pub fn faest_verify<T, R, C>(
+pub fn faest_verify<T, R, C, P, O>(
     msg: &[u8],
     pk: (&[u8], &[u8]),
     sigma: (
@@ -425,22 +391,22 @@ pub fn faest_verify<T, R, C>(
         Vec<u8>,
         [u8; 16],
     ),
-    param: &Param,
-    paramowf: &ParamOWF,
 ) -> bool
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
     R: RandomOracle,
     C: Variant,
+    P : PARAM,
+    O : PARAMOWF,
 {
-    let lambda = (param.get_lambda() / 8) as usize;
-    let l = (param.get_l() / 8) as usize;
-    let b = (param.get_b() / 8) as usize;
-    let tau = param.get_tau() as usize;
-    let k0 = param.get_k0() as u16;
-    let k1 = param.get_k1() as u16;
-    let t0 = param.get_tau0() as u16;
-    let t1 = param.get_tau1() as u16;
+    let lambda = (P::LAMBDA / 8) as usize;
+    let l = (P::L / 8) as usize;
+    let b = (P::B / 8) as usize;
+    let tau = P::TAU as usize;
+    let k0 = P::K0 as u16;
+    let k1 = P::K1 as u16;
+    let t0 = P::TAU0 as u16;
+    let t1 = P::TAU1 as u16;
     let (c, u_t, d, a_t, pdecom, chall3, iv) = sigma;
     /* ok */let mut mu = vec![0; 2 * lambda];
     R::h1(&[pk.0, pk.1, msg].concat(), &mut mu);
@@ -557,7 +523,7 @@ where
     println!("{:?}", chall2);
     println!("{:?}", chall3);
     println!("{:?}", [pk.0, pk.1].concat()); */
-    let b_t = C::verify::<T>(
+    let b_t = C::verify::<T, P, O>(
         &d,
         gq.iter()
             .flat_map(|x| {
@@ -570,8 +536,6 @@ where
         &chall2,
         &chall3,
         &[pk.0, pk.1].concat(),
-        paramowf,
-        param,
     );
     let mut chall3_p = vec![0; lambda];
    //println!("chall2 : {:?}", chall2);
@@ -603,7 +567,7 @@ pub fn sigma_to_signature (mut sigma : (
     signature
 }
 
-pub fn signature_to_sigma(signature : &[u8], paramowf: &ParamOWF, param: &Param) -> (
+pub fn signature_to_sigma<P, O>(signature : &[u8]) -> (
     Vec<Vec<u8>>,
     Vec<u8>,
     Vec<u8>,
@@ -611,14 +575,15 @@ pub fn signature_to_sigma(signature : &[u8], paramowf: &ParamOWF, param: &Param)
     Vec<(Vec<Vec<u8>>, Vec<u8>)>,
     Vec<u8>,
     [u8; 16],
-){  let mut index = 0;
-    let tau = param.get_tau() as usize;
-    let lambda = (param.get_lambda()/8_) as usize;
-    let l = (param.get_l()/8) as usize;
-    let k0 = param.get_k0() as usize;
-    let k1 = param.get_k1() as usize;
-    let tau0 = param.get_tau0() as usize;
-    let tau1 = param.get_tau1() as usize;
+) where P : PARAM, O : PARAMOWF,
+{  let mut index = 0;
+    let tau = P::TAU as usize;
+    let lambda = (P::LAMBDA/8) as usize;
+    let l = (P::L/8) as usize;
+    let k0 = P::K0 as usize;
+    let k1 = P::K1 as usize;
+    let tau0 = P::TAU0 as usize;
+    let tau1 = P::TAU1 as usize;
     let l_b = l + 2*lambda + 2;
     let mut c = vec![Vec::with_capacity(l_b); tau - 1];
     for i in 0..tau - 1 {

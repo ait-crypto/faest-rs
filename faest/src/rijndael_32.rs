@@ -260,6 +260,250 @@ pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8, r: u8) -> Vec<u
     }
 }
 
+#[allow(dead_code)]
+pub(crate) fn rijndael_key_schedule_has0(key: &[u8], nst: u8, nk: u8, r: u8,  w : &mut Vec<u8>) -> Vec<u32> {
+    let mut rkeys = vec![0u32; (((nst.div_ceil(nk)) * 8 * (r + 1)) + 8).into()];
+    let mut sd_part = [0u8; 16];
+    for i in 0..(nk * 4) - 16 {
+        sd_part[i as usize] = key[(16 + i) as usize];
+    }
+    bitslice(&mut rkeys[..8], &key[..16], &sd_part);
+
+    let mut rk_off = 0;
+    for i in 0..((r + 1) * nst) / nk {
+        memshift32(&mut rkeys, rk_off);
+        rk_off += 8;
+        //we keep only the values whose sbox will be useful in the key computation
+        if nk == 8 {
+            w.append(&mut inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..].to_vec());
+            w.append(&mut inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][12..].to_vec());
+        } else if nk == 6 {
+            w.append(&mut inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][4..8].to_vec());
+        } else {
+            w.append(&mut inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..].to_vec());
+        }
+        
+        sub_bytes(&mut rkeys[rk_off..(rk_off + 8)]);
+        sub_bytes_nots(&mut rkeys[rk_off..(rk_off + 8)]);
+
+        let table = [
+            1, 2, 4, 8, 16, 32, 64, 128, 27, 54, 108, 216, 171, 77, 154, 47, 94, 188, 99, 198, 151,
+            53, 106, 212, 179, 125, 250, 239, 197, 145,
+        ];
+        let ind = nk * 4;
+        let mut rcon_0 = [0u8; 16];
+        let mut rcon_1 = [0u8; 16];
+        rcon_0[13] = table[i as usize] * (1 - ind / 17);
+        rcon_1[5] = (table[i as usize] as u16 * (((ind / 8) % 2) as u16)) as u8;
+        rcon_1[13] = table[i as usize] * (ind / 32);
+        let mut bitsliced_rcon = [0u32; 8];
+        bitslice(&mut bitsliced_rcon, &rcon_0, &rcon_1);
+
+        for j in 0..8 {
+            rkeys[rk_off + j] ^= bitsliced_rcon[j];
+        }
+
+        let idx_ror: u32;
+
+        if nk == 4 {
+            idx_ror = 14;
+        } else if nk == 6 {
+            idx_ror = 11;
+        } else {
+            idx_ror = 15;
+        }
+
+        xor_columns(&mut rkeys, rk_off, 8, idx_ror, nk);
+    }
+    if nk == 4 {
+        let mut final_res: Vec<u8> = vec![];
+        for i in 0..rkeys.len() / 8 {
+            let res = inv_bitslice(&rkeys[i * 8..(i + 1) * 8]);
+            if nst == 4 {
+                for j in 0..16 {
+                    final_res.push(res[0][j]);
+                }
+                for _j in 0..16 {
+                    final_res.push(0);
+                }
+            } else if nst == 6 {
+                if i % 3 == 0 {
+                    for j in 0..16 {
+                        final_res.push(res[0][j]);
+                    }
+                } else if i % 3 == 1 {
+                    for j in 0..8 {
+                        final_res.push(res[0][j]);
+                    }
+                    for _j in 0..8 {
+                        final_res.push(0);
+                    }
+                    for j in 8..16 {
+                        final_res.push(res[0][j]);
+                    }
+                } else {
+                    for j in 0..16 {
+                        final_res.push(res[0][j]);
+                    }
+                    for _j in 0..8 {
+                        final_res.push(0);
+                    }
+                }
+            } else {
+                for j in 0..16 {
+                    final_res.push(res[0][j]);
+                }
+            }
+        }
+
+        let mut final_bitsliced_res = vec![0u32; final_res.len() / 4];
+        for i in 0..final_res.len() / 32 {
+            bitslice(
+                &mut final_bitsliced_res[i * 8..(i + 1) * 8],
+                &final_res[32 * i..(32 * i) + 16],
+                &final_res[(32 * i) + 16..32 * (i + 1)],
+            );
+        }
+        final_bitsliced_res
+    } else if nk == 6 {
+        let mut final_res: Vec<u8> = vec![];
+        for i in 0..rkeys.len() / 8 {
+            let res = inv_bitslice(&rkeys[i * 8..(i + 1) * 8]);
+            if nst == 4 {
+                if i % 2 == 0 {
+                    for j in 0..16 {
+                        final_res.push(res[0][j]);
+                    }
+                    for _j in 0..16 {
+                        final_res.push(0);
+                    }
+                    for j in 0..8 {
+                        final_res.push(res[1][j]);
+                    }
+                } else {
+                    for j in 0..8 {
+                        final_res.push(res[0][j]);
+                    }
+                    for _j in 0..16 {
+                        final_res.push(0);
+                    }
+                    for j in 8..16 {
+                        final_res.push(res[0][j]);
+                    }
+                    for j in 0..8 {
+                        final_res.push(res[1][j]);
+                    }
+                    for _j in 0..16 {
+                        final_res.push(0);
+                    }
+                }
+            } else if nst == 6 {
+                for j in 0..16 {
+                    final_res.push(res[0][j]);
+                }
+                for j in 0..8 {
+                    final_res.push(res[1][j]);
+                }
+                for _j in 0..8 {
+                    final_res.push(0);
+                }
+            } else {
+                for j in 0..16 {
+                    final_res.push(res[0][j]);
+                }
+                for j in 0..8 {
+                    final_res.push(res[1][j]);
+                }
+            }
+        }
+        let mut final_bitsliced_res = vec![0u32; final_res.len() / 4];
+        for i in 0..final_res.len() / 32 {
+            bitslice(
+                &mut final_bitsliced_res[i * 8..(i + 1) * 8],
+                &final_res[32 * i..(32 * i) + 16],
+                &final_res[(32 * i) + 16..32 * (i + 1)],
+            );
+        }
+        final_bitsliced_res
+    } else {
+        let mut final_res: Vec<u8> = vec![];
+        for i in 0..rkeys.len() / 8 {
+            let res = inv_bitslice(&rkeys[i * 8..(i + 1) * 8]);
+            if nst == 4 {
+                for j in 0..16 {
+                    final_res.push(res[0][j]);
+                }
+                for _j in 0..16 {
+                    final_res.push(0);
+                }
+                for j in 0..16 {
+                    final_res.push(res[1][j]);
+                }
+                for _j in 0..16 {
+                    final_res.push(0);
+                }
+            } else if nst == 6 {
+                if i % 3 == 0 {
+                    for j in 0..16 {
+                        final_res.push(res[0][j]);
+                    }
+                    for j in 0..8 {
+                        final_res.push(res[1][j]);
+                    }
+                    for _j in 0..8 {
+                        final_res.push(0);
+                    }
+                    for j in 8..16 {
+                        final_res.push(res[1][j]);
+                    }
+                } else if i % 3 == 1 {
+                    for j in 0..16 {
+                        final_res.push(res[0][j]);
+                    }
+                    for _j in 0..8 {
+                        final_res.push(0);
+                    }
+                    for j in 0..16 {
+                        final_res.push(res[1][j]);
+                    }
+                } else {
+                    for j in 0..8 {
+                        final_res.push(res[0][j]);
+                    }
+                    for _j in 0..8 {
+                        final_res.push(0);
+                    }
+                    for j in 8..16 {
+                        final_res.push(res[0][j]);
+                    }
+                    for j in 0..16 {
+                        final_res.push(res[1][j]);
+                    }
+                    for _j in 0..8 {
+                        final_res.push(0);
+                    }
+                }
+            } else {
+                for j in 0..16 {
+                    final_res.push(res[0][j]);
+                }
+                for j in 0..16 {
+                    final_res.push(res[1][j]);
+                }
+            }
+        }
+        let mut final_bitsliced_res = vec![0u32; final_res.len() / 4];
+        for i in 0..final_res.len() / 32 {
+            bitslice(
+                &mut final_bitsliced_res[i * 8..(i + 1) * 8],
+                &final_res[32 * i..(32 * i) + 16],
+                &final_res[(32 * i) + 16..32 * (i + 1)],
+            );
+        }
+        final_bitsliced_res
+    }
+}
+
 /// Fully-fixsliced AES-128 decryption (the InvShiftRows is completely omitted).
 ///
 /// Decrypts four blocks in-place and in parallel.

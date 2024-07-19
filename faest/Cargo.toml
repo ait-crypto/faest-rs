@@ -13,6 +13,7 @@ aes = "0.8.4"
 cipher = "=0.5.0-pre.4"
 signature = "2.2.0"
 hex = "0.4.3"
+nist-pqc-seeded-rng = "0.1.2"
 
 [dev-dependencies]
 num-bigint = "0.4.4"
