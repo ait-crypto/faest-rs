@@ -205,21 +205,21 @@ impl Variant for EmCypher {
             let mut sk = vec![0u8; 2*lambda];
             rng.fill_bytes(&mut sk);
             let mut y = em_witness_has0::<P, O>(&sk[lambda..], &sk[..lambda]);
-            println!(" ");
-            println!("temoins :  ");
+            /* println!(" ");
+            println!("temoins :  "); */
             for elem in &mut y {
-                print!("{:x}, ", elem);
+                //print!("{:x}, ", elem);
                 if *elem == 0 {
                     //println!("yolo ??");
                     continue 'boucle;
                 }
             }
-            println!(" ");
-            println!(" cle : ");
+            //println!(" ");
+            /* println!(" cle : ");
             for v in &sk {
                 print!("{:x}, ", v);
             }
-            println!(" ");
+            println!(" "); */
             let mut rk= rijndael_key_schedule(&sk[..lambda], nst, nk, r);
             let cypher = rijndael_encrypt(&rk, &[&sk[lambda..], &vec![0u8; 32 - lambda as usize]].concat(), nst, nk, r);
             y = cypher.into_iter().flatten().take(lambda as usize).zip(&sk[lambda..]).map(|(y, k)| y ^ k).collect();
