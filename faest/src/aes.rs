@@ -4,7 +4,9 @@ use crate::{
     fields::BigGaloisField,
     parameter::{PARAM, PARAMOWF},
     rijndael_32::{
-        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key, rijndael_key_schedule, rijndael_key_schedule_has0, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State
+        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
+        rijndael_key_schedule, rijndael_key_schedule_has0, rijndael_shift_rows_1, sub_bytes,
+        sub_bytes_nots, State,
     },
     universal_hashing::zkhash,
     vole::chaldec,
@@ -23,9 +25,21 @@ where
     res
 }
 
-pub fn aes_extendedwitness<P, O>(key: &[u8], pk: &[u8]) -> Vec<u8> 
-where P : PARAM,
-O : PARAMOWF, 
+pub fn temp_display_state(state: [u32; 8]) {
+    println!("New state : ");
+    for j in 0..32 {
+        println!(" ");
+        for i in state {
+            print!("{:?}, ", (i >> j) & 1);
+        }
+    }
+    println!(" ");
+}
+
+pub fn aes_extendedwitness<P, O>(key: &[u8], pk: &[u8]) -> Vec<u8>
+where
+    P: PARAM,
+    O: PARAMOWF,
 {
     let beta = P::BETA as usize;
     let bc = 4;
@@ -36,10 +50,10 @@ O : PARAMOWF,
     input[..16 * beta].clone_from_slice(&pk[..16 * beta]);
     let mut w = Vec::with_capacity((P::L / 8).into());
     //step 3
-    let kb = rijndael_key_schedule(key, bc, kc as u8, r);
+    let kb = rijndael_key_schedule(key, bc, kc as u8, r, O::SKE);
     //step 4
     w.append(
-        &mut convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4 as usize]
+        &mut convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4]
             .to_vec()
             .iter()
             .flat_map(|x| x.to_le_bytes())
@@ -52,8 +66,8 @@ O : PARAMOWF,
             .flat_map(|x| x.to_le_bytes())
             .collect::<Vec<u8>>(),
     );
-    for j in 1 + (kc / 8)
-        ..1 + (kc / 8) + ((O::SKE as usize) * ((2 - (kc % 4)) * 2 + (kc % 4) * 3)) / 16
+    for j in
+        1 + (kc / 8)..1 + (kc / 8) + ((O::SKE as usize) * ((2 - (kc % 4)) * 2 + (kc % 4) * 3)) / 16
     {
         let key = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]));
         if kc == 6 {
@@ -79,9 +93,12 @@ O : PARAMOWF,
     w
 }
 
-///This function allow to get the directs antecedents of subbyte when calling extendwitness to check quicly if the key is valid or not 
-pub fn aes_witness_has0<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8> where P : PARAM,
-O : PARAMOWF {
+///This function allow to get the directs antecedents of subbyte when calling extendwitness to check quicly if the key is valid or not
+pub fn aes_witness_has0<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8>
+where
+    P: PARAM,
+    O: PARAMOWF,
+{
     let beta = P::BETA as usize;
     let bc = 4;
     let r = O::R;
@@ -89,30 +106,23 @@ O : PARAMOWF {
     let mut input = [0u8; 32];
     //step 0
     input[..16 * beta].clone_from_slice(&pk[..16 * beta]);
-    let mut w = Vec::with_capacity((P::L / 8).into());
+    let mut w: Vec<u8> = vec![];
     //step 3
-    let kb = rijndael_key_schedule_has0(k, bc, kc as u8, r, &mut w);
+    let kb = rijndael_key_schedule_has0(k, bc, kc as u8, r, O::SKE, &mut w);
     //step 4
-    
-    for j in 1 + (kc / 8)
-        ..1 + (kc / 8) + ((O::SKE as usize) * ((2 - (kc % 4)) * 2 + (kc % 4) * 3)) / 16
-    {
-        let key = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]));
-    } 
-    
+
     //step 5
     for b in 0..beta {
         round_with_save_has0(
             input[16 * b..16 * (b + 1)].try_into().unwrap(),
             [0; 16],
             &kb,
-            r,
+            r + 1,
             &mut w,
         );
     }
     w
 }
-
 
 #[allow(clippy::too_many_arguments)]
 fn round_with_save(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mut Vec<u8>) {
@@ -124,7 +134,7 @@ fn round_with_save(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mu
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, 4);
         w.append(
-            &mut convert_from_batchblocks(inv_bitslice(&state))[..4 as usize][..4 as usize]
+            &mut convert_from_batchblocks(inv_bitslice(&state))[..4][..4]
                 .to_vec()
                 .iter()
                 .flat_map(|x| x.to_le_bytes())
@@ -132,26 +142,24 @@ fn round_with_save(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mu
         );
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
-    } 
-    
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
-    fn round_with_save_has0(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mut Vec<u8>) {
-        let mut state = State::default();
-        bitslice(&mut state, &input1, &input2);
-        rijndael_add_round_key(&mut state, &kb[..8]);
-        for j in 1..r as usize {
-            w.append(&mut inv_bitslice(&state)[0][..].to_vec());
-            sub_bytes(&mut state);
-            sub_bytes_nots(&mut state);
-            rijndael_shift_rows_1(&mut state, 4);
-            
-            mix_columns_0(&mut state);
-            rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
-        } 
-        
+fn round_with_save_has0(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mut Vec<u8>) {
+    let mut state = State::default();
+    bitslice(&mut state, &input1, &input2);
+    rijndael_add_round_key(&mut state, &kb[..8]);
+    for j in 1..r as usize {
+        w.append(&mut inv_bitslice(&state)[0][..].to_vec());
+        sub_bytes(&mut state);
+        sub_bytes_nots(&mut state);
+        rijndael_shift_rows_1(&mut state, 4);
+
+        mix_columns_0(&mut state);
+        rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
     }
+}
 
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
@@ -281,7 +289,7 @@ pub fn aes_key_exp_cstrnts<T, O>(
     v: &[T],
     mkey: bool,
     q: &[T],
-    delta: T
+    delta: T,
 ) -> (Vec<T>, Vec<T>, Vec<T>, Vec<T>)
 where
     T: BigGaloisField
@@ -289,7 +297,7 @@ where
         + std::marker::Sized
         + std::fmt::Debug
         + std::ops::Add<T>,
-    O: PARAMOWF
+    O: PARAMOWF,
 {
     let lambda = T::LENGTH as usize;
     let kc = O::NK;
@@ -475,7 +483,7 @@ where
         + std::marker::Sized
         + std::fmt::Debug
         + std::ops::Add<T>,
-    O: PARAMOWF
+    O: PARAMOWF,
 {
     let mut res = Vec::with_capacity(O::SENC.into());
     let r = O::R as usize;
@@ -539,7 +547,7 @@ where
         + std::marker::Sized
         + std::fmt::Debug
         + std::ops::Add<T>,
-    O: PARAMOWF
+    O: PARAMOWF,
 {
     let senc = O::SENC as usize;
     if !mkey {
@@ -582,14 +590,14 @@ pub fn aes_prove<T, P, O>(
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
     P: PARAM,
-    O: PARAMOWF
+    O: PARAMOWF,
 {
     let l = O::L as usize;
     let c = O::C as usize;
     let lke = O::LKE as usize;
     let lenc = O::LENC as usize;
     let senc = O::SENC as usize;
-    let lambda = P::LAMBDA as usize;
+    let lambda = P::LAMBDA;
     let new_w = &w[..l / 8];
     let mut temp_v = Vec::with_capacity((l + lambda) * lambda / 8);
     for i in 0..(l + lambda) / 8 {
@@ -609,13 +617,8 @@ where
     } else {
         (&pk[..lambda / 8], &pk[lambda / 8..])
     };
-    let (mut a0, mut a1, k, vk) = aes_key_exp_cstrnts::<T, O>(
-        &new_w[..lke / 8],
-        &new_v[..lke],
-        false,
-        &[],
-        T::default(),
-    );
+    let (mut a0, mut a1, k, vk) =
+        aes_key_exp_cstrnts::<T, O>(&new_w[..lke / 8], &new_v[..lke], false, &[], T::default());
     let a_01 = aes_enc_cstrnts::<T, O>(
         input[..16].try_into().unwrap(),
         output[..16].try_into().unwrap(),
@@ -673,7 +676,7 @@ pub fn aes_verify<T, P, O>(
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
     P: PARAM,
-    O: PARAMOWF
+    O: PARAMOWF,
 {
     let lambda = T::LENGTH as usize;
     let k0 = P::K0 as usize;
@@ -742,7 +745,7 @@ where
         true,
         &new_q[lke..lke + lenc],
         &qk[..],
-        delta
+        delta,
     );
     b.append(&mut b1);
     b.append(&mut b2);

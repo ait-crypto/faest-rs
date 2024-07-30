@@ -26,7 +26,8 @@ pub(crate) type State = [u32; 8];
 
 /// Fully bitsliced Rijndael key schedule to match the fully-fixsliced representation.
 #[allow(dead_code)]
-pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8, r: u8) -> Vec<u32> {
+pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8, r: u8, ske: u8) -> Vec<u32> {
+    //println!("key : {:?}", key);
     let mut rkeys = vec![0u32; (((nst.div_ceil(nk)) * 8 * (r + 1)) + 8).into()];
     let mut sd_part = [0u8; 16];
     for i in 0..(nk * 4) - 16 {
@@ -35,9 +36,13 @@ pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8, r: u8) -> Vec<u
     bitslice(&mut rkeys[..8], &key[..16], &sd_part);
 
     let mut rk_off = 0;
-    for i in 0..((r + 1) * nst) / nk {
+    for i in 0..ske / 4 {
         memshift32(&mut rkeys, rk_off);
         rk_off += 8;
+        //256s aes
+        /* println!("i = {:?}", i);
+        temp_display_state(rkeys[rk_off..(rk_off + 8)].try_into().unwrap());
+        println!("{:?}, ", &mut inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][..].to_vec()); */
         sub_bytes(&mut rkeys[rk_off..(rk_off + 8)]);
         sub_bytes_nots(&mut rkeys[rk_off..(rk_off + 8)]);
 
@@ -261,7 +266,15 @@ pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8, r: u8) -> Vec<u
 }
 
 #[allow(dead_code)]
-pub(crate) fn rijndael_key_schedule_has0(key: &[u8], nst: u8, nk: u8, r: u8,  w : &mut Vec<u8>) -> Vec<u32> {
+pub(crate) fn rijndael_key_schedule_has0(
+    key: &[u8],
+    nst: u8,
+    nk: u8,
+    r: u8,
+    ske: u8,
+    w: &mut Vec<u8>,
+) -> Vec<u32> {
+    /* println!("keytest : {:?}", key); */
     let mut rkeys = vec![0u32; (((nst.div_ceil(nk)) * 8 * (r + 1)) + 8).into()];
     let mut sd_part = [0u8; 16];
     for i in 0..(nk * 4) - 16 {
@@ -270,19 +283,25 @@ pub(crate) fn rijndael_key_schedule_has0(key: &[u8], nst: u8, nk: u8, r: u8,  w 
     bitslice(&mut rkeys[..8], &key[..16], &sd_part);
 
     let mut rk_off = 0;
-    for i in 0..((r + 1) * nst) / nk {
-        memshift32(&mut rkeys, rk_off);
-        rk_off += 8;
+    let mut count = 0;
+    for i in 0..ske / 4 {
+        //256s aes
+        /* println!("i test = {:?}", i);
+        temp_display_state(rkeys[rk_off..(rk_off + 8)].try_into().unwrap());
+        println!("{:?}, ", &mut inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[(i%2) as usize][12..].to_vec()); */
         //we keep only the values whose sbox will be useful in the key computation
         if nk == 8 {
-            w.append(&mut inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..].to_vec());
-            w.append(&mut inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][12..].to_vec());
+            if count < ske/4 {
+                w.append(&mut inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][12..].to_vec());
+                count += 1
+            }
         } else if nk == 6 {
             w.append(&mut inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][4..8].to_vec());
         } else {
             w.append(&mut inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..].to_vec());
         }
-        
+        memshift32(&mut rkeys, rk_off);
+        rk_off += 8;
         sub_bytes(&mut rkeys[rk_off..(rk_off + 8)]);
         sub_bytes_nots(&mut rkeys[rk_off..(rk_off + 8)]);
 
@@ -313,8 +332,14 @@ pub(crate) fn rijndael_key_schedule_has0(key: &[u8], nst: u8, nk: u8, r: u8,  w 
             idx_ror = 15;
         }
 
-        xor_columns(&mut rkeys, rk_off, 8, idx_ror, nk);
+        xor_columns_has0(&mut rkeys, rk_off, 8, idx_ror, nk);
+        if nk == 8 && count < ske/4 {
+            w.append(&mut inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..].to_vec());
+            count += 1
+        }
+        
     }
+
     if nk == 4 {
         let mut final_res: Vec<u8> = vec![];
         for i in 0..rkeys.len() / 8 {
@@ -540,12 +565,15 @@ pub(crate) fn rijndael_decrypt(rkeys: &[u32], blocks: &BatchBlocks, bc: u8, r: u
 ///
 /// Encrypts four blocks in-place and in parallel.
 #[allow(dead_code)]
-pub(crate) fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst:u8,  bc: u8, r: u8) -> BatchBlocks {
+pub(crate) fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst: u8, _bc: u8, r: u8) -> BatchBlocks {
     let mut state = State::default();
     bitslice(&mut state, &input[..16], &input[16..]);
     rijndael_add_round_key(&mut state, &rkeys[..8]);
     let mut rk_off = 8;
+    //println!("cypher time");
     loop {
+        //not even mansour
+        //temp_display_state(state);
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, nst);
@@ -557,6 +585,10 @@ pub(crate) fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst:u8,  bc: u8, r: 
             break;
         }
     }
+    //not even Mansour
+    //192f ok
+    //192s ok
+    //temp_display_state(state);
     sub_bytes(&mut state);
     sub_bytes_nots(&mut state);
     rijndael_shift_rows_1(&mut state, nst);
@@ -1180,6 +1212,59 @@ fn rijndael_inv_shift_rows_1(state: &mut [u32], bc: u8) {
 fn xor_columns(rkeys: &mut [u32], offset: usize, idx_xor: usize, idx_ror: u32, nk: u8) {
     if nk == 4 {
         for i in 0..8 {
+            let off_i: usize = offset + i;
+            let rk = rkeys[off_i - idx_xor] ^ (0x03030303 & ror(rkeys[off_i], idx_ror));
+            rkeys[off_i] =
+                rk ^ (0xfcfcfcfc & (rk << 2)) ^ (0xf0f0f0f0 & (rk << 4)) ^ (0xc0c0c0c0 & (rk << 6));
+        }
+    } else if nk == 6 {
+        for i in 0..8 {
+            let off_i = offset + i;
+            let rk = rkeys[off_i - idx_xor] ^ (0x01010101 & ror(rkeys[off_i], idx_ror));
+            rkeys[off_i] = rk
+                ^ (0x5c5c5c5c & (rk << 2))
+                ^ (0x02020202 & (rk >> 5))
+                ^ (0x50505050 & (rk << 4))
+                ^ (0x0a0a0a0a & (rk >> 3))
+                ^ (0x0a0a0a0a & (rk << 1))
+                ^ (0x0a0a0a0a & (rk >> 1))
+                ^ (0x08080808 & (rk << 3))
+                ^ (0x40404040 & (rk << 6));
+        }
+    } else {
+        let mut temp = [0u32; 8];
+        #[allow(clippy::needless_range_loop)]
+        for i in 0..8 {
+            let off_i = offset + i;
+            let rk = rkeys[off_i - idx_xor] ^ (0x01010101 & ror(rkeys[off_i], idx_ror));
+            rkeys[off_i] =
+                rk ^ (0x54545454 & (rk << 2)) ^ (0x50505050 & (rk << 4)) ^ (0x40404040 & (rk << 6));
+            temp[i] = rkeys[off_i];
+        }
+        //Not even Mansour
+        //0 pour 256
+        //192s see nothing
+        //temp_display_state(temp);
+        sub_bytes(&mut temp);
+        sub_bytes_nots(&mut temp);
+        for i in 0..8 {
+            let off_i = offset + i;
+            let rk = rkeys[off_i] ^ (temp[off_i % 8] & 0x40404040) >> 5;
+            rkeys[off_i] =
+                rk ^ (0xa8a8a8a8 & (rk << 2)) ^ (0xa0a0a0a0 & (rk << 4)) ^ (0x80808080 & (rk << 6));
+        }
+    }
+}
+
+fn xor_columns_has0(
+    rkeys: &mut [u32],
+    offset: usize,
+    idx_xor: usize,
+    idx_ror: u32,
+    nk: u8,
+) {
+    if nk == 4 {
+        for i in 0..8 {
             let off_i = offset + i;
             let rk = rkeys[off_i - idx_xor] ^ (0x03030303 & ror(rkeys[off_i], idx_ror));
             rkeys[off_i] =
@@ -1209,6 +1294,9 @@ fn xor_columns(rkeys: &mut [u32], offset: usize, idx_xor: usize, idx_ror: u32, n
                 rk ^ (0x54545454 & (rk << 2)) ^ (0x50505050 & (rk << 4)) ^ (0x40404040 & (rk << 6));
             temp[i] = rkeys[off_i];
         }
+        //temp_display_state(temp);
+        /* println!("{:?}", w);
+        println!("{:?}", &mut inv_bitslice(&temp)[0][8..12].to_vec()); */
         sub_bytes(&mut temp);
         sub_bytes_nots(&mut temp);
         for i in 0..8 {
@@ -1360,7 +1448,6 @@ pub fn convert_from_batchblocks(input: BatchBlocks) -> Vec<u32> {
 /// Copy 32-bytes within the provided slice to an 8-byte offset
 fn memshift32(buffer: &mut [u32], src_offset: usize) {
     debug_assert_eq!(src_offset % 8, 0);
-
     let dst_offset = src_offset + 8;
     debug_assert!(dst_offset + 8 <= buffer.len());
 

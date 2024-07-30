@@ -1,6 +1,6 @@
 use faest::{
     fields::{BigGaloisField, GF128, GF192, GF256},
-    random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
+    random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
     vc::open,
     vole::{chaldec, volecommit, volereconstruct},
 };
@@ -12,7 +12,6 @@ fn test_commitment_and_construction() {
     for _i in 0..1 {
         let lambdabytes = 16_usize;
         let lh = 234;
-        let prg = RandomOracleShake128::prg;
         let iv: u128 = random();
         let mut rng = thread_rng();
         let choice = rng.gen_range(0..2);
@@ -31,14 +30,8 @@ fn test_commitment_and_construction() {
         let chall = GF128::rand();
         let mut chal = chall.get_value().0.to_le_bytes().to_vec();
         chal.append(&mut chall.get_value().1.to_le_bytes().to_vec()[..lambdabytes - 16].to_vec());
-        let (h1, decom, _c, _u, _v) = volecommit::<GF128, RandomOracleShake128>(
-            &r,
-            iv,
-            lh,
-            tau,
-            k0,
-            k1,
-        );
+        let (h1, decom, _c, _u, _v) =
+            volecommit::<GF128, RandomOracleShake128>(&r, iv, lh, tau, k0, k1);
         let mut pdecom = vec![(Vec::new(), Vec::new()); tau];
         for i in 0..tau {
             let b = chaldec(
@@ -69,7 +62,6 @@ fn test_commitment_and_construction() {
     for _i in 0..1 {
         let lambdabytes = 24_usize;
         let lh = 458;
-        let prg = RandomOracleShake192::prg;
         let iv: u128 = random();
         let mut rng = thread_rng();
         let choice = rng.gen_range(0..2);
@@ -88,14 +80,8 @@ fn test_commitment_and_construction() {
         let chall = GF192::rand();
         let mut chal = chall.get_value().0.to_le_bytes().to_vec();
         chal.append(&mut chall.get_value().1.to_le_bytes().to_vec()[..lambdabytes - 16].to_vec());
-        let (h1, decom, _c, _u, _v) = volecommit::<GF192, RandomOracleShake192>(
-            &r,
-            iv,
-            lh,
-            tau,
-            k0,
-            k1,
-        );
+        let (h1, decom, _c, _u, _v) =
+            volecommit::<GF192, RandomOracleShake192>(&r, iv, lh, tau, k0, k1);
         let mut pdecom = vec![(Vec::new(), Vec::new()); tau];
         for i in 0..tau {
             let b = chaldec(
@@ -126,7 +112,6 @@ fn test_commitment_and_construction() {
     for _i in 0..1 {
         let lambdabytes = 32_usize;
         let lh = 566;
-        let prg = RandomOracleShake256::prg;
         let iv: u128 = random();
         let mut rng = thread_rng();
         let choice = rng.gen_range(0..2);
@@ -145,14 +130,8 @@ fn test_commitment_and_construction() {
         let chall = GF256::rand();
         let mut chal = chall.get_value().0.to_le_bytes().to_vec();
         chal.append(&mut chall.get_value().1.to_le_bytes().to_vec()[..lambdabytes - 16].to_vec());
-        let (h1, decom, _c, _u, _v) = volecommit::<GF256, RandomOracleShake256>(
-            &r,
-            iv,
-            lh,
-            tau,
-            k0,
-            k1,
-        );
+        let (h1, decom, _c, _u, _v) =
+            volecommit::<GF256, RandomOracleShake256>(&r, iv, lh, tau, k0, k1);
         let mut pdecom = vec![(Vec::new(), Vec::new()); tau];
         for i in 0..tau {
             let b = chaldec(

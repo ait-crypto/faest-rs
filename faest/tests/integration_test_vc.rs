@@ -9,8 +9,7 @@ fn test_commitment_and_decomitment() {
         let iv: u128 = random();
         let n = 2u32.pow(8);
         let r = faest::fields::GF128::rand();
-        let (com, decom, _sd) =
-            faest::vc::commit::<GF128, RandomOracleShake128>(r, iv, n);
+        let (com, decom, _sd) = faest::vc::commit::<GF128, RandomOracleShake128>(r, iv, n);
         let mut b: Vec<u8> = vec![];
         for _i in 0..8 {
             b.append(&mut vec![random::<u8>() & 1]);
@@ -24,8 +23,7 @@ fn test_commitment_and_decomitment() {
         let iv: u128 = random();
         let n = 2u32.pow(8);
         let r = faest::fields::GF192::rand();
-        let (com, decom, _sd) =
-            faest::vc::commit::<GF192, RandomOracleShake192>(r, iv, n);
+        let (com, decom, _sd) = faest::vc::commit::<GF192, RandomOracleShake192>(r, iv, n);
         let mut b: Vec<u8> = vec![];
         for _i in 0..8 {
             b.append(&mut vec![random::<u8>() & 1]);
@@ -39,8 +37,7 @@ fn test_commitment_and_decomitment() {
         let iv: u128 = random();
         let n = 2u32.pow(8);
         let r = faest::fields::GF256::rand();
-        let (com, decom, _sd) =
-            faest::vc::commit::<GF256, RandomOracleShake256>(r, iv, n);
+        let (com, decom, _sd) = faest::vc::commit::<GF256, RandomOracleShake256>(r, iv, n);
         let mut b: Vec<u8> = vec![];
         for _i in 0..8 {
             b.append(&mut vec![random::<u8>() & 1]);

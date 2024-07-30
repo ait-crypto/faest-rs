@@ -1,21 +1,20 @@
 use crate::fields::{self, GaloisField, GF64};
 
 #[allow(dead_code)]
-pub fn volehash<T>(sd: &[u8], mut x0: Vec<u8>, x1: &[u8], l: usize, b: usize) -> Vec<u8>
+pub fn volehash<T>(sd: &[u8], mut x0: Vec<u8>, x1: &[u8], l: usize, _b: usize) -> Vec<u8>
 where
     T: fields::BigGaloisField,
-{   let lambda = (T::LENGTH as usize) / 8;
+{
+    let lambda = (T::LENGTH as usize) / 8;
     let mut r: [T; 4] = [T::new(0u128, 0u128); 4];
     for i in 0..4 {
-        r[i] =
-            T::to_field(&sd[i * lambda..(i + 1) * lambda])[0];
+        r[i] = T::to_field(&sd[i * lambda..(i + 1) * lambda])[0];
     }
     let s = T::to_field(&sd[4 * lambda..5 * lambda])[0];
-    let t =
-        &GF64::to_field(&sd[5 * lambda..(5 * lambda) + 8])[0];
-    
-    let l_p = lambda*8 * (l + lambda*8).div_ceil(lambda*8);
-    for _i in 1..(l_p - (l + (lambda*8))) {
+    let t = &GF64::to_field(&sd[5 * lambda..(5 * lambda) + 8])[0];
+
+    let l_p = lambda * 8 * (l + lambda * 8).div_ceil(lambda * 8);
+    for _i in 1..(l_p - (l + (lambda * 8))) {
         x0.push(0u8);
     }
     //use resize to get rid of the vec
@@ -24,8 +23,8 @@ where
 
     let mut h0 = T::new(0u128, 0u128);
     let mut s_add = T::ONE;
-    for i in 0..(l_p / (lambda*8)) {
-        h0 += s_add * y_h[(l_p / (lambda*8)) - 1 - i];
+    for i in 0..(l_p / (lambda * 8)) {
+        h0 += s_add * y_h[(l_p / (lambda * 8)) - 1 - i];
         s_add *= s;
     }
     let mut h1 = GF64::new(0u64);
@@ -41,9 +40,7 @@ where
     let mut h = h2.get_value().0.to_le_bytes().to_vec();
     h.append(&mut h2.get_value().1.to_le_bytes()[..(lambda) - 16].to_vec());
     //taking the B first bytes of h3
-    h.append(
-        &mut h3.get_value().0.to_le_bytes()[..2].to_vec(),
-    );
+    h.append(&mut h3.get_value().0.to_le_bytes()[..2].to_vec());
     h.iter_mut().zip(x1.iter()).for_each(|(x1, x2)| *x1 ^= *x2);
     h
 }

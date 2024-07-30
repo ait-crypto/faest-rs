@@ -5,19 +5,31 @@ use crate::{
     fields::BigGaloisField,
     parameter::{PARAM, PARAMOWF},
     rijndael_32::{
-        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key, rijndael_key_schedule, rijndael_key_schedule_has0, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State
+        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
+        rijndael_key_schedule, rijndael_key_schedule_has0, rijndael_shift_rows_1, sub_bytes,
+        sub_bytes_nots, State,
     },
     universal_hashing::zkhash,
     vole::chaldec,
 };
 
-pub fn em_extendedwitness<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8> where P : PARAM, O : PARAMOWF {
-    let lambda = (P::LAMBDA / 8) as usize;
+pub fn em_extendedwitness<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8>
+where
+    P: PARAM,
+    O: PARAMOWF,
+{
+    let lambda = P::LAMBDA / 8;
     let nst = O::NST.unwrap() as usize;
     let r = O::R as usize;
     let kc = O::NK;
     let mut res = Vec::with_capacity((O::L / 8) as usize);
-    let x = rijndael_key_schedule(&pk[..lambda], nst as u8, kc, r as u8);
+    let x = rijndael_key_schedule(
+        &pk[..lambda],
+        nst as u8,
+        kc,
+        r as u8,
+        (4 * (((r + 1) * nst) / kc as usize)) as u8,
+    );
     res.append(&mut k.to_vec());
     let mut state = State::default();
     bitslice(
@@ -43,30 +55,38 @@ pub fn em_extendedwitness<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8> where P : PARAM,
     res
 }
 
-
-pub fn em_witness_has0<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8> where P : PARAM, O : PARAMOWF {
-    let lambda = (P::LAMBDA / 8) as usize;
+pub fn em_witness_has0<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8>
+where
+    P: PARAM,
+    O: PARAMOWF,
+{
+    let lambda = P::LAMBDA / 8;
     let nst = O::NST.unwrap() as usize;
     let r = O::R as usize;
     let kc = O::NK;
-    let mut res = Vec::with_capacity((O::L / 8) as usize);
-    let x = rijndael_key_schedule(&pk[..lambda], nst as u8, kc, r as u8);
+    let mut res: Vec<u8> = vec![];
+    let x = rijndael_key_schedule_has0(
+        &pk[..lambda],
+        nst as u8,
+        kc,
+        r as u8,
+        (4 * (((r + 1) * nst) / kc as usize)) as u8,
+        &mut vec![0],
+    );
     let mut state = State::default();
     bitslice(
         &mut state,
         &k[..16],
         &[k[16..].to_vec(), vec![0u8; 32 - lambda]].concat(),
     );
-    res.append(&mut k.to_vec());
     rijndael_add_round_key(&mut state, &x[..8]);
-    for j in 1..r {
+    for j in 1..r + 1 {
         res.append(&mut inv_bitslice(&state)[0][..].to_vec());
         if nst == 6 {
             res.append(&mut inv_bitslice(&state)[1][..8].to_vec());
         } else if nst == 8 {
             res.append(&mut inv_bitslice(&state)[1][..].to_vec());
         }
-       
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, nst as u8);
@@ -163,7 +183,7 @@ where
     let mut res = Vec::with_capacity(O::SENC.into());
     let r = O::R as usize;
     let nst = O::NST.unwrap() as usize;
-    let lambda = P::LAMBDA as usize;
+    let lambda = P::LAMBDA;
     let immut = if !mtag {
         if mkey {
             delta
@@ -223,7 +243,7 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    let lambda = P::LAMBDA as usize;
+    let lambda = P::LAMBDA;
     let senc = O::SENC as usize;
     let nst = O::NST.unwrap() as usize;
     let r = O::R as usize;
@@ -239,14 +259,7 @@ where
         let v_out = &v[0..lambda];
         let s = em_enc_fwd::<T, O>(new_w, &new_x);
         let vs = em_enc_fwd::<T, O>(v, &vec![T::default(); lambda * (r + 1)]);
-        let s_b = em_enc_bkwd::<T, P, O>(
-            &new_x,
-            new_w,
-            &w_out,
-            false,
-            false,
-            T::default(),
-        );
+        let s_b = em_enc_bkwd::<T, P, O>(&new_x, new_w, &w_out, false, false, T::default());
         let v_s_b = em_enc_bkwd::<T, P, O>(
             &vec![T::default(); lambda * (r + 1)],
             v,
@@ -314,7 +327,13 @@ where
         }
     }
     let new_v = T::to_field(&temp_v);
-    let x = rijndael_key_schedule(&pk[..lambda / 8], nst.unwrap(), nk, r);
+    let x = rijndael_key_schedule(
+        &pk[..lambda / 8],
+        nst.unwrap(),
+        nk,
+        r,
+        4 * (((r + 1) * nst.unwrap()) / nk),
+    );
     let (a0, a1) = em_enc_cstrnts::<T, P, O>(
         &pk[lambda / 8..],
         &x.chunks(8)
@@ -330,7 +349,7 @@ where
         &new_v,
         &[],
         false,
-        T::default()
+        T::default(),
     );
     let u_s: T = T::to_field(&u[l / 8..])[0];
     let mut v_s = new_v[l];
@@ -360,7 +379,7 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    let lambda = P::LAMBDA as usize;
+    let lambda = P::LAMBDA;
     let k0 = P::K0 as usize;
     let k1 = P::K1 as usize;
     let t0 = P::TAU0 as usize;
@@ -411,7 +430,13 @@ where
         }
     }
     let new_q = T::to_field(&temp_q);
-    let x = rijndael_key_schedule(&pk[..lambda / 8], nst.unwrap(), nk, r);
+    let x = rijndael_key_schedule(
+        &pk[..lambda / 8],
+        nst.unwrap(),
+        nk,
+        r,
+        4 * (((r + 1) * nst.unwrap()) / nk),
+    );
     let (b, _) = em_enc_cstrnts::<T, P, O>(
         &pk[lambda / 8..],
         &x.chunks(8)
@@ -436,6 +461,5 @@ where
         q_s += new_q[l + i] * cur_alpha;
         cur_alpha *= alpha;
     }
-    //println!("qt = {:?}", &zkhash::<T>(chall2, &b, q_s, c));
     T::to_bytes(T::to_field(&zkhash::<T>(chall2, &b, q_s, c))[0] + T::to_field(a_t)[0] * delta)
 }

@@ -4,11 +4,11 @@ use serde::Deserialize;
 
 use crate::{
     aes::convert_to_bit,
-    em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_prove, em_verify, em_extendedwitness},
+    em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_extendedwitness, em_prove, em_verify},
     fields::{BigGaloisField, GF128, GF192, GF256},
     parameter::{
-        PARAM, PARAM128F, PARAM128S, PARAM192F, PARAM192S, PARAM256F, PARAM256S,
-        PARAMOWF128EM, PARAMOWF192EM, PARAMOWF256EM,
+        PARAM128F, PARAM128S, PARAM192F, PARAM192S, PARAM256F, PARAM256S, PARAMOWF128EM,
+        PARAMOWF192EM, PARAMOWF256EM,
     },
 };
 
@@ -16,10 +16,6 @@ use crate::{
 #[serde(rename_all = "camelCase")]
 struct EmExtendedWitness {
     lambda: u16,
-
-    l: u16,
-
-    lke: u16,
 
     key: Vec<u8>,
 
@@ -35,22 +31,13 @@ fn em_extended_witness_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let res = em_extendedwitness::<PARAM128S, PARAMOWF128EM>(
-                &data.key,
-                &data.input,
-            );
+            let res = em_extendedwitness::<PARAM128S, PARAMOWF128EM>(&data.key, &data.input);
             assert_eq!(res, data.w);
         } else if data.lambda == 192 {
-            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(
-                &data.key,
-                &data.input,
-            );
+            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(&data.key, &data.input);
             assert_eq!(res, data.w);
         } else {
-            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(
-                &data.key,
-                &data.input,
-            );
+            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(&data.key, &data.input);
             assert_eq!(res, data.w);
         }
     }
@@ -109,7 +96,6 @@ fn em_enc_fwd_test() {
                     .collect::<Vec<GF128>>()
             )
         } else if data.lambda == 192 {
-            let paramowf = PARAMOWF192EM;
             let (input_x, input_z): (Vec<GF192>, Vec<GF192>) = if data.m == 1 {
                 (
                     data.x
@@ -142,7 +128,6 @@ fn em_enc_fwd_test() {
                     .collect::<Vec<GF192>>()
             )
         } else {
-            let paramowf = PARAMOWF256EM;
             let (input_x, input_z): (Vec<GF256>, Vec<GF256>) = if data.m == 1 {
                 (
                     data.x
@@ -267,8 +252,6 @@ fn em_enc_bkwd_test() {
                     .collect::<Vec<GF128>>()
             )
         } else if data.lambda == 192 {
-            let paramowf = PARAMOWF192EM;
-            let param = PARAM192S;
             let (x_in, z_in, z_out_in) = if data.m == 1 {
                 (
                     data.x
@@ -316,8 +299,6 @@ fn em_enc_bkwd_test() {
                     .collect::<Vec<GF192>>()
             )
         } else {
-            let paramowf = PARAMOWF256EM;
-            let param = PARAM256S;
             let (x_in, z_in, z_out_in) = if data.m == 1 {
                 (
                     data.x
@@ -481,7 +462,7 @@ fn em_enc_cstrnts_test() {
                     )
                 })
                 .collect::<Vec<GF256>>()[..];
-            let res = em_enc_cstrnts::<GF256, PARAM256S, PARAMOWF256EM,>(
+            let res = em_enc_cstrnts::<GF256, PARAM256S, PARAMOWF256EM>(
                 &data.out,
                 &data.x,
                 &data.w,
@@ -539,7 +520,7 @@ fn em_prove_test() {
         if data.lambda == 128 {
             let res = em_prove::<GF128, PARAM128S, PARAMOWF128EM>(
                 &data.w,
-                &data.u,
+                &[[0u8; 160].to_vec(), data.u].concat(),
                 &data.gv,
                 &[data.input, data.output].concat(),
                 &data.chall,
@@ -548,7 +529,7 @@ fn em_prove_test() {
         } else if data.lambda == 192 {
             let res = em_prove::<GF192, PARAM192S, PARAMOWF192EM>(
                 &data.w,
-                &data.u,
+                &[[0u8; 288].to_vec(), data.u].concat(),
                 &data.gv,
                 &[data.input, data.output].concat(),
                 &data.chall,
@@ -557,7 +538,7 @@ fn em_prove_test() {
         } else {
             let res = em_prove::<GF256, PARAM256S, PARAMOWF256EM>(
                 &data.w,
-                &data.u,
+                &[[0u8; 448].to_vec(), data.u].concat(),
                 &data.gv,
                 &[data.input, data.output].concat(),
                 &data.chall,
