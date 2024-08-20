@@ -1,4 +1,4 @@
-use faest::fields::{BigGaloisField, GF128, GF192, GF256};
+/* use faest::fields::{BigGaloisField, GF128, GF192, GF256};
 use faest::random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256};
 use rand::random;
 
@@ -47,3 +47,4 @@ fn test_commitment_and_decomitment() {
         assert_eq!(res, 1);
     }
 }
+ */

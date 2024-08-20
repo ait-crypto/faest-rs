@@ -1,7 +1,12 @@
+
 use sha3::{
     digest::{core_api::CoreWrapper, ExtendableOutput, Update, XofReader},
     Shake128, Shake256,
 };
+use cipher::Unsigned;
+use std::ops::{Add, Sub};
+use generic_array::{sequence::GenericSequence, ArrayLength, GenericArray};
+use typenum::{Prod, U128, U16, U192, U24, U256, U3, U32, U40, U48, U64, U72, U96};
 
 use aes::cipher::{KeyIvInit, StreamCipher};
 type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
@@ -10,20 +15,24 @@ type Aes256Ctr128BE = ctr::Ctr128BE<aes::Aes256>;
 
 use crate::random_oracles;
 
-pub trait RandomOracle {
+pub trait RandomOracle{
     type Hasher: Hasher;
+    type LAMBDA : ArrayLength<u8>;
+    type LAMBDA16 : ArrayLength<u8>;
+    type PRODLAMBDA3 : ArrayLength<u8>;
+    type PRODLAMBDA2 : ArrayLength<u8>;
 
-    fn prg(k: &[u8], iv: u128, ll: usize) -> Vec<u8>;
+    fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128,) -> GenericArray<u8, LH> where LH : ArrayLength<u8>;
 
-    fn h0(data: &[u8], dest: &mut [u8]) {
+    fn h0(data: GenericArray<u8, Self::LAMBDA16>, dest: &mut GenericArray<u8, Self::PRODLAMBDA3>) {
         let mut hasher = Self::h0_init();
-        hasher.h0_update(data);
+        hasher.h0_update(&data);
         hasher.h0_finish(dest);
     }
 
-    fn h1(data: &[u8], dest: &mut [u8]) {
+    fn h1(data: &[u8], dest: &mut GenericArray<u8, Self::PRODLAMBDA2>) {
         let mut hasher = Self::h1_init();
-        hasher.h1_update(data);
+        hasher.h1_update(&data);
         hasher.h1_finish(dest);
     }
 
@@ -33,10 +42,10 @@ pub trait RandomOracle {
         hasher.h2_finish(dest);
     }
 
-    fn h3(data: &[u8], dest: &mut [u8]) {
+    fn h3(data: &[u8], mut dest: GenericArray<u8, Self::LAMBDA16>) {
         let mut hasher = Self::h3_init();
         hasher.h3_update(data);
-        hasher.h3_finish(dest);
+        hasher.h3_finish(&mut dest);
     }
 
     fn h0_init() -> Self::Hasher;
@@ -98,13 +107,21 @@ impl RandomOracle for RandomOracleShake128 {
             hasher: Shake128::default(),
         }
     }
-    
-    fn prg(k: &[u8], iv: u128, ll: usize) -> Vec<u8> {
-        let mut buf = vec![0u8; ll];
-        let mut cipher = Aes128Ctr128BE::new(k.into(), &iv.to_be_bytes().into());
+
+    fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH> where LH : ArrayLength<u8>{
+        let mut buf = GenericArray::generate(|i : usize| 0u8);
+        let mut cipher = Aes128Ctr128BE::new(&k, &iv.to_be_bytes().into());
         cipher.apply_keystream(&mut buf);
         buf
     }
+    
+    type LAMBDA = U16;
+    
+    type LAMBDA16 = U32;
+    
+    type PRODLAMBDA3 = U48;
+    
+    type PRODLAMBDA2 = U32;
 }
 
 impl Hasher for Hasher128 {
@@ -185,13 +202,21 @@ impl RandomOracle for RandomOracleShake192 {
             hasher: Shake256::default(),
         }
     }
-    
-    fn prg(k: &[u8], iv: u128, ll: usize) -> Vec<u8> {
-        let mut buf = vec![0; ll];
-        let mut cipher = Aes192Ctr128BE::new(k.into(), &iv.to_be_bytes().into());
+
+    fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH> where LH : ArrayLength<u8>{
+        let mut buf = GenericArray::generate(|i:usize|0u8);
+        let mut cipher = Aes192Ctr128BE::new(&k, &iv.to_be_bytes().into());
         cipher.apply_keystream(&mut buf);
         buf
     }
+    
+    type LAMBDA = U24;
+    
+    type LAMBDA16 = U40;
+    
+    type PRODLAMBDA3 = U72;
+    
+    type PRODLAMBDA2 = U48;
 }
 
 impl Hasher for Hasher256 {
@@ -244,8 +269,6 @@ impl Hasher for Hasher256 {
     }
 }
 
-
-
 pub struct RandomOracleShake256 {}
 
 pub struct Hasher256 {
@@ -278,11 +301,19 @@ impl RandomOracle for RandomOracleShake256 {
             hasher: Shake256::default(),
         }
     }
-    
-    fn prg(k: &[u8], iv: u128, ll: usize) -> Vec<u8> {
-        let mut buf = vec![0; ll];
-        let mut cipher = Aes256Ctr128BE::new(k.into(), &iv.to_be_bytes().into());
+
+    fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH> where LH : ArrayLength<u8>{
+        let mut buf = GenericArray::generate(|i:usize| 0u8);
+        let mut cipher = Aes256Ctr128BE::new(&k, &iv.to_be_bytes().into());
         cipher.apply_keystream(&mut buf);
         buf
     }
+    
+    type LAMBDA = U32;
+    
+    type LAMBDA16 = U48;
+    
+    type PRODLAMBDA3 = U96;
+    
+    type PRODLAMBDA2 = U64;
 }

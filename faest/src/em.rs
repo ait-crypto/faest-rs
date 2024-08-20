@@ -1,4 +1,7 @@
+
 use std::iter::zip;
+
+use cipher::Unsigned;
 
 use crate::{
     aes::convert_to_bit,
@@ -18,11 +21,11 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    let lambda = P::LAMBDA / 8;
-    let nst = O::NST.unwrap() as usize;
-    let r = O::R as usize;
-    let kc = O::NK;
-    let mut res = Vec::with_capacity((O::L / 8) as usize);
+    let lambda = <P::LAMBDA as Unsigned>::to_usize() / 8;
+    let nst = <O::NST as Unsigned>::to_usize();
+    let r = <O::R as Unsigned>::to_usize();
+    let kc = <O::NK as Unsigned>::to_u8();
+    let mut res = Vec::with_capacity((<O::L as Unsigned>::to_usize() / 8));
     let x = rijndael_key_schedule(
         &pk[..lambda],
         nst as u8,
@@ -60,10 +63,10 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    let lambda = P::LAMBDA / 8;
-    let nst = O::NST.unwrap() as usize;
-    let r = O::R as usize;
-    let kc = O::NK;
+    let lambda = <P::LAMBDA as Unsigned>::to_usize()/ 8;
+    let nst = <O::NST as Unsigned>::to_usize();
+    let r = <O::R as Unsigned>::to_usize();
+    let kc = <O::NK as Unsigned>::to_u8();
     let mut res: Vec<u8> = vec![];
     let x = rijndael_key_schedule_has0(
         &pk[..lambda],
@@ -107,8 +110,8 @@ where
         + std::ops::Add<T>,
     O: PARAMOWF,
 {
-    let mut res = Vec::with_capacity(O::SENC.into());
-    let nst = O::NST.unwrap() as usize;
+    let mut res = Vec::with_capacity(<O::SENC as Unsigned>::to_usize().into());
+    let nst = <O::NST as Unsigned>::to_usize();
     //Step 2-3
     for j in 0..4 * nst {
         res.push(
@@ -117,7 +120,7 @@ where
         );
     }
     //Step 4
-    for j in 1..O::R as usize {
+    for j in 1..<O::R as Unsigned>::to_usize() {
         for c in 0..nst {
             let i: usize = 32 * nst * j + 32 * c;
             let mut z_hat: [T; 4] = [T::default(); 4];
@@ -180,10 +183,10 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    let mut res = Vec::with_capacity(O::SENC.into());
-    let r = O::R as usize;
-    let nst = O::NST.unwrap() as usize;
-    let lambda = P::LAMBDA;
+    let mut res = Vec::with_capacity(<O::SENC as Unsigned>::to_usize().into());
+    let r = <O::R as Unsigned>::to_usize();
+    let nst = <O::NST as Unsigned>::to_usize();
+    let lambda = <P::LAMBDA as Unsigned>::to_usize();
     let immut = if !mtag {
         if mkey {
             delta
@@ -243,10 +246,10 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    let lambda = P::LAMBDA;
-    let senc = O::SENC as usize;
-    let nst = O::NST.unwrap() as usize;
-    let r = O::R as usize;
+    let lambda = <P::LAMBDA as Unsigned>::to_usize();
+    let senc = <O::SENC as Unsigned>::to_usize();
+    let nst = <O::NST as Unsigned>::to_usize();
+    let r = <O::R as Unsigned>::to_usize();
     if !mkey {
         let new_w = &convert_to_bit::<T>(w);
         let new_x = convert_to_bit::<T>(&x[..4 * nst * (r + 1)]);
@@ -307,12 +310,12 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    let nst = O::NST;
-    let nk = O::NK;
-    let r = O::R;
-    let l = O::L as usize;
-    let c = O::C as usize;
-    let lambda = T::LENGTH as usize;
+    let nst = <O::NST as Unsigned>::to_u8();
+    let nk = <O::NK as Unsigned>::to_u8();
+    let r = <O::R as Unsigned>::to_u8( );
+    let l = <O::L as Unsigned>::to_usize();
+    let c = <O::C as Unsigned>::to_usize();
+    let lambda = <P::LAMBDA as Unsigned>::to_usize();
     let new_w = &w[..l / 8];
     let mut temp_v = Vec::with_capacity((l + lambda) * lambda / 8);
     for i in 0..(l + lambda) / 8 {
@@ -329,10 +332,10 @@ where
     let new_v = T::to_field(&temp_v);
     let x = rijndael_key_schedule(
         &pk[..lambda / 8],
-        nst.unwrap(),
+        nst,
         nk,
         r,
-        4 * (((r + 1) * nst.unwrap()) / nk),
+        4 * (((r + 1) * nst) / nk),
     );
     let (a0, a1) = em_enc_cstrnts::<T, P, O>(
         &pk[lambda / 8..],
@@ -379,17 +382,17 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    let lambda = P::LAMBDA;
-    let k0 = P::K0 as usize;
-    let k1 = P::K1 as usize;
-    let t0 = P::TAU0 as usize;
-    let t1 = P::TAU1 as usize;
-    let l = O::L as usize;
-    let c = O::C as usize;
+    let lambda = <P::LAMBDA as Unsigned>::to_usize();
+    let k0 = <P::K0 as Unsigned>::to_usize();
+    let k1 = <P::K1 as Unsigned>::to_usize();
+    let t0 = <P::TAU0 as Unsigned>::to_usize();
+    let t1 = <P::TAU1 as Unsigned>::to_usize();
+    let l = <O::L as Unsigned>::to_usize();
+    let c = <O::C as Unsigned>::to_usize();
     let delta = T::to_field(chall3)[0];
-    let nst = O::NST;
-    let nk = O::NK;
-    let r = O::R;
+    let nst = <O::NST as Unsigned>::to_u8();
+    let nk = <O::NK as Unsigned>::to_u8();
+    let r = <O::R as Unsigned>::to_u8();
     for i in 0..t0 {
         let sdelta = chaldec(chall3, k0 as u16, t0 as u16, k1 as u16, t1 as u16, i as u16);
         for j in 0..k0 {
@@ -432,10 +435,10 @@ where
     let new_q = T::to_field(&temp_q);
     let x = rijndael_key_schedule(
         &pk[..lambda / 8],
-        nst.unwrap(),
+        nst,
         nk,
         r,
-        4 * (((r + 1) * nst.unwrap()) / nk),
+        4 * (((r + 1) * nst) / nk),
     );
     let (b, _) = em_enc_cstrnts::<T, P, O>(
         &pk[lambda / 8..],

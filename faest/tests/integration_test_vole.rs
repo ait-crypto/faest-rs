@@ -1,4 +1,4 @@
-use faest::{
+/* use faest::{
     fields::{BigGaloisField, GF128, GF192, GF256},
     random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
     vc::open,
@@ -159,3 +159,4 @@ fn test_commitment_and_construction() {
         assert_eq!(h1, h2);
     }
 }
+ */

@@ -1,11 +1,13 @@
+use cipher::Unsigned;
 use rand::RngCore;
-use std::iter::zip;
-
+use typenum::{Quot, Sum, U16, U8};
+use std::{iter::zip, ops::{Add, Div, Mul}};
+use generic_array::{GenericArray, ArrayLength, sequence::GenericSequence};
 use crate::{
     aes::{aes_extendedwitness, aes_prove, aes_verify, aes_witness_has0},
     em::{em_extendedwitness, em_prove, em_verify, em_witness_has0},
     fields::BigGaloisField,
-    parameter::{PARAM, PARAMOWF},
+    parameter::{self, PARAM, PARAMOWF},
     random_oracles::RandomOracle,
     rijndael_32::{rijndael_encrypt, rijndael_key_schedule},
     universal_hashing::volehash,
@@ -13,38 +15,47 @@ use crate::{
     vole::{chaldec, volecommit, volereconstruct},
 };
 
+
 pub trait Variant {
-    fn witness<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8>
+    ///input : key (len lambda, snd part of sk); public key
+    ///output : witness of l bits
+    fn witness<P, O>(k: &GenericArray<u8, O::SK>, pk: &GenericArray<u8, O::PK>) -> GenericArray<u8, P::LBYTES>
     where
         P: PARAM,
         O: PARAMOWF;
 
+    ///input : witness of l bits, masking values (l+lambda in aes, lambda in em), Vole tag ((l + lambda) *lambda bits), public key, chall(3lambda + 64)
+    ///Output : QuickSilver response (Lambda bytes)
     fn prove<P, O, T>(
-        w: &[u8],
-        u: &[u8],
-        gv: &[Vec<u8>],
-        pk: &[u8],
-        chall: &[u8],
-    ) -> (Vec<u8>, Vec<u8>)
+        w: &GenericArray<u8, P::LBYTES>,
+        u: &GenericArray<u8, O::LAMBDALBYTES>,
+        gv: &GenericArray<GenericArray<u8, O::LAMBDABYTES>, O::LAMBDALBYTES>,
+        pk: &GenericArray<u8, O::PK>,
+        chall: &GenericArray<u8, O::CHALL2>
+    ) -> (GenericArray<u8, O::LAMBDABYTES>, GenericArray<u8, O::LAMBDABYTES>)
     where
         P: PARAM,
         O: PARAMOWF,
         T: BigGaloisField + std::default::Default + std::fmt::Debug;
 
-    fn verify<T, P, O>(
-        d: &[u8],
-        gq: Vec<Vec<u8>>,
-        a_t: &[u8],
-        chall2: &[u8],
-        chall3: &[u8],
-        pk: &[u8],
-    ) -> Vec<u8>
+    ///input : Masked witness (l bits), Vole Key ((l + lambda) * Lambda bits), hash of constrints values (lambda bits), chall2 (3*lambda + 64 bits), chall3 (lambda bits), public key
+    ///output q_tilde - delta * a_tilde (lambda bytes)
+    fn verify<P, O, T>(
+        d: &GenericArray<u8, P::LBYTES>,
+        gq: &GenericArray<GenericArray<u8, O::LAMBDABYTES>, O::LAMBDALBYTES>,
+        a_t: &GenericArray<u8, O::LAMBDABYTES>,
+        chall2: &GenericArray<u8, O::CHALL>,
+        chall3: &GenericArray<u8, O::LAMBDABYTES>,
+        pk: &GenericArray<u8, O::PK>,
+    ) -> GenericArray<u8, O::LAMBDABYTES>
     where
         P: PARAM,
         O: PARAMOWF,
         T: BigGaloisField + std::default::Default + std::fmt::Debug;
 
-    fn keygen_with_rng<P, O>(rng: impl RngCore) -> (Vec<u8>, Vec<u8>, Vec<u8>)
+    ///input : a random number generator
+    /// output = pk : input, output; sk : input, key; rho (len = Lambda bytes)
+    fn keygen_with_rng<P, O>(rng: impl RngCore) -> (GenericArray<u8, O::PK>, GenericArray<u8, O::SK>, GenericArray<u8, O::LAMBDABYTES>)
     where
         P: PARAM,
         O: PARAMOWF;
@@ -53,7 +64,7 @@ pub trait Variant {
 pub struct AesCypher {}
 
 impl Variant for AesCypher {
-    fn witness<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8>
+    fn witness<P, O>(k: &GenericArray<u8, O::LAMBDABYTES>, pk: &GenericArray<u8, O::PK>) -> GenericArray<u8, P::LBYTES>
     where
         P: PARAM,
         O: PARAMOWF,
@@ -62,12 +73,12 @@ impl Variant for AesCypher {
     }
 
     fn prove<P, O, T>(
-        w: &[u8],
-        u: &[u8],
-        gv: &[Vec<u8>],
-        pk: &[u8],
-        chall: &[u8],
-    ) -> (Vec<u8>, Vec<u8>)
+        w: &GenericArray<u8, P::LBYTES>,
+        u: &GenericArray<u8, O::LAMBDALBYTES>,
+        gv: &GenericArray<GenericArray<u8, O::LAMBDABYTES>, O::LAMBDALBYTES>,
+        pk: &GenericArray<u8, O::PK>,
+        chall: &GenericArray<u8, O::CHALL>
+    ) -> (GenericArray<u8, O::LAMBDALBYTES>, GenericArray<u8, O::LAMBDALBYTES>)
     where
         P: PARAM,
         O: PARAMOWF,
@@ -76,14 +87,14 @@ impl Variant for AesCypher {
         aes_prove::<T, P, O>(w, u, gv, pk, chall)
     }
 
-    fn verify<T, P, O>(
-        d: &[u8],
-        gq: Vec<Vec<u8>>,
-        a_t: &[u8],
-        chall2: &[u8],
-        chall3: &[u8],
-        pk: &[u8],
-    ) -> Vec<u8>
+    fn verify<P, O, T>(
+        d: &GenericArray<u8, P::LBYTES>,
+        gq: &GenericArray<GenericArray<u8, O::LAMBDABYTES>, O::LAMBDALBYTES>,
+        a_t: &GenericArray<u8, O::LAMBDABYTES>,
+        chall2: &GenericArray<u8, O::CHALL>,
+        chall3: &GenericArray<u8, O::LAMBDABYTES>,
+        pk: &GenericArray<u8, O::PK>,
+    ) -> GenericArray<u8, O::LAMBDABYTES>
     where
         P: PARAM,
         O: PARAMOWF,
@@ -95,50 +106,36 @@ impl Variant for AesCypher {
     ///Input : the parameter of the faest protocol
     /// Output : sk : inputOWF||keyOWF, pk : inputOWF||outputOWF
     #[allow(clippy::never_loop)]
-    fn keygen_with_rng<P, O>(mut rng: impl RngCore) -> (Vec<u8>, Vec<u8>, Vec<u8>)
+    fn keygen_with_rng<P, O>(mut rng: impl RngCore) -> (GenericArray<u8, O::PK>, GenericArray<u8, O::SK>, GenericArray<u8, O::LAMBDABYTES>)
     where
         P: PARAM,
         O: PARAMOWF,
     {
-        let nk = O::NK;
-        let r = O::R;
+        let nk = <O::NK as Unsigned>::to_u8();
+        let r = <O::R as Unsigned>::to_u8();
+        let beta = <P::BETA as Unsigned>::to_u8();
         'boucle: loop {
-            let mut rho = [0u8; 32];
-            let mut sk: Vec<u8>;
+            let mut rho : GenericArray<u8, O::LAMBDABYTES> = GenericArray::generate(|i: usize| 0u8);
+            let mut sk: GenericArray<u8, O::SK> = GenericArray::generate(|i: usize| 0u8);
             let mut y: Vec<u8>;
-            if P::BETA == 1 {
-                sk = vec![0u8; 32];
-                rng.fill_bytes(&mut sk);
-                
+            rng.fill_bytes(&mut sk);
+            // S'occupper de y#################################################################################333
+            if beta == 1 {
                 y = aes_witness_has0::<P, O>(&sk[16..], &sk[..16]);
             } else {
-                sk = vec![0u8; 32 + P::LAMBDA / 8];
-                rng.fill_bytes(&mut sk);
-                println!(" ");
-                println!(" New_sk");
-                for i in &sk {
-                    print!("{:x}, ", i);
-                }
-                println!(" ");
-                
                 y = aes_witness_has0::<P, O>(&sk[32..], &sk[..32]);
             };
-            println!(" ");
             for elem in &mut y {
-                print!("{:?}, ", elem);
                 if *elem == 0 {
-                    //println!("yolo ??");
                     continue 'boucle;
                 }
             }
-            println!(" ");
-
             let mut cypher: cipher::array::Array<
                 aes::cipher::generic_array::GenericArray<u8, _>,
                 _,
             >;
-            let rk = rijndael_key_schedule(&sk[16 * P::BETA as usize..], 4, O::NK, O::R, O::SKE);
-            if P::BETA == 1 {
+            let rk = rijndael_key_schedule(&sk[16 * <P::BETA as Unsigned>::to_usize()..], 4, <O::NK as Unsigned>::to_u8(), <O::R as Unsigned>::to_u8(), <O::SKE as Unsigned>::to_u8());
+            if beta == 1 {
                 cypher = rijndael_encrypt(&rk, &[&sk[..16], &[0u8; 16]].concat(), 4, nk, r);
                 y = cypher.into_iter().flatten().take(16).collect();
             } else {
@@ -149,9 +146,9 @@ impl Variant for AesCypher {
             };
             rng.fill_bytes(&mut rho);
             return (
-                sk.to_vec(),
-                [&sk[..16 * O::BETA as usize], &y[..]].concat(),
-                rho.to_vec(),
+                *GenericArray::from_slice(&[&sk[..16 * beta as usize], &y[..]].concat()),
+                sk,
+                rho,
             );
         }
     }
@@ -160,7 +157,7 @@ impl Variant for AesCypher {
 pub struct EmCypher {}
 
 impl Variant for EmCypher {
-    fn witness<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8>
+    fn witness<P, O>(k: &GenericArray<u8, O::LAMBDABYTES>, pk: &GenericArray<u8, O::PK>) -> GenericArray<u8, P::LBYTES>
     where
         P: PARAM,
         O: PARAMOWF,
@@ -169,12 +166,12 @@ impl Variant for EmCypher {
     }
 
     fn prove<P, O, T>(
-        w: &[u8],
-        u: &[u8],
-        gv: &[Vec<u8>],
-        pk: &[u8],
-        chall: &[u8],
-    ) -> (Vec<u8>, Vec<u8>)
+        w: &GenericArray<u8, P::LBYTES>,
+        u: &GenericArray<u8, O::LAMBDALBYTES>,
+        gv: &GenericArray<GenericArray<u8, O::LAMBDABYTES>, O::LAMBDALBYTES>,
+        pk: &GenericArray<u8, O::PK>,
+        chall: &GenericArray<u8, O::CHALL>
+    ) -> (GenericArray<u8, O::LAMBDALBYTES>, GenericArray<u8, O::LAMBDALBYTES>)
     where
         P: PARAM,
         O: PARAMOWF,
@@ -183,14 +180,14 @@ impl Variant for EmCypher {
         em_prove::<T, P, O>(w, u, gv, pk, chall)
     }
 
-    fn verify<T, P, O>(
-        d: &[u8],
-        gq: Vec<Vec<u8>>,
-        a_t: &[u8],
-        chall2: &[u8],
-        chall3: &[u8],
-        pk: &[u8],
-    ) -> Vec<u8>
+    fn verify<P, O, T>(
+        d: &GenericArray<u8, P::LBYTES>,
+        gq: &GenericArray<GenericArray<u8, O::LAMBDABYTES>, O::LAMBDALBYTES>,
+        a_t: &GenericArray<u8, O::LAMBDABYTES>,
+        chall2: &GenericArray<u8, O::CHALL>,
+        chall3: &GenericArray<u8, O::LAMBDABYTES>,
+        pk: &GenericArray<u8, O::PK>,
+    ) -> GenericArray<u8, O::LAMBDABYTES>
     where
         P: PARAM,
         O: PARAMOWF,
@@ -199,28 +196,25 @@ impl Variant for EmCypher {
         em_verify::<T, P, O>(d, gq, a_t, chall2, chall3, pk)
     }
 
-    fn keygen_with_rng<P, O>(mut rng: impl RngCore) -> (Vec<u8>, Vec<u8>, Vec<u8>)
+    fn keygen_with_rng<P, O>(mut rng: impl RngCore) -> (GenericArray<u8, O::PK>, GenericArray<u8, O::SK>, GenericArray<u8, O::LAMBDABYTES>)
     where
         P: PARAM,
         O: PARAMOWF,
     {
-        let lambda = P::LAMBDA / 8;
-        let nk = O::NK;
-        let r = O::R;
-        let nst = O::NST.unwrap();
+        let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
+        let nk = <O::NK as Unsigned>::to_u8();
+        let r = <O::R as Unsigned>::to_u8();
+        let nst = <O::NST as Unsigned>::to_u8();
         'boucle: loop {
-            let mut rho = [0u8; 32];
-            let mut sk = vec![0u8; 2 * lambda];
+            let mut rho : GenericArray<u8, O::LAMBDABYTES> = GenericArray::generate(|i: usize| 0u8);
+            let mut sk :GenericArray<u8, O::SK> = GenericArray::generate(|i: usize| 0u8);
             rng.fill_bytes(&mut sk);
             let mut y = em_witness_has0::<P, O>(&sk[lambda..], &sk[..lambda]);
-            //println!(" ");
             for elem in &mut y {
-                //print!("{:?}, ", elem);
                 if *elem == 0 {
                     continue 'boucle;
                 }
             }
-            //println!(" ");
             let rk = rijndael_key_schedule(&sk[..lambda], nst, nk, r, 4 * (((r + 1) * nst) / nk));
             let cypher = rijndael_encrypt(
                 &rk,
@@ -237,28 +231,31 @@ impl Variant for EmCypher {
                 .map(|(y, k)| y ^ k)
                 .collect();
             rng.fill_bytes(&mut rho);
-            return (sk.to_vec(), [&sk[..lambda], &y[..]].concat(), rho.to_vec());
+            return (*GenericArray::from_slice(&[&sk[..lambda], &y[..]].concat()), sk, rho);
         }
     }
 }
 
-///The input message is assumed to be a byte array
+///input : Message (an array of bytes), sk : secret key, pk : public key, rho : lambda bits
+///output : correction string (tau - 1 * (l_hat bits)), Hash of VOLE sceet (LAMBDA + 16 bits), Commitment to the witness (l bits)
+/// Quicksilver proof (Lambda), Partial decommitment (Tau * (t0 * k0*lambda + t1 * k1*lambda  +  2Lambda) bits), 
+///last challenge (lambda bits), initialisation vector
 #[allow(clippy::needless_range_loop)]
 #[allow(clippy::type_complexity)]
 #[allow(clippy::unnecessary_to_owned)]
 pub fn faest_sign<T, R, C, P, O>(
     msg: &[u8],
-    sk: &[u8],
-    pk: &[u8],
-    rho: Vec<u8>,
+    sk: &GenericArray<u8, O::SK>,
+    pk: &GenericArray<u8, O::PK>,
+    rho: &GenericArray<u8, O::LAMBDA>,
 ) -> (
-    Vec<Vec<u8>>,
-    Vec<u8>,
-    Vec<u8>,
-    Vec<u8>,
-    Vec<(Vec<Vec<u8>>, Vec<u8>)>,
-    Vec<u8>,
-    [u8; 16],
+    GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>,
+    GenericArray<u8, O::LAMBDAPLUSTWO>,
+    GenericArray<u8, O::LBYTES>,
+    GenericArray<u8, O::LAMBDABYTES>,
+    GenericArray<(GenericArray<Vec<u8>, P::TAU>, GenericArray<u8, O::LAMBDADOUBLE>), P::TAU>,
+    GenericArray<u8, O::LAMBDABYTES>,
+    GenericArray<u8, U16>,
 )
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
@@ -267,30 +264,30 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    let lambda = P::LAMBDA / 8;
-    let l = (P::L / 8) as usize;
-    let b = (P::B / 8) as usize;
-    let tau = P::TAU as usize;
-    let k0 = P::K0 as u16;
-    let k1 = P::K1 as u16;
-    let mut mu = vec![0; 2 * lambda];
+    let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
+    let l = (<P::L as Unsigned>::to_usize() / 8);
+    let b = (<P::B as Unsigned>::to_usize() / 8);
+    let tau = <P::TAU as Unsigned>::to_usize();
+    let k0 = <P::K0 as Unsigned>::to_u16();
+    let k1 = <P::K1 as Unsigned>::to_u16();
+    let mut mu : GenericArray<u8, O::LAMBDADOUBLE> = GenericArray::generate(|i: usize| 0u8);
     R::h1(&[pk, msg].concat(), &mut mu);
-    let mut riv = vec![0; lambda + 16];
-    R::h3(&[sk, &mu, &rho].concat(), &mut riv);
-    let (r, iv) = (&riv[..lambda], &riv[lambda..]);
+    let mut riv : GenericArray<u8, O::LAMBDAPLUS16> = GenericArray::generate(|i: usize| 0u8);
+    R::h3(&[sk.to_vec(), mu.to_vec(), rho.to_vec()].concat(), &mut riv);
+    let (r, iv) = (GenericArray::from_slice(&riv[..lambda]), GenericArray::from_slice(&riv[lambda..]));
     let (hcom, decom, c, mut u, gv) = volecommit::<T, R>(
         r,
-        u128::from_be_bytes(iv.try_into().unwrap()),
+        u128::from_be_bytes(iv.into_array()),
         l + 2 * lambda + b,
         tau,
         k0,
         k1,
     );
-    let mut chall1 = vec![0; 5 * lambda + 8];
+    let mut chall1 : GenericArray<u8, O::CHALL1> = GenericArray::generate(|i: usize| 0u8);
     R::h2(
         &[
-            mu,
-            hcom,
+            mu.to_vec(),
+            hcom.to_vec(),
             c.clone().into_iter().flatten().collect::<Vec<u8>>(),
             iv.to_vec(),
         ]
@@ -320,21 +317,21 @@ where
                 .collect()
         })
         .collect();
-    let mut hv = vec![0; 2 * lambda];
+    let mut hv : GenericArray<u8, O::LAMBDADOUBLE> = GenericArray::generate(|i: usize| 0u8);
     R::h1(
         &gv_t.into_iter().flatten().flatten().collect::<Vec<u8>>()[..],
         &mut hv,
     );
     let w = C::witness::<P, O>(sk, pk);
-    let d = &zip(
+    let d = GenericArray::from_slice(&zip(
         w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
         &mut u[..l],
     )
     .map(|(w, u)| w ^ *u)
-    .collect::<Vec<u8>>()[..];
-    let mut chall2 = vec![0; 3 * lambda + 8];
-    R::h2(&[chall1, u_t.clone(), hv, d.to_vec()].concat(), &mut chall2);
-    let new_u = &u[..l + lambda];
+    .collect::<Vec<u8>>()[..]);
+    let mut chall2 : GenericArray<u8, O::CHALL2> = GenericArray::generate(|i: usize| 0u8);
+    R::h2(&[chall1.to_vec(), u_t.to_vec(), hv.to_vec(), d.to_vec()].concat(), &mut chall2);
+    let new_u = GenericArray::from_slice(&u[..l + lambda]);
     let new_gv = gv
         .iter()
         .map(|x| {
@@ -345,7 +342,7 @@ where
         .collect::<Vec<Vec<Vec<u8>>>>();
 
     let (a_t, b_t) = C::prove::<P, O, T>(
-        &w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
+        GenericArray::from_slice(&w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>()),
         new_u,
         &(new_gv.to_vec())
             .into_iter()
@@ -354,39 +351,28 @@ where
         pk,
         &chall2,
     );
-    let mut chall3 = vec![0; lambda];
-    //println!("chall2 : {:?}", chall2);
-    //println!("a_t : {:?}", a_t);
-    //println!("b_t : {:?}", b_t);
-    R::h2(&[chall2, a_t.clone(), b_t].concat(), &mut chall3);
+    let mut chall3 : GenericArray<u8, O::LAMBDABYTES> = GenericArray::generate(|i: usize| 0u8);
+    R::h2(&[chall2.to_vec(), a_t.to_vec(), b_t.to_vec()].concat(), &mut chall3);
     let mut pdecom = Vec::with_capacity(tau);
     for i in 0..tau {
         let s = chaldec(
             &chall3.to_vec(),
             k0,
-            P::TAU0.into(),
+            <P::TAU0 as Unsigned>::to_u16().into(),
             k1,
-            P::TAU1.into(),
+            <P::TAU1>::to_u16().into(),
             i as u16,
         );
         pdecom.push(open(&decom[i], s));
     }
-    /* println!(" ");
-    for v in &a_t {
-        print!("{:x}, ", v);
-        /* for i in v {
-            print!("{:x}, ", i);
-        } */
-    }
-    println!(" "); */
     (
         c,
         u_t,
-        d.to_vec(),
+        d,
         a_t,
         pdecom,
-        chall3.to_vec(),
-        iv.try_into().unwrap(),
+        chall3,
+        *iv,
     )
 }
 
@@ -394,15 +380,15 @@ where
 #[allow(clippy::type_complexity)]
 pub fn faest_verify<T, R, C, P, O>(
     msg: &[u8],
-    pk: (&[u8], &[u8]),
+    pk: GenericArray<u8, O::PK>,
     sigma: (
-        Vec<Vec<u8>>,
-        Vec<u8>,
-        Vec<u8>,
-        Vec<u8>,
-        Vec<(Vec<Vec<u8>>, Vec<u8>)>,
-        Vec<u8>,
-        [u8; 16],
+        GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>,
+        GenericArray<u8, O::LAMBDAPLUSTWO>,
+        GenericArray<u8, O::LBYTES>,
+        GenericArray<u8, O::LAMBDABYTES>,
+        GenericArray<(GenericArray<Vec<u8>, P::TAU>, GenericArray<u8, O::LAMBDADOUBLE>), P::TAU>,
+        GenericArray<u8, O::LAMBDABYTES>,
+        GenericArray<u8, U16>,
     ),
 ) -> bool
 where
@@ -412,19 +398,18 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    let lambda = P::LAMBDA / 8;
-    let l = (P::L / 8) as usize;
-    let b = (P::B / 8) as usize;
-    let tau = P::TAU as usize;
-    let k0 = P::K0 as u16;
-    let k1 = P::K1 as u16;
-    let t0 = P::TAU0 as u16;
-    let t1 = P::TAU1 as u16;
+    let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
+    let l = (<P::L as Unsigned>::to_usize() / 8);
+    let b = (<P::B as Unsigned>::to_usize() / 8);
+    let tau = <P::TAU as Unsigned>::to_usize();
+    let k0 = <P::K0 as Unsigned>::to_u16();
+    let k1 = <P::K1 as Unsigned>::to_u16();
+    let t0 = <P::TAU0 as Unsigned>::to_u16();
+    let t1 = <P::TAU1 as Unsigned>::to_u16();
     let (c, u_t, d, a_t, pdecom, chall3, iv) = sigma;
-    /* ok */
-    let mut mu = vec![0; 2 * lambda];
-    R::h1(&[pk.0, pk.1, msg].concat(), &mut mu);
-    /*  hcom : ok */
+    
+    let mut mu : GenericArray<u8, O::LAMBDADOUBLE> = GenericArray::generate(|i: usize| 0u8);
+    R::h1(&[pk.to_vec(), msg.to_vec()].concat(), &mut mu);
     let (hcom, gq_p) = volereconstruct::<T, R>(
         &chall3,
         pdecom,
@@ -437,8 +422,7 @@ where
         k1,
         lambda,
     );
-    /* ok */
-    let mut chall1 = vec![0; 5 * lambda + 8];
+    let mut chall1 : GenericArray<u8, O::CHALL1> = GenericArray::generate(|i: usize| 0u8);
     R::h2(
         &[
             mu,
@@ -524,7 +508,7 @@ where
     );
     let mut chall2 = vec![0; 3 * lambda + 8];
     R::h2(&[chall1.clone(), u_t, hv, d.clone()].concat(), &mut chall2);
-    let b_t = C::verify::<T, P, O>(
+    let b_t = C::verify::<P, O, T>(
         &d,
         gq.iter()
             .flat_map(|x| {
@@ -589,13 +573,13 @@ where
     O: PARAMOWF,
 {
     let mut index = 0;
-    let tau = P::TAU as usize;
-    let lambda = P::LAMBDA / 8;
-    let l = (P::L / 8) as usize;
-    let k0 = P::K0 as usize;
-    let k1 = P::K1 as usize;
-    let tau0 = P::TAU0 as usize;
-    let tau1 = P::TAU1 as usize;
+    let tau = <P::TAU as Unsigned>::to_usize();
+    let lambda = <P::LAMBDA as Unsigned>::to_usize() / 8;
+    let l = (<P::L as Unsigned>::to_usize() / 8);
+    let k0 = <P::K0 as Unsigned>::to_usize();
+    let k1 = <P::K1 as Unsigned>::to_usize();
+    let tau0 = <P::TAU0 as Unsigned>::to_usize();
+    let tau1 = <P::TAU1 as Unsigned>::to_usize();
     let l_b = l + 2 * lambda + 2;
     let mut c = vec![Vec::with_capacity(l_b); tau - 1];
     for i in c.iter_mut().take(tau - 1) {

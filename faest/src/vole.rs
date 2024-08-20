@@ -1,54 +1,69 @@
-use crate::random_oracles::Hasher;
+use cipher::Unsigned;
+use generic_array::sequence::GenericSequence;
+use generic_array::{ArrayLength, GenericArray};
+
+use crate::parameter::{self, PARAM};
+use crate::random_oracles::{self, Hasher};
 use crate::vc;
 use crate::{fields::BigGaloisField, random_oracles::RandomOracle, vc::commit};
 
 #[allow(clippy::type_complexity)]
-pub fn convert_to_vole<R>(
-    sd: &[Option<Vec<u8>>],
+pub fn convert_to_vole<R, LH>(
+    sd: Vec<Option<GenericArray<u8, R::LAMBDA>>>,
     iv: u128,
-    lh: usize,
-) -> (Vec<u8>, Vec<Vec<u8>>) where R : RandomOracle{
-    for _i in 0..100 {}
+) -> (GenericArray<u8, LH>, Vec<GenericArray<u8, LH>>) 
+where R : RandomOracle,
+    LH: ArrayLength<u8>
+    {
+    let a = 0;
+    let a = 1;
     let n = sd.len();
     let d = (128 - (n as u128).leading_zeros() - 1) as usize;
-    let mut r = vec![vec![vec![0u8; lh]; n]; d + 1];
+    let lh = <LH as Unsigned>::to_u16();
+    let mut r : Vec<Vec<GenericArray<u8, LH>>> = vec![vec![GenericArray::generate(|k:usize| 0u8);n];d];
     match &sd[0] {
-        None => r[0][0] = vec![0; lh],
-        Some(sd0) => r[0][0] = R::prg(&sd0[..], iv, lh)[..].to_vec(),
+        None => (),
+        Some(sd0) => r[0][0] = R::prg::<LH>(*sd0, iv,),
     }
     for (i, _) in sd.iter().enumerate().skip(1).take(n) {
-        r[0][i] = R::prg(
-            &<std::option::Option<std::vec::Vec<u8>> as Clone>::clone(&sd[i]).unwrap(),
+        r[0][i] = R::prg::<LH>(
+            sd[i].unwrap(),
             iv,
-            lh,
         );
     }
-    let mut v = vec![vec![0u8; lh]; d];
+    let mut v : Vec<GenericArray<u8, LH>> = vec![GenericArray::generate(|k:usize| 0u8); d];
     for j in 0..d {
         for i in 0..n / (1_usize << (j + 1)) {
-            v[j] = v[j]
+            v[j] = *GenericArray::from_slice(&v[j]
                 .iter()
                 .zip(r[j][2 * i + 1].iter())
                 .map(|(&x1, &x2)| x1 ^ x2)
-                .collect();
-            r[j + 1][i] = r[j][2 * i]
+                .collect::<GenericArray<u8, LH>>());
+            r[j + 1][i] = *GenericArray::from_slice(&r[j][2 * i]
                 .iter()
                 .zip(r[j][2 * i + 1].iter())
                 .map(|(&x1, x2)| x1 ^ x2)
-                .collect();
+                .collect::<GenericArray<u8, LH>>());
         }
     }
     for j in 0..d {
         for _i in 0..n / (1_usize << (d - j - 1)) {}
     }
-    let u = r[d][0].clone().to_vec();
+    let u = *GenericArray::from_slice(&r[d][0].clone());
     (u, v)
 }
 
 //constant time checking the value of i : if i is not correct, then the output will be an empty vec
-pub fn chaldec(chal: &[u8], k0: u16, t0: u16, k1: u16, t1: u16, i: u16) -> Vec<u8> {
+//K = k0 if i < tau0 else k1
+pub fn chaldec<P, K>(chal: GenericArray<u8, P::LAMBDA>, i: u16) -> GenericArray<u8, K> 
+where P: PARAM,
+K: ArrayLength<u8>{
     let mut lo = 1_u16;
     let mut hi = 0_u16;
+    let t0 = <P::TAU0 as Unsigned>::to_u16();
+    let t1 = <P::TAU1 as Unsigned>::to_u16();
+    let k0 = <P::K0 as Unsigned>::to_u16();
+    let k1 = <P::K1 as Unsigned>::to_u16();
     if i < t0 {
         lo = i * k0;
         hi = (i + 1) * k0 - 1;
@@ -57,43 +72,51 @@ pub fn chaldec(chal: &[u8], k0: u16, t0: u16, k1: u16, t1: u16, i: u16) -> Vec<u
         lo = t0 * k0 + t * k1;
         hi = t0 * k0 + (t + 1) * k1 - 1;
     }
-    let mut res = vec![(chal[(lo / 8) as usize] >> (lo % 8)) & 1];
+    let mut res:GenericArray<u8, K> = GenericArray::generate(|i:usize| 0u8);
     for j in 1..hi - lo + 1 {
-        res.push((chal[((lo + j) / 8) as usize] >> ((lo + j) % 8)) & 1)
+        res[j as usize - 1] = ((chal[((lo + j) / 8) as usize] >> ((lo + j) % 8)) & 1);
     }
     res
 }
 
 #[allow(clippy::type_complexity)]
-pub fn volecommit<T, R>(
-    r: &[u8],
+pub fn volecommit<P, T, R, LH>(
+    r: GenericArray<u8, <R as RandomOracle>::LAMBDA>,
     iv: u128,
-    lh: usize,
-    tau: usize,
-    k0: u16,
-    k1: u16,
 ) -> (
-    Vec<u8>,
-    Vec<(Vec<Vec<u8>>, Vec<Vec<u8>>)>,
-    Vec<Vec<u8>>,
-    Vec<u8>,
-    Vec<Vec<Vec<u8>>>,
+    GenericArray<u8, R::PRODLAMBDA2>,
+    //Here decom can have two diferent length, depending on if it's a i < t0 or > 0 so we use vectors
+    GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<GenericArray<u8, R::PRODLAMBDA2>>), P::TAU>,
+    GenericArray<GenericArray<u8, LH>, P::TAUMINUS>,
+    GenericArray<u8, LH>,
+    GenericArray<Vec<GenericArray<u8, LH>>, P::TAU>,
 )
 where
+    P: PARAM,
+    <P as parameter::PARAM>::POWK0: ArrayLength<GenericArray<u8, R::LAMBDA>>,
+    <P as parameter::PARAM>::POWK1: ArrayLength<GenericArray<u8, R::LAMBDA>>,
+    <P as parameter::PARAM>::N0: ArrayLength<Option<GenericArray<u8, R::LAMBDA>>> + ArrayLength<GenericArray<u8, R::PRODLAMBDA2>>,
+    <P as parameter::PARAM>::N1: ArrayLength<Option<GenericArray<u8, R::LAMBDA>>> + ArrayLength<GenericArray<u8, R::PRODLAMBDA2>>,
+    <P as parameter::PARAM>::TAU: ArrayLength<Vec<GenericArray<u8, LH>>> + ArrayLength<Vec::<Option<GenericArray<u8, R::LAMBDA>>>> + ArrayLength<GenericArray<u8, R::PRODLAMBDA2>> + ArrayLength<T> + ArrayLength<GenericArray<u8, LH>> + ArrayLength<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<GenericArray<u8, R::PRODLAMBDA2>>)>,
+    <P as parameter::PARAM>::TAUMINUS: ArrayLength<GenericArray<u8, LH>>,
     T: BigGaloisField + std::default::Default,
     R: RandomOracle,
+    LH: generic_array::ArrayLength<u8>,
 {
-    /* ok */let tau_res = R::prg(r, iv, tau * ((T::LENGTH)/8) as usize);
-    let mut r = vec![T::default(); tau];
-    let mut com = vec![Vec::new(); tau];
-    let mut decom = vec![(vec![Vec::new()], vec![Vec::new()]); tau];
-    let mut sd = vec![Vec::new(); tau];
-    let mut u = vec![vec![0; lh]; tau];
-    let mut v = vec![Vec::new(); tau];
-    let mut c = vec![vec![0; lh]; tau - 1];
+    let tau = <P::TAU as Unsigned>::to_usize();
+    let k0 = <P::K0 as Unsigned>::to_u16();
+    let k1 = <P::K1 as Unsigned>::to_u16();
+    let t1 = <P::TAU1 as Unsigned>::to_u16();
+    let tau_res = R::prg::<P::PRODLAMBDATAU>(r, iv);
+    let mut r : GenericArray<T, P::TAU> = GenericArray::generate(|i:usize| T::default());
+    let mut com : GenericArray<GenericArray<u8, R::PRODLAMBDA2>, P::TAU> = GenericArray::generate(|j:usize|GenericArray::generate(|k:usize| 0u8));
+    let mut decom : GenericArray<(Vec::<GenericArray<u8, R::LAMBDA>>, Vec::<GenericArray<u8, R::PRODLAMBDA2>>), P::TAU> = GenericArray::generate(|i:usize| (vec![GenericArray::generate(|j:usize| 0u8)], vec![GenericArray::generate(|j:usize| 0u8)]));
+    let mut sd : GenericArray<Vec::<Option<GenericArray<u8, R::LAMBDA>>>, P::TAU> = GenericArray::generate(|i:usize| vec![Some(GenericArray::generate(|j:usize| 0u8))]);
+    let mut u : GenericArray<GenericArray<u8, LH>, P::TAU> = GenericArray::generate(|j:usize|GenericArray::generate(|k:usize| 0u8));
+    let mut v : GenericArray<Vec<GenericArray<u8, LH>>, P::TAU> = GenericArray::generate(|i:usize| vec![GenericArray::generate(|j:usize| 0u8)]);
+    let mut c : GenericArray<GenericArray<u8, LH>, P::TAUMINUS> = GenericArray::generate(|j:usize|GenericArray::generate(|k:usize| 0u8));
     for i in 0..tau {
         r[i] = T::from(&tau_res[i * (T::LENGTH / 8) as usize..(i + 1) * (T::LENGTH / 8) as usize]);
-        /* println!("ri = {:?}", r[i]); */
     }
     let tau_0 = T::LENGTH % (tau as u32);
     let mut hasher = R::h1_init();
@@ -102,23 +125,7 @@ where
         let k = ((1 - b) * k0) + b * k1;
         (com[i], decom[i], sd[i]) = commit::<T, R>(r[i], iv, 1u32 << k);
         hasher.h1_update(&com[i]);
-        v[i] = vec![vec![0; lh]; k.into()];
-        (u[i], v[i]) = convert_to_vole::<R>(&sd[i], iv, lh);
-        /* println!(" ");
-        println!(" ");
-        println!("ui");
-        for un in &u[i] {
-            print!("0x{:02x}, ", un);
-        }
-        println!(" "); */
-        /* println!("vi");
-        for un in &v[i] {
-            for deux in un{
-                print!("0x{:02x}, ", deux);
-            }
-        }
-        println!(" ");
-        println!(" "); */
+        (u[i], v[i]) = convert_to_vole::<R, LH>(sd[i], iv);
     }
     for i in 1..tau {
         c[i - 1] = u[0]
@@ -127,14 +134,14 @@ where
             .map(|(&x1, &x2)| x1 ^ x2)
             .collect();
     }
-    let mut hcom = vec![0; (T::LENGTH / 4).try_into().unwrap()];
+    let mut hcom : GenericArray<u8, R::PRODLAMBDA2> = GenericArray::generate(|i:usize| 0u8);
     hasher.h1_finish(&mut hcom);
     (hcom, decom, c, u[0].clone(), v)
 }
 
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::type_complexity)]
-pub fn volereconstruct<T, R>(
+pub fn volereconstruct<T, R, P>(
     chal: &[u8],
     pdecom: Vec<(Vec<Vec<u8>>, Vec<u8>)>,
     iv: u128,
@@ -149,6 +156,7 @@ pub fn volereconstruct<T, R>(
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
     R: RandomOracle,
+    P: PARAM
 {
     let mut com = vec![vec![0; lambdabytes]; tau];
     let mut s = vec![Vec::new(); tau];
@@ -159,7 +167,7 @@ where
     for i in 0..tau {
         let b: u16 = (i < tau0.into()).into();
         let k = b * k0 + (1 - b) * k1;
-        let delta_p = chaldec(chal, k0, tau0, k1, tau1, i.try_into().unwrap());
+        let delta_p = chaldec(chal, i.try_into().unwrap());
         #[allow(clippy::needless_range_loop)]
         for j in 0..delta_p.len() {
             delta[i] += (delta_p[j] as u32) << j;

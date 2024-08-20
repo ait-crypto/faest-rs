@@ -1,5 +1,5 @@
 use cipher::Unsigned;
-use faest::{faest::{faest_sign, faest_verify, AesCypher, Variant}, fields::{BigGaloisField, GF128}, parameter::{PARAM, PARAM128S, PARAMOWF, PARAMOWF128}, random_oracles::{RandomOracle, RandomOracleShake128}};
+//use faest::{faest::{faest_sign, faest_verify, AesCypher, Variant}, fields::{BigGaloisField, GF128}, parameter::{PARAM, PARAM128S, PARAMOWF, PARAMOWF128}, random_oracles::{RandomOracle, RandomOracleShake128}};
 use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
 use rand::random;
 
@@ -7,7 +7,7 @@ mod fields;
 
 fn main() {
     //let _ = bench_sign::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(generate_sign_input_aes::<AesCypher, PARAM128S, PARAMOWF128>());
-    let res = bench_verify_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(generate_verify_input_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>());
+    //let res = bench_verify_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(generate_verify_input_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>());
 
 }
 
@@ -17,7 +17,7 @@ fn generate_rng() -> NistPqcAes256CtrRng {
     NistPqcAes256CtrRng::from(seed)
 }
 
-fn generate_sign_input_aes<C, P, O>() -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) where P: PARAM, O:PARAMOWF, C:Variant{
+/* fn generate_sign_input_aes<C, P, O>() -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) where P: PARAM, O:PARAMOWF, C:Variant{
     let rng = generate_rng();
     let (sk, pk, rho) = C::keygen_with_rng::<P, O>(rng);
     let length: u8 = random();
@@ -121,4 +121,4 @@ R: RandomOracle,
 P: PARAM,
 O: PARAMOWF,{
     faest_verify::<T, R, C, P, O>(&input.0, (&input.1[..<P::LAMBDA as Unsigned>::to_usize()/8], &input.1[<P::LAMBDA as Unsigned>::to_usize()/8..]), input.2);
-}
+} */

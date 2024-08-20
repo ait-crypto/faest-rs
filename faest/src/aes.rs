@@ -1,8 +1,9 @@
-use std::iter::zip;
+use std::{iter::zip, ops::Add};
+use typenum::{Integer, Unsigned};
 
 use crate::{
     fields::BigGaloisField,
-    parameter::{PARAM, PARAMOWF},
+    parameter::{self, PARAM, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_key_schedule_has0, rijndael_shift_rows_1, sub_bytes,
@@ -25,32 +26,21 @@ where
     res
 }
 
-pub fn temp_display_state(state: [u32; 8]) {
-    println!("New state : ");
-    for j in 0..32 {
-        println!(" ");
-        for i in state {
-            print!("{:?}, ", (i >> j) & 1);
-        }
-    }
-    println!(" ");
-}
-
 pub fn aes_extendedwitness<P, O>(key: &[u8], pk: &[u8]) -> Vec<u8>
 where
     P: PARAM,
     O: PARAMOWF,
 {
-    let beta = P::BETA as usize;
+    let beta = <P::BETA as Unsigned>::to_usize();
     let bc = 4;
-    let r = O::R;
-    let kc = O::NK as usize;
+    let r = <O::R as Unsigned>::to_u8();
+    let kc = <O::NK as Unsigned>::to_usize();
     let mut input = [0u8; 32];
     //step 0
     input[..16 * beta].clone_from_slice(&pk[..16 * beta]);
-    let mut w = Vec::with_capacity((P::L / 8).into());
+    let mut w = Vec::with_capacity((<P::L as Unsigned>::to_usize() / 8).into());
     //step 3
-    let kb = rijndael_key_schedule(key, bc, kc as u8, r, O::SKE);
+    let kb = rijndael_key_schedule(key, bc, kc as u8, r, <O::SKE as Unsigned>::to_u8());
     //step 4
     w.append(
         &mut convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4]
@@ -67,7 +57,7 @@ where
             .collect::<Vec<u8>>(),
     );
     for j in
-        1 + (kc / 8)..1 + (kc / 8) + ((O::SKE as usize) * ((2 - (kc % 4)) * 2 + (kc % 4) * 3)) / 16
+        1 + (kc / 8)..1 + (kc / 8) + ((<O::SKE as Unsigned>::to_usize()) * ((2 - (kc % 4)) * 2 + (kc % 4) * 3)) / 16
     {
         let key = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]));
         if kc == 6 {
@@ -99,16 +89,16 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    let beta = P::BETA as usize;
+    let beta = <P::BETA as Unsigned>::to_usize();
     let bc = 4;
-    let r = O::R;
-    let kc = O::NK as usize;
+    let r = <O::R as Unsigned>::to_u8();
+    let kc = <O::NK as Unsigned>::to_usize();
     let mut input = [0u8; 32];
     //step 0
     input[..16 * beta].clone_from_slice(&pk[..16 * beta]);
     let mut w: Vec<u8> = vec![];
     //step 3
-    let kb = rijndael_key_schedule_has0(k, bc, kc as u8, r, O::SKE, &mut w);
+    let kb = rijndael_key_schedule_has0(k, bc, kc as u8, r, <O::SKE as Unsigned>::to_u8(), &mut w);
     //step 4
 
     //step 5
@@ -300,8 +290,8 @@ where
     O: PARAMOWF,
 {
     let lambda = T::LENGTH as usize;
-    let kc = O::NK;
-    let ske = O::SKE as u16;
+    let kc = <O::NK as Unsigned>::to_u8();
+    let ske = <O::SKE as Unsigned>::to_u16();
     let mut iwd: u16 = 32 * (kc - 1) as u16;
     let mut dorotword = true;
     if !mkey {
@@ -309,8 +299,8 @@ where
             Vec::<T>::with_capacity(ske.into()),
             Vec::<T>::with_capacity(ske.into()),
         );
-        let k = aes_key_exp_fwd(&convert_to_bit(w), O::R, lambda, kc);
-        let vk = aes_key_exp_fwd(&v.to_vec(), O::R, lambda, kc);
+        let k = aes_key_exp_fwd(&convert_to_bit(w), <O::R as Unsigned>::to_u8(), lambda, kc);
+        let vk = aes_key_exp_fwd(&v.to_vec(), <O::R as Unsigned>::to_u8(), lambda, kc);
         let w_b = aes_key_exp_bwd::<T>(&convert_to_bit(w)[lambda..], &k, false, false, delta, ske);
         let v_w_b = aes_key_exp_bwd::<T>(&v[lambda..], &vk, true, false, delta, ske);
         for j in 0..ske / 4 {
@@ -353,7 +343,7 @@ where
         (a.0, a.1, k, vk)
     } else {
         let mut b = Vec::<T>::with_capacity(ske.into());
-        let q_k = aes_key_exp_fwd(&q.to_vec(), O::R, lambda, kc);
+        let q_k = aes_key_exp_fwd(&q.to_vec(), <O::R as Unsigned>::to_u8(), lambda, kc);
         let q_w_b = aes_key_exp_bwd::<T>(&q[lambda..], &q_k, false, true, delta, ske);
         for j in 0..ske / 4 {
             let mut q_h_k = [T::default(); 4];
@@ -402,7 +392,7 @@ where
         + std::ops::Add<T>,
     O: PARAMOWF,
 {
-    let mut res = Vec::with_capacity(O::SENC.into());
+    let mut res = Vec::with_capacity(<O::SENC as Unsigned>::to_usize().into());
     //Step 2-5
     for i in 0..16 {
         let mut xin = [T::default(); 8];
@@ -423,7 +413,7 @@ where
         );
     }
     //Step 6
-    for j in 1..O::R as usize {
+    for j in 1..<O::R as Unsigned>::to_usize() {
         for c in 0..4 {
             let ix: usize = 128 * (j - 1) + 32 * c;
             let ik: usize = 128 * j + 32 * c;
@@ -485,8 +475,8 @@ where
         + std::ops::Add<T>,
     O: PARAMOWF,
 {
-    let mut res = Vec::with_capacity(O::SENC.into());
-    let r = O::R as usize;
+    let mut res = Vec::with_capacity(<O::SENC as Unsigned>::to_usize().into());
+    let r = <O::R as Unsigned>::to_usize() as usize;
     let immut = if mtag {
         T::default()
     } else if mkey {
@@ -549,7 +539,7 @@ where
         + std::ops::Add<T>,
     O: PARAMOWF,
 {
-    let senc = O::SENC as usize;
+    let senc = <O::SENC as Unsigned>::to_usize();
     if !mkey {
         let field_w = &(w
             .iter()
@@ -592,12 +582,12 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    let l = O::L as usize;
-    let c = O::C as usize;
-    let lke = O::LKE as usize;
-    let lenc = O::LENC as usize;
-    let senc = O::SENC as usize;
-    let lambda = P::LAMBDA;
+    let l = <O::L as Unsigned>::to_usize();
+    let c = <O::C as Unsigned>::to_usize();
+    let lke = <O::LKE as Unsigned>::to_usize();
+    let lenc = <O::LENC as Unsigned>::to_usize();
+    let senc = <O::SENC as Unsigned>::to_usize();
+    let lambda = <P::LAMBDA as Unsigned>::to_usize();
     let new_w = &w[..l / 8];
     let mut temp_v = Vec::with_capacity((l + lambda) * lambda / 8);
     for i in 0..(l + lambda) / 8 {
@@ -679,15 +669,15 @@ where
     O: PARAMOWF,
 {
     let lambda = T::LENGTH as usize;
-    let k0 = P::K0 as usize;
-    let k1 = P::K1 as usize;
-    let t0 = P::TAU0 as usize;
-    let t1 = P::TAU1 as usize;
-    let l = P::L as usize;
-    let c = O::C as usize;
+    let k0 = <P::K0 as Unsigned>::to_usize();
+    let k1 = <P::K1 as Unsigned>::to_usize();
+    let t0 = <P::TAU0 as Unsigned>::to_usize();
+    let t1 = <P::TAU1 as Unsigned>::to_usize();
+    let l = <P::L as Unsigned>::to_usize();
+    let c = <O::C as Unsigned>::to_usize();
     let delta = T::to_field(chall3)[0];
-    let lke = O::LKE as usize;
-    let lenc = O::LENC as usize;
+    let lke = <O::LKE as Unsigned>::to_usize();
+    let lenc = <O::LENC as Unsigned>::to_usize();
     let (input, output) = if lambda == 128 {
         (&pk[..16], &pk[16..])
     } else {

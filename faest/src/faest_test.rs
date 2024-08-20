@@ -11991,7 +11991,6 @@ fn faest_aes_test_128s() {
             sigma.clone(),
         );
         assert!(res_true);
-        println!("SUCCESS !!!")
     }
 }
 
@@ -12506,7 +12505,6 @@ fn test_nyst_faest() {
     let datas = read_kats(include_str!("../PQCsignKAT_faest_256f.rsp"));
     for data in datas {
         let seed: [u8; 48] = data.seed.try_into().unwrap();
-        println!("{:?}", seed);
         let rng = NistPqcAes256CtrRng::from(seed);
         let pk = data.pk;
         let msg = data.message;
