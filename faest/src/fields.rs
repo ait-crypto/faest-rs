@@ -1,7 +1,6 @@
 use std::{
     fmt::Debug,
-    ops::{Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Shl, Shr, Sub, SubAssign},
-    u128,
+    ops::{Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Shl, Shr, Sub},
 };
 
 use rand::{
@@ -11,35 +10,30 @@ use rand::{
 
 pub trait GaloisField<T>
 where
-    T: Sized
-        + std::ops::BitAnd<Output = T>
-        + std::ops::Sub
-        + std::ops::Shl<i32>
-        + std::ops::Mul<<T as std::ops::BitAnd>::Output, Output = T>
-        + std::ops::Shr<<T as std::ops::Sub>::Output, Output = T>
-        + std::ops::Sub<Output = T>
-        + std::ops::Shl<i32>
-        + std::ops::Mul
-        + std::ops::BitXorAssign
-        + Clone
-        + std::ops::Shr
-        + std::ops::Add<Output = T>
-        + std::ops::AddAssign
-        + std::fmt::Debug,
+    Self: From<T>,
+    T: Sized + Copy,
+    T: Add<Output = T>
+        + BitAnd<Output = T>
+        + BitXor<Output = T>
+        + BitXorAssign
+        + Mul<Output = T>
+        + Shl<usize, Output = T>
+        + Shr<usize, Output = T>,
 {
     const MODULUS: T;
 
     const ONE: T;
 
-    fn new(value: T) -> Self;
+    const MAX: T;
+
+    const BITS: usize;
+
+    #[deprecated]
+    fn new(v: T) -> Self {
+        Self::from(v)
+    }
 
     fn get_value(&self) -> T;
-
-    fn get_max() -> T;
-
-    fn get_bit_usize() -> usize;
-
-    fn get_bit_int() -> T;
 
     fn set_value(&mut self, value: T);
 
@@ -50,32 +44,22 @@ where
     {
         let ret: T = rand::random();
 
-        Self::new(ret)
+        Self::from(ret)
     }
 
     fn mul(lhs: &Self, rhs: &Self) -> Self
     where
         Self: Sized,
-        <T as Shl<i32>>::Output: BitXor<<T as BitAnd>::Output, Output = T>,
-        <T as Mul<<T as BitAnd>::Output>>::Output: BitAnd<T>,
-        <T as Shr<<T as Sub>::Output>>::Output: BitAnd<T>,
-        <T as BitAnd>::Output: BitXorAssign,
-        <T as Shl<i32>>::Output:
-            BitXor<T> + std::ops::Mul + std::ops::Add<Output = T> + std::fmt::Debug,
     {
         let mut left = lhs.get_value();
         let right = rhs.get_value();
-        let mut result_value = (Self::get_max() * (right.clone() & Self::ONE)) & left.clone();
-        let mut count = Self::ONE;
-        for _i in 1..Self::get_bit_usize() {
-            let mask: T =
-                Self::get_max() * ((left.clone() >> (Self::get_bit_int() - Self::ONE)) & Self::ONE);
-            left = (left.clone() << 1) ^ (mask & Self::MODULUS);
-            result_value ^=
-                (Self::get_max() * ((right.clone() >> count.clone()) & Self::ONE)) & left.clone();
-            count += Self::ONE;
+        let mut result_value = (Self::MAX * (right & Self::ONE)) & left;
+        for i in 1..Self::BITS {
+            let mask = Self::MAX * ((left >> (Self::BITS - 1)) & Self::ONE);
+            left = (left << 1) ^ (mask & Self::MODULUS);
+            result_value ^= (Self::MAX * ((right >> i) & Self::ONE)) & left;
         }
-        Self::new(result_value)
+        Self::from(result_value)
     }
 }
 
@@ -102,13 +86,19 @@ impl GF8 {
     }
 }
 
+impl From<u8> for GF8 {
+    fn from(value: u8) -> Self {
+        Self { value }
+    }
+}
+
 impl GaloisField<u8> for GF8 {
+    const BITS: usize = u8::BITS as usize;
+
+    const MAX: u8 = u8::MAX;
+
     fn get_value(&self) -> u8 {
         self.value
-    }
-
-    fn get_max() -> u8 {
-        u8::MAX
     }
 
     fn set_value(&mut self, value: u8) {
@@ -118,18 +108,6 @@ impl GaloisField<u8> for GF8 {
     const ONE: u8 = 1u8;
 
     const MODULUS: u8 = 0b11011u8;
-
-    fn new(value: u8) -> Self {
-        GF8 { value }
-    }
-
-    fn get_bit_usize() -> usize {
-        u8::BITS as usize
-    }
-
-    fn get_bit_int() -> u8 {
-        u8::BITS as u8
-    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -141,7 +119,7 @@ impl From<&[u8]> for GF64 {
     fn from(value: &[u8]) -> Self {
         let mut array = [0u8; 8];
         array.copy_from_slice(&value[..8]);
-        GF64::new(u64::from_le_bytes(array))
+        Self::from(u64::from_le_bytes(array))
     }
 }
 
@@ -156,19 +134,21 @@ impl GF64 {
     }
 }
 
-impl GaloisField<u64> for GF64 {
-    const MODULUS: u64 = 0b00011011u64;
-
-    fn new(value: u64) -> Self {
-        GF64 { value }
+impl From<u64> for GF64 {
+    fn from(value: u64) -> Self {
+        Self { value }
     }
+}
+
+impl GaloisField<u64> for GF64 {
+    const BITS: usize = u64::BITS as usize;
+
+    const MAX: u64 = u64::MAX;
+
+    const MODULUS: u64 = 0b00011011u64;
 
     fn get_value(&self) -> u64 {
         self.value
-    }
-
-    fn get_max() -> u64 {
-        u64::MAX
     }
 
     fn set_value(&mut self, value: u64) {
@@ -176,14 +156,6 @@ impl GaloisField<u64> for GF64 {
     }
 
     const ONE: u64 = 1u64;
-
-    fn get_bit_usize() -> usize {
-        u64::BITS as usize
-    }
-
-    fn get_bit_int() -> u64 {
-        u64::BITS as u64
-    }
 }
 
 //For GF192 and GF256, as u192 and u256 dont exist in rust, we will implement a new trait BigGaloisField, in wich we will also implement basis operations.
