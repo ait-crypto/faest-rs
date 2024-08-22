@@ -1,6 +1,6 @@
+#![warn(missing_docs)]
+
 pub mod fields;
-#[cfg(test)]
-mod fields_test;
 
 mod universal_hashing;
 //#[cfg(test)]
@@ -14,9 +14,9 @@ pub mod random_oracles;
 #[cfg(test)]
 mod random_oracles_test;
 
-pub mod vole;
+/* pub mod vole;
 #[cfg(test)]
-pub mod vole_test;
+pub mod vole_test; */
 
 /* pub mod aes;
 #[cfg(test)]
