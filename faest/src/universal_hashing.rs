@@ -39,8 +39,8 @@ where
     let mut h1 = GF64::new(0u64);
     let mut t_add = GF64::new(1u64);
     for i in 0..(l_p / 64) {
-        h1.set_value(h1.get_value() ^ (GF64::mul(&t_add, &y_b[(l_p / 64) - 1 - i])).get_value());
-        t_add = GF64::mul(&t_add, t);
+        h1 += t_add * y_b[(l_p / 64) - 1 - i];
+        t_add *= t;
     }
 
     let h1_p = T::new(h1.get_value() as u128, 0u128);

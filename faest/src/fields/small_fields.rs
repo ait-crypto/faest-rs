@@ -1,10 +1,26 @@
-use std::ops::{BitAnd, BitXor, BitXorAssign, Mul, Shl, Shr};
+use std::ops::{
+    Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Shl, Shr, Sub, SubAssign,
+};
 
-use rand::distributions::{Distribution, Standard};
+use super::Field;
 
-pub trait GaloisField<T>
+/// Trait for binary Galois fields up to a size of `2^64`
+pub trait GaloisField<T>: Field
 where
-    Self: From<T>,
+    Self: From<T> + Copy,
+    T: From<Self>,
+{
+    #[deprecated]
+    fn new(v: T) -> Self {
+        Self::from(v)
+    }
+
+    #[deprecated]
+    fn get_value(&self) -> T;
+}
+
+trait GaloisFieldHelper<T>
+where
     T: Sized + Copy,
     T: BitAnd<Output = T>
         + BitXor<Output = T>
@@ -21,90 +37,199 @@ where
 
     const BITS: usize;
 
-    fn new(v: T) -> Self {
-        Self::from(v)
-    }
-
-    fn get_value(&self) -> T;
-
-    fn set_value(&mut self, value: T);
-
-    fn rand_polynome() -> Self
-    where
-        Self: Sized,
-        Standard: Distribution<T>,
-    {
-        let ret: T = rand::random();
-
-        Self::from(ret)
-    }
-
-    fn mul(lhs: &Self, rhs: &Self) -> Self
-    where
-        Self: Sized,
-    {
-        let mut left = lhs.get_value();
-        let right = rhs.get_value();
+    fn mul_helper(mut left: T, right: T) -> T {
         let mut result_value = (Self::MAX * (right & Self::ONE)) & left;
         for i in 1..Self::BITS {
             let mask = Self::MAX * ((left >> (Self::BITS - 1)) & Self::ONE);
             left = (left << 1) ^ (mask & Self::MODULUS);
             result_value ^= (Self::MAX * ((right >> i) & Self::ONE)) & left;
         }
-        Self::from(result_value)
+        result_value
     }
 }
 
+/// Small binary fields to a size up to 64 bits
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub struct GF8 {
-    value: u8,
-}
+#[repr(transparent)]
+pub struct SmallGF<T>(T)
+where
+    T: Copy;
 
-impl GF8 {
-    //---------------------------------------------------------------------------check this
-    #[allow(dead_code)]
-    pub fn inv(self) -> Self {
-        let t2 = GF8::mul(&self, &self);
-        let t3 = GF8::mul(&self, &t2);
-        let t5 = GF8::mul(&t3, &t2);
-        let t7 = GF8::mul(&t5, &t2);
-        let t14 = GF8::mul(&t7, &t7);
-        let t28 = GF8::mul(&t14, &t14);
-        let t56 = GF8::mul(&t28, &t28);
-        let t63 = GF8::mul(&t56, &t7);
-        let t126 = GF8::mul(&t63, &t63);
-        let t252 = GF8::mul(&t126, &t126);
-        GF8::mul(&t252, &t2)
+impl<T> From<T> for SmallGF<T>
+where
+    T: Copy,
+{
+    #[inline(always)]
+    fn from(value: T) -> Self {
+        Self(value)
     }
 }
 
-impl From<u8> for GF8 {
-    fn from(value: u8) -> Self {
-        Self { value }
+impl From<SmallGF<u8>> for u8 {
+    #[inline(always)]
+    fn from(value: SmallGF<u8>) -> Self {
+        value.0
     }
 }
 
-impl GaloisField<u8> for GF8 {
+impl From<SmallGF<u64>> for u64 {
+    #[inline(always)]
+    fn from(value: SmallGF<u64>) -> Self {
+        value.0
+    }
+}
+
+impl<T> Default for SmallGF<T>
+where
+    T: Copy + Default,
+{
+    #[inline(always)]
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
+impl<T> PartialEq<T> for SmallGF<T>
+where
+    T: Copy,
+    T: PartialEq,
+{
+    fn eq(&self, other: &T) -> bool {
+        self.0 == *other
+    }
+}
+
+impl<T> Add for SmallGF<T>
+where
+    T: BitXor<Output = T> + Copy,
+{
+    type Output = Self;
+
+    #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 ^ rhs.0)
+    }
+}
+
+impl<T> AddAssign for SmallGF<T>
+where
+    T: BitXorAssign + Copy,
+{
+    #[inline(always)]
+    #[allow(clippy::suspicious_op_assign_impl)]
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 ^= rhs.0
+    }
+}
+
+impl<T> Sub for SmallGF<T>
+where
+    T: BitXor<Output = T> + Copy,
+{
+    type Output = Self;
+
+    #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 ^ rhs.0)
+    }
+}
+
+impl<T> SubAssign for SmallGF<T>
+where
+    T: BitXorAssign + Copy,
+{
+    #[inline(always)]
+    #[allow(clippy::suspicious_op_assign_impl)]
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0 ^= rhs.0
+    }
+}
+
+impl GaloisFieldHelper<u8> for SmallGF<u8> {
     const BITS: usize = u8::BITS as usize;
 
     const MAX: u8 = u8::MAX;
-
-    fn get_value(&self) -> u8 {
-        self.value
-    }
-
-    fn set_value(&mut self, value: u8) {
-        self.value = value;
-    }
 
     const ONE: u8 = 1u8;
 
     const MODULUS: u8 = 0b11011u8;
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct GF64 {
-    value: u64,
+impl GaloisFieldHelper<u64> for SmallGF<u64> {
+    const BITS: usize = u64::BITS as usize;
+
+    const MAX: u64 = u64::MAX;
+
+    const MODULUS: u64 = 0b00011011u64;
+
+    const ONE: u64 = 1u64;
+}
+
+impl Mul for SmallGF<u8> {
+    type Output = Self;
+
+    #[inline(always)]
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self(Self::mul_helper(self.0, rhs.0))
+    }
+}
+
+impl MulAssign for SmallGF<u8> {
+    #[inline(always)]
+
+    fn mul_assign(&mut self, rhs: Self) {
+        self.0 = Self::mul_helper(self.0, rhs.0);
+    }
+}
+
+impl Mul for SmallGF<u64> {
+    type Output = Self;
+
+    #[inline(always)]
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self(Self::mul_helper(self.0, rhs.0))
+    }
+}
+
+impl MulAssign for SmallGF<u64> {
+    #[inline(always)]
+    fn mul_assign(&mut self, rhs: Self) {
+        self.0 = Self::mul_helper(self.0, rhs.0);
+    }
+}
+
+impl Field for SmallGF<u8> {}
+impl Field for SmallGF<u64> {}
+
+/// Binary field `2^8`
+pub type GF8 = SmallGF<u8>;
+/// Binary field `2^64`
+pub type GF64 = SmallGF<u64>;
+
+impl GF8 {
+    //---------------------------------------------------------------------------check this
+    #[allow(dead_code)]
+    pub fn inv(self) -> Self {
+        let t2 = self * self;
+        let t3 = self * t2;
+        let t5 = t3 * t2;
+        let t7 = t5 * t2;
+        let t14 = t7 * t7;
+        let t28 = t14 * t14;
+        let t56 = t28 * t28;
+        let t63 = t56 * t7;
+        let t126 = t63 * t63;
+        let t252 = t126 * t126;
+        t252 * t2
+    }
+}
+
+impl GaloisField<u8> for GF8 {
+    fn get_value(&self) -> u8 {
+        self.0
+    }
 }
 
 impl From<&[u8]> for GF64 {
@@ -126,44 +251,25 @@ impl GF64 {
     }
 }
 
-impl From<u64> for GF64 {
-    fn from(value: u64) -> Self {
-        Self { value }
-    }
-}
-
 impl GaloisField<u64> for GF64 {
-    const BITS: usize = u64::BITS as usize;
-
-    const MAX: u64 = u64::MAX;
-
-    const MODULUS: u64 = 0b00011011u64;
-
     fn get_value(&self) -> u64 {
-        self.value
+        self.0
     }
-
-    fn set_value(&mut self, value: u64) {
-        self.value = value;
-    }
-
-    const ONE: u64 = 1u64;
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use num_bigint::BigUint;
     use rand::random;
 
     //GF8
     #[test]
     //Precondition = None
     //Post contidtion = GF8 whose get_value is as expected
-    fn gf8_test_new_and_get_value() {
+    fn gf8_test_from_and_get_value() {
         let x: u8 = random();
-        let polynome = GF8::new(x);
-        assert_eq!(x, polynome.get_value());
+        let polynome = GF8::from(x);
+        assert_eq!(polynome, x);
     }
 
     #[test]
@@ -179,16 +285,6 @@ mod test {
     }
 
     #[test]
-    //precondtion : the GF8 polynome with a value x
-    //postconition : the value of GF8 polynome is y
-    fn gf8_test_set_value() {
-        let mut polynome = GF8::new(67u8);
-        assert_eq!(polynome.get_value(), 67u8);
-        polynome.set_value(243u8);
-        assert_eq!(polynome.get_value(), 243u8);
-    }
-
-    #[test]
     //135 * 2 should be equal to 21
     //2 * 135 should be equal to 21
     //0 * anything should be equal to 0
@@ -196,19 +292,19 @@ mod test {
     //1 * anything should be equal to anything
     //anything * 1 should be equal to anything
     fn gf8_test_mul() {
-        let pol_2 = GF8::new(2u8);
-        let pol_135 = GF8::new(135u8);
-        let pol_21 = GF8::new(21u8);
-        let anything = random();
-        let pol_anything = GF8::new(anything);
-        let pol_0 = GF8::new(0u8);
-        let pol_1 = GF8::new(1u8);
-        assert_eq!(GF8::mul(&pol_2, &pol_135), pol_21);
-        assert_eq!(GF8::mul(&pol_135, &pol_2), pol_21);
-        assert_eq!(GF8::mul(&pol_0, &pol_anything), pol_0);
-        assert_eq!(GF8::mul(&pol_anything, &pol_0), pol_0);
-        assert_eq!(GF8::mul(&pol_1, &pol_anything), pol_anything);
-        assert_eq!(GF8::mul(&pol_anything, &pol_1), pol_anything);
+        let pol_2 = GF8::from(2u8);
+        let pol_135 = GF8::from(135u8);
+        let pol_21 = GF8::from(21u8);
+        let anything: u8 = random();
+        let pol_anything = GF8::from(anything);
+        let pol_0 = GF8::from(0u8);
+        let pol_1 = GF8::from(1u8);
+        assert_eq!(pol_2 * pol_135, pol_21);
+        assert_eq!(pol_135 * pol_2, pol_21);
+        assert_eq!(pol_0 * pol_anything, pol_0);
+        assert_eq!(pol_anything * pol_0, pol_0);
+        assert_eq!(pol_1 * pol_anything, pol_anything);
+        assert_eq!(pol_anything * pol_1, pol_anything);
         //Some datas obtained from the refrence implementation :
         let database = [
             [0xffu8, 0x0u8, 0x0u8],
@@ -573,12 +669,12 @@ mod test {
             [0xf3u8, 0xbfu8, 0xe9u8],
         ];
         for data in database {
-            let left = GF8::new(data[0]);
-            let right = GF8::new(data[1]);
-            let result = GF8::new(data[2]);
-            let res = GF8::mul(&left, &right);
-            let res_rev = GF8::mul(&right, &left);
-            assert_eq!(res.get_value(), result.get_value());
+            let left = GF8::from(data[0]);
+            let right = GF8::from(data[1]);
+            let result = GF8::from(data[2]);
+            let res = left * right;
+            let res_rev = right * left;
+            assert_eq!(res, result);
             //to test commutativity
             assert_eq!(res, res_rev);
         }
@@ -588,15 +684,12 @@ mod test {
     //anything * inv(anything) should be equal to 1
     //anything * inv(0) should be equal to 0
     fn gf8_test_inv() {
-        let pol_1 = GF8::new(1u8);
-        let pol_0 = GF8::new(0u8);
-        let anything = random();
-        let pol_anything = GF8::new(anything);
-        assert_eq!(
-            GF8::mul(&pol_anything, &GF8::inv(GF8::new(anything))),
-            pol_1
-        );
-        assert_eq!(GF8::mul(&pol_anything, &GF8::inv(GF8::new(0u8))), pol_0);
+        let pol_1 = GF8::from(1u8);
+        let pol_0 = GF8::from(0u8);
+        let anything: u8 = random();
+        let pol_anything = GF8::from(anything);
+        assert_eq!(pol_anything * GF8::inv(GF8::from(anything)), pol_1);
+        assert_eq!(pol_anything * GF8::inv(GF8::from(0u8)), pol_0);
         let database = [
             [0x1u8, 0x1u8],
             [0xb9u8, 0x8eu8],
@@ -651,10 +744,10 @@ mod test {
             [0xb9u8, 0x8eu8],
         ];
         for data in database {
-            let input = GF8::new(data[0]);
-            let result = GF8::new(data[1]);
+            let input = GF8::from(data[0]);
+            let result = GF8::from(data[1]);
             let res = input.inv();
-            assert_eq!(res.get_value(), result.get_value());
+            assert_eq!(res, result);
         }
     }
 
@@ -663,10 +756,10 @@ mod test {
     #[test]
     //Precondition = None
     //Post contidtion = GF64 whose get_value is as expected
-    fn gf64_test_new_and_get_value() {
+    fn gf64_test_from_and_get_value() {
         let x: u64 = random();
-        let polynome = GF64::new(x);
-        assert_eq!(x, polynome.get_value());
+        let polynome = GF64::from(x);
+        assert_eq!(polynome, x);
     }
 
     #[test]
@@ -682,31 +775,21 @@ mod test {
     }
 
     #[test]
-    //precondtion : the GF64 polynome with a value x
-    //postconition : the value of GF64 polynome is y
-    fn gf64_test_set_value() {
-        let mut polynome = GF64::new(0xe367u64);
-        assert_eq!(polynome.get_value(), 0xe367u64);
-        polynome.set_value(0x243u64);
-        assert_eq!(polynome.get_value(), 0x243u64);
-    }
-
-    #[test]
     //-----------------------------------
     //0 * anything should be equal to 0
     //anything * 0 should be equal to 0
     //1 * anything should be equal to anything
     //anything * 1 should be equal to anything
     fn gf64_test_mul() {
-        let anything = random();
-        let pol_anything = GF64::new(anything);
-        let pol_0 = GF64::new(0u64);
-        let pol_1 = GF64::new(1u64);
-        assert_eq!(GF64::mul(&pol_1, &pol_1), pol_1);
-        assert_eq!(GF64::mul(&pol_0, &pol_anything), pol_0);
-        assert_eq!(GF64::mul(&pol_anything, &pol_0), pol_0);
-        assert_eq!(GF64::mul(&pol_1, &pol_anything), pol_anything);
-        assert_eq!(GF64::mul(&pol_anything, &pol_1), pol_anything);
+        let anything: u64 = random();
+        let pol_anything = GF64::from(anything);
+        let pol_0 = GF64::from(0u64);
+        let pol_1 = GF64::from(1u64);
+        assert_eq!(pol_1 * pol_1, pol_1);
+        assert_eq!(pol_0 * pol_anything, pol_0);
+        assert_eq!(pol_anything * pol_0, pol_0);
+        assert_eq!(pol_1 * pol_anything, pol_anything);
+        assert_eq!(pol_anything * pol_1, pol_anything);
         let database = [
             [0xffu64, 0x0u64, 0x0u64],
             [0x0u64, 0xffu64, 0x0u64],
@@ -1049,12 +1132,12 @@ mod test {
             ],
         ];
         for data in database {
-            let left = GF64::new(data[0]);
-            let right = GF64::new(data[1]);
-            let result = GF64::new(data[2]);
-            let res = GF64::mul(&left, &right);
-            let res_rev = GF64::mul(&right, &left);
-            assert_eq!(res.get_value(), result.get_value());
+            let left = GF64::from(data[0]);
+            let right = GF64::from(data[1]);
+            let result = GF64::from(data[2]);
+            let res = left * right;
+            let res_rev = right * left;
+            assert_eq!(res, result);
             //to test commutativity
             assert_eq!(res, res_rev);
         }
@@ -1066,7 +1149,7 @@ mod test {
             let random = random::<[u8; 8]>();
             let res = GF64::to_field(&random);
             let verif = u64::from_le_bytes(random);
-            assert_eq!(res[0].get_value(), verif);
+            assert_eq!(res[0], verif);
         }
         //with many
         for _i in 0..1000 {
@@ -1074,8 +1157,8 @@ mod test {
             let res = GF64::to_field(&random);
             let verif_1 = u64::from_le_bytes(random[0..8].try_into().expect("REASON"));
             let verif_2 = u64::from_le_bytes(random[8..16].try_into().expect("REASON"));
-            assert_eq!(res[0].get_value(), verif_1);
-            assert_eq!(res[1].get_value(), verif_2);
+            assert_eq!(res[0], verif_1);
+            assert_eq!(res[1], verif_2);
         }
     }
 }
