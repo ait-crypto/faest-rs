@@ -1,4 +1,3 @@
-#[cfg(test)]
 use std::fs::File;
 
 use generic_array::{sequence::GenericSequence, ArrayLength, GenericArray};

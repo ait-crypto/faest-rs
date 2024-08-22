@@ -1,8 +1,5 @@
-#[cfg(test)]
 use crate::fields::{BigGaloisField, GaloisField, GF128, GF192, GF256, GF64, GF8};
-#[cfg(test)]
 use num_bigint::BigUint;
-#[cfg(test)]
 use rand::random;
 
 //GF8

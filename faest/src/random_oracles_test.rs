@@ -2,8 +2,9 @@ use generic_array::{sequence::GenericSequence, GenericArray};
 use typenum::{U240, U32, U40, U48, U64, U72, U96};
 
 use crate::random_oracles;
-#[cfg(test)]
-use crate::random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake192, RandomOracleShake256};
+use crate::random_oracles::{
+    RandomOracle, RandomOracleShake128, RandomOracleShake192, RandomOracleShake256,
+};
 
 //We don't test Random oracle 192 except for prg, since it is the ony thing that distinguish it from Random oracle 256
 #[test]

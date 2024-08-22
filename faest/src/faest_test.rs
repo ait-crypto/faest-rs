@@ -1,7 +1,6 @@
 use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
 use rand::random;
 
-#[cfg(test)]
 use crate::{
     faest::{
         faest_sign, faest_verify, sigma_to_signature, signature_to_sigma, AesCypher, EmCypher,

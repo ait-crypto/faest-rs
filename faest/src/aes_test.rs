@@ -5,7 +5,6 @@ use crate::aes::{
 };
 use crate::fields::{BigGaloisField, GF128, GF192, GF256};
 use crate::parameter::{PARAM128S, PARAM192S, PARAM256S, PARAMOWF128, PARAMOWF192, PARAMOWF256};
-#[cfg(test)]
 use serde::Deserialize;
 #[allow(unused_imports)]
 use std::convert;

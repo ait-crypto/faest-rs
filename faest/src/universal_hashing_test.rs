@@ -1,10 +1,8 @@
 use generic_array::{sequence::GenericSequence, GenericArray, GenericArrayIter};
 use typenum::{U104, U128, U168, U18, U20, U26, U28, U34, U36, U56, U8, U80, U88};
 
-#[cfg(test)]
 use crate::fields::{BigGaloisField, GF128, GF192, GF256};
 use crate::parameter::{PARAMOWF128, PARAMOWF192, PARAMOWF256};
-#[cfg(test)]
 use crate::universal_hashing::{volehash, zkhash};
 
 #[test]
