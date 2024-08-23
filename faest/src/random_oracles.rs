@@ -1,8 +1,8 @@
 use aes::cipher::{KeyIvInit, StreamCipher};
-use generic_array::{sequence::GenericSequence, ArrayLength, GenericArray};
+use generic_array::{ArrayLength, GenericArray};
 use sha3::{
-    digest::{core_api::CoreWrapper, ExtendableOutput, Update, XofReader},
-    Shake128, Shake256,
+    digest::{core_api::XofReaderCoreWrapper, ExtendableOutput, Update, XofReader},
+    Shake128, Shake128ReaderCore, Shake256, Shake256ReaderCore,
 };
 use typenum::{U16, U24, U32, U40, U48, U64, U72, U96};
 
@@ -11,7 +11,7 @@ type Aes192Ctr128BE = ctr::Ctr128BE<aes::Aes192>;
 type Aes256Ctr128BE = ctr::Ctr128BE<aes::Aes256>;
 
 pub trait RandomOracle {
-    type Hasher: Hasher;
+    type Hasher<const SEP: u8>: Hasher;
     type LAMBDA: ArrayLength<u8>;
     type LAMBDA16: ArrayLength<u8>;
     type PRODLAMBDA3: ArrayLength<u8>;
@@ -21,89 +21,97 @@ pub trait RandomOracle {
     where
         LH: ArrayLength<u8>;
 
+    // FIXME: return dest instead
     fn h0(data: GenericArray<u8, Self::LAMBDA16>, dest: &mut GenericArray<u8, Self::PRODLAMBDA3>) {
         let mut hasher = Self::h0_init();
         hasher.update(&data);
-        hasher.h0_finish(dest);
+        let mut reader = hasher.finish();
+        reader.read(dest);
     }
 
+    // FIXME: return dest instead
     fn h1(data: &[u8], dest: &mut GenericArray<u8, Self::PRODLAMBDA2>) {
         let mut hasher = Self::h1_init();
-        hasher.update(&data);
-        hasher.h1_finish(dest);
+        hasher.update(data);
+        let mut reader = hasher.finish();
+        reader.read(dest);
     }
 
     fn h2(data: &[u8], dest: &mut [u8]) {
         let mut hasher = Self::h2_init();
         hasher.update(data);
-        hasher.h2_finish(dest);
+        let mut reader = hasher.finish();
+        reader.read(dest);
     }
 
-    fn h3(data: &[u8], mut dest: GenericArray<u8, Self::LAMBDA16>) {
+    // FIXME: return dest instead
+    fn h3(data: &[u8], dest: &mut GenericArray<u8, Self::LAMBDA16>) {
         let mut hasher = Self::h3_init();
         hasher.update(data);
-        hasher.h3_finish(&mut dest);
+        let mut reader = hasher.finish();
+        reader.read(dest);
     }
 
-    fn h0_init() -> Self::Hasher;
+    fn h0_init() -> Self::Hasher<0>;
 
-    fn h1_init() -> Self::Hasher;
+    fn h1_init() -> Self::Hasher<1>;
 
-    fn h2_init() -> Self::Hasher;
+    fn h2_init() -> Self::Hasher<2>;
 
-    fn h3_init() -> Self::Hasher;
+    fn h3_init() -> Self::Hasher<3>;
+}
+
+pub trait Reader {
+    fn read(&mut self, dst: &mut [u8]);
 }
 
 pub trait Hasher {
+    type Reader: Reader;
+
     fn update(&mut self, data: &[u8]);
 
-    fn h0_finish(self, dest: &mut [u8]);
-
-    fn h1_finish(self, dest: &mut [u8]);
-
-    fn h2_finish(self, dest: &mut [u8]);
-
-    fn h3_finish(self, dest: &mut [u8]);
+    fn finish(self) -> Self::Reader;
 }
 
 pub struct RandomOracleShake128 {}
 
-pub struct Hasher128 {
-    hasher: CoreWrapper<sha3::Shake128Core>,
+#[derive(Debug, Default)]
+pub struct Hasher128<const SEP: u8> {
+    hasher: Shake128,
+}
+
+pub struct Hasher128Reader(XofReaderCoreWrapper<Shake128ReaderCore>);
+
+impl Reader for Hasher128Reader {
+    fn read(&mut self, dst: &mut [u8]) {
+        self.0.read(dst)
+    }
 }
 
 impl RandomOracle for RandomOracleShake128 {
-    type Hasher = Hasher128;
+    type Hasher<const SEP: u8> = Hasher128<SEP>;
 
-    fn h0_init() -> Hasher128 {
-        Hasher128 {
-            hasher: Shake128::default(),
-        }
+    fn h0_init() -> Hasher128<0> {
+        Hasher128::default()
     }
 
-    fn h1_init() -> Hasher128 {
-        Hasher128 {
-            hasher: Shake128::default(),
-        }
+    fn h1_init() -> Hasher128<1> {
+        Hasher128::default()
     }
 
-    fn h2_init() -> Hasher128 {
-        Hasher128 {
-            hasher: Shake128::default(),
-        }
+    fn h2_init() -> Hasher128<2> {
+        Hasher128::default()
     }
 
-    fn h3_init() -> Hasher128 {
-        Hasher128 {
-            hasher: Shake128::default(),
-        }
+    fn h3_init() -> Hasher128<3> {
+        Hasher128::default()
     }
 
     fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH>
     where
         LH: ArrayLength<u8>,
     {
-        let mut buf = GenericArray::generate(|i: usize| 0u8);
+        let mut buf = GenericArray::default();
         let mut cipher = Aes128Ctr128BE::new(&k, &iv.to_be_bytes().into());
         cipher.apply_keystream(&mut buf);
         buf
@@ -118,70 +126,45 @@ impl RandomOracle for RandomOracleShake128 {
     type PRODLAMBDA2 = U32;
 }
 
-impl Hasher for Hasher128 {
+impl<const SEP: u8> Hasher for Hasher128<SEP> {
+    type Reader = Hasher128Reader;
+
     fn update(&mut self, data: &[u8]) {
         self.hasher.update(data);
     }
 
-    fn h0_finish(mut self, dest: &mut [u8]) {
-        self.hasher.update(&[0u8]);
-        let mut reader = self.hasher.finalize_xof();
-        reader.read(dest);
-    }
-
-    fn h1_finish(mut self, dest: &mut [u8]) {
-        self.hasher.update(&[1u8]);
-        let mut reader = self.hasher.finalize_xof();
-        reader.read(dest);
-    }
-
-    fn h2_finish(mut self, dest: &mut [u8]) {
-        self.hasher.update(&[2u8]);
-        let mut reader = self.hasher.finalize_xof();
-        reader.read(dest);
-    }
-
-    fn h3_finish(mut self, dest: &mut [u8]) {
-        self.hasher.update(&[3u8]);
-        let mut reader = self.hasher.finalize_xof();
-        reader.read(dest);
+    fn finish(mut self) -> Self::Reader {
+        self.hasher.update(&[SEP]);
+        Hasher128Reader(self.hasher.finalize_xof())
     }
 }
 
 pub struct RandomOracleShake192 {}
 
 impl RandomOracle for RandomOracleShake192 {
-    type Hasher = Hasher256;
+    type Hasher<const SEP: u8> = Hasher256<SEP>;
 
-    fn h0_init() -> Hasher256 {
-        Hasher256 {
-            hasher: Shake256::default(),
-        }
+    fn h0_init() -> Hasher256<0> {
+        Hasher256::default()
     }
 
-    fn h1_init() -> Hasher256 {
-        Hasher256 {
-            hasher: Shake256::default(),
-        }
+    fn h1_init() -> Hasher256<1> {
+        Hasher256::default()
     }
 
-    fn h2_init() -> Hasher256 {
-        Hasher256 {
-            hasher: Shake256::default(),
-        }
+    fn h2_init() -> Hasher256<2> {
+        Hasher256::default()
     }
 
-    fn h3_init() -> Hasher256 {
-        Hasher256 {
-            hasher: Shake256::default(),
-        }
+    fn h3_init() -> Hasher256<3> {
+        Hasher256::default()
     }
 
     fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH>
     where
         LH: ArrayLength<u8>,
     {
-        let mut buf = GenericArray::generate(|i: usize| 0u8);
+        let mut buf = GenericArray::default();
         let mut cipher = Aes192Ctr128BE::new(&k, &iv.to_be_bytes().into());
         cipher.apply_keystream(&mut buf);
         buf
@@ -196,74 +179,58 @@ impl RandomOracle for RandomOracleShake192 {
     type PRODLAMBDA2 = U48;
 }
 
-impl Hasher for Hasher256 {
+impl<const SEP: u8> Hasher for Hasher256<SEP> {
+    type Reader = Hasher256Reader;
+
     fn update(&mut self, data: &[u8]) {
         self.hasher.update(data);
     }
 
-    fn h0_finish(mut self, dest: &mut [u8]) {
-        self.hasher.update(&[0u8]);
-        let mut reader = self.hasher.finalize_xof();
-        reader.read(dest);
-    }
-
-    fn h1_finish(mut self, dest: &mut [u8]) {
-        self.hasher.update(&[1u8]);
-        let mut reader = self.hasher.finalize_xof();
-        reader.read(dest);
-    }
-
-    fn h2_finish(mut self, dest: &mut [u8]) {
-        self.hasher.update(&[2u8]);
-        let mut reader = self.hasher.finalize_xof();
-        reader.read(dest);
-    }
-
-    fn h3_finish(mut self, dest: &mut [u8]) {
-        self.hasher.update(&[3u8]);
-        let mut reader = self.hasher.finalize_xof();
-        reader.read(dest);
+    fn finish(mut self) -> Self::Reader {
+        self.hasher.update(&[SEP]);
+        Hasher256Reader(self.hasher.finalize_xof())
     }
 }
 
 pub struct RandomOracleShake256 {}
 
-pub struct Hasher256 {
-    hasher: CoreWrapper<sha3::Shake256Core>,
+#[derive(Default)]
+pub struct Hasher256<const SEP: u8> {
+    hasher: Shake256,
+}
+
+pub struct Hasher256Reader(XofReaderCoreWrapper<Shake256ReaderCore>);
+
+impl Reader for Hasher256Reader {
+    fn read(&mut self, dst: &mut [u8]) {
+        self.0.read(dst)
+    }
 }
 
 impl RandomOracle for RandomOracleShake256 {
-    type Hasher = Hasher256;
+    type Hasher<const SEP: u8> = Hasher256<SEP>;
 
-    fn h0_init() -> Hasher256 {
-        Hasher256 {
-            hasher: Shake256::default(),
-        }
+    fn h0_init() -> Hasher256<0> {
+        Hasher256::default()
     }
 
-    fn h1_init() -> Hasher256 {
-        Hasher256 {
-            hasher: Shake256::default(),
-        }
+    fn h1_init() -> Hasher256<1> {
+        Hasher256::default()
     }
 
-    fn h2_init() -> Hasher256 {
-        Hasher256 {
-            hasher: Shake256::default(),
-        }
+    fn h2_init() -> Hasher256<2> {
+        Hasher256::default()
     }
 
-    fn h3_init() -> Hasher256 {
-        Hasher256 {
-            hasher: Shake256::default(),
-        }
+    fn h3_init() -> Hasher256<3> {
+        Hasher256::default()
     }
 
     fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH>
     where
         LH: ArrayLength<u8>,
     {
-        let mut buf = GenericArray::generate(|i: usize| 0u8);
+        let mut buf = GenericArray::default();
         let mut cipher = Aes256Ctr128BE::new(&k, &iv.to_be_bytes().into());
         cipher.apply_keystream(&mut buf);
         buf
@@ -280,7 +247,7 @@ impl RandomOracle for RandomOracleShake256 {
 
 #[cfg(test)]
 mod test {
-    use generic_array::{sequence::GenericSequence, GenericArray};
+    use generic_array::GenericArray;
     use typenum::{U240, U32, U40, U48};
 
     use super::*;
@@ -1029,20 +996,17 @@ mod test {
             let output = &data.2;
             if lambda == 128 {
                 let input: GenericArray<u8, U32> = *GenericArray::from_slice(&data.1);
-                let mut res: GenericArray<u8, <RandomOracleShake128 as RandomOracle>::PRODLAMBDA3> =
-                    GenericArray::generate(|i: usize| 0u8);
+                let mut res = GenericArray::default();
                 RandomOracleShake128::h0(input, &mut res);
                 assert_eq!(res[..], output[..]);
             } else if lambda == 192 {
                 let input: GenericArray<u8, U40> = *GenericArray::from_slice(&data.1);
-                let mut res: GenericArray<u8, <RandomOracleShake192 as RandomOracle>::PRODLAMBDA3> =
-                    GenericArray::generate(|i: usize| 0u8);
+                let mut res = GenericArray::default();
                 RandomOracleShake192::h0(input, &mut res);
                 assert_eq!(res[..], output[..]);
             } else {
                 let input: GenericArray<u8, U48> = *GenericArray::from_slice(&data.1);
-                let mut res: GenericArray<u8, <RandomOracleShake256 as RandomOracle>::PRODLAMBDA3> =
-                    GenericArray::generate(|i: usize| 0u8);
+                let mut res = GenericArray::default();
                 RandomOracleShake256::h0(input, &mut res);
                 assert_eq!(res[..], output[..]);
             }
@@ -3309,18 +3273,15 @@ mod test {
             let input = data.1;
             let output = data.2;
             if lambda == 128 {
-                let mut res: GenericArray<u8, <RandomOracleShake128 as RandomOracle>::PRODLAMBDA2> =
-                    GenericArray::generate(|i: usize| 0u8);
+                let mut res = GenericArray::default();
                 RandomOracleShake128::h1(&input, &mut res);
                 assert_eq!(res[..], output[..]);
             } else if lambda == 192 {
-                let mut res: GenericArray<u8, <RandomOracleShake192 as RandomOracle>::PRODLAMBDA2> =
-                    GenericArray::generate(|i: usize| 0u8);
+                let mut res = GenericArray::default();
                 RandomOracleShake192::h1(&input, &mut res);
                 assert_eq!(res[..], output[..]);
             } else {
-                let mut res: GenericArray<u8, <RandomOracleShake256 as RandomOracle>::PRODLAMBDA2> =
-                    GenericArray::generate(|i: usize| 0u8);
+                let mut res = GenericArray::default();
                 RandomOracleShake256::h1(&input, &mut res);
                 assert_eq!(res[..], output[..]);
             }
