@@ -1,5 +1,8 @@
-use std::ops::{
-    Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Shl, Shr, Sub, SubAssign,
+use std::{
+    num::Wrapping,
+    ops::{
+        Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
+    },
 };
 
 use super::Field;
@@ -24,27 +27,25 @@ where
 trait GaloisFieldHelper<T>
 where
     T: Sized + Copy,
-    T: BitAnd<Output = T>
-        + BitXor<Output = T>
+    Wrapping<T>: BitAnd<Output = Wrapping<T>>
+        + BitXor<Output = Wrapping<T>>
         + BitXorAssign
-        + Mul<Output = T>
-        + Shl<usize, Output = T>
-        + Shr<usize, Output = T>,
+        + Neg<Output = Wrapping<T>>
+        + Shl<usize, Output = Wrapping<T>>
+        + Shr<usize, Output = Wrapping<T>>,
 {
-    const MODULUS: T;
+    const MODULUS: Wrapping<T>;
 
-    const ONE: T;
-
-    const MAX: T;
+    const ONE: Wrapping<T>;
 
     const BITS: usize;
 
-    fn mul_helper(mut left: T, right: T) -> T {
-        let mut result_value = (Self::MAX * (right & Self::ONE)) & left;
+    fn mul_helper(mut left: Wrapping<T>, right: Wrapping<T>) -> Wrapping<T> {
+        let mut result_value = (-(right & Self::ONE)) & left;
         for i in 1..Self::BITS {
-            let mask = Self::MAX * ((left >> (Self::BITS - 1)) & Self::ONE);
+            let mask = -((left >> (Self::BITS - 1)) & Self::ONE);
             left = (left << 1) ^ (mask & Self::MODULUS);
-            result_value ^= (Self::MAX * ((right >> i) & Self::ONE)) & left;
+            result_value ^= (-((right >> i) & Self::ONE)) & left;
         }
         result_value
     }
@@ -53,7 +54,7 @@ where
 /// Small binary fields to a size up to 64 bits
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(transparent)]
-pub struct SmallGF<T>(T)
+pub struct SmallGF<T>(Wrapping<T>)
 where
     T: Copy;
 
@@ -63,21 +64,21 @@ where
 {
     #[inline(always)]
     fn from(value: T) -> Self {
-        Self(value)
+        Self(Wrapping(value))
     }
 }
 
 impl From<SmallGF<u8>> for u8 {
     #[inline(always)]
     fn from(value: SmallGF<u8>) -> Self {
-        value.0
+        value.0 .0
     }
 }
 
 impl From<SmallGF<u64>> for u64 {
     #[inline(always)]
     fn from(value: SmallGF<u64>) -> Self {
-        value.0
+        value.0 .0
     }
 }
 
@@ -97,13 +98,14 @@ where
     T: PartialEq,
 {
     fn eq(&self, other: &T) -> bool {
-        self.0 == *other
+        self.0 .0 == *other
     }
 }
 
 impl<T> Add for SmallGF<T>
 where
-    T: BitXor<Output = T> + Copy,
+    Wrapping<T>: BitXor<Output = Wrapping<T>>,
+    T: Copy,
 {
     type Output = Self;
 
@@ -116,7 +118,8 @@ where
 
 impl<T> AddAssign for SmallGF<T>
 where
-    T: BitXorAssign + Copy,
+    Wrapping<T>: BitXorAssign,
+    T: Copy,
 {
     #[inline(always)]
     #[allow(clippy::suspicious_op_assign_impl)]
@@ -127,7 +130,8 @@ where
 
 impl<T> Sub for SmallGF<T>
 where
-    T: BitXor<Output = T> + Copy,
+    Wrapping<T>: BitXor<Output = Wrapping<T>>,
+    T: Copy,
 {
     type Output = Self;
 
@@ -140,7 +144,8 @@ where
 
 impl<T> SubAssign for SmallGF<T>
 where
-    T: BitXorAssign + Copy,
+    Wrapping<T>: BitXorAssign,
+    T: Copy,
 {
     #[inline(always)]
     #[allow(clippy::suspicious_op_assign_impl)]
@@ -152,21 +157,17 @@ where
 impl GaloisFieldHelper<u8> for SmallGF<u8> {
     const BITS: usize = u8::BITS as usize;
 
-    const MAX: u8 = u8::MAX;
+    const ONE: Wrapping<u8> = Wrapping(1u8);
 
-    const ONE: u8 = 1u8;
-
-    const MODULUS: u8 = 0b11011u8;
+    const MODULUS: Wrapping<u8> = Wrapping(0b11011u8);
 }
 
 impl GaloisFieldHelper<u64> for SmallGF<u64> {
     const BITS: usize = u64::BITS as usize;
 
-    const MAX: u64 = u64::MAX;
+    const MODULUS: Wrapping<u64> = Wrapping(0b00011011u64);
 
-    const MODULUS: u64 = 0b00011011u64;
-
-    const ONE: u64 = 1u64;
+    const ONE: Wrapping<u64> = Wrapping(1u64);
 }
 
 impl Mul for SmallGF<u8> {
@@ -180,7 +181,6 @@ impl Mul for SmallGF<u8> {
 
 impl MulAssign for SmallGF<u8> {
     #[inline(always)]
-
     fn mul_assign(&mut self, rhs: Self) {
         self.0 = Self::mul_helper(self.0, rhs.0);
     }
@@ -230,7 +230,7 @@ impl GF8 {
 
 impl GaloisField<u8> for GF8 {
     fn get_value(&self) -> u8 {
-        self.0
+        self.0 .0
     }
 }
 
@@ -255,7 +255,7 @@ impl GF64 {
 
 impl GaloisField<u64> for GF64 {
     fn get_value(&self) -> u64 {
-        self.0
+        self.0 .0
     }
 }
 
@@ -272,12 +272,6 @@ mod test {
         let x: u8 = random();
         let polynome = GF8::from(x);
         assert_eq!(polynome, x);
-    }
-
-    #[test]
-    //should be equal to u8::MAX
-    fn gf8_test_get_max() {
-        assert_eq!(GF8::MAX, u8::MAX);
     }
 
     #[test]
@@ -762,12 +756,6 @@ mod test {
         let x: u64 = random();
         let polynome = GF64::from(x);
         assert_eq!(polynome, x);
-    }
-
-    #[test]
-    //should be equal to u64::MAX
-    fn gf64_test_get_max() {
-        assert_eq!(GF64::MAX, u64::MAX);
     }
 
     #[test]
