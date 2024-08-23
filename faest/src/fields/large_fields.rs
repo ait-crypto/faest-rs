@@ -47,17 +47,6 @@ where
         Self::new(u128::MAX * c, u128::MAX * c)
     }
 
-    fn switch_right(self, int: u32) -> Self {
-        //the int  & 64 is for GF192, in wich the bit worthing 64 would not have been taken into account otherwise.
-        let lim_int = (int & (Self::LENGTH - 1)) | (int & 64);
-        let (first_value, second_value) = self.get_value();
-        let carry = second_value & (u128::MAX.wrapping_shr(128 - lim_int));
-        Self::new(
-            (first_value.wrapping_shr(lim_int)) | (carry.wrapping_shl(128 - lim_int)),
-            second_value.wrapping_shr(lim_int),
-        )
-    }
-
     fn switch_left_1(self) -> Self {
         let (first_value, second_value) = self.get_value();
         let carry = (first_value & (1u128 << 127)) >> 127;
@@ -609,17 +598,6 @@ impl BigGaloisField for GF128 {
             >> 127;
         let c = c_1 | c_2;
         Self::new(u128::MAX * c, u128::MAX * c)
-    }
-
-    fn switch_right(self, int: u32) -> Self {
-        //the int  & 64 is for GF192, in wich the bit worthing 64 would not have been taken into account otherwise.
-        let lim_int = (int & (Self::LENGTH - 1)) | (int & 64);
-        let (first_value, second_value) = self.get_value();
-        let carry = second_value & (u128::MAX.wrapping_shr(128 - lim_int));
-        Self::new(
-            (first_value.wrapping_shr(lim_int)) | (carry.wrapping_shl(128 - lim_int)),
-            second_value.wrapping_shr(lim_int),
-        )
     }
 
     fn switch_left_1(self) -> Self {
