@@ -1,8 +1,8 @@
 use aes::cipher::{KeyIvInit, StreamCipher};
 use generic_array::{ArrayLength, GenericArray};
 use sha3::{
-    digest::{core_api::XofReaderCoreWrapper, ExtendableOutput, Update, XofReader},
-    Shake128, Shake128ReaderCore, Shake256, Shake256ReaderCore,
+    digest::{ExtendableOutput, Update, XofReader},
+    Shake128, Shake128Reader, Shake256, Shake256Reader,
 };
 use typenum::{U16, U24, U32, U40, U48, U64, U72, U96};
 
@@ -88,7 +88,7 @@ pub struct Hasher128<const SEP: u8> {
     hasher: Shake128,
 }
 
-pub struct Hasher128Reader(XofReaderCoreWrapper<Shake128ReaderCore>);
+pub struct Hasher128Reader(Shake128Reader);
 
 impl Reader for Hasher128Reader {
     fn read(&mut self, dst: &mut [u8]) {
@@ -175,7 +175,7 @@ pub struct Hasher256<const SEP: u8> {
     hasher: Shake256,
 }
 
-pub struct Hasher256Reader(XofReaderCoreWrapper<Shake256ReaderCore>);
+pub struct Hasher256Reader(Shake256Reader);
 
 impl Reader for Hasher256Reader {
     fn read(&mut self, dst: &mut [u8]) {
