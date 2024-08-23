@@ -11,8 +11,6 @@ pub mod vc;
 mod vc_test;
 
 pub mod random_oracles;
-#[cfg(test)]
-mod random_oracles_test;
 
 /* pub mod vole;
 #[cfg(test)]
