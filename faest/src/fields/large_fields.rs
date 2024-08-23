@@ -77,8 +77,8 @@ where
 
     fn byte_combine(x: [Self; 8]) -> Self {
         let mut out = x[0];
-        for (i, _) in x.iter().enumerate().skip(1) {
-            out += x[i] * Self::ALPHA[i - 1];
+        for (i, xi) in x.into_iter().enumerate().skip(1) {
+            out += xi * Self::ALPHA[i - 1];
         }
         out
     }
@@ -630,24 +630,8 @@ impl BigGaloisField for GF128 {
         Self::new(first_res, second_res)
     }
 
-    fn byte_combine(x: [Self; 8]) -> Self {
-        let mut out = x[0];
-        for (i, _) in x.iter().enumerate().skip(1) {
-            out += x[i] * Self::ALPHA[i - 1];
-        }
-        out
-    }
-
     fn from_bit(x: u8) -> Self {
         Self::new((x & 1) as u128, 0u128)
-    }
-
-    fn byte_combine_bits(x: u8) -> Self {
-        let mut out = Self::from_bit(x);
-        for i in 1..8 {
-            out += Self::ALPHA[i - 1] * (x >> i);
-        }
-        out
     }
 
     fn to_field(x: &[u8]) -> Vec<Self> {
