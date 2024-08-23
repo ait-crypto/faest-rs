@@ -7,6 +7,7 @@ use rand::{
     distributions::{Distribution, Standard},
     Rng,
 };
+use subtle::{Choice, ConditionallySelectable};
 
 //For GF192 and GF256, as u192 and u256 dont exist in rust, we will implement a new trait BigGaloisField, in wich we will also implement basis operations.
 
@@ -342,13 +343,40 @@ macro_rules! impl_RefMul64 {
 
 impl_RefMul64!(for GF128, GF192, GF256);
 
+impl ConditionallySelectable for GF128 {
+    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
+        Self {
+            first_value: u128::conditional_select(&a.first_value, &b.first_value, choice),
+            second_value: 0u128,
+        }
+    }
+}
+
+impl ConditionallySelectable for GF192 {
+    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
+        Self {
+            first_value: u128::conditional_select(&a.first_value, &b.first_value, choice),
+            second_value: u128::conditional_select(&a.second_value, &b.second_value, choice),
+        }
+    }
+}
+
+impl ConditionallySelectable for GF256 {
+    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
+        Self {
+            first_value: u128::conditional_select(&a.first_value, &b.first_value, choice),
+            second_value: u128::conditional_select(&a.second_value, &b.second_value, choice),
+        }
+    }
+}
+
 macro_rules! impl_Mul8 {
     (for $($t:ty),+) => {
         $(impl Mul<u8> for $t {
             type Output = Self;
+
             fn mul(self, right: u8) -> Self::Output {
-                let right = <$t>::new(right as u128 & 1, 0u128);
-                return self * right
+                Self::conditional_select(&Self::default(), &self, (right & 1).into())
             }
         })*
     }
@@ -356,27 +384,13 @@ macro_rules! impl_Mul8 {
 
 impl_Mul8!(for GF128, GF192, GF256);
 
-macro_rules! impl_Mul8Ref {
-    (for $($t:ty),+) => {
-        $(impl Mul<&u8> for $t {
-            type Output = Self;
-            fn mul(self, right: &u8) -> Self::Output {
-                let right = <$t>::new(*right as u128 & 1, 0u128);
-                return self * right
-            }
-        })*
-    }
-}
-
-impl_Mul8Ref!(for GF128, GF192, GF256);
-
 macro_rules! impl_RefMul8 {
     (for $($t:ty),+) => {
-        $(impl<'a, 'b> Mul<&'a u8> for &'b $t {
+        $(impl<'a> Mul<u8> for &'a $t {
             type Output = $t;
-            fn mul(self, other: &u8) -> $t{
-                let right = <$t>::new(*other as u128 & 1, 0u128);
-                return *self * right
+
+            fn mul(self,right: u8) -> $t {
+                <$t>::conditional_select(&<$t>::default(), &self, (right & 1).into())
             }
         })*
     }
