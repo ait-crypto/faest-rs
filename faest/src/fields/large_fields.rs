@@ -358,6 +358,7 @@ macro_rules! impl_Mul8 {
         $(impl Mul<u8> for $t {
             type Output = Self;
 
+            #[allow(clippy::suspicious_arithmetic_impl)]
             fn mul(self, right: u8) -> Self::Output {
                 Self::conditional_select(&Self::default(), &self, (right & 1).into())
             }
@@ -372,6 +373,7 @@ macro_rules! impl_RefMul8 {
         $(impl<'a> Mul<u8> for &'a $t {
             type Output = $t;
 
+            #[allow(clippy::suspicious_arithmetic_impl)]
             fn mul(self,right: u8) -> $t {
                 <$t>::conditional_select(&<$t>::default(), &self, (right & 1).into())
             }
