@@ -1,6 +1,6 @@
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub};
 
-use super::Field;
+use super::{Field, GF64};
 
 #[cfg(test)]
 use rand::{
@@ -17,6 +17,7 @@ where
     Self: Sized + Copy,
     Self: for<'a> From<&'a [u8]>,
     Self: Mul<u8, Output = Self>,
+    Self: Mul<GF64, Output = Self>,
     Self: for<'a> MulAssign<&'a Self>,
 {
     const LENGTH: u32;
@@ -291,38 +292,32 @@ impl_Mul!(for GF128, GF192, GF256);
 
 macro_rules! impl_Mul64 {
     (for $($t:ty),+) => {
-        $(impl Mul<u64> for $t {
+        $(impl Mul<GF64> for $t {
+            type Output = Self;
+            fn mul(self, right: GF64) -> Self::Output {
+                let right = <$t>::new(u64::from(right) as u128, 0u128);
+                return self * right
+            }
+        }
+
+        impl Mul<u64> for $t {
             type Output = Self;
             fn mul(self, right: u64) -> Self::Output {
                 let right = <$t>::new(right as u128, 0u128);
                 return self * right
             }
-        })*
+        }    )*
     }
 }
 
 impl_Mul64!(for GF128, GF192, GF256);
 
-macro_rules! impl_Mul64Ref {
-    (for $($t:ty),+) => {
-        $(impl Mul<&u64> for $t {
-            type Output = Self;
-            fn mul(self, right: &u64) -> Self::Output {
-                let right = <$t>::new(*right as u128, 0u128);
-                return self * right
-            }
-        })*
-    }
-}
-
-impl_Mul64Ref!(for GF128, GF192, GF256);
-
 macro_rules! impl_RefMul64 {
     (for $($t:ty),+) => {
-        $(impl<'a, 'b> Mul<&'b u64> for &'a $t {
+        $(impl<'a> Mul<u64> for &'a $t {
             type Output = $t;
-            fn mul(self, other: &u64) -> $t{
-                let right = <$t>::new(*other as u128, 0u128);
+            fn mul(self, other: u64) -> $t{
+                let right = <$t>::new(other as u128, 0u128);
                 return *self * right
             }
         })*
@@ -403,7 +398,7 @@ macro_rules! impl_RefMul {
     (for $($t:ty),+) => {
         $(impl<'a, 'b> Mul<&'b $t> for &'a $t {
             type Output = $t;
-            fn mul(self, right: &'b $t) -> $t where $t : BigGaloisField{
+            fn mul(self, right: &'b $t) -> $t {
                 *self * *right
             }
         })*
@@ -489,27 +484,21 @@ impl_MulAssignRef!(for GF128, GF192, GF256);
 
 macro_rules! impl_MulAssign64 {
     (for $($t:ty),+) => {
-        $(impl MulAssign<u64> for $t {
+        $(impl MulAssign<GF64> for $t {
+            fn mul_assign(&mut self, other: GF64) {
+                *self = *self * other;
+            }
+        }
+
+        impl MulAssign<u64> for $t {
             fn mul_assign(&mut self, other: u64) {
                 *self = *self * other;
             }
-        })*
+        }    )*
     }
 }
 
 impl_MulAssign64!(for GF128, GF192, GF256);
-
-macro_rules! impl_MulAssign64Ref {
-    (for $($t:ty),+) => {
-        $(impl MulAssign<&u64> for $t {
-            fn mul_assign(&mut self, other: &u64) {
-                *self = *self * *other;
-            }
-        })*
-    }
-}
-
-impl_MulAssign64Ref!(for GF128, GF192, GF256);
 
 macro_rules! impl_MulAssign8 {
     (for $($t:ty),+) => {
@@ -522,18 +511,6 @@ macro_rules! impl_MulAssign8 {
 }
 
 impl_MulAssign8!(for GF128, GF192, GF256);
-
-macro_rules! impl_MulAssign8Ref {
-    (for $($t:ty),+) => {
-        $(impl MulAssign<&u8> for $t {
-            fn mul_assign(&mut self, other: &u8) {
-                *self = *self * *other;
-            }
-        })*
-    }
-}
-
-impl_MulAssign8Ref!(for GF128, GF192, GF256);
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct GF128 {
@@ -1984,14 +1961,14 @@ mod test {
         assert_eq!(res, result);
         //to test with ref
         #[allow(clippy::op_ref)]
-        let res_rev = &left * &right;
+        let res_rev = &left * right;
         #[allow(clippy::op_ref)]
-        let res = left * &right;
+        let res = left * right;
         assert_eq!(res, result);
         assert_eq!(res_rev, result);
         //to test mulassign
         left *= right;
-        left_2 *= &right;
+        left_2 *= right;
         assert_eq!(left, result);
         assert_eq!(left_2, result);
 
@@ -4090,14 +4067,14 @@ mod test {
         assert_eq!(res, result);
         //to test with ref
         #[allow(clippy::op_ref)]
-        let res_rev = &left * &right;
+        let res_rev = &left * right;
         #[allow(clippy::op_ref)]
-        let res = left * &right;
+        let res = left * right;
         assert_eq!(res, result);
         assert_eq!(res_rev, result);
         //to test mulassign
         left *= right;
-        left_2 *= &right;
+        left_2 *= right;
         assert_eq!(left, result);
         assert_eq!(left_2, result);
     }
@@ -6400,14 +6377,14 @@ mod test {
         assert_eq!(res, result);
         //to test with ref
         #[allow(clippy::op_ref)]
-        let res_rev = &left * &right;
+        let res_rev = &left * right;
         #[allow(clippy::op_ref)]
-        let res = left * &right;
+        let res = left * right;
         assert_eq!(res, result);
         assert_eq!(res_rev, result);
         //to test mulassign
         left *= right;
-        left_2 *= &right;
+        left_2 *= right;
         assert_eq!(left, result);
         assert_eq!(left_2, result);
     }
