@@ -121,18 +121,6 @@ where
     }
 }
 
-macro_rules! impl_Default {
-    (for $($t:ty),+) => {
-        $(impl Default for $t {
-            fn default() -> Self {
-                return Self::new(0u128, 0u128);
-            }
-        })*
-    }
-}
-
-impl_Default!(for GF128, GF192, GF256);
-
 macro_rules! impl_From {
     (for $($t:ty),+) => {
         $(impl From<&[u8]> for $t {
@@ -547,7 +535,7 @@ macro_rules! impl_MulAssign8Ref {
 
 impl_MulAssign8Ref!(for GF128, GF192, GF256);
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct GF128 {
     first_value: u128,
     second_value: u128,
@@ -704,7 +692,7 @@ impl BigGaloisField for GF128 {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct GF192 {
     first_value: u128,
     second_value: u128,
@@ -793,7 +781,7 @@ impl BigGaloisField for GF192 {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct GF256 {
     first_value: u128,
     second_value: u128,
