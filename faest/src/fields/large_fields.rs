@@ -1,6 +1,10 @@
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub};
 
-use rand::random;
+#[cfg(test)]
+use rand::{
+    distributions::{Distribution, Standard},
+    Rng,
+};
 
 //For GF192 and GF256, as u192 and u256 dont exist in rust, we will implement a new trait BigGaloisField, in wich we will also implement basis operations.
 
