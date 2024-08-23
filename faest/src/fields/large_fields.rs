@@ -1,5 +1,7 @@
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub};
 
+use super::Field;
+
 #[cfg(test)]
 use rand::{
     distributions::{Distribution, Standard},
@@ -8,15 +10,12 @@ use rand::{
 
 //For GF192 and GF256, as u192 and u256 dont exist in rust, we will implement a new trait BigGaloisField, in wich we will also implement basis operations.
 
-pub trait BigGaloisField: Clone
+/// "Marker" trait for the larger binary Galois fields, i.e., [GF128], [GF192] and [GF256].
+pub trait BigGaloisField: Field
 where
     Self: Sized + Copy,
     Self: for<'a> From<&'a [u8]>,
-    Self: Mul<Output = Self>,
-    Self: Add<Output = Self>,
-    Self: AddAssign,
     Self: Mul<u8, Output = Self>,
-    Self: MulAssign<Self>,
     Self: for<'a> MulAssign<&'a Self>,
 {
     const LENGTH: u32;
@@ -261,7 +260,7 @@ macro_rules! impl_Mul {
     (for $($t:ty),+) => {
         $(impl Mul for $t {
             type Output = Self;
-            fn mul(self, right: Self) -> Self::Output where Self : BigGaloisField{
+            fn mul(self, right: Self) -> Self::Output {
                 let mut leftc = self; //to avoid side effect
                 let mut result = Self::and(
                     &Self::and(&right, &Self::ONE).all_bytes_heavyweight(),
@@ -540,6 +539,8 @@ pub struct GF128 {
     second_value: u128,
 }
 
+impl Field for GF128 {}
+
 #[cfg(test)]
 impl Distribution<GF128> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF128 {
@@ -695,6 +696,8 @@ pub struct GF192 {
     second_value: u128,
 }
 
+impl Field for GF192 {}
+
 #[cfg(test)]
 impl Distribution<GF192> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF192 {
@@ -781,6 +784,8 @@ pub struct GF256 {
     first_value: u128,
     second_value: u128,
 }
+
+impl Field for GF256 {}
 
 #[cfg(test)]
 impl Distribution<GF256> for Standard {
