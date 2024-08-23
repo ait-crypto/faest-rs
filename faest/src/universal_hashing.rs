@@ -36,8 +36,8 @@ where
         h0 += s_add * y_h[(l_p/(lambda*8)) - 1 - i];
         s_add *= s;
     }
-    let mut h1 = GF64::new(0u64);
-    let mut t_add = GF64::new(1u64);
+    let mut h1 = GF64::ZERO;
+    let mut t_add = GF64::ONE;
     for i in 0..(l_p / 64) {
         h1 += t_add * y_b[(l_p / 64) - 1 - i];
         t_add *= t;

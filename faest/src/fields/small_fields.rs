@@ -13,15 +13,11 @@ where
     Self: From<T> + Copy,
     T: From<Self>,
 {
-    /// Use `From::from` instead
-    #[deprecated]
-    fn new(v: T) -> Self {
-        Self::from(v)
-    }
+    /// Representation of `0`
+    const ZERO: Self;
 
-    //// Use `From::from` instead
-    #[deprecated]
-    fn get_value(&self) -> T;
+    /// Representation of `1`
+    const ONE: Self;
 }
 
 trait GaloisFieldHelper<T>
@@ -229,9 +225,8 @@ impl GF8 {
 }
 
 impl GaloisField<u8> for GF8 {
-    fn get_value(&self) -> u8 {
-        self.0 .0
-    }
+    const ZERO: Self = Self(Wrapping(0));
+    const ONE: Self = Self(Wrapping(1));
 }
 
 impl From<&[u8]> for GF64 {
@@ -254,9 +249,8 @@ impl GF64 {
 }
 
 impl GaloisField<u64> for GF64 {
-    fn get_value(&self) -> u64 {
-        self.0 .0
-    }
+    const ZERO: Self = Self(Wrapping(0));
+    const ONE: Self = Self(Wrapping(1));
 }
 
 #[cfg(test)]
