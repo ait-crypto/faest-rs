@@ -319,7 +319,6 @@ impl ConditionallySelectable for GF128 {
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
         Self {
             first_value: u128::conditional_select(&a.first_value, &b.first_value, choice),
-            second_value: 0u128,
         }
     }
 }
@@ -506,7 +505,6 @@ impl_MulAssign8!(for GF128, GF192, GF256);
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct GF128 {
     first_value: u128,
-    second_value: u128,
 }
 
 impl Field for GF128 {}
@@ -516,7 +514,6 @@ impl Distribution<GF128> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF128 {
         GF128 {
             first_value: rng.sample(self),
-            second_value: 0u128,
         }
     }
 }
@@ -526,86 +523,62 @@ impl BigGaloisField for GF128 {
 
     const MODULUS: Self = GF128 {
         first_value: 0b10000111u128,
-        second_value: 0u128,
     };
 
-    const ONE: Self = GF128 {
-        first_value: 1u128,
-        second_value: 0u128,
-    };
+    const ONE: Self = GF128 { first_value: 1u128 };
 
     const MAX: Self = GF128 {
         first_value: u128::MAX,
-        second_value: 0u128,
     };
 
     const ALPHA: [Self; 7] = [
         GF128 {
             first_value: 0x053d8555a9979a1ca13fe8ac5560ce0du128,
-            second_value: 0u128,
         },
         GF128 {
             first_value: 0x4cf4b7439cbfbb84ec7759ca3488aee1u128,
-            second_value: 0u128,
         },
         GF128 {
             first_value: 0x35ad604f7d51d2c6bfcf02ae363946a8u128,
-            second_value: 0u128,
         },
         GF128 {
             first_value: 0x0dcb364640a222fe6b8330483c2e9849u128,
-            second_value: 0u128,
         },
         GF128 {
             first_value: 0x549810e11a88dea5252b49277b1b82b4u128,
-            second_value: 0u128,
         },
         GF128 {
             first_value: 0xd681a5686c0c1f75c72bf2ef2521ff22u128,
-            second_value: 0u128,
         },
         GF128 {
             first_value: 0x0950311a4fb78fe07a7a8e94e136f9bcu128,
-            second_value: 0u128,
         },
     ];
 
     fn new(first_value: u128, _second_value: u128) -> Self {
-        GF128 {
-            first_value,
-            second_value: 0u128,
-        }
+        GF128 { first_value }
     }
 
     fn get_value(&self) -> (u128, u128) {
-        (self.first_value, self.second_value)
+        (self.first_value, 0u128)
     }
 
     fn and(left: &Self, right: &Self) -> Self {
-        Self::new(
-            left.first_value & right.first_value,
-            left.second_value & right.second_value,
-        )
+        Self::new(left.first_value & right.first_value, 0u128)
     }
 
     fn all_bytes_heavyweight(self) -> Self {
-        let (first_value, second_value) = self.get_value();
-        let c_1 = (first_value & ((1u128 << 127).wrapping_shr(first_value.leading_zeros())))
+        let (first_value, _) = self.get_value();
+        let c = (first_value & ((1u128 << 127).wrapping_shr(first_value.leading_zeros())))
             .wrapping_shl(first_value.leading_zeros())
             >> 127;
-        let c_2 = (second_value & ((1u128 << 127).wrapping_shr(second_value.leading_zeros())))
-            .wrapping_shl(second_value.leading_zeros())
-            >> 127;
-        let c = c_1 | c_2;
-        Self::new(u128::MAX * c, u128::MAX * c)
+        Self::new(u128::MAX * c, 0u128)
     }
 
     fn switch_left_1(self) -> Self {
-        let (first_value, second_value) = self.get_value();
-        let carry = (first_value & (1u128 << 127)) >> 127;
+        let (first_value, _) = self.get_value();
         let first_res = first_value.wrapping_shl(1);
-        let second_res = (second_value.wrapping_shl(1)) | carry;
-        Self::new(first_res, second_res)
+        Self::new(first_res, 0u128)
     }
 
     fn from_bit(x: u8) -> Self {
