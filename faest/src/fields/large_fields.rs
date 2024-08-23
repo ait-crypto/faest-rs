@@ -29,8 +29,6 @@ where
 
     fn get_value(&self) -> (u128, u128);
 
-    fn rand() -> Self;
-
     //return MAX if the input is different from 0
     fn all_bytes_heavyweight(self) -> Self {
         let (first_value, second_value) = self.get_value();
@@ -538,6 +536,16 @@ pub struct GF128 {
     second_value: u128,
 }
 
+#[cfg(test)]
+impl Distribution<GF128> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF128 {
+        GF128 {
+            first_value: rng.sample(self),
+            second_value: 0u128,
+        }
+    }
+}
+
 impl BigGaloisField for GF128 {
     const LENGTH: u32 = 128u32;
 
@@ -596,10 +604,6 @@ impl BigGaloisField for GF128 {
 
     fn get_value(&self) -> (u128, u128) {
         (self.first_value, self.second_value)
-    }
-
-    fn rand() -> Self {
-        Self::new(random(), 0u128)
     }
 
     fn and(left: &Self, right: &Self) -> Self {
@@ -687,6 +691,19 @@ pub struct GF192 {
     second_value: u128,
 }
 
+#[cfg(test)]
+impl Distribution<GF192> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF192 {
+        GF192 {
+            first_value: rng.sample(self),
+            second_value: {
+                let v: u64 = rng.sample(self);
+                v as u128
+            },
+        }
+    }
+}
+
 impl BigGaloisField for GF192 {
     const MODULUS: Self = GF192 {
         first_value: 0b10000111u128,
@@ -747,13 +764,6 @@ impl BigGaloisField for GF192 {
         (self.first_value, self.second_value)
     }
 
-    fn rand() -> Self {
-        GF192 {
-            first_value: random(),
-            second_value: random::<u128>() & (u64::MAX as u128),
-        }
-    }
-
     fn to_bytes(input: Self) -> Vec<u8> {
         let mut res = Vec::with_capacity(Self::LENGTH as usize / 8);
         res.append(&mut input.get_value().0.to_le_bytes().to_vec());
@@ -766,6 +776,16 @@ impl BigGaloisField for GF192 {
 pub struct GF256 {
     first_value: u128,
     second_value: u128,
+}
+
+#[cfg(test)]
+impl Distribution<GF256> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF256 {
+        GF256 {
+            first_value: rng.sample(self),
+            second_value: rng.sample(Self),
+        }
+    }
 }
 
 impl BigGaloisField for GF256 {
@@ -828,10 +848,6 @@ impl BigGaloisField for GF256 {
         (self.first_value, self.second_value)
     }
 
-    fn rand() -> Self {
-        Self::new(random(), random())
-    }
-
     fn to_bytes(input: Self) -> Vec<u8> {
         let mut res = Vec::with_capacity(Self::LENGTH as usize / 8);
         res.append(&mut input.get_value().0.to_le_bytes().to_vec());
@@ -844,7 +860,6 @@ impl BigGaloisField for GF256 {
 mod test {
     use super::*;
     use num_bigint::BigUint;
-    use rand::random;
 
     //GF128
     #[test]
@@ -887,8 +902,10 @@ mod test {
     //precondition : a GF128
     //a GF128 that has switch to the left by one
     fn gf128_test_switch_left_1() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..10000 {
-            let random = random::<u128>();
+            let random: u128 = rng.gen();
             let pol_1 = GF128::new(random, 0u128);
             let pol_1_res = pol_1.switch_left_1();
             let (first_value, second_value) = pol_1_res.get_value();
@@ -901,10 +918,12 @@ mod test {
     //input : two GF128
     //output : the product of the two according to the rules of Galois Fields arithmetic
     fn gf128_test_mul() {
+        let mut rng = rand::thread_rng();
+
         //0 * anything = 0
         let pol_0 = GF128::default();
         for _i in 0..1000 {
-            let anything = GF128::rand();
+            let anything: GF128 = rng.gen();
             let pol_res = pol_0 * anything;
             let (first_value, second_value) = pol_res.get_value();
             assert_eq!(first_value, 0u128);
@@ -1917,10 +1936,12 @@ mod test {
     //output : the product of the two according to the rules of Galois Fields arithmetic
     #[allow(clippy::erasing_op)]
     fn gf128_test_mul_64() {
+        let mut rng = rand::thread_rng();
+
         let pol_0 = GF128::default();
         for _i in 0..1000 {
             //0 * anything = 0
-            let anything = random::<u64>();
+            let anything: u64 = rng.gen();
             let pol_res = pol_0 * anything;
             let (first_value, second_value) = pol_res.get_value();
             assert_eq!(first_value, 0u128);
@@ -1931,7 +1952,7 @@ mod test {
             assert_eq!(first_value_1, anything as u128);
             assert_eq!(second_value_1, 0u128);
             //anything * 0 = 0
-            let anything = GF128::rand();
+            let anything: GF128 = rng.gen();
             let pol_res_rev = anything * 0u64;
             let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
             assert_eq!(first_value_rev, 0u128);
@@ -1972,9 +1993,11 @@ mod test {
     //input : one GF128 and one GF128 restricted to 1 memory bits
     #[allow(clippy::erasing_op)] //output : the product of the two according to the rules of Galois Fields arithmetic
     fn gf128_test_mul_bit() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..1000 {
             //anything * 0 = 0
-            let anything = GF128::rand();
+            let anything: GF128 = rng.gen();
             let pol_res_rev = anything * 0u8;
             let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
             assert_eq!(first_value_rev, 0u128);
@@ -1986,13 +2009,13 @@ mod test {
             assert_eq!(first_value_rev, first_value_anything);
             assert_eq!(second_value_rev, 0u128);
             //anything_1 * anything_2 (odd) = anything_1
-            let anything_2 = random::<u8>() | 1u8;
+            let anything_2 = rng.gen::<u8>() | 1u8;
             let pol_res_2 = anything * anything_2;
             let (first_value_2, second_value_2) = pol_res_2.get_value();
             assert_eq!(first_value_2, first_value_anything);
             assert_eq!(second_value_2, second_value_anything);
             //anything_1 * anything_2 (even) = 0
-            let anything_3 = random::<u8>() & u8::MAX << 1;
+            let anything_3 = rng.gen::<u8>() & u8::MAX << 1;
             let pol_res_3 = anything * anything_3;
             let (first_value_3, second_value_3) = pol_res_3.get_value();
             assert_eq!(first_value_3, 0u128);
@@ -2004,9 +2027,11 @@ mod test {
     //input : two GF128
     //output : the result of the and bitwise operation on the two inputs
     fn gf128_test_and() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..10000 {
-            let random_1_1 = random::<u128>();
-            let random_2_1 = random::<u128>();
+            let random_1_1 = rng.gen();
+            let random_2_1 = rng.gen();
             let pol_1 = GF128::new(random_1_1, 0u128);
             let pol_2 = GF128::new(random_2_1, 0u128);
             let pol_res = GF128::and(&pol_1, &pol_2);
@@ -2020,9 +2045,11 @@ mod test {
     //input : two GF128
     //output : the result of the xor bitwise operation on the two inputs
     fn gf128_test_add() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..10000 {
-            let random_1_1 = random::<u128>();
-            let random_2_1 = random::<u128>();
+            let random_1_1 = rng.gen();
+            let random_2_1 = rng.gen();
             let mut pol_1 = GF128::new(random_1_1, 0u128);
             let pol_2 = GF128::new(random_2_1, 0u128);
             #[allow(clippy::op_ref)]
@@ -2308,8 +2335,10 @@ mod test {
     #[test]
     //We see if the to field function give the same result that what we could have with BigUint
     fn gf128_test_to_field() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..1000 {
-            let random = random::<[u8; 16]>();
+            let random: [u8; 16] = rng.gen();
             let pol = GF128::to_field(&random);
             let verif_big = BigUint::from_bytes_le(&random);
             let verif = verif_big.to_u64_digits()[0] as u128
@@ -2318,7 +2347,7 @@ mod test {
         }
         //with many polynomes
         for _i in 0..1000 {
-            let random = random::<[u8; 32]>();
+            let random: [u8; 32] = rng.gen();
             let pol = GF128::to_field(&random);
             let verif_big = BigUint::from_bytes_le(&random);
             let verif_0 = verif_big.to_u64_digits()[0] as u128
@@ -2391,9 +2420,11 @@ mod test {
     //precondition : a GF192
     //a GF192 that has switch to the left by one
     fn gf192_test_switch_left_1() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..10000 {
-            let random_1 = random::<u128>();
-            let random_2 = random::<u128>();
+            let random_1 = rng.gen();
+            let random_2 = rng.gen();
             let pol_1 = GF192::new(random_1, random_2);
             let pol_1_res = pol_1.switch_left_1();
             let (first_value, second_value) = pol_1_res.get_value();
@@ -2411,10 +2442,12 @@ mod test {
     //input : two GF192
     //output : the product of the two according to te rules of Galois Fields arithmetic
     fn gf192_test_mul() {
+        let mut rng = rand::thread_rng();
+
         //0 * anything = 0
         let pol_0 = GF192::default();
         for _i in 0..1000 {
-            let anything = GF192::rand();
+            let anything: GF192 = rng.gen();
             let pol_res = pol_0 * anything;
             let (first_value, second_value) = pol_res.get_value();
             assert_eq!(first_value, 0u128);
@@ -4000,10 +4033,12 @@ mod test {
     //output : the product of the two according to the rules of Galois Fields arithmetic
     #[allow(clippy::erasing_op)]
     fn gf192_test_mul_64() {
+        let mut rng = rand::thread_rng();
+
         let pol_0 = GF192::default();
         for _i in 0..1000 {
             //0 * anything = 0
-            let anything = random::<u64>();
+            let anything: u64 = rng.gen();
             let pol_res = pol_0 * anything;
             let (first_value, second_value) = pol_res.get_value();
             assert_eq!(first_value, 0u128);
@@ -4014,7 +4049,7 @@ mod test {
             assert_eq!(first_value_1, anything as u128);
             assert_eq!(second_value_1, 0u128);
             //anything * 0 = 0
-            let anything = GF192::rand();
+            let anything: GF192 = rng.gen();
             let pol_res_rev = anything * 0u64;
             let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
             assert_eq!(first_value_rev, 0u128);
@@ -4061,9 +4096,11 @@ mod test {
     //output : the product of the two according to the rules of Galois Fields arithmetic
     #[allow(clippy::erasing_op)]
     fn gf192_test_mul_bit() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..1000 {
             //anything * 0 = 0
-            let anything = GF192::rand();
+            let anything: GF192 = rng.gen();
             let pol_res_rev = anything * 0u8;
             let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
             assert_eq!(first_value_rev, 0u128);
@@ -4075,13 +4112,13 @@ mod test {
             assert_eq!(first_value_rev, first_value_anything);
             assert_eq!(second_value_rev, second_value_anything);
             //anything_1 * anything_2 (odd) = anything_1
-            let anything_2 = random::<u8>() | 1u8;
+            let anything_2 = rng.gen::<u8>() | 1u8;
             let pol_res_2 = anything * anything_2;
             let (first_value_2, second_value_2) = pol_res_2.get_value();
             assert_eq!(first_value_2, first_value_anything);
             assert_eq!(second_value_2, second_value_anything);
             //anything_1 * anything_2 (even) = 0
-            let anything_3 = random::<u8>() & u8::MAX << 1;
+            let anything_3 = rng.gen::<u8>() & u8::MAX << 1;
             let pol_res_3 = anything * anything_3;
             let (first_value_3, second_value_3) = pol_res_3.get_value();
             assert_eq!(first_value_3, 0u128);
@@ -4093,11 +4130,13 @@ mod test {
     //input : two GF192
     //output : the result of the and bitwise operation on the two inputs
     fn gf192_test_and() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..10000 {
-            let random_1_1 = random::<u128>();
-            let random_1_2 = random::<u128>() & u64::MAX as u128;
-            let random_2_1 = random::<u128>();
-            let random_2_2 = random::<u128>() & u64::MAX as u128;
+            let random_1_1 = rng.gen();
+            let random_1_2 = rng.gen::<u128>() & u64::MAX as u128;
+            let random_2_1 = rng.gen();
+            let random_2_2 = rng.gen::<u128>() & u64::MAX as u128;
             let pol_1 = GF192::new(random_1_1, random_1_2);
             let pol_2 = GF192::new(random_2_1, random_2_2);
             let pol_res = pol_1 + pol_2;
@@ -4111,11 +4150,13 @@ mod test {
     //input : two GF192
     //output : the result of the xor bitwise operation on the two inputs
     fn gf192_test_xor() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..10000 {
-            let random_1_1 = random::<u128>();
-            let random_1_2 = random::<u128>() & u64::MAX as u128;
-            let random_2_1 = random::<u128>();
-            let random_2_2 = random::<u128>() & u64::MAX as u128;
+            let random_1_1 = rng.gen();
+            let random_1_2 = rng.gen::<u128>() & u64::MAX as u128;
+            let random_2_1 = rng.gen();
+            let random_2_2 = rng.gen::<u128>() & u64::MAX as u128;
             let pol_1 = GF192::new(random_1_1, random_1_2);
             let pol_2 = GF192::new(random_2_1, random_2_2);
             let pol_res = GF192::and(&pol_1, &pol_2);
@@ -4618,8 +4659,10 @@ mod test {
     #[test]
     //We see if the to field function give the same result that what we could have with BigUint
     fn gf192_test_to_field() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..1000 {
-            let random = random::<[u8; 24]>();
+            let random: [u8; 24] = rng.gen();
             let pol = GF192::to_field(&random);
             let verif_big = BigUint::from_bytes_le(&random);
             let verif_0_0 = verif_big.to_u64_digits()[0] as u128
@@ -4630,8 +4673,8 @@ mod test {
         }
         //with many polynomes
         for _i in 0..1000 {
-            let mut random_1 = random::<[u8; 24]>().to_vec();
-            let mut random_2 = random::<[u8; 24]>().to_vec();
+            let mut random_1 = rng.gen::<[u8; 24]>().to_vec();
+            let mut random_2 = rng.gen::<[u8; 24]>().to_vec();
             random_1.append(&mut random_2);
             let pol = GF192::to_field(&random_1.clone());
             let verif_big = BigUint::from_bytes_le(&random_1);
@@ -4690,9 +4733,11 @@ mod test {
     //precondition : a GF256
     //a GF256 that has switch to the left by one
     fn gf256_test_switch_left_1() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..10000 {
-            let random_1 = random::<u128>();
-            let random_2 = random::<u128>();
+            let random_1 = rng.gen();
+            let random_2 = rng.gen();
             let pol_1 = GF256::new(random_1, random_2);
             let pol_1_res = pol_1.switch_left_1();
             let (first_value, second_value) = pol_1_res.get_value();
@@ -4708,10 +4753,12 @@ mod test {
     //input : two GF256
     //output : the product of the two according to te rules of Galois Fields arithmetic
     fn gf256_test_mul() {
+        let mut rng = rand::thread_rng();
+
         //0 * anything = 0
         let pol_0 = GF256::default();
         for _i in 0..1000 {
-            let anything = GF256::rand();
+            let anything: GF256 = rng.gen();
             let pol_res = pol_0 * anything;
             let (first_value, second_value) = pol_res.get_value();
             assert_eq!(first_value, 0u128);
@@ -6296,10 +6343,12 @@ mod test {
     //output : the product of the two according to the rules of Galois Fields arithmetic
     #[allow(clippy::erasing_op)]
     fn gf256_test_mul_64() {
+        let mut rng = rand::thread_rng();
+
         let pol_0 = GF256::default();
         for _i in 0..1000 {
             //0 * anything = 0
-            let anything = random::<u64>();
+            let anything: u64 = rng.gen();
             let pol_res = pol_0 * anything;
             let (first_value, second_value) = pol_res.get_value();
             assert_eq!(first_value, 0u128);
@@ -6310,7 +6359,7 @@ mod test {
             assert_eq!(first_value_1, anything as u128);
             assert_eq!(second_value_1, 0u128);
             //anything * 0 = 0
-            let anything = GF256::rand();
+            let anything: GF256 = rng.gen();
             let pol_res_rev = anything * 0u64;
             let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
             assert_eq!(first_value_rev, 0u128);
@@ -6357,9 +6406,11 @@ mod test {
     //output : the product of the two according to the rules of Galois Fields arithmetic
     #[allow(clippy::erasing_op)]
     fn gf256_test_mul_bit() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..1000 {
             //anything * 0 = 0
-            let anything = GF256::rand();
+            let anything: GF256 = rng.gen();
             let pol_res_rev = anything * 0u8;
             let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
             assert_eq!(first_value_rev, 0u128);
@@ -6371,13 +6422,13 @@ mod test {
             assert_eq!(first_value_rev, first_value_anything);
             assert_eq!(second_value_rev, second_value_anything);
             //anything_1 * anything_2 (odd) = anything_1
-            let anything_2 = random::<u8>() | 1u8;
+            let anything_2 = rng.gen::<u8>() | 1u8;
             let pol_res_2 = anything * anything_2;
             let (first_value_2, second_value_2) = pol_res_2.get_value();
             assert_eq!(first_value_2, first_value_anything);
             assert_eq!(second_value_2, second_value_anything);
             //anything_1 * anything_2 (even) = 0
-            let anything_3 = random::<u8>() & u8::MAX << 1;
+            let anything_3 = rng.gen::<u8>() & u8::MAX << 1;
             let pol_res_3 = anything * anything_3;
             let (first_value_3, second_value_3) = pol_res_3.get_value();
             assert_eq!(first_value_3, 0u128);
@@ -6389,11 +6440,13 @@ mod test {
     //input : two GF256
     //output : the result of the and bitwise operation on the two inputs
     fn gf256_test_and() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..10000 {
-            let random_1_1 = random::<u128>();
-            let random_1_2 = random::<u128>();
-            let random_2_1 = random::<u128>();
-            let random_2_2 = random::<u128>();
+            let random_1_1 = rng.gen();
+            let random_1_2 = rng.gen();
+            let random_2_1 = rng.gen();
+            let random_2_2 = rng.gen();
             let pol_1 = GF256::new(random_1_1, random_1_2);
             let pol_2 = GF256::new(random_2_1, random_2_2);
             let pol_res = GF256::and(&pol_1, &pol_2);
@@ -6407,11 +6460,13 @@ mod test {
     //input : two GF256
     //output : the result of the xor bitwise operation on the two inputs
     fn gf256_test_xor() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..10000 {
-            let random_1_1 = random::<u128>();
-            let random_1_2 = random::<u128>();
-            let random_2_1 = random::<u128>();
-            let random_2_2 = random::<u128>();
+            let random_1_1 = rng.gen();
+            let random_1_2 = rng.gen();
+            let random_2_1 = rng.gen();
+            let random_2_2 = rng.gen();
             let pol_1 = GF256::new(random_1_1, random_1_2);
             let pol_2 = GF256::new(random_2_1, random_2_2);
             let pol_res = pol_1 + pol_2;
@@ -6914,8 +6969,10 @@ mod test {
     #[test]
     //We see if the to field function give the same result that what we could have with BigUint
     fn gf256_test_to_field() {
+        let mut rng = rand::thread_rng();
+
         for _i in 0..1000 {
-            let random = random::<[u8; 32]>();
+            let random: [u8; 32] = rng.gen();
             let pol = GF256::to_field(&random);
             let verif_big = BigUint::from_bytes_le(&random);
             let verif_0_0 = verif_big.to_u64_digits()[0] as u128
@@ -6927,8 +6984,8 @@ mod test {
         }
         //with many polynomes
         for _i in 0..1000 {
-            let mut random_1 = random::<[u8; 32]>().to_vec();
-            let mut random_2 = random::<[u8; 32]>().to_vec();
+            let mut random_1 = rng.gen::<[u8; 32]>().to_vec();
+            let mut random_2 = rng.gen::<[u8; 32]>().to_vec();
             random_1.append(&mut random_2);
             let pol = GF256::to_field(&random_1.clone());
             let verif_big = BigUint::from_bytes_le(&random_1);
