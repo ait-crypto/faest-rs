@@ -11,7 +11,7 @@ type Aes192Ctr128BE = ctr::Ctr128BE<aes::Aes192>;
 type Aes256Ctr128BE = ctr::Ctr128BE<aes::Aes256>;
 
 pub trait RandomOracle {
-    type Hasher<const SEP: u8>: Hasher;
+    type Hasher<const SEP: u8>: Hasher + Default;
     type LAMBDA: ArrayLength<u8>;
     type LAMBDA16: ArrayLength<u8>;
     type PRODLAMBDA3: ArrayLength<u8>;
@@ -52,13 +52,21 @@ pub trait RandomOracle {
         reader.read(dest);
     }
 
-    fn h0_init() -> Self::Hasher<0>;
+    fn h0_init() -> Self::Hasher<0> {
+        Self::Hasher::default()
+    }
 
-    fn h1_init() -> Self::Hasher<1>;
+    fn h1_init() -> Self::Hasher<1> {
+        Self::Hasher::default()
+    }
 
-    fn h2_init() -> Self::Hasher<2>;
+    fn h2_init() -> Self::Hasher<2> {
+        Self::Hasher::default()
+    }
 
-    fn h3_init() -> Self::Hasher<3>;
+    fn h3_init() -> Self::Hasher<3> {
+        Self::Hasher::default()
+    }
 }
 
 pub trait Reader {
@@ -90,22 +98,6 @@ impl Reader for Hasher128Reader {
 
 impl RandomOracle for RandomOracleShake128 {
     type Hasher<const SEP: u8> = Hasher128<SEP>;
-
-    fn h0_init() -> Hasher128<0> {
-        Hasher128::default()
-    }
-
-    fn h1_init() -> Hasher128<1> {
-        Hasher128::default()
-    }
-
-    fn h2_init() -> Hasher128<2> {
-        Hasher128::default()
-    }
-
-    fn h3_init() -> Hasher128<3> {
-        Hasher128::default()
-    }
 
     fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH>
     where
@@ -143,22 +135,6 @@ pub struct RandomOracleShake192 {}
 
 impl RandomOracle for RandomOracleShake192 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
-
-    fn h0_init() -> Hasher256<0> {
-        Hasher256::default()
-    }
-
-    fn h1_init() -> Hasher256<1> {
-        Hasher256::default()
-    }
-
-    fn h2_init() -> Hasher256<2> {
-        Hasher256::default()
-    }
-
-    fn h3_init() -> Hasher256<3> {
-        Hasher256::default()
-    }
 
     fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH>
     where
@@ -209,22 +185,6 @@ impl Reader for Hasher256Reader {
 
 impl RandomOracle for RandomOracleShake256 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
-
-    fn h0_init() -> Hasher256<0> {
-        Hasher256::default()
-    }
-
-    fn h1_init() -> Hasher256<1> {
-        Hasher256::default()
-    }
-
-    fn h2_init() -> Hasher256<2> {
-        Hasher256::default()
-    }
-
-    fn h3_init() -> Hasher256<3> {
-        Hasher256::default()
-    }
 
     fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH>
     where
