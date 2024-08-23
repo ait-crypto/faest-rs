@@ -10,11 +10,13 @@ where
     Self: From<T> + Copy,
     T: From<Self>,
 {
+    /// Use `From::from` instead
     #[deprecated]
     fn new(v: T) -> Self {
         Self::from(v)
     }
 
+    //// Use `From::from` instead
     #[deprecated]
     fn get_value(&self) -> T;
 }
