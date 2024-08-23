@@ -504,7 +504,7 @@ macro_rules! impl_MulAssign8 {
     (for $($t:ty),+) => {
         $(impl MulAssign<u8> for $t {
             fn mul_assign(&mut self, other: u8) {
-                *self = *self * other;
+                self.conditional_assign(&Self::default(), (!other & 1).into());
             }
         })*
     }
