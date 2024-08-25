@@ -21,6 +21,11 @@ impl IntoChoice for u8 {
     }
 }
 
+/// Helper trait that define "alphas" calucaltion embeedings
+trait Alphas: Sized {
+    const ALPHA: [Self; 7];
+}
+
 /// Create an instance of `0` or `1` in the field out of a bit representation
 pub trait FromBit: Field + ConditionallySelectable {
     #[deprecated]
@@ -41,14 +46,13 @@ where
     Self: for<'a> MulAssign<&'a Self>,
     Self: for<'a> Mul<&'a Self, Output = Self>,
     Self: ConditionallySelectable,
+    Self: ByteCombine,
 {
     const LENGTH: u32;
 
     const MODULUS: Self;
 
     const MAX: Self;
-
-    const ALPHA: [Self; 7];
 
     fn new(first_value: u128, second_value: u128) -> Self;
 
@@ -84,22 +88,6 @@ where
         )
     }
 
-    fn byte_combine(x: [Self; 8]) -> Self {
-        x.iter()
-            .skip(1)
-            .zip(Self::ALPHA)
-            .fold(x[0], |sum, (xi, alphai)| sum + (alphai * xi))
-    }
-
-    fn byte_combine_bits(x: u8) -> Self {
-        Self::ALPHA
-            .iter()
-            .enumerate()
-            .fold(Self::from_bit(x), |sum, (index, alpha)| {
-                sum + Self::conditional_select(&Self::ZERO, alpha, (x >> (index + 1)).into_choice())
-            })
-    }
-
     fn to_bytes(input: Self) -> Vec<u8>;
 
     fn sum_poly(v: &[Self]) -> Self {
@@ -124,10 +112,31 @@ where
     }
 }
 
-pub trait ByteCombine: Sized {
+pub trait ByteCombine: Field {
     fn byte_combine(x: &[Self; 8]) -> Self;
 
     fn byte_combine_bits(x: u8) -> Self;
+}
+
+impl<T> ByteCombine for T
+where
+    T: Alphas + Field + ConditionallySelectable + for<'a> Mul<&'a Self, Output = Self>,
+{
+    fn byte_combine(x: &[Self; 8]) -> Self {
+        x.iter()
+            .skip(1)
+            .zip(Self::ALPHA)
+            .fold(x[0], |sum, (xi, alphai)| sum + (alphai * xi))
+    }
+
+    fn byte_combine_bits(x: u8) -> Self {
+        Self::ALPHA.iter().enumerate().fold(
+            Self::conditional_select(&Self::ZERO, &Self::ONE, x.into_choice()),
+            |sum, (index, alpha)| {
+                sum + Self::conditional_select(&Self::ZERO, alpha, (x >> (index + 1)).into_choice())
+            },
+        )
+    }
 }
 
 macro_rules! impl_From {
@@ -542,6 +551,32 @@ impl Distribution<GF128> for Standard {
     }
 }
 
+impl Alphas for GF128 {
+    const ALPHA: [Self; 7] = [
+        Self {
+            first_value: 0x053d8555a9979a1ca13fe8ac5560ce0du128,
+        },
+        Self {
+            first_value: 0x4cf4b7439cbfbb84ec7759ca3488aee1u128,
+        },
+        Self {
+            first_value: 0x35ad604f7d51d2c6bfcf02ae363946a8u128,
+        },
+        Self {
+            first_value: 0x0dcb364640a222fe6b8330483c2e9849u128,
+        },
+        Self {
+            first_value: 0x549810e11a88dea5252b49277b1b82b4u128,
+        },
+        Self {
+            first_value: 0xd681a5686c0c1f75c72bf2ef2521ff22u128,
+        },
+        Self {
+            first_value: 0x0950311a4fb78fe07a7a8e94e136f9bcu128,
+        },
+    ];
+}
+
 impl BigGaloisField for GF128 {
     const LENGTH: u32 = 128u32;
 
@@ -552,30 +587,6 @@ impl BigGaloisField for GF128 {
     const MAX: Self = GF128 {
         first_value: u128::MAX,
     };
-
-    const ALPHA: [Self; 7] = [
-        GF128 {
-            first_value: 0x053d8555a9979a1ca13fe8ac5560ce0du128,
-        },
-        GF128 {
-            first_value: 0x4cf4b7439cbfbb84ec7759ca3488aee1u128,
-        },
-        GF128 {
-            first_value: 0x35ad604f7d51d2c6bfcf02ae363946a8u128,
-        },
-        GF128 {
-            first_value: 0x0dcb364640a222fe6b8330483c2e9849u128,
-        },
-        GF128 {
-            first_value: 0x549810e11a88dea5252b49277b1b82b4u128,
-        },
-        GF128 {
-            first_value: 0xd681a5686c0c1f75c72bf2ef2521ff22u128,
-        },
-        GF128 {
-            first_value: 0x0950311a4fb78fe07a7a8e94e136f9bcu128,
-        },
-    ];
 
     fn new(first_value: u128, _second_value: u128) -> Self {
         GF128 { first_value }
@@ -656,6 +667,39 @@ impl Distribution<GF192> for Standard {
     }
 }
 
+impl Alphas for GF192 {
+    const ALPHA: [Self; 7] = [
+        Self {
+            first_value: 0xe665d76c966ebdeaccc8a3d56f389763u128,
+            second_value: 0x310bc8140e6b3662u128,
+        },
+        Self {
+            first_value: 0x7bf61f19d5633f26b233619e7cf450bbu128,
+            second_value: 0xda933726d491db34u128,
+        },
+        Self {
+            first_value: 0x8232e37706328d199c6d2c13f5398a0du128,
+            second_value: 0x0c3b0d703c754ef6u128,
+        },
+        Self {
+            first_value: 0x7a5542ab0058d22edd20747cbd2bf75du128,
+            second_value: 0x45ec519c94bc1251u128,
+        },
+        Self {
+            first_value: 0x08168cb767debe84d8d50ce28ace2bf8u128,
+            second_value: 0xd67d146a4ba67045u128,
+        },
+        Self {
+            first_value: 0xf3eaf7ae5fd72048970f9c76eed5e1bau128,
+            second_value: 0x29a6bd5f696cea43u128,
+        },
+        Self {
+            first_value: 0x6019fd623906e9d3f5945dc265068571u128,
+            second_value: 0xc77c56540f87c4b0u128,
+        },
+    ];
+}
+
 impl BigGaloisField for GF192 {
     const MODULUS: Self = GF192 {
         first_value: 0b10000111u128,
@@ -668,37 +712,6 @@ impl BigGaloisField for GF192 {
         first_value: u128::MAX,
         second_value: u64::MAX as u128,
     };
-
-    const ALPHA: [Self; 7] = [
-        GF192 {
-            first_value: 0xe665d76c966ebdeaccc8a3d56f389763u128,
-            second_value: 0x310bc8140e6b3662u128,
-        },
-        GF192 {
-            first_value: 0x7bf61f19d5633f26b233619e7cf450bbu128,
-            second_value: 0xda933726d491db34u128,
-        },
-        GF192 {
-            first_value: 0x8232e37706328d199c6d2c13f5398a0du128,
-            second_value: 0x0c3b0d703c754ef6u128,
-        },
-        GF192 {
-            first_value: 0x7a5542ab0058d22edd20747cbd2bf75du128,
-            second_value: 0x45ec519c94bc1251u128,
-        },
-        GF192 {
-            first_value: 0x08168cb767debe84d8d50ce28ace2bf8u128,
-            second_value: 0xd67d146a4ba67045u128,
-        },
-        GF192 {
-            first_value: 0xf3eaf7ae5fd72048970f9c76eed5e1bau128,
-            second_value: 0x29a6bd5f696cea43u128,
-        },
-        GF192 {
-            first_value: 0x6019fd623906e9d3f5945dc265068571u128,
-            second_value: 0xc77c56540f87c4b0u128,
-        },
-    ];
 
     fn new(first_value: u128, second_value: u128) -> Self {
         GF192 {
@@ -748,6 +761,39 @@ impl Distribution<GF256> for Standard {
     }
 }
 
+impl Alphas for GF256 {
+    const ALPHA: [Self; 7] = [
+        Self {
+            first_value: 0xbed68d38a0474e67969788420bdefee7u128,
+            second_value: 0x04c9a8cf20c95833df229845f8f1e16au128,
+        },
+        Self {
+            first_value: 0x2ba5c48d2c42072fa95af52ad52289c1u128,
+            second_value: 0x064e4d699c5b4af1d14a0d376c00b0eau128,
+        },
+        Self {
+            first_value: 0x1771831e533b0f5755dab3833f809d1du128,
+            second_value: 0x6195e3db7011f68dfb96573fad3fac10u128,
+        },
+        Self {
+            first_value: 0x752758911a30e3f6de010519b01bcdd5u128,
+            second_value: 0x56c24fd64f7688382a0778b6489ea03fu128,
+        },
+        Self {
+            first_value: 0x1bc4dbd440f1848298c2f529e98a30b6u128,
+            second_value: 0x22270b6d71574ffc2fbe09947d49a981u128,
+        },
+        Self {
+            first_value: 0xaced66c666f1afbc9e75afb9de44670bu128,
+            second_value: 0xc03d372fd1fa29f3f001253ff2991f7eu128,
+        },
+        Self {
+            first_value: 0x5237c4d625b86f0dba43b698b332e88bu128,
+            second_value: 0x133eea09d26b7bb82f652b2af4e81545u128,
+        },
+    ];
+}
+
 impl BigGaloisField for GF256 {
     const LENGTH: u32 = 256u32;
 
@@ -760,37 +806,6 @@ impl BigGaloisField for GF256 {
         first_value: u128::MAX,
         second_value: u128::MAX,
     };
-
-    const ALPHA: [Self; 7] = [
-        GF256 {
-            first_value: 0xbed68d38a0474e67969788420bdefee7u128,
-            second_value: 0x04c9a8cf20c95833df229845f8f1e16au128,
-        },
-        GF256 {
-            first_value: 0x2ba5c48d2c42072fa95af52ad52289c1u128,
-            second_value: 0x064e4d699c5b4af1d14a0d376c00b0eau128,
-        },
-        GF256 {
-            first_value: 0x1771831e533b0f5755dab3833f809d1du128,
-            second_value: 0x6195e3db7011f68dfb96573fad3fac10u128,
-        },
-        GF256 {
-            first_value: 0x752758911a30e3f6de010519b01bcdd5u128,
-            second_value: 0x56c24fd64f7688382a0778b6489ea03fu128,
-        },
-        GF256 {
-            first_value: 0x1bc4dbd440f1848298c2f529e98a30b6u128,
-            second_value: 0x22270b6d71574ffc2fbe09947d49a981u128,
-        },
-        GF256 {
-            first_value: 0xaced66c666f1afbc9e75afb9de44670bu128,
-            second_value: 0xc03d372fd1fa29f3f001253ff2991f7eu128,
-        },
-        GF256 {
-            first_value: 0x5237c4d625b86f0dba43b698b332e88bu128,
-            second_value: 0x133eea09d26b7bb82f652b2af4e81545u128,
-        },
-    ];
 
     fn new(first_value: u128, second_value: u128) -> Self {
         GF256 {
@@ -2219,7 +2234,7 @@ mod test {
                 tab[i] = GF128::new(data[i], 0u128);
             }
             let result = GF128::new(data[8], 0);
-            assert_eq!(GF128::byte_combine(tab), result);
+            assert_eq!(GF128::byte_combine(&tab), result);
         }
     }
 
@@ -4472,7 +4487,7 @@ mod test {
                 tab[i] = GF192::new(data[2 * i], data[(2 * i) + 1]);
             }
             let result = GF192::new(data[16], data[17]);
-            assert_eq!(GF192::byte_combine(tab), result);
+            assert_eq!(GF192::byte_combine(&tab), result);
         }
     }
 
@@ -6782,7 +6797,7 @@ mod test {
                 tab[i] = GF256::new(data[2 * i], data[(2 * i) + 1]);
             }
             let result = GF256::new(data[16], data[17]);
-            assert_eq!(GF256::byte_combine(tab), result);
+            assert_eq!(GF256::byte_combine(&tab), result);
         }
     }
 
