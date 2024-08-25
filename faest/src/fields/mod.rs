@@ -17,4 +17,9 @@ pub trait Field:
     + Mul<Self, Output = Self>
     + MulAssign
 {
+    /// Reppresentation of `0`
+    const ZERO: Self;
+
+    /// Reppresentation of `0`
+    const ONE: Self;
 }

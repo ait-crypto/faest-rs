@@ -26,10 +26,6 @@ where
 
     const MODULUS: Self;
 
-    const ONE: Self;
-
-    const ZERO: Self;
-
     const MAX: Self;
 
     const ALPHA: [Self; 7];
@@ -508,7 +504,10 @@ pub struct GF128 {
     first_value: u128,
 }
 
-impl Field for GF128 {}
+impl Field for GF128 {
+    const ZERO: Self = Self { first_value: 0 };
+    const ONE: Self = Self { first_value: 1 };
+}
 
 #[cfg(test)]
 impl Distribution<GF128> for Standard {
@@ -525,10 +524,6 @@ impl BigGaloisField for GF128 {
     const MODULUS: Self = GF128 {
         first_value: 0b10000111u128,
     };
-
-    const ONE: Self = GF128 { first_value: 1u128 };
-
-    const ZERO: Self = GF128 { first_value: 0u128 };
 
     const MAX: Self = GF128 {
         first_value: u128::MAX,
@@ -615,7 +610,16 @@ pub struct GF192 {
     second_value: u128,
 }
 
-impl Field for GF192 {}
+impl Field for GF192 {
+    const ZERO: Self = Self {
+        first_value: 0,
+        second_value: 0,
+    };
+    const ONE: Self = Self {
+        first_value: 1,
+        second_value: 0,
+    };
+}
 
 #[cfg(test)]
 impl Distribution<GF192> for Standard {
@@ -633,16 +637,6 @@ impl Distribution<GF192> for Standard {
 impl BigGaloisField for GF192 {
     const MODULUS: Self = GF192 {
         first_value: 0b10000111u128,
-        second_value: 0u128,
-    };
-
-    const ONE: Self = GF192 {
-        first_value: 1u128,
-        second_value: 0u128,
-    };
-
-    const ZERO: Self = GF192 {
-        first_value: 0u128,
         second_value: 0u128,
     };
 
@@ -709,7 +703,16 @@ pub struct GF256 {
     second_value: u128,
 }
 
-impl Field for GF256 {}
+impl Field for GF256 {
+    const ZERO: Self = Self {
+        first_value: 0,
+        second_value: 0,
+    };
+    const ONE: Self = Self {
+        first_value: 1,
+        second_value: 0,
+    };
+}
 
 #[cfg(test)]
 impl Distribution<GF256> for Standard {
@@ -726,16 +729,6 @@ impl BigGaloisField for GF256 {
 
     const MODULUS: Self = GF256 {
         first_value: 0b10000100101u128,
-        second_value: 0u128,
-    };
-
-    const ONE: Self = GF256 {
-        first_value: 1u128,
-        second_value: 0u128,
-    };
-
-    const ZERO: Self = GF256 {
-        first_value: 0u128,
         second_value: 0u128,
     };
 

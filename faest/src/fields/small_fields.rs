@@ -7,17 +7,12 @@ use std::{
 
 use super::Field;
 
-/// Trait for binary Galois fields up to a size of `2^64`
+/// Marker trait for binary Galois fields up to a size of `2^64`
 pub trait GaloisField<T>: Field
 where
     Self: From<T> + Copy,
     T: From<Self>,
 {
-    /// Representation of `0`
-    const ZERO: Self;
-
-    /// Representation of `1`
-    const ONE: Self;
 }
 
 trait GaloisFieldHelper<T>
@@ -198,13 +193,20 @@ impl MulAssign for SmallGF<u64> {
     }
 }
 
-impl Field for SmallGF<u8> {}
-impl Field for SmallGF<u64> {}
-
 /// Binary field `2^8`
 pub type GF8 = SmallGF<u8>;
 /// Binary field `2^64`
 pub type GF64 = SmallGF<u64>;
+
+impl Field for GF8 {
+    const ZERO: Self = Self(Wrapping(0));
+    const ONE: Self = Self(Wrapping(1));
+}
+
+impl Field for GF64 {
+    const ZERO: Self = Self(Wrapping(0));
+    const ONE: Self = Self(Wrapping(1));
+}
 
 impl GF8 {
     //---------------------------------------------------------------------------check this
@@ -224,10 +226,7 @@ impl GF8 {
     }
 }
 
-impl GaloisField<u8> for GF8 {
-    const ZERO: Self = Self(Wrapping(0));
-    const ONE: Self = Self(Wrapping(1));
-}
+impl GaloisField<u8> for GF8 {}
 
 impl From<&[u8]> for GF64 {
     fn from(value: &[u8]) -> Self {
@@ -248,10 +247,7 @@ impl GF64 {
     }
 }
 
-impl GaloisField<u64> for GF64 {
-    const ZERO: Self = Self(Wrapping(0));
-    const ONE: Self = Self(Wrapping(1));
-}
+impl GaloisField<u64> for GF64 {}
 
 #[cfg(test)]
 mod test {
