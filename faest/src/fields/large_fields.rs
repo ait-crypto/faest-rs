@@ -19,12 +19,16 @@ where
     Self: Mul<u8, Output = Self>,
     Self: Mul<GF64, Output = Self>,
     Self: for<'a> MulAssign<&'a Self>,
+    Self: for<'a> Mul<&'a Self, Output = Self>,
+    Self: ConditionallySelectable,
 {
     const LENGTH: u32;
 
     const MODULUS: Self;
 
     const ONE: Self;
+
+    const ZERO: Self;
 
     const MAX: Self;
 
@@ -65,26 +69,26 @@ where
     }
 
     fn byte_combine(x: [Self; 8]) -> Self {
-        let mut out = x[0];
-        for (i, xi) in x.into_iter().enumerate().skip(1) {
-            out += xi * Self::ALPHA[i - 1];
-        }
-        out
+        x.iter()
+            .skip(1)
+            .zip(Self::ALPHA)
+            .fold(x[0], |sum, (xi, alphai)| sum + (alphai * xi))
+    }
+
+    fn byte_combine_bits(x: u8) -> Self {
+        Self::ALPHA
+            .iter()
+            .enumerate()
+            .fold(Self::from_bit(x), |sum, (index, alpha)| {
+                sum + Self::conditional_select(&Self::ZERO, alpha, ((x >> (index + 1)) & 1).into())
+            })
     }
 
     fn from_bit(x: u8) -> Self {
-        Self::new((x & 1) as u128, 0u128)
+        Self::conditional_select(&Self::ZERO, &Self::ONE, (x & 1).into())
     }
 
     fn to_bytes(input: Self) -> Vec<u8>;
-
-    fn byte_combine_bits(x: u8) -> Self {
-        let mut out = Self::from_bit(x);
-        for i in 1..8 {
-            out += Self::ALPHA[i - 1] * (x >> i);
-        }
-        out
-    }
 
     fn sum_poly(v: Vec<Self>) -> Self {
         let mut res = v[0];
@@ -527,6 +531,8 @@ impl BigGaloisField for GF128 {
 
     const ONE: Self = GF128 { first_value: 1u128 };
 
+    const ZERO: Self = GF128 { first_value: 0u128 };
+
     const MAX: Self = GF128 {
         first_value: u128::MAX,
     };
@@ -638,6 +644,11 @@ impl BigGaloisField for GF192 {
         second_value: 0u128,
     };
 
+    const ZERO: Self = GF192 {
+        first_value: 0u128,
+        second_value: 0u128,
+    };
+
     const LENGTH: u32 = 192u32;
 
     const MAX: Self = GF192 {
@@ -723,6 +734,11 @@ impl BigGaloisField for GF256 {
 
     const ONE: Self = GF256 {
         first_value: 1u128,
+        second_value: 0u128,
+    };
+
+    const ZERO: Self = GF256 {
+        first_value: 0u128,
         second_value: 0u128,
     };
 
