@@ -1,4 +1,7 @@
-use std::ops::{Add, AddAssign, Mul, MulAssign, Sub};
+use std::{
+    num::Wrapping,
+    ops::{Add, AddAssign, Mul, MulAssign, Sub},
+};
 
 use super::{Field, GF64};
 
@@ -365,9 +368,7 @@ impl_RefMul64!(for GF128, GF192, GF256);
 
 impl ConditionallySelectable for GF128 {
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
-        Self {
-            first_value: u128::conditional_select(&a.first_value, &b.first_value, choice),
-        }
+        Self(u128::conditional_select(&a.0, &b.0, choice))
     }
 }
 
@@ -551,85 +552,64 @@ macro_rules! impl_MulAssign8 {
 impl_MulAssign8!(for GF128, GF192, GF256);
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
-pub struct GF128 {
-    first_value: u128,
-}
+#[repr(transparent)]
+pub struct GF128(u128);
 
 impl FromBit for GF128 {}
 
 impl Field for GF128 {
-    const ZERO: Self = Self { first_value: 0 };
-    const ONE: Self = Self { first_value: 1 };
+    const ZERO: Self = Self(0);
+    const ONE: Self = Self(1);
 }
 
 #[cfg(test)]
 impl Distribution<GF128> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF128 {
-        GF128 {
-            first_value: rng.sample(self),
-        }
+        GF128(rng.sample(self))
     }
 }
 
 impl Alphas for GF128 {
     const ALPHA: [Self; 7] = [
-        Self {
-            first_value: 0x053d8555a9979a1ca13fe8ac5560ce0du128,
-        },
-        Self {
-            first_value: 0x4cf4b7439cbfbb84ec7759ca3488aee1u128,
-        },
-        Self {
-            first_value: 0x35ad604f7d51d2c6bfcf02ae363946a8u128,
-        },
-        Self {
-            first_value: 0x0dcb364640a222fe6b8330483c2e9849u128,
-        },
-        Self {
-            first_value: 0x549810e11a88dea5252b49277b1b82b4u128,
-        },
-        Self {
-            first_value: 0xd681a5686c0c1f75c72bf2ef2521ff22u128,
-        },
-        Self {
-            first_value: 0x0950311a4fb78fe07a7a8e94e136f9bcu128,
-        },
+        Self(0x053d8555a9979a1ca13fe8ac5560ce0du128),
+        Self(0x4cf4b7439cbfbb84ec7759ca3488aee1u128),
+        Self(0x35ad604f7d51d2c6bfcf02ae363946a8u128),
+        Self(0x0dcb364640a222fe6b8330483c2e9849u128),
+        Self(0x549810e11a88dea5252b49277b1b82b4u128),
+        Self(0xd681a5686c0c1f75c72bf2ef2521ff22u128),
+        Self(0x0950311a4fb78fe07a7a8e94e136f9bcu128),
     ];
 }
 
 impl Double for GF128 {
-    fn double(mut self) -> Self {
+    fn double(self) -> Self {
         // TODO: check efficiency
-        let choice = ((self.first_value >> (128 - 1)) as u8).into_choice();
-        self.first_value = (self.first_value << 1)
-            ^ u128::conditional_select(&Self::ZERO.first_value, &Self::MODULUS.first_value, choice);
-        self
+        // let choice = ((self.first_value >> (128 - 1)) as u8).into_choice();
+        // self.first_value = (self.first_value << 1)
+        //    ^ u128::conditional_select(&Self::ZERO.first_value, &Self::MODULUS.first_value, choice);
+        // self
+        let mask = -Wrapping(self.0 >> (128 - 1));
+        Self((self.0 << 1) ^ (mask.0 & Self::MODULUS.0))
     }
 }
 
 impl BigGaloisField for GF128 {
     const LENGTH: u32 = 128u32;
 
-    const MODULUS: Self = Self {
-        first_value: 0b10000111u128,
-    };
+    const MODULUS: Self = Self(0b10000111u128);
 
-    const MAX: Self = Self {
-        first_value: u128::MAX,
-    };
+    const MAX: Self = Self(u128::MAX);
 
     fn new(first_value: u128, _second_value: u128) -> Self {
-        Self { first_value }
+        Self(first_value)
     }
 
     fn get_value(&self) -> (u128, u128) {
-        (self.first_value, 0u128)
+        (self.0, 0u128)
     }
 
     fn and(left: &Self, right: &Self) -> Self {
-        Self {
-            first_value: left.first_value & right.first_value,
-        }
+        Self(left.0 & right.0)
     }
 
     fn all_bytes_heavyweight(self) -> Self {
@@ -641,9 +621,7 @@ impl BigGaloisField for GF128 {
     }
 
     fn switch_left_1(self) -> Self {
-        Self {
-            first_value: self.first_value.wrapping_shl(1),
-        }
+        Self(self.0.wrapping_shl(1))
     }
 
     fn to_field(x: &[u8]) -> Vec<Self> {
