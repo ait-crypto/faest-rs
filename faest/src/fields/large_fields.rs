@@ -47,6 +47,7 @@ where
     Self: for<'a> Mul<&'a Self, Output = Self>,
     Self: ConditionallySelectable,
     Self: ByteCombine,
+    Self: SumPoly,
 {
     const LENGTH: u32;
 
@@ -90,13 +91,6 @@ where
 
     fn to_bytes(input: Self) -> Vec<u8>;
 
-    fn sum_poly(v: &[Self]) -> Self {
-        v.iter()
-            .rev()
-            .skip(1)
-            .fold(v[v.len() - 1], |sum, val| sum * Self::ALPHA[0] + *val)
-    }
-
     fn to_field(x: &[u8]) -> Vec<Self> {
         let n = (8 * x.len()) / (Self::LENGTH as usize);
         let mut res = vec![];
@@ -136,6 +130,26 @@ where
                 sum + Self::conditional_select(&Self::ZERO, alpha, (x >> (index + 1)).into_choice())
             },
         )
+    }
+}
+
+trait Double: Field {
+    fn double(self) -> Self;
+}
+
+pub trait SumPoly: Field {
+    fn sum_poly(v: &[Self]) -> Self;
+}
+
+impl<T> SumPoly for T
+where
+    T: Copy + Field + Double + for<'a> Add<&'a Self, Output = Self>,
+{
+    fn sum_poly(v: &[Self]) -> Self {
+        v.iter()
+            .rev()
+            .skip(1)
+            .fold(v[v.len() - 1], |sum, val| sum.double() + val)
     }
 }
 
@@ -577,6 +591,16 @@ impl Alphas for GF128 {
     ];
 }
 
+impl Double for GF128 {
+    fn double(mut self) -> Self {
+        // TODO: check efficiency
+        let choice = ((self.first_value >> (128 - 1)) as u8).into_choice();
+        self.first_value = (self.first_value << 1)
+            ^ u128::conditional_select(&Self::ZERO.first_value, &Self::MODULUS.first_value, choice);
+        self
+    }
+}
+
 impl BigGaloisField for GF128 {
     const LENGTH: u32 = 128u32;
 
@@ -664,6 +688,17 @@ impl Distribution<GF192> for Standard {
                 v as u128
             },
         }
+    }
+}
+
+impl Double for GF192 {
+    fn double(self) -> Self {
+        // TODO: check efficiency
+        let choice = ((self.second_value >> (64 - 1)) as u8).into_choice();
+        let mut new_self = self.switch_left_1();
+        new_self.first_value ^=
+            u128::conditional_select(&Self::ZERO.first_value, &Self::MODULUS.first_value, choice);
+        new_self
     }
 }
 
@@ -758,6 +793,17 @@ impl Distribution<GF256> for Standard {
             first_value: rng.sample(self),
             second_value: rng.sample(Self),
         }
+    }
+}
+
+impl Double for GF256 {
+    fn double(self) -> Self {
+        // TODO: check efficiency
+        let choice = ((self.second_value >> (128 - 1)) as u8).into_choice();
+        let mut new_self = self.switch_left_1();
+        new_self.first_value ^=
+            u128::conditional_select(&Self::ZERO.first_value, &Self::MODULUS.first_value, choice);
+        new_self
     }
 }
 
@@ -2300,7 +2346,16 @@ mod test {
 
     #[test]
     //To dest those one we use the test dataset of the reference implementation
-    fn gf128_test_sum_poly() {}
+    fn gf128_test_sum_poly() {
+        let all_zeroes = [GF128::ZERO; 128];
+        assert_eq!(GF128::sum_poly(&all_zeroes), GF128::ZERO);
+
+        let all_ones = [GF128::ONE; 128];
+        assert_eq!(
+            GF128::sum_poly(&all_ones),
+            GF128::new(0xffffffffffffffffffffffffffffffffu128, 0u128)
+        );
+    }
 
     #[test]
     //We see if the to field function give the same result that what we could have with BigUint
@@ -4624,7 +4679,19 @@ mod test {
     }
 
     #[test]
-    fn gf192_test_sum_poly() {}
+    fn gf192_test_sum_poly() {
+        let all_zeroes = [GF192::ZERO; 192];
+        assert_eq!(GF192::sum_poly(&all_zeroes), GF192::ZERO);
+
+        let all_ones = [GF192::ONE; 192];
+        assert_eq!(
+            GF192::sum_poly(&all_ones),
+            GF192::new(
+                0xffffffffffffffffffffffffffffffffu128,
+                0xffffffffffffffffffffffffffffffffu128
+            )
+        );
+    }
 
     #[test]
     //We see if the to field function give the same result that what we could have with BigUint
@@ -6934,7 +7001,19 @@ mod test {
     }
 
     #[test]
-    fn gf256_test_sum_poly() {}
+    fn gf256_test_sum_poly() {
+        let all_zeroes = [GF256::ZERO; 256];
+        assert_eq!(GF256::sum_poly(&all_zeroes), GF256::ZERO);
+
+        let all_ones = [GF256::ONE; 256];
+        assert_eq!(
+            GF256::sum_poly(&all_ones),
+            GF256::new(
+                0xffffffffffffffffffffffffffffffffu128,
+                0xffffffffffffffffffffffffffffffffu128
+            )
+        );
+    }
 
     #[test]
     //We see if the to field function give the same result that what we could have with BigUint
