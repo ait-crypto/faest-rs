@@ -9,6 +9,26 @@ use rand::{
 };
 use subtle::{Choice, ConditionallySelectable};
 
+/// Helper trait to convert the least significant bit of `u8` values into a [Choice].
+trait IntoChoice {
+    fn into_choice(self) -> Choice;
+}
+
+impl IntoChoice for u8 {
+    #[inline(always)]
+    fn into_choice(self) -> Choice {
+        (self & 1).into()
+    }
+}
+
+/// Create an instance of `0` or `1` in the field out of a bit representation
+pub trait FromBit: Field + ConditionallySelectable {
+    #[deprecated]
+    fn from_bit(x: u8) -> Self {
+        Self::conditional_select(&Self::ZERO, &Self::ONE, x.into_choice())
+    }
+}
+
 //For GF192 and GF256, as u192 and u256 dont exist in rust, we will implement a new trait BigGaloisField, in wich we will also implement basis operations.
 
 /// "Marker" trait for the larger binary Galois fields, i.e., [GF128], [GF192] and [GF256].
@@ -76,12 +96,8 @@ where
             .iter()
             .enumerate()
             .fold(Self::from_bit(x), |sum, (index, alpha)| {
-                sum + Self::conditional_select(&Self::ZERO, alpha, ((x >> (index + 1)) & 1).into())
+                sum + Self::conditional_select(&Self::ZERO, alpha, (x >> (index + 1)).into_choice())
             })
-    }
-
-    fn from_bit(x: u8) -> Self {
-        Self::conditional_select(&Self::ZERO, &Self::ONE, (x & 1).into())
     }
 
     fn to_bytes(input: Self) -> Vec<u8>;
@@ -106,6 +122,12 @@ where
         }
         res
     }
+}
+
+pub trait ByteCombine: Sized {
+    fn byte_combine(x: &[Self; 8]) -> Self;
+
+    fn byte_combine_bits(x: u8) -> Self;
 }
 
 macro_rules! impl_From {
@@ -345,7 +367,7 @@ macro_rules! impl_Mul8 {
 
             #[allow(clippy::suspicious_arithmetic_impl)]
             fn mul(self, right: u8) -> Self::Output {
-                Self::conditional_select(&Self::default(), &self, (right & 1).into())
+                Self::conditional_select(&Self::ZERO, &self, right.into_choice())
             }
         })*
     }
@@ -360,7 +382,7 @@ macro_rules! impl_RefMul8 {
 
             #[allow(clippy::suspicious_arithmetic_impl)]
             fn mul(self,right: u8) -> $t {
-                <$t>::conditional_select(&<$t>::default(), &self, (right & 1).into())
+                <$t>::conditional_select(&<$t>::ZERO, &self, right.into_choice())
             }
         })*
     }
@@ -491,7 +513,7 @@ macro_rules! impl_MulAssign8 {
     (for $($t:ty),+) => {
         $(impl MulAssign<u8> for $t {
             fn mul_assign(&mut self, other: u8) {
-                self.conditional_assign(&Self::default(), (!other & 1).into());
+                self.conditional_assign(&Self::default(), (!other).into_choice());
             }
         })*
     }
@@ -503,6 +525,8 @@ impl_MulAssign8!(for GF128, GF192, GF256);
 pub struct GF128 {
     first_value: u128,
 }
+
+impl FromBit for GF128 {}
 
 impl Field for GF128 {
     const ZERO: Self = Self { first_value: 0 };
@@ -579,10 +603,6 @@ impl BigGaloisField for GF128 {
         Self::new(first_res, 0u128)
     }
 
-    fn from_bit(x: u8) -> Self {
-        Self::new((x & 1) as u128, 0u128)
-    }
-
     fn to_field(x: &[u8]) -> Vec<Self> {
         let n = 8 * x.len() / (Self::LENGTH as usize);
         let mut res = vec![];
@@ -609,6 +629,8 @@ pub struct GF192 {
     first_value: u128,
     second_value: u128,
 }
+
+impl FromBit for GF192 {}
 
 impl Field for GF192 {
     const ZERO: Self = Self {
@@ -702,6 +724,8 @@ pub struct GF256 {
     first_value: u128,
     second_value: u128,
 }
+
+impl FromBit for GF256 {}
 
 impl Field for GF256 {
     const ZERO: Self = Self {
