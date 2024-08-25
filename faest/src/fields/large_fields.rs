@@ -90,14 +90,11 @@ where
 
     fn to_bytes(input: Self) -> Vec<u8>;
 
-    fn sum_poly(v: Vec<Self>) -> Self {
-        let mut res = v[0];
-        let mut alpha = Self::ALPHA[0];
-        for v_val in v.iter().skip(1) {
-            res += *v_val * alpha;
-            alpha *= Self::ALPHA[0];
-        }
-        res
+    fn sum_poly(v: &[Self]) -> Self {
+        v.iter()
+            .rev()
+            .skip(1)
+            .fold(v[v.len() - 1], |sum, val| sum * Self::ALPHA[0] + *val)
     }
 
     fn to_field(x: &[u8]) -> Vec<Self> {
