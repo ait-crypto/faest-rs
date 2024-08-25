@@ -610,16 +610,16 @@ impl Double for GF128 {
 impl BigGaloisField for GF128 {
     const LENGTH: u32 = 128u32;
 
-    const MODULUS: Self = GF128 {
+    const MODULUS: Self = Self {
         first_value: 0b10000111u128,
     };
 
-    const MAX: Self = GF128 {
+    const MAX: Self = Self {
         first_value: u128::MAX,
     };
 
     fn new(first_value: u128, _second_value: u128) -> Self {
-        GF128 { first_value }
+        Self { first_value }
     }
 
     fn get_value(&self) -> (u128, u128) {
@@ -627,7 +627,9 @@ impl BigGaloisField for GF128 {
     }
 
     fn and(left: &Self, right: &Self) -> Self {
-        Self::new(left.first_value & right.first_value, 0u128)
+        Self {
+            first_value: left.first_value & right.first_value,
+        }
     }
 
     fn all_bytes_heavyweight(self) -> Self {
@@ -639,9 +641,9 @@ impl BigGaloisField for GF128 {
     }
 
     fn switch_left_1(self) -> Self {
-        let (first_value, _) = self.get_value();
-        let first_res = first_value.wrapping_shl(1);
-        Self::new(first_res, 0u128)
+        Self {
+            first_value: self.first_value.wrapping_shl(1),
+        }
     }
 
     fn to_field(x: &[u8]) -> Vec<Self> {
@@ -742,14 +744,14 @@ impl Alphas for GF192 {
 }
 
 impl BigGaloisField for GF192 {
-    const MODULUS: Self = GF192 {
+    const MODULUS: Self = Self {
         first_value: 0b10000111u128,
         second_value: 0u128,
     };
 
     const LENGTH: u32 = 192u32;
 
-    const MAX: Self = GF192 {
+    const MAX: Self = Self {
         first_value: u128::MAX,
         second_value: u64::MAX as u128,
     };
@@ -849,18 +851,18 @@ impl Alphas for GF256 {
 impl BigGaloisField for GF256 {
     const LENGTH: u32 = 256u32;
 
-    const MODULUS: Self = GF256 {
+    const MODULUS: Self = Self {
         first_value: 0b10000100101u128,
         second_value: 0u128,
     };
 
-    const MAX: Self = GF256 {
+    const MAX: Self = Self {
         first_value: u128::MAX,
         second_value: u128::MAX,
     };
 
     fn new(first_value: u128, second_value: u128) -> Self {
-        GF256 {
+        Self {
             first_value,
             second_value,
         }
