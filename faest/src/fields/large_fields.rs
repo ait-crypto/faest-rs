@@ -21,7 +21,7 @@ impl IntoChoice for u8 {
     }
 }
 
-/// Helper trait that define "alphas" calucaltion embeedings
+/// Helper trait that define "alphas" for calculating embedings as part of [ByteCombine]
 trait Alphas: Sized {
     const ALPHA: [Self; 7];
 }
@@ -106,9 +106,12 @@ where
     }
 }
 
+/// Trait provinding "byte combination"
 pub trait ByteCombine: Field {
+    /// "Combine" field elements
     fn byte_combine(x: &[Self; 8]) -> Self;
 
+    /// "Combine" bits
     fn byte_combine_bits(x: u8) -> Self;
 }
 
@@ -133,11 +136,14 @@ where
     }
 }
 
+/// Helper trait for blanket implementations of [SumPoly]
 trait Double: Field {
     fn double(self) -> Self;
 }
 
+/// Trait providing a polynomial sum
 pub trait SumPoly: Field {
+    /// Compute polynomial sum
     fn sum_poly(v: &[Self]) -> Self;
 }
 
