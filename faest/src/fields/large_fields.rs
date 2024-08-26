@@ -33,14 +33,6 @@ trait Alphas: Sized {
     const ALPHA: [Self; 7];
 }
 
-/// Create an instance of `0` or `1` in the field out of a bit representation
-pub trait FromBit: Field + ConditionallySelectable {
-    #[deprecated]
-    fn from_bit(x: u8) -> Self {
-        Self::conditional_select(&Self::ZERO, &Self::ONE, x.into_choice())
-    }
-}
-
 //For GF192 and GF256, as u192 and u256 dont exist in rust, we will implement a new trait BigGaloisField, in wich we will also implement basis operations.
 
 /// "Marker" trait for the larger binary Galois fields, i.e., [GF128], [GF192] and [GF256].
@@ -693,9 +685,6 @@ impl BigGaloisField for BigGF<u128, 1, 128> {
     }
 }
 
-#[cfg(test)]
-impl FromBit for BigGF<u128, 1, 128> {}
-
 /// Type representing binary Galois field of size `2^128`
 pub type GF128 = BigGF<u128, 1, 128>;
 
@@ -786,9 +775,6 @@ impl BigGaloisField for BigGF<u128, 2, 192> {
         res
     }
 }
-
-#[cfg(test)]
-impl FromBit for BigGF<u128, 2, 192> {}
 
 /// Type representing binary Galois field of size `2^128`
 pub type GF192 = BigGF<u128, 2, 192>;
@@ -883,9 +869,6 @@ impl BigGaloisField for BigGF<u128, 2, 256> {
         bytes
     }
 }
-
-#[cfg(test)]
-impl FromBit for BigGF<u128, 2, 256> {}
 
 /// Type representing binary Galois field of size `2^128`
 pub type GF256 = BigGF<u128, 2, 256>;
@@ -2253,36 +2236,6 @@ mod test {
             let result = GF128::new(data[8], 0);
             assert_eq!(GF128::byte_combine(&tab), result);
         }
-    }
-
-    #[test]
-    //input : a bit (or a byte or many)
-    //output : a GF128 whose light-weight bit is equal to the input bit (or the lightweight bit of the input value)
-    fn gf128_test_from_bit() {
-        //with bit = 0
-        let bit_1 = 0u8;
-        let res_1 = GF128::from_bit(bit_1);
-        let (first_value_1, second_value_1) = res_1.get_value();
-        assert_eq!(first_value_1, bit_1 as u128);
-        assert_eq!(second_value_1, 0u128);
-        //with bit = 1
-        let bit_2 = 1u8;
-        let res_2 = GF128::from_bit(bit_2);
-        let (first_value_2, second_value_2) = res_2.get_value();
-        assert_eq!(first_value_2, bit_2 as u128);
-        assert_eq!(second_value_2, 0u128);
-        //with byte whose lightweight bit =0
-        let bit_3 = 76u8;
-        let res_3 = GF128::from_bit(bit_3);
-        let (first_value_3, second_value_3) = res_3.get_value();
-        assert_eq!(first_value_3, 0u128);
-        assert_eq!(second_value_3, 0u128);
-        //with byte whose lightweight bit =0
-        let bit_4 = 75u8;
-        let res_4 = GF128::from_bit(bit_4);
-        let (first_value_4, second_value_4) = res_4.get_value();
-        assert_eq!(first_value_4, bit_4 as u128 & 1);
-        assert_eq!(second_value_4, 0u128);
     }
 
     #[test]
@@ -4449,36 +4402,6 @@ mod test {
             let result = GF192::new(data[16], data[17]);
             assert_eq!(GF192::byte_combine(&tab), result);
         }
-    }
-
-    #[test]
-    //input : a bit (or a byte or many)
-    //output : a GF192 whose light-weight bit is equal to the input bit (or the lightweight bit of the input value)
-    fn gf192_test_from_bit() {
-        //with bit = 0
-        let bit_1 = 0u8;
-        let res_1 = GF192::from_bit(bit_1);
-        let (first_value_1, second_value_1) = res_1.get_value();
-        assert_eq!(first_value_1, bit_1 as u128);
-        assert_eq!(second_value_1, 0u128);
-        //with bit = 1
-        let bit_2 = 1u8;
-        let res_2 = GF192::from_bit(bit_2);
-        let (first_value_2, second_value_2) = res_2.get_value();
-        assert_eq!(first_value_2, bit_2 as u128);
-        assert_eq!(second_value_2, 0u128);
-        //with byte whose lightweight bit =0
-        let bit_3 = 76u8;
-        let res_3 = GF192::from_bit(bit_3);
-        let (first_value_3, second_value_3) = res_3.get_value();
-        assert_eq!(first_value_3, 0u128);
-        assert_eq!(second_value_3, 0u128);
-        //with byte whose lightweight bit =0
-        let bit_4 = 75u8;
-        let res_4 = GF192::from_bit(bit_4);
-        let (first_value_4, second_value_4) = res_4.get_value();
-        assert_eq!(first_value_4, bit_4 as u128 & 1);
-        assert_eq!(second_value_4, 0u128);
     }
 
     #[test]
@@ -6707,36 +6630,6 @@ mod test {
             let result = GF256::new(data[16], data[17]);
             assert_eq!(GF256::byte_combine(&tab), result);
         }
-    }
-
-    #[test]
-    //input : a bit (or a byte or many)
-    //output : a GF256 whose light-weight bit is equal to the input bit (or the lightweight bit of the input value)
-    fn gf256_test_from_bit() {
-        //with bit = 0
-        let bit_1 = 0u8;
-        let res_1 = GF256::from_bit(bit_1);
-        let (first_value_1, second_value_1) = res_1.get_value();
-        assert_eq!(first_value_1, bit_1 as u128);
-        assert_eq!(second_value_1, 0u128);
-        //with bit = 1
-        let bit_2 = 1u8;
-        let res_2 = GF256::from_bit(bit_2);
-        let (first_value_2, second_value_2) = res_2.get_value();
-        assert_eq!(first_value_2, bit_2 as u128);
-        assert_eq!(second_value_2, 0u128);
-        //with byte whose lightweight bit =0
-        let bit_3 = 76u8;
-        let res_3 = GF256::from_bit(bit_3);
-        let (first_value_3, second_value_3) = res_3.get_value();
-        assert_eq!(first_value_3, 0u128);
-        assert_eq!(second_value_3, 0u128);
-        //with byte whose lightweight bit =0
-        let bit_4 = 75u8;
-        let res_4 = GF256::from_bit(bit_4);
-        let (first_value_4, second_value_4) = res_4.get_value();
-        assert_eq!(first_value_4, bit_4 as u128 & 1);
-        assert_eq!(second_value_4, 0u128);
     }
 
     #[test]
