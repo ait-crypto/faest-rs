@@ -1,6 +1,10 @@
 use std::{
+    array, mem,
     num::Wrapping,
-    ops::{Add, AddAssign, Mul, MulAssign, Sub},
+    ops::{
+        Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitXor, BitXorAssign, Mul, MulAssign, Neg,
+        Shl, Shr, Sub, SubAssign,
+    },
 };
 
 use super::{Field, GF64};
@@ -178,7 +182,7 @@ macro_rules! impl_From {
     }
 }
 
-impl_From!(for GF128, GF192, GF256);
+impl_From!(for GF192);
 
 macro_rules! impl_Add {
     (for $($t:ty),+) => {
@@ -196,7 +200,7 @@ macro_rules! impl_Add {
     }
 }
 
-impl_Add!(for GF128, GF192, GF256);
+impl_Add!(for GF192);
 
 macro_rules! impl_AddRef {
     (for $($t:ty),+) => {
@@ -214,7 +218,7 @@ macro_rules! impl_AddRef {
     }
 }
 
-impl_AddRef!(for GF128, GF192, GF256);
+impl_AddRef!(for GF192);
 
 macro_rules! impl_RefAdd {
     (for $($t:ty),+) => {
@@ -231,7 +235,7 @@ macro_rules! impl_RefAdd {
     }
 }
 
-impl_RefAdd!(for GF128, GF192, GF256);
+impl_RefAdd!(for GF192);
 
 macro_rules! impl_Sub {
     (for $($t:ty),+) => {
@@ -249,7 +253,7 @@ macro_rules! impl_Sub {
     }
 }
 
-impl_Sub!(for GF128, GF192, GF256);
+impl_Sub!(for GF192);
 
 macro_rules! impl_SubRef {
     (for $($t:ty),+) => {
@@ -267,7 +271,7 @@ macro_rules! impl_SubRef {
     }
 }
 
-impl_SubRef!(for GF128, GF192, GF256);
+impl_SubRef!(for GF192);
 
 macro_rules! impl_RefSub {
     (for $($t:ty),+) => {
@@ -284,7 +288,7 @@ macro_rules! impl_RefSub {
     }
 }
 
-impl_RefSub!(for GF128, GF192, GF256);
+impl_RefSub!(for GF192);
 
 macro_rules! impl_Mul {
     (for $($t:ty),+) => {
@@ -328,7 +332,7 @@ macro_rules! impl_Mul {
     }
 }
 
-impl_Mul!(for GF128, GF192, GF256);
+impl_Mul!(for GF192);
 
 macro_rules! impl_Mul64 {
     (for $($t:ty),+) => {
@@ -350,7 +354,7 @@ macro_rules! impl_Mul64 {
     }
 }
 
-impl_Mul64!(for GF128, GF192, GF256);
+impl_Mul64!(for GF192);
 
 macro_rules! impl_RefMul64 {
     (for $($t:ty),+) => {
@@ -364,24 +368,9 @@ macro_rules! impl_RefMul64 {
     }
 }
 
-impl_RefMul64!(for GF128, GF192, GF256);
-
-impl ConditionallySelectable for GF128 {
-    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
-        Self(u128::conditional_select(&a.0, &b.0, choice))
-    }
-}
+impl_RefMul64!(for GF192);
 
 impl ConditionallySelectable for GF192 {
-    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
-        Self {
-            first_value: u128::conditional_select(&a.first_value, &b.first_value, choice),
-            second_value: u128::conditional_select(&a.second_value, &b.second_value, choice),
-        }
-    }
-}
-
-impl ConditionallySelectable for GF256 {
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
         Self {
             first_value: u128::conditional_select(&a.first_value, &b.first_value, choice),
@@ -403,7 +392,7 @@ macro_rules! impl_Mul8 {
     }
 }
 
-impl_Mul8!(for GF128, GF192, GF256);
+impl_Mul8!(for GF192);
 
 macro_rules! impl_RefMul8 {
     (for $($t:ty),+) => {
@@ -418,7 +407,7 @@ macro_rules! impl_RefMul8 {
     }
 }
 
-impl_RefMul8!(for GF128, GF192, GF256);
+impl_RefMul8!(for GF192);
 
 macro_rules! impl_MulRef {
     (for $($t:ty),+) => {
@@ -431,7 +420,7 @@ macro_rules! impl_MulRef {
     }
 }
 
-impl_MulRef!(for GF128, GF192, GF256);
+impl_MulRef!(for GF192);
 
 macro_rules! impl_RefMul {
     (for $($t:ty),+) => {
@@ -444,7 +433,7 @@ macro_rules! impl_RefMul {
     }
 }
 
-impl_RefMul!(for GF128, GF192, GF256);
+impl_RefMul!(for GF192);
 
 macro_rules! impl_AddAssign {
     (for $($t:ty),+) => {
@@ -456,7 +445,7 @@ macro_rules! impl_AddAssign {
     }
 }
 
-impl_AddAssign!(for GF128, GF192, GF256);
+impl_AddAssign!(for GF192);
 
 macro_rules! impl_AddAssignRef {
     (for $($t:ty),+) => {
@@ -469,7 +458,7 @@ macro_rules! impl_AddAssignRef {
     }
 }
 
-impl_AddAssignRef!(for GF128, GF192, GF256);
+impl_AddAssignRef!(for GF192);
 
 macro_rules! impl_SubAssign {
     (for $($t:ty),+) => {
@@ -482,7 +471,7 @@ macro_rules! impl_SubAssign {
     }
 }
 
-impl_SubAssign!(for GF128, GF192, GF256);
+impl_SubAssign!(for GF192);
 
 macro_rules! impl_SubAssignRef {
     (for $($t:ty),+) => {
@@ -495,7 +484,7 @@ macro_rules! impl_SubAssignRef {
     }
 }
 
-impl_SubAssignRef!(for GF128, GF192, GF256);
+impl_SubAssignRef!(for GF192);
 
 macro_rules! impl_MulAssign {
     (for $($t:ty),+) => {
@@ -507,7 +496,7 @@ macro_rules! impl_MulAssign {
     }
 }
 
-impl_MulAssign!(for GF128, GF192, GF256);
+impl_MulAssign!(for GF192);
 
 macro_rules! impl_MulAssignRef {
     (for $($t:ty),+) => {
@@ -519,7 +508,7 @@ macro_rules! impl_MulAssignRef {
     }
 }
 
-impl_MulAssignRef!(for GF128, GF192, GF256);
+impl_MulAssignRef!(for GF192);
 
 macro_rules! impl_MulAssign64 {
     (for $($t:ty),+) => {
@@ -537,7 +526,7 @@ macro_rules! impl_MulAssign64 {
     }
 }
 
-impl_MulAssign64!(for GF128, GF192, GF256);
+impl_MulAssign64!(for GF192);
 
 macro_rules! impl_MulAssign8 {
     (for $($t:ty),+) => {
@@ -549,101 +538,7 @@ macro_rules! impl_MulAssign8 {
     }
 }
 
-impl_MulAssign8!(for GF128, GF192, GF256);
-
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-#[repr(transparent)]
-pub struct GF128(u128);
-
-impl FromBit for GF128 {}
-
-impl Field for GF128 {
-    const ZERO: Self = Self(0);
-    const ONE: Self = Self(1);
-}
-
-#[cfg(test)]
-impl Distribution<GF128> for Standard {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF128 {
-        GF128(rng.sample(self))
-    }
-}
-
-impl Alphas for GF128 {
-    const ALPHA: [Self; 7] = [
-        Self(0x053d8555a9979a1ca13fe8ac5560ce0du128),
-        Self(0x4cf4b7439cbfbb84ec7759ca3488aee1u128),
-        Self(0x35ad604f7d51d2c6bfcf02ae363946a8u128),
-        Self(0x0dcb364640a222fe6b8330483c2e9849u128),
-        Self(0x549810e11a88dea5252b49277b1b82b4u128),
-        Self(0xd681a5686c0c1f75c72bf2ef2521ff22u128),
-        Self(0x0950311a4fb78fe07a7a8e94e136f9bcu128),
-    ];
-}
-
-impl Double for GF128 {
-    fn double(self) -> Self {
-        // TODO: check efficiency
-        // let choice = ((self.first_value >> (128 - 1)) as u8).into_choice();
-        // self.first_value = (self.first_value << 1)
-        //    ^ u128::conditional_select(&Self::ZERO.first_value, &Self::MODULUS.first_value, choice);
-        // self
-        let mask = -Wrapping(self.0 >> (128 - 1));
-        Self((self.0 << 1) ^ (mask.0 & Self::MODULUS.0))
-    }
-}
-
-impl BigGaloisField for GF128 {
-    const LENGTH: u32 = 128u32;
-
-    const MODULUS: Self = Self(0b10000111u128);
-
-    const MAX: Self = Self(u128::MAX);
-
-    fn new(first_value: u128, _second_value: u128) -> Self {
-        Self(first_value)
-    }
-
-    fn get_value(&self) -> (u128, u128) {
-        (self.0, 0u128)
-    }
-
-    fn and(left: &Self, right: &Self) -> Self {
-        Self(left.0 & right.0)
-    }
-
-    fn all_bytes_heavyweight(self) -> Self {
-        let (first_value, _) = self.get_value();
-        let c = (first_value & ((1u128 << 127).wrapping_shr(first_value.leading_zeros())))
-            .wrapping_shl(first_value.leading_zeros())
-            >> 127;
-        Self::new(u128::MAX * c, 0u128)
-    }
-
-    fn switch_left_1(self) -> Self {
-        Self(self.0.wrapping_shl(1))
-    }
-
-    fn to_field(x: &[u8]) -> Vec<Self> {
-        let n = 8 * x.len() / (Self::LENGTH as usize);
-        let mut res = vec![];
-        let padding_array = [0u8; 16];
-        for i in 0..n {
-            let padded_value = &mut x
-                [(i * (Self::LENGTH as usize) / 8)..((i + 1) * (Self::LENGTH as usize) / 8)]
-                .to_vec();
-            padded_value.append(&mut padding_array[..(32 - (Self::LENGTH as usize) / 8)].to_vec());
-            res.push(Self::from(&padded_value[..]));
-        }
-        res
-    }
-
-    fn to_bytes(input: Self) -> Vec<u8> {
-        let mut res = Vec::with_capacity(Self::LENGTH as usize / 8);
-        res.append(&mut input.get_value().0.to_le_bytes().to_vec());
-        res
-    }
-}
+impl_MulAssign8!(for GF192);
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct GF192 {
@@ -753,108 +648,656 @@ impl BigGaloisField for GF192 {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-pub struct GF256 {
-    first_value: u128,
-    second_value: u128,
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub struct BigGF<T, const N: usize, const LENGTH: usize>([T; N]);
+
+impl<T, const N: usize, const LENGTH: usize> Default for BigGF<T, N, LENGTH>
+where
+    T: Default + Copy,
+{
+    fn default() -> Self {
+        Self([Default::default(); N])
+    }
 }
 
-impl FromBit for GF256 {}
-
-impl Field for GF256 {
-    const ZERO: Self = Self {
-        first_value: 0,
-        second_value: 0,
-    };
-    const ONE: Self = Self {
-        first_value: 1,
-        second_value: 0,
-    };
+impl<T, const N: usize, const LENGTH: usize> ConditionallySelectable for BigGF<T, N, LENGTH>
+where
+    T: ConditionallySelectable,
+{
+    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
+        Self(<[T; N]>::conditional_select(&a.0, &b.0, choice))
+    }
 }
+
+// generic implementations of Add and AddASsign
+
+impl<T, const N: usize, const LENGTH: usize> Add for BigGF<T, N, LENGTH>
+where
+    T: BitXorAssign + Copy,
+{
+    type Output = Self;
+
+    #[inline]
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn add(mut self, rhs: Self) -> Self::Output {
+        for idx in 0..N {
+            self.0[idx] ^= rhs.0[idx];
+        }
+        self
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> Add<&Self> for BigGF<T, N, LENGTH>
+where
+    T: BitXorAssign<T> + Copy,
+{
+    type Output = Self;
+
+    #[inline]
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn add(mut self, rhs: &Self) -> Self::Output {
+        for idx in 0..N {
+            self.0[idx] ^= rhs.0[idx];
+        }
+        self
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> Add<Self> for &BigGF<T, N, LENGTH>
+where
+    T: BitXor<Output = T> + Copy,
+{
+    type Output = BigGF<T, N, LENGTH>;
+
+    #[inline]
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn add(self, rhs: Self) -> Self::Output {
+        BigGF(array::from_fn(|idx| self.0[idx] ^ rhs.0[idx]))
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> AddAssign for BigGF<T, N, LENGTH>
+where
+    T: BitXorAssign<T> + Copy,
+{
+    #[inline]
+    #[allow(clippy::suspicious_op_assign_impl)]
+    fn add_assign(&mut self, rhs: Self) {
+        for idx in 0..N {
+            self.0[idx] ^= rhs.0[idx];
+        }
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> AddAssign<&Self> for BigGF<T, N, LENGTH>
+where
+    T: BitXorAssign<T> + Copy,
+{
+    #[inline]
+    #[allow(clippy::suspicious_op_assign_impl)]
+    fn add_assign(&mut self, rhs: &Self) {
+        for idx in 0..N {
+            self.0[idx] ^= rhs.0[idx];
+        }
+    }
+}
+
+// generic implementations of Sub and SubAssign
+
+impl<T, const N: usize, const LENGTH: usize> Sub for BigGF<T, N, LENGTH>
+where
+    T: BitXorAssign + Copy,
+{
+    type Output = Self;
+
+    #[inline]
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn sub(mut self, rhs: Self) -> Self::Output {
+        for idx in 0..N {
+            self.0[idx] ^= rhs.0[idx];
+        }
+        self
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> Sub<&Self> for BigGF<T, N, LENGTH>
+where
+    T: BitXorAssign<T> + Copy,
+{
+    type Output = Self;
+
+    #[inline]
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn sub(mut self, rhs: &Self) -> Self::Output {
+        for idx in 0..N {
+            self.0[idx] ^= rhs.0[idx];
+        }
+        self
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> SubAssign for BigGF<T, N, LENGTH>
+where
+    T: BitXorAssign<T> + Copy,
+{
+    #[inline]
+    #[allow(clippy::suspicious_op_assign_impl)]
+    fn sub_assign(&mut self, rhs: Self) {
+        for idx in 0..N {
+            self.0[idx] ^= rhs.0[idx];
+        }
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> SubAssign<&Self> for BigGF<T, N, LENGTH>
+where
+    T: BitXorAssign<T> + Copy,
+{
+    #[inline]
+    #[allow(clippy::suspicious_op_assign_impl)]
+    fn sub_assign(&mut self, rhs: &Self) {
+        for idx in 0..N {
+            self.0[idx] ^= rhs.0[idx];
+        }
+    }
+}
+
+// generic implementations of Mul and MulAssign
+
+trait Modulus<T> {
+    const MODULUS: T;
+}
+
+trait ToMask<T> {
+    fn to_mask(&self) -> T;
+
+    fn to_mask_bit(&self, bit: usize) -> T;
+}
+
+trait ApplyMask<T> {
+    type Output;
+
+    fn apply_mask(self, mask: T) -> Self::Output;
+
+    fn copy_apply_mask(&self, mask: T) -> Self::Output;
+}
+
+impl<T, const N: usize, const LENGTH: usize> ApplyMask<T> for BigGF<T, N, LENGTH>
+where
+    T: BitAndAssign + BitAnd<Output = T> + Copy,
+{
+    type Output = Self;
+
+    fn apply_mask(mut self, mask: T) -> Self::Output {
+        for idx in 0..N {
+            self.0[idx] &= mask;
+        }
+        self
+    }
+
+    fn copy_apply_mask(&self, mask: T) -> Self::Output {
+        Self(array::from_fn(|idx| self.0[idx] & mask))
+    }
+}
+
+trait ShiftLeft1 {
+    type Output;
+
+    fn shift_left_1(self) -> Self::Output;
+}
+
+impl<T, const N: usize, const LENGTH: usize> ShiftLeft1 for BigGF<T, N, LENGTH>
+where
+    T: Shl<usize, Output = T> + Shr<usize, Output = T> + BitOr<Output = T> + Copy,
+{
+    type Output = Self;
+
+    fn shift_left_1(mut self) -> Self::Output {
+        for idx in (1..N).rev() {
+            self.0[idx] = (self.0[idx] << 1) | (self.0[idx - 1] >> (mem::size_of::<T>() * 8 - 1));
+        }
+        self.0[0] = self.0[0] << 1;
+        self
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> Mul for BigGF<T, N, LENGTH>
+where
+    Self: Modulus<T>,
+    Self: ToMask<T>,
+    Self: ApplyMask<T, Output = Self>,
+    Self: AddAssign,
+    Self: ShiftLeft1<Output = Self>,
+    T: BitAnd<Output = T>,
+    T: BitXorAssign,
+{
+    type Output = Self;
+
+    fn mul(mut self, rhs: Self) -> Self::Output {
+        let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
+        for idx in 1..LENGTH {
+            let mask = self.to_mask();
+            self = self.shift_left_1();
+            self.0[0] ^= mask & Self::MODULUS;
+
+            result += self.copy_apply_mask(rhs.to_mask_bit(idx))
+        }
+        result
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> Mul<&Self> for BigGF<T, N, LENGTH>
+where
+    Self: Modulus<T>,
+    Self: ToMask<T>,
+    Self: ApplyMask<T, Output = Self>,
+    Self: AddAssign,
+    Self: ShiftLeft1<Output = Self>,
+    T: BitAnd<Output = T>,
+    T: BitXorAssign,
+{
+    type Output = Self;
+
+    fn mul(mut self, rhs: &Self) -> Self::Output {
+        let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
+        for idx in 1..LENGTH {
+            let mask = self.to_mask();
+            self = self.shift_left_1();
+            self.0[0] ^= mask & Self::MODULUS;
+
+            result += self.copy_apply_mask(rhs.to_mask_bit(idx))
+        }
+        result
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> Mul<Self> for &BigGF<T, N, LENGTH>
+where
+    BigGF<T, N, LENGTH>: Mul<Self, Output = BigGF<T, N, LENGTH>>,
+    BigGF<T, N, LENGTH>: Copy,
+{
+    type Output = BigGF<T, N, LENGTH>;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        *self * rhs
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> Mul<u8> for BigGF<T, N, LENGTH>
+where
+    Self: ApplyMask<T, Output = Self>,
+    u8: ToMask<T>,
+{
+    type Output = Self;
+
+    fn mul(self, rhs: u8) -> Self::Output {
+        self.apply_mask(rhs.to_mask_bit(0))
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> Mul<u64> for BigGF<T, N, LENGTH>
+where
+    Self: Modulus<T>,
+    Self: ToMask<T>,
+    Self: ApplyMask<T, Output = Self>,
+    Self: AddAssign,
+    Self: ShiftLeft1<Output = Self>,
+    T: BitAnd<Output = T>,
+    T: BitXorAssign + std::fmt::Debug,
+    u64: ToMask<T>,
+{
+    type Output = Self;
+
+    fn mul(mut self, rhs: u64) -> Self::Output {
+        let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
+        for idx in 1..64 {
+            let mask = self.to_mask();
+            self = self.shift_left_1();
+            self.0[0] ^= mask & Self::MODULUS;
+
+            result += self.copy_apply_mask(rhs.to_mask_bit(idx))
+        }
+        result
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> Mul<u64> for &BigGF<T, N, LENGTH>
+where
+    BigGF<T, N, LENGTH>: Copy,
+    BigGF<T, N, LENGTH>: Mul<u64, Output = BigGF<T, N, LENGTH>>,
+{
+    type Output = BigGF<T, N, LENGTH>;
+
+    fn mul(self, rhs: u64) -> Self::Output {
+        *self * rhs
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> Mul<GF64> for BigGF<T, N, LENGTH>
+where
+    Self: Mul<u64, Output = Self>,
+{
+    type Output = Self;
+
+    #[inline]
+    fn mul(self, rhs: GF64) -> Self::Output {
+        self * (rhs.into())
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> MulAssign for BigGF<T, N, LENGTH>
+where
+    Self: Copy,
+    Self: Modulus<T>,
+    Self: ToMask<T>,
+    Self: ApplyMask<T, Output = Self>,
+    Self: AddAssign,
+    Self: ShiftLeft1<Output = Self>,
+    T: BitAnd<Output = T>,
+    T: BitXorAssign,
+{
+    fn mul_assign(&mut self, rhs: Self) {
+        let mut lhs = *self;
+        *self = self.copy_apply_mask(rhs.to_mask_bit(0));
+        for idx in 1..LENGTH {
+            let mask = lhs.to_mask();
+            lhs = lhs.shift_left_1();
+            lhs.0[0] ^= mask & Self::MODULUS;
+
+            *self += lhs.copy_apply_mask(rhs.to_mask_bit(idx))
+        }
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> MulAssign<&Self> for BigGF<T, N, LENGTH>
+where
+    Self: Copy,
+    Self: Modulus<T>,
+    Self: ToMask<T>,
+    Self: ApplyMask<T, Output = Self>,
+    Self: AddAssign,
+    Self: ShiftLeft1<Output = Self>,
+    T: BitAnd<Output = T>,
+    T: BitXorAssign,
+{
+    fn mul_assign(&mut self, rhs: &Self) {
+        let mut lhs = *self;
+        *self = self.copy_apply_mask(rhs.to_mask_bit(0));
+        for idx in 1..LENGTH {
+            let mask = lhs.to_mask();
+            lhs = lhs.shift_left_1();
+            lhs.0[0] ^= mask & Self::MODULUS;
+
+            *self += lhs.copy_apply_mask(rhs.to_mask_bit(idx))
+        }
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> MulAssign<u64> for BigGF<T, N, LENGTH>
+where
+    Self: Copy,
+    Self: Modulus<T>,
+    Self: ToMask<T>,
+    Self: ApplyMask<T, Output = Self>,
+    Self: AddAssign,
+    Self: ShiftLeft1<Output = Self>,
+    T: BitAnd<Output = T>,
+    T: BitXorAssign,
+    u64: ToMask<T>,
+{
+    fn mul_assign(&mut self, rhs: u64) {
+        let mut lhs = *self;
+        *self = self.copy_apply_mask(rhs.to_mask_bit(0));
+        for idx in 1..64 {
+            let mask = lhs.to_mask();
+            lhs = lhs.shift_left_1();
+            lhs.0[0] ^= mask & Self::MODULUS;
+
+            *self += lhs.copy_apply_mask(rhs.to_mask_bit(idx))
+        }
+    }
+}
+
+// generic implementation of Double
+
+impl<T, const N: usize, const LENGTH: usize> Double for BigGF<T, N, LENGTH>
+where
+    Self: ToMask<T>,
+    Self: Modulus<T>,
+    Self: ShiftLeft1<Output = Self>,
+    T: BitAnd<Output = T>,
+    T: BitXorAssign,
+{
+    fn double(mut self) -> Self {
+        let mask = self.to_mask();
+        self = self.shift_left_1();
+        self.0[0] ^= mask & Self::MODULUS;
+        self
+    }
+}
+
+// implementations for u128 based field implementations
+
+impl<const N: usize, const LENGTH: usize> ToMask<u128> for BigGF<u128, N, LENGTH> {
+    fn to_mask(&self) -> u128 {
+        let array_index = (LENGTH - 1) / (mem::size_of::<u128>() * 8);
+        let value_index = (LENGTH - 1) % (mem::size_of::<u128>() * 8);
+
+        (-Wrapping((self.0[array_index] >> value_index) & 1)).0
+    }
+
+    fn to_mask_bit(&self, bit: usize) -> u128 {
+        let array_index = bit / (mem::size_of::<u128>() * 8);
+        let value_index = bit % (mem::size_of::<u128>() * 8);
+
+        (-Wrapping((self.0[array_index] >> value_index) & 1)).0
+    }
+}
+
+impl ToMask<u128> for u64 {
+    fn to_mask(&self) -> u128 {
+        self.to_mask_bit(64 - 1)
+    }
+
+    fn to_mask_bit(&self, bit: usize) -> u128 {
+        // let array_index = bit / 64;
+        let value_index = bit % 64;
+
+        (-Wrapping(((self >> value_index) & 1) as u128)).0
+    }
+}
+
+impl ToMask<u128> for GF64 {
+    fn to_mask(&self) -> u128 {
+        self.to_mask_bit(64 - 1)
+    }
+
+    fn to_mask_bit(&self, bit: usize) -> u128 {
+        let value: u64 = (*self).into();
+        value.to_mask_bit(bit)
+    }
+}
+
+impl ToMask<u128> for u8 {
+    fn to_mask(&self) -> u128 {
+        self.to_mask_bit(0)
+    }
+
+    fn to_mask_bit(&self, bit: usize) -> u128 {
+        (-Wrapping(((*self >> bit) & 1) as u128)).0
+    }
+}
+
+// u128-based GF128, GF256
+
+impl Modulus<u128> for BigGF<u128, 1, 128> {
+    const MODULUS: u128 = 0b10000111u128;
+}
+
+impl Field for BigGF<u128, 1, 128> {
+    const ZERO: Self = Self([0]);
+    const ONE: Self = Self([1]);
+}
+
+impl Alphas for BigGF<u128, 1, 128> {
+    const ALPHA: [Self; 7] = [
+        Self([0x053d8555a9979a1ca13fe8ac5560ce0du128]),
+        Self([0x4cf4b7439cbfbb84ec7759ca3488aee1u128]),
+        Self([0x35ad604f7d51d2c6bfcf02ae363946a8u128]),
+        Self([0x0dcb364640a222fe6b8330483c2e9849u128]),
+        Self([0x549810e11a88dea5252b49277b1b82b4u128]),
+        Self([0xd681a5686c0c1f75c72bf2ef2521ff22u128]),
+        Self([0x0950311a4fb78fe07a7a8e94e136f9bcu128]),
+    ];
+}
+
+impl From<&[u8]> for BigGF<u128, 1, 128> {
+    fn from(value: &[u8]) -> Self {
+        // FIXME
+        // assert_eq!(value.len(), 16);
+        let mut array = [0u8; 16];
+        array.copy_from_slice(&value[..16]);
+        Self([u128::from_le_bytes(array)])
+    }
+}
+
+impl BigGaloisField for BigGF<u128, 1, 128> {
+    const LENGTH: u32 = 128;
+
+    const MODULUS: Self = Self([<Self as Modulus<u128>>::MODULUS]);
+
+    const MAX: Self = Self([u128::MAX]);
+
+    fn new(first_value: u128, _second_value: u128) -> Self {
+        Self([first_value])
+    }
+
+    fn get_value(&self) -> (u128, u128) {
+        (self.0[0], 0)
+    }
+
+    fn to_bytes(input: Self) -> Vec<u8> {
+        input.0[0].to_le_bytes().to_vec()
+    }
+
+    fn switch_left_1(self) -> Self {
+        self.shift_left_1()
+    }
+
+    fn and(left: &Self, right: &Self) -> Self {
+        todo!()
+    }
+}
+
+#[cfg(test)]
+impl FromBit for BigGF<u128, 1, 128> {}
+
+/// Type representing binary Galois field of size `2^128`
+pub type GF128 = BigGF<u128, 1, 128>;
+
+#[cfg(test)]
+impl Distribution<GF128> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF128 {
+        BigGF([rng.sample(self)])
+    }
+}
+
+impl Modulus<u128> for BigGF<u128, 2, 256> {
+    const MODULUS: u128 = 0b10000100101u128;
+}
+
+impl Field for BigGF<u128, 2, 256> {
+    const ZERO: Self = Self([0, 0]);
+    const ONE: Self = Self([1, 0]);
+}
+
+impl Alphas for BigGF<u128, 2, 256> {
+    const ALPHA: [Self; 7] = [
+        Self([
+            0xbed68d38a0474e67969788420bdefee7u128,
+            0x04c9a8cf20c95833df229845f8f1e16au128,
+        ]),
+        Self([
+            0x2ba5c48d2c42072fa95af52ad52289c1u128,
+            0x064e4d699c5b4af1d14a0d376c00b0eau128,
+        ]),
+        Self([
+            0x1771831e533b0f5755dab3833f809d1du128,
+            0x6195e3db7011f68dfb96573fad3fac10u128,
+        ]),
+        Self([
+            0x752758911a30e3f6de010519b01bcdd5u128,
+            0x56c24fd64f7688382a0778b6489ea03fu128,
+        ]),
+        Self([
+            0x1bc4dbd440f1848298c2f529e98a30b6u128,
+            0x22270b6d71574ffc2fbe09947d49a981u128,
+        ]),
+        Self([
+            0xaced66c666f1afbc9e75afb9de44670bu128,
+            0xc03d372fd1fa29f3f001253ff2991f7eu128,
+        ]),
+        Self([
+            0x5237c4d625b86f0dba43b698b332e88bu128,
+            0x133eea09d26b7bb82f652b2af4e81545u128,
+        ]),
+    ];
+}
+
+impl From<&[u8]> for BigGF<u128, 2, 256> {
+    fn from(value: &[u8]) -> Self {
+        // FIXME
+        // assert_eq!(value.len(), 16);
+        let mut array = [0u8; 16];
+        array.copy_from_slice(&value[..16]);
+        Self(array::from_fn(|idx| {
+            let mut array = [0u8; 16];
+            array.copy_from_slice(&value[idx * 16..(idx + 1) * 16]);
+            u128::from_le_bytes(array)
+        }))
+    }
+}
+
+impl BigGaloisField for BigGF<u128, 2, 256> {
+    const LENGTH: u32 = 256;
+
+    const MODULUS: Self = Self([<Self as Modulus<u128>>::MODULUS, 0]);
+
+    const MAX: Self = Self([u128::MAX, u128::MAX]);
+
+    fn new(first_value: u128, second_value: u128) -> Self {
+        Self([first_value, second_value])
+    }
+
+    fn get_value(&self) -> (u128, u128) {
+        (self.0[0], self.0[1])
+    }
+
+    fn to_bytes(input: Self) -> Vec<u8> {
+        let mut bytes = input.0[0].to_le_bytes().to_vec();
+        bytes.extend_from_slice(&input.0[1].to_le_bytes());
+        bytes
+    }
+
+    fn switch_left_1(self) -> Self {
+        self.shift_left_1()
+    }
+
+    fn and(left: &Self, right: &Self) -> Self {
+        todo!()
+    }
+}
+
+#[cfg(test)]
+impl FromBit for BigGF<u128, 2, 256> {}
+
+/// Type representing binary Galois field of size `2^128`
+pub type GF256 = BigGF<u128, 2, 256>;
 
 #[cfg(test)]
 impl Distribution<GF256> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF256 {
-        GF256 {
-            first_value: rng.sample(self),
-            second_value: rng.sample(Self),
-        }
-    }
-}
-
-impl Double for GF256 {
-    fn double(self) -> Self {
-        // TODO: check efficiency
-        let choice = ((self.second_value >> (128 - 1)) as u8).into_choice();
-        let mut new_self = self.switch_left_1();
-        new_self.first_value ^=
-            u128::conditional_select(&Self::ZERO.first_value, &Self::MODULUS.first_value, choice);
-        new_self
-    }
-}
-
-impl Alphas for GF256 {
-    const ALPHA: [Self; 7] = [
-        Self {
-            first_value: 0xbed68d38a0474e67969788420bdefee7u128,
-            second_value: 0x04c9a8cf20c95833df229845f8f1e16au128,
-        },
-        Self {
-            first_value: 0x2ba5c48d2c42072fa95af52ad52289c1u128,
-            second_value: 0x064e4d699c5b4af1d14a0d376c00b0eau128,
-        },
-        Self {
-            first_value: 0x1771831e533b0f5755dab3833f809d1du128,
-            second_value: 0x6195e3db7011f68dfb96573fad3fac10u128,
-        },
-        Self {
-            first_value: 0x752758911a30e3f6de010519b01bcdd5u128,
-            second_value: 0x56c24fd64f7688382a0778b6489ea03fu128,
-        },
-        Self {
-            first_value: 0x1bc4dbd440f1848298c2f529e98a30b6u128,
-            second_value: 0x22270b6d71574ffc2fbe09947d49a981u128,
-        },
-        Self {
-            first_value: 0xaced66c666f1afbc9e75afb9de44670bu128,
-            second_value: 0xc03d372fd1fa29f3f001253ff2991f7eu128,
-        },
-        Self {
-            first_value: 0x5237c4d625b86f0dba43b698b332e88bu128,
-            second_value: 0x133eea09d26b7bb82f652b2af4e81545u128,
-        },
-    ];
-}
-
-impl BigGaloisField for GF256 {
-    const LENGTH: u32 = 256u32;
-
-    const MODULUS: Self = Self {
-        first_value: 0b10000100101u128,
-        second_value: 0u128,
-    };
-
-    const MAX: Self = Self {
-        first_value: u128::MAX,
-        second_value: u128::MAX,
-    };
-
-    fn new(first_value: u128, second_value: u128) -> Self {
-        Self {
-            first_value,
-            second_value,
-        }
-    }
-
-    fn get_value(&self) -> (u128, u128) {
-        (self.first_value, self.second_value)
-    }
-
-    fn to_bytes(input: Self) -> Vec<u8> {
-        let mut res = Vec::with_capacity(Self::LENGTH as usize / 8);
-        res.append(&mut input.get_value().0.to_le_bytes().to_vec());
-        res.append(&mut input.get_value().1.to_le_bytes().to_vec());
-        res
+        BigGF([rng.sample(self), rng.sample(self)])
     }
 }
 
