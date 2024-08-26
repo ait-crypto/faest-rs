@@ -140,7 +140,7 @@ where
 }
 
 /// Helper trait for blanket implementations of [SumPoly]
-trait Double: Field {
+trait Double: Sized {
     fn double(self) -> Self;
 }
 
