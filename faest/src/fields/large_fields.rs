@@ -2,8 +2,8 @@ use std::{
     array, mem,
     num::Wrapping,
     ops::{
-        Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitXor, BitXorAssign, Mul, MulAssign, Neg,
-        Shl, Shr, Sub, SubAssign,
+        Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitXor, BitXorAssign, Mul, MulAssign, Shl,
+        Shr, Sub, SubAssign,
     },
 };
 
@@ -58,43 +58,9 @@ where
 {
     const LENGTH: u32;
 
-    const MODULUS: Self;
-
-    const MAX: Self;
-
     fn new(first_value: u128, second_value: u128) -> Self;
 
     fn get_value(&self) -> (u128, u128);
-
-    //return MAX if the input is different from 0
-    fn all_bytes_heavyweight(self) -> Self {
-        let (first_value, second_value) = self.get_value();
-        let c_1 = (first_value & ((1u128 << 127).wrapping_shr(first_value.leading_zeros())))
-            .wrapping_shl(first_value.leading_zeros())
-            >> 127;
-        let c_2 = (second_value & ((1u128 << 127).wrapping_shr(second_value.leading_zeros())))
-            .wrapping_shl(second_value.leading_zeros())
-            >> 127;
-        let c = c_1 | c_2;
-        Self::new(u128::MAX * c, u128::MAX * c)
-    }
-
-    fn switch_left_1(self) -> Self {
-        let (first_value, second_value) = self.get_value();
-        let carry = (first_value & (1u128 << 127)) >> 127;
-        let first_res = first_value.wrapping_shl(1);
-        let second_res = (second_value.wrapping_shl(1)) | carry;
-        Self::new(first_res, second_res)
-    }
-
-    fn and(left: &Self, right: &Self) -> Self {
-        let (l_first_value, l_second_value) = left.get_value();
-        let (r_first_value, r_second_value) = right.get_value();
-        Self::new(
-            l_first_value & r_first_value,
-            l_second_value & r_second_value,
-        )
-    }
 
     fn to_bytes(input: Self) -> Vec<u8>;
 
@@ -714,10 +680,6 @@ impl From<&[u8]> for BigGF<u128, 1, 128> {
 impl BigGaloisField for BigGF<u128, 1, 128> {
     const LENGTH: u32 = 128;
 
-    const MODULUS: Self = Self([<Self as Modulus<u128>>::MODULUS]);
-
-    const MAX: Self = Self([u128::MAX]);
-
     fn new(first_value: u128, _second_value: u128) -> Self {
         Self([first_value])
     }
@@ -728,14 +690,6 @@ impl BigGaloisField for BigGF<u128, 1, 128> {
 
     fn to_bytes(input: Self) -> Vec<u8> {
         input.0[0].to_le_bytes().to_vec()
-    }
-
-    fn switch_left_1(self) -> Self {
-        self.shift_left_1()
-    }
-
-    fn and(left: &Self, right: &Self) -> Self {
-        todo!()
     }
 }
 
@@ -817,10 +771,6 @@ impl From<&[u8]> for BigGF<u128, 2, 192> {
 impl BigGaloisField for BigGF<u128, 2, 192> {
     const LENGTH: u32 = 192;
 
-    const MODULUS: Self = Self([<Self as Modulus<u128>>::MODULUS, 0]);
-
-    const MAX: Self = Self([u128::MAX, u64::MAX as u128]);
-
     fn new(first_value: u128, second_value: u128) -> Self {
         Self([first_value, second_value]).clear_high_bits()
     }
@@ -834,14 +784,6 @@ impl BigGaloisField for BigGF<u128, 2, 192> {
         res.append(&mut input.0[0].to_le_bytes().to_vec());
         res.append(&mut input.0[1].to_le_bytes()[..8].to_vec());
         res
-    }
-
-    fn switch_left_1(self) -> Self {
-        self.shift_left_1()
-    }
-
-    fn and(left: &Self, right: &Self) -> Self {
-        todo!()
     }
 }
 
@@ -927,10 +869,6 @@ impl From<&[u8]> for BigGF<u128, 2, 256> {
 impl BigGaloisField for BigGF<u128, 2, 256> {
     const LENGTH: u32 = 256;
 
-    const MODULUS: Self = Self([<Self as Modulus<u128>>::MODULUS, 0]);
-
-    const MAX: Self = Self([u128::MAX, u128::MAX]);
-
     fn new(first_value: u128, second_value: u128) -> Self {
         Self([first_value, second_value])
     }
@@ -943,14 +881,6 @@ impl BigGaloisField for BigGF<u128, 2, 256> {
         let mut bytes = input.0[0].to_le_bytes().to_vec();
         bytes.extend_from_slice(&input.0[1].to_le_bytes());
         bytes
-    }
-
-    fn switch_left_1(self) -> Self {
-        self.shift_left_1()
-    }
-
-    fn and(left: &Self, right: &Self) -> Self {
-        todo!()
     }
 }
 
@@ -987,42 +917,6 @@ mod test {
         let (first_value, second_value) = polynome.get_value();
         assert_eq!(first_value, 243806996201303833512771950610419307673u128);
         assert_eq!(second_value, 0u128);
-    }
-
-    #[test]
-    //precondition: a GF128
-    //postcondition : return MAX if the input is different from 0
-    fn gf128_test_all_bytes_heavyweight() {
-        //input != 0
-        let pol_1 = GF128::ONE;
-        let pol_1_big = GF128::new(2730312856557028196081990424695764059u128 | 1u128, 0u128);
-        let pol_2 = pol_1.all_bytes_heavyweight();
-        let pol_2_big = pol_1_big.all_bytes_heavyweight();
-        assert_eq!(pol_2, GF128::MAX);
-        assert_eq!(pol_2_big, GF128::MAX);
-        //input = 0
-        let pol_0 = GF128::default();
-        let pol_res = pol_0.all_bytes_heavyweight();
-        assert_eq!(pol_res, pol_0);
-        let pol_0_p = GF128::new(0u128, 63483453u128);
-        let pol_res_p = pol_0_p.all_bytes_heavyweight();
-        assert_eq!(pol_res_p, pol_0);
-    }
-
-    #[test]
-    //precondition : a GF128
-    //a GF128 that has switch to the left by one
-    fn gf128_test_switch_left_1() {
-        let mut rng = rand::thread_rng();
-
-        for _i in 0..10000 {
-            let random: u128 = rng.gen();
-            let pol_1 = GF128::new(random, 0u128);
-            let pol_1_res = pol_1.switch_left_1();
-            let (first_value, second_value) = pol_1_res.get_value();
-            assert_eq!(first_value, random.wrapping_shl(1));
-            assert_eq!(second_value, 0u128);
-        }
     }
 
     #[test]
@@ -2136,24 +2030,6 @@ mod test {
 
     #[test]
     //input : two GF128
-    //output : the result of the and bitwise operation on the two inputs
-    fn gf128_test_and() {
-        let mut rng = rand::thread_rng();
-
-        for _i in 0..10000 {
-            let random_1_1 = rng.gen();
-            let random_2_1 = rng.gen();
-            let pol_1 = GF128::new(random_1_1, 0u128);
-            let pol_2 = GF128::new(random_2_1, 0u128);
-            let pol_res = GF128::and(&pol_1, &pol_2);
-            let (first_value, second_value) = pol_res.get_value();
-            assert_eq!(first_value, random_1_1 & random_2_1);
-            assert_eq!(second_value, 0u128);
-        }
-    }
-
-    #[test]
-    //input : two GF128
     //output : the result of the xor bitwise operation on the two inputs
     fn gf128_test_add() {
         let mut rng = rand::thread_rng();
@@ -2510,52 +2386,6 @@ mod test {
             other_second_value,
             275646867658955913877178570363409381843u128 & u64::MAX as u128
         );
-    }
-
-    #[test]
-    //precondition: a GF192
-    //postcondition : return MAX if the input is different from 0
-    fn gf192_test_all_bytes_heavyweight() {
-        //input != 1
-        let pol_1 = GF192::new(1u128, 0u128);
-        let pol_1_big = GF192::new(
-            2730312856557028196081990424695764059u128 | 1u128,
-            2730312856557028196081990424695764059u128,
-        );
-        let pol_2 = pol_1.all_bytes_heavyweight();
-        let pol_2_big = pol_1_big.all_bytes_heavyweight();
-        assert_eq!(pol_2, GF192::MAX);
-        assert_eq!(pol_2_big, GF192::MAX);
-        let pol_1_p = GF192::new(0u128, 63483453u128);
-        let pol_2_p = pol_1_p.all_bytes_heavyweight();
-        assert_eq!(pol_2_p, GF192::MAX);
-
-        //input = 0
-        let pol_3 = GF192::default();
-        let pol_4 = pol_3.all_bytes_heavyweight();
-        assert_eq!(pol_4, pol_3);
-    }
-
-    #[test]
-    //precondition : a GF192
-    //a GF192 that has switch to the left by one
-    fn gf192_test_switch_left_1() {
-        let mut rng = rand::thread_rng();
-
-        for _i in 0..10000 {
-            let random_1 = rng.gen();
-            let random_2 = rng.gen();
-            let pol_1 = GF192::new(random_1, random_2);
-            let pol_1_res = pol_1.switch_left_1();
-            let (first_value, second_value) = pol_1_res.get_value();
-            assert_eq!(first_value, random_1.wrapping_shl(1));
-            assert_eq!(
-                second_value,
-                ((random_2 & u64::MAX as u128).wrapping_shl(1)
-                    | (random_1 & (1u128 << 127)) >> 127)
-                    & u64::MAX as u128
-            );
-        }
     }
 
     #[test]
@@ -4267,26 +4097,6 @@ mod test {
     }
 
     #[test]
-    //input : two GF192
-    //output : the result of the xor bitwise operation on the two inputs
-    fn gf192_test_and() {
-        let mut rng = rand::thread_rng();
-
-        for _i in 0..10000 {
-            let random_1_1 = rng.gen();
-            let random_1_2 = rng.gen::<u128>() & u64::MAX as u128;
-            let random_2_1 = rng.gen();
-            let random_2_2 = rng.gen::<u128>() & u64::MAX as u128;
-            let pol_1 = GF192::new(random_1_1, random_1_2);
-            let pol_2 = GF192::new(random_2_1, random_2_2);
-            let pol_res = GF192::and(&pol_1, &pol_2);
-            let (first_value, second_value) = pol_res.get_value();
-            assert_eq!(first_value, random_1_1 & random_2_1);
-            assert_eq!(second_value, random_1_2 & random_2_2);
-        }
-    }
-
-    #[test]
     //To dest those one we use the test dataset of the reference implementation
     fn gf192_test_byte_combine() {
         let database = [
@@ -4835,50 +4645,6 @@ mod test {
         let (first_value, second_value) = polynome.get_value();
         assert_eq!(first_value, 164039018632738885083851012429149951352u128);
         assert_eq!(second_value, 259919711421018557325306649715233556854u128);
-    }
-
-    #[test]
-    //precondition: a GF256
-    //postcondition : return MAX if the input is different from 0
-    fn gf256_test_all_bytes_heavyweight() {
-        //input != 0
-        let pol_1 = GF256::new(1u128, 0u128);
-        let pol_1_big = GF256::new(
-            2730312856557028196081990424695764059u128 | 1u128,
-            2730312856557028196081990424695764059u128,
-        );
-        let pol_2 = pol_1.all_bytes_heavyweight();
-        let pol_2_big = pol_1_big.all_bytes_heavyweight();
-        assert_eq!(pol_2, GF256::MAX);
-        assert_eq!(pol_2_big, GF256::MAX);
-        let pol_1_p = GF256::new(0u128, 63483453u128);
-        let pol_2_p = pol_1_p.all_bytes_heavyweight();
-        assert_eq!(pol_2_p, GF256::MAX);
-
-        //input = 0
-        let pol_3 = GF256::default();
-        let pol_4 = pol_3.all_bytes_heavyweight();
-        assert_eq!(pol_4, pol_3);
-    }
-
-    #[test]
-    //precondition : a GF256
-    //a GF256 that has switch to the left by one
-    fn gf256_test_switch_left_1() {
-        let mut rng = rand::thread_rng();
-
-        for _i in 0..10000 {
-            let random_1 = rng.gen();
-            let random_2 = rng.gen();
-            let pol_1 = GF256::new(random_1, random_2);
-            let pol_1_res = pol_1.switch_left_1();
-            let (first_value, second_value) = pol_1_res.get_value();
-            assert_eq!(first_value, random_1.wrapping_shl(1));
-            assert_eq!(
-                second_value,
-                (random_2).wrapping_shl(1) | (random_1 & (1u128 << 127)) >> 127
-            );
-        }
     }
 
     #[test]
@@ -6565,26 +6331,6 @@ mod test {
             let (first_value_3, second_value_3) = pol_res_3.get_value();
             assert_eq!(first_value_3, 0u128);
             assert_eq!(second_value_3, 0u128);
-        }
-    }
-
-    #[test]
-    //input : two GF256
-    //output : the result of the and bitwise operation on the two inputs
-    fn gf256_test_and() {
-        let mut rng = rand::thread_rng();
-
-        for _i in 0..10000 {
-            let random_1_1 = rng.gen();
-            let random_1_2 = rng.gen();
-            let random_2_1 = rng.gen();
-            let random_2_2 = rng.gen();
-            let pol_1 = GF256::new(random_1_1, random_1_2);
-            let pol_2 = GF256::new(random_2_1, random_2_2);
-            let pol_res = GF256::and(&pol_1, &pol_2);
-            let (first_value, second_value) = pol_res.get_value();
-            assert_eq!(first_value, random_1_1 & random_2_1);
-            assert_eq!(second_value, random_1_2 & random_2_2);
         }
     }
 
