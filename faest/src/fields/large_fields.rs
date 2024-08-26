@@ -36,17 +36,22 @@ trait Alphas: Sized {
 //For GF192 and GF256, as u192 and u256 dont exist in rust, we will implement a new trait BigGaloisField, in wich we will also implement basis operations.
 
 /// "Marker" trait for the larger binary Galois fields, i.e., [GF128], [GF192] and [GF256].
-pub trait BigGaloisField: Field
+pub trait BigGaloisField:
+    Field
+    + Copy
+    + Mul<u8, Output = Self>
+    + Mul<GF64, Output = Self>
+    + ConditionallySelectable
+    + ByteCombine
+    + SumPoly
 where
-    Self: Sized + Copy,
     Self: for<'a> From<&'a [u8]>,
-    Self: Mul<u8, Output = Self>,
-    Self: Mul<GF64, Output = Self>,
+    Self: for<'a> AddAssign<&'a Self>,
+    Self: for<'a> Add<&'a Self, Output = Self>,
+    Self: for<'a> SubAssign<&'a Self>,
+    Self: for<'a> Sub<&'a Self, Output = Self>,
     Self: for<'a> MulAssign<&'a Self>,
     Self: for<'a> Mul<&'a Self, Output = Self>,
-    Self: ConditionallySelectable,
-    Self: ByteCombine,
-    Self: SumPoly,
 {
     const LENGTH: u32;
 
