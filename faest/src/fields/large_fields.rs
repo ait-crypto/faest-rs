@@ -166,488 +166,6 @@ where
     }
 }
 
-macro_rules! impl_From {
-    (for $($t:ty),+) => {
-        $(impl From<&[u8]> for $t {
-            fn from(value: &[u8]) -> Self {
-                let mut array_1 = [0u8; 16];
-                let mut array_2 = [0u8; 16];
-                let mut data = value.to_vec();
-                data.append(&mut vec![0u8; 32 - value.len()]);
-                array_1.copy_from_slice(&data[..16]);
-                array_2.copy_from_slice(&data[16..]);
-                Self::new(u128::from_le_bytes(array_1), u128::from_le_bytes(array_2))
-            }
-        })*
-    }
-}
-
-impl_From!(for GF192);
-
-macro_rules! impl_Add {
-    (for $($t:ty),+) => {
-        $(impl Add for $t {
-            type Output = Self;
-            fn add(self, other: Self) -> Self::Output{
-                let (l_first_value, l_second_value) = self.get_value();
-                let (r_first_value, r_second_value) = other.get_value();
-                Self::new(
-                    l_first_value ^ r_first_value,
-                    l_second_value ^ r_second_value,
-                )
-            }
-        })*
-    }
-}
-
-impl_Add!(for GF192);
-
-macro_rules! impl_AddRef {
-    (for $($t:ty),+) => {
-        $(impl Add<&Self> for $t {
-            type Output = Self;
-            fn add(self, other: &Self) -> Self::Output{
-                let (l_first_value, l_second_value) = self.get_value();
-                let (r_first_value, r_second_value) = other.get_value();
-                Self::new(
-                    l_first_value ^ r_first_value,
-                    l_second_value ^ r_second_value,
-                )
-            }
-        })*
-    }
-}
-
-impl_AddRef!(for GF192);
-
-macro_rules! impl_RefAdd {
-    (for $($t:ty),+) => {
-        $(impl<'a, 'b> Add<&'b $t> for &'a $t {
-            type Output = $t;
-            fn add(self, other: &'b $t) -> $t{
-                let (l_first_value, l_second_value) = self.get_value();
-                let (r_first_value, r_second_value) = other.get_value();
-                return (<$t>::new(l_first_value ^ r_first_value,
-                    l_second_value ^ r_second_value)
-                );
-            }
-        })*
-    }
-}
-
-impl_RefAdd!(for GF192);
-
-macro_rules! impl_Sub {
-    (for $($t:ty),+) => {
-        $(impl Sub for $t {
-            type Output = Self;
-            fn sub(self, other: Self) -> Self::Output{
-                let (l_first_value, l_second_value) = self.get_value();
-                let (r_first_value, r_second_value) = other.get_value();
-                Self::new(
-                    l_first_value ^ r_first_value,
-                    l_second_value ^ r_second_value,
-                )
-            }
-        })*
-    }
-}
-
-impl_Sub!(for GF192);
-
-macro_rules! impl_SubRef {
-    (for $($t:ty),+) => {
-        $(impl Sub<&Self> for $t {
-            type Output = Self;
-            fn sub(self, other: &Self) -> Self::Output{
-                let (l_first_value, l_second_value) = self.get_value();
-                let (r_first_value, r_second_value) = other.get_value();
-                Self::new(
-                    l_first_value ^ r_first_value,
-                    l_second_value ^ r_second_value,
-                )
-            }
-        })*
-    }
-}
-
-impl_SubRef!(for GF192);
-
-macro_rules! impl_RefSub {
-    (for $($t:ty),+) => {
-        $(impl<'a, 'b> Sub<&'b $t> for &'a $t {
-            type Output = $t;
-            fn sub(self, other: &'b $t) -> $t{
-                let (l_first_value, l_second_value) = self.get_value();
-                let (r_first_value, r_second_value) = other.get_value();
-                return (<$t>::new(l_first_value ^ r_first_value,
-                    l_second_value ^ r_second_value)
-                );
-            }
-        })*
-    }
-}
-
-impl_RefSub!(for GF192);
-
-macro_rules! impl_Mul {
-    (for $($t:ty),+) => {
-        $(impl Mul for $t {
-            type Output = Self;
-            fn mul(self, right: Self) -> Self::Output {
-                let mut leftc = self; //to avoid side effect
-                let mut result = Self::and(
-                    &Self::and(&right, &Self::ONE).all_bytes_heavyweight(),
-                    &leftc,
-                );
-                for i in 1..Self::LENGTH {
-                    let mask = Self::and(
-                        &leftc,
-                        &Self::new(
-                            (1_u128 - ((Self::LENGTH - 1) / 128) as u128)
-                                * (1_u128 << ((Self::LENGTH - 1) % 128)),
-                            ((Self::LENGTH - 1) as u128 / 128) * (1_u128 << ((Self::LENGTH - 1) % 128)),
-                        ),
-                    )
-                    .all_bytes_heavyweight();
-                    leftc = leftc.switch_left_1() + Self::and(&mask, &Self::MODULUS);
-                    result =
-                        Self::and(
-                            &Self::and(
-                                &right,
-                                &Self::new(
-                                    (1_u128 - (i as u128 / 128)) * (1_u128 << (i as u128 % 128)),
-                                    (i as u128 / 128) * (1_u128 << (i as u128 % 128)),
-                                ),
-                            )
-                            .all_bytes_heavyweight(),
-                            &leftc,
-                        ) +
-                        result
-                    ;
-                }
-                result
-            }
-        })*
-    }
-}
-
-impl_Mul!(for GF192);
-
-macro_rules! impl_Mul64 {
-    (for $($t:ty),+) => {
-        $(impl Mul<GF64> for $t {
-            type Output = Self;
-            fn mul(self, right: GF64) -> Self::Output {
-                let right = <$t>::new(u64::from(right) as u128, 0u128);
-                return self * right
-            }
-        }
-
-        impl Mul<u64> for $t {
-            type Output = Self;
-            fn mul(self, right: u64) -> Self::Output {
-                let right = <$t>::new(right as u128, 0u128);
-                return self * right
-            }
-        }    )*
-    }
-}
-
-impl_Mul64!(for GF192);
-
-macro_rules! impl_RefMul64 {
-    (for $($t:ty),+) => {
-        $(impl<'a> Mul<u64> for &'a $t {
-            type Output = $t;
-            fn mul(self, other: u64) -> $t{
-                let right = <$t>::new(other as u128, 0u128);
-                return *self * right
-            }
-        })*
-    }
-}
-
-impl_RefMul64!(for GF192);
-
-impl ConditionallySelectable for GF192 {
-    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
-        Self {
-            first_value: u128::conditional_select(&a.first_value, &b.first_value, choice),
-            second_value: u128::conditional_select(&a.second_value, &b.second_value, choice),
-        }
-    }
-}
-
-macro_rules! impl_Mul8 {
-    (for $($t:ty),+) => {
-        $(impl Mul<u8> for $t {
-            type Output = Self;
-
-            #[allow(clippy::suspicious_arithmetic_impl)]
-            fn mul(self, right: u8) -> Self::Output {
-                Self::conditional_select(&Self::ZERO, &self, right.into_choice())
-            }
-        })*
-    }
-}
-
-impl_Mul8!(for GF192);
-
-macro_rules! impl_RefMul8 {
-    (for $($t:ty),+) => {
-        $(impl<'a> Mul<u8> for &'a $t {
-            type Output = $t;
-
-            #[allow(clippy::suspicious_arithmetic_impl)]
-            fn mul(self,right: u8) -> $t {
-                <$t>::conditional_select(&<$t>::ZERO, &self, right.into_choice())
-            }
-        })*
-    }
-}
-
-impl_RefMul8!(for GF192);
-
-macro_rules! impl_MulRef {
-    (for $($t:ty),+) => {
-        $(impl Mul<&Self> for $t {
-            type Output = Self;
-            fn mul(self, right: &Self) -> Self::Output {
-                self * *right
-            }
-        })*
-    }
-}
-
-impl_MulRef!(for GF192);
-
-macro_rules! impl_RefMul {
-    (for $($t:ty),+) => {
-        $(impl<'a, 'b> Mul<&'b $t> for &'a $t {
-            type Output = $t;
-            fn mul(self, right: &'b $t) -> $t {
-                *self * *right
-            }
-        })*
-    }
-}
-
-impl_RefMul!(for GF192);
-
-macro_rules! impl_AddAssign {
-    (for $($t:ty),+) => {
-        $(impl AddAssign for $t {
-            fn add_assign(&mut self, other: Self) {
-                *self = (*self + other);
-            }
-        })*
-    }
-}
-
-impl_AddAssign!(for GF192);
-
-macro_rules! impl_AddAssignRef {
-    (for $($t:ty),+) => {
-        $(impl AddAssign<&Self> for $t {
-            fn add_assign(&mut self, other: &Self) {
-                let res = *self + *other;
-                *self = res;
-            }
-        })*
-    }
-}
-
-impl_AddAssignRef!(for GF192);
-
-macro_rules! impl_SubAssign {
-    (for $($t:ty),+) => {
-        $(impl std::ops::SubAssign for $t {
-            #[allow(clippy::suspicious_op_assign_impl)]
-            fn sub_assign(&mut self, other: Self) {
-                *self += other;
-            }
-        })*
-    }
-}
-
-impl_SubAssign!(for GF192);
-
-macro_rules! impl_SubAssignRef {
-    (for $($t:ty),+) => {
-        $(impl std::ops::SubAssign<&Self> for $t {
-            #[allow(clippy::suspicious_op_assign_impl)]
-            fn sub_assign(&mut self, other: &Self) {
-                *self += *other;
-            }
-        })*
-    }
-}
-
-impl_SubAssignRef!(for GF192);
-
-macro_rules! impl_MulAssign {
-    (for $($t:ty),+) => {
-        $(impl MulAssign for $t {
-            fn mul_assign(&mut self, other: Self) {
-                *self = *self * other;
-            }
-        })*
-    }
-}
-
-impl_MulAssign!(for GF192);
-
-macro_rules! impl_MulAssignRef {
-    (for $($t:ty),+) => {
-        $(impl MulAssign<&Self> for $t {
-            fn mul_assign(&mut self, other: &Self) {
-                *self = *self * *other;
-            }
-        })*
-    }
-}
-
-impl_MulAssignRef!(for GF192);
-
-macro_rules! impl_MulAssign64 {
-    (for $($t:ty),+) => {
-        $(impl MulAssign<GF64> for $t {
-            fn mul_assign(&mut self, other: GF64) {
-                *self = *self * other;
-            }
-        }
-
-        impl MulAssign<u64> for $t {
-            fn mul_assign(&mut self, other: u64) {
-                *self = *self * other;
-            }
-        }    )*
-    }
-}
-
-impl_MulAssign64!(for GF192);
-
-macro_rules! impl_MulAssign8 {
-    (for $($t:ty),+) => {
-        $(impl MulAssign<u8> for $t {
-            fn mul_assign(&mut self, other: u8) {
-                self.conditional_assign(&Self::default(), (!other).into_choice());
-            }
-        })*
-    }
-}
-
-impl_MulAssign8!(for GF192);
-
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-pub struct GF192 {
-    first_value: u128,
-    second_value: u128,
-}
-
-impl FromBit for GF192 {}
-
-impl Field for GF192 {
-    const ZERO: Self = Self {
-        first_value: 0,
-        second_value: 0,
-    };
-    const ONE: Self = Self {
-        first_value: 1,
-        second_value: 0,
-    };
-}
-
-#[cfg(test)]
-impl Distribution<GF192> for Standard {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF192 {
-        GF192 {
-            first_value: rng.sample(self),
-            second_value: {
-                let v: u64 = rng.sample(self);
-                v as u128
-            },
-        }
-    }
-}
-
-impl Double for GF192 {
-    fn double(self) -> Self {
-        // TODO: check efficiency
-        let choice = ((self.second_value >> (64 - 1)) as u8).into_choice();
-        let mut new_self = self.switch_left_1();
-        new_self.first_value ^=
-            u128::conditional_select(&Self::ZERO.first_value, &Self::MODULUS.first_value, choice);
-        new_self
-    }
-}
-
-impl Alphas for GF192 {
-    const ALPHA: [Self; 7] = [
-        Self {
-            first_value: 0xe665d76c966ebdeaccc8a3d56f389763u128,
-            second_value: 0x310bc8140e6b3662u128,
-        },
-        Self {
-            first_value: 0x7bf61f19d5633f26b233619e7cf450bbu128,
-            second_value: 0xda933726d491db34u128,
-        },
-        Self {
-            first_value: 0x8232e37706328d199c6d2c13f5398a0du128,
-            second_value: 0x0c3b0d703c754ef6u128,
-        },
-        Self {
-            first_value: 0x7a5542ab0058d22edd20747cbd2bf75du128,
-            second_value: 0x45ec519c94bc1251u128,
-        },
-        Self {
-            first_value: 0x08168cb767debe84d8d50ce28ace2bf8u128,
-            second_value: 0xd67d146a4ba67045u128,
-        },
-        Self {
-            first_value: 0xf3eaf7ae5fd72048970f9c76eed5e1bau128,
-            second_value: 0x29a6bd5f696cea43u128,
-        },
-        Self {
-            first_value: 0x6019fd623906e9d3f5945dc265068571u128,
-            second_value: 0xc77c56540f87c4b0u128,
-        },
-    ];
-}
-
-impl BigGaloisField for GF192 {
-    const MODULUS: Self = Self {
-        first_value: 0b10000111u128,
-        second_value: 0u128,
-    };
-
-    const LENGTH: u32 = 192u32;
-
-    const MAX: Self = Self {
-        first_value: u128::MAX,
-        second_value: u64::MAX as u128,
-    };
-
-    fn new(first_value: u128, second_value: u128) -> Self {
-        GF192 {
-            first_value,
-            second_value: second_value & u64::MAX as u128,
-        }
-    }
-
-    fn get_value(&self) -> (u128, u128) {
-        (self.first_value, self.second_value)
-    }
-
-    fn to_bytes(input: Self) -> Vec<u8> {
-        let mut res = Vec::with_capacity(Self::LENGTH as usize / 8);
-        res.append(&mut input.get_value().0.to_le_bytes().to_vec());
-        res.append(&mut input.get_value().1.to_le_bytes()[..8].to_vec());
-        res
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct BigGF<T, const N: usize, const LENGTH: usize>([T; N]);
 
@@ -814,6 +332,26 @@ trait ToMask<T> {
     fn to_mask_bit(&self, bit: usize) -> T;
 }
 
+/* impl<T, const N: usize, const LENGTH: usize> ToMask<T> for BigGF<T, N, LENGTH>
+where
+    T: Copy + Shr<usize, Output = T>,
+    Wrapping<T>: Neg<Output = Wrapping<T>>,
+{
+    fn to_mask(&self) -> T {
+        let array_index = (LENGTH - 1) / (size_of::<T>() * 8);
+        let value_index = (LENGTH - 1) % (size_of::<T>() * 8);
+
+        (-Wrapping(self.0[array_index] >> value_index)).0
+    }
+
+    fn to_mask_bit(&self, bit: usize) -> T {
+        let array_index = bit / (size_of::<T>() * 8);
+        let value_index = bit % (size_of::<T>() * 8);
+
+        (-Wrapping(self.0[array_index] >> value_index)).0
+    }
+} */
+
 trait ApplyMask<T> {
     type Output;
 
@@ -846,8 +384,13 @@ trait ShiftLeft1 {
     fn shift_left_1(self) -> Self::Output;
 }
 
+trait ClearHighBits: Sized {
+    fn clear_high_bits(self) -> Self;
+}
+
 impl<T, const N: usize, const LENGTH: usize> ShiftLeft1 for BigGF<T, N, LENGTH>
 where
+    Self: ClearHighBits,
     T: Shl<usize, Output = T> + Shr<usize, Output = T> + BitOr<Output = T> + Copy,
 {
     type Output = Self;
@@ -857,7 +400,7 @@ where
             self.0[idx] = (self.0[idx] << 1) | (self.0[idx - 1] >> (mem::size_of::<T>() * 8 - 1));
         }
         self.0[0] = self.0[0] << 1;
-        self
+        self.clear_high_bits()
     }
 }
 
@@ -1134,6 +677,13 @@ impl Modulus<u128> for BigGF<u128, 1, 128> {
     const MODULUS: u128 = 0b10000111u128;
 }
 
+impl ClearHighBits for BigGF<u128, 1, 128> {
+    #[inline(always)]
+    fn clear_high_bits(self) -> Self {
+        self
+    }
+}
+
 impl Field for BigGF<u128, 1, 128> {
     const ZERO: Self = Self([0]);
     const ONE: Self = Self([1]);
@@ -1202,8 +752,124 @@ impl Distribution<GF128> for Standard {
     }
 }
 
+impl Modulus<u128> for BigGF<u128, 2, 192> {
+    const MODULUS: u128 = 0b10000111u128;
+}
+
+impl ClearHighBits for BigGF<u128, 2, 192> {
+    #[inline(always)]
+    fn clear_high_bits(mut self) -> Self {
+        self.0[1] &= u64::MAX as u128;
+        self
+    }
+}
+
+impl Field for BigGF<u128, 2, 192> {
+    const ZERO: Self = Self([0, 0]);
+    const ONE: Self = Self([1, 0]);
+}
+
+impl Alphas for BigGF<u128, 2, 192> {
+    const ALPHA: [Self; 7] = [
+        Self([
+            0xe665d76c966ebdeaccc8a3d56f389763u128,
+            0x310bc8140e6b3662u128,
+        ]),
+        Self([
+            0x7bf61f19d5633f26b233619e7cf450bbu128,
+            0xda933726d491db34u128,
+        ]),
+        Self([
+            0x8232e37706328d199c6d2c13f5398a0du128,
+            0x0c3b0d703c754ef6u128,
+        ]),
+        Self([
+            0x7a5542ab0058d22edd20747cbd2bf75du128,
+            0x45ec519c94bc1251u128,
+        ]),
+        Self([
+            0x08168cb767debe84d8d50ce28ace2bf8u128,
+            0xd67d146a4ba67045u128,
+        ]),
+        Self([
+            0xf3eaf7ae5fd72048970f9c76eed5e1bau128,
+            0x29a6bd5f696cea43u128,
+        ]),
+        Self([
+            0x6019fd623906e9d3f5945dc265068571u128,
+            0xc77c56540f87c4b0u128,
+        ]),
+    ];
+}
+
+impl From<&[u8]> for BigGF<u128, 2, 192> {
+    fn from(value: &[u8]) -> Self {
+        // FIXME
+        // assert_eq!(value.len(), 16);
+        let mut array_1 = [0u8; 16];
+        array_1.copy_from_slice(&value[..16]);
+        let mut array_2 = [0u8; 16];
+        array_2.copy_from_slice(&value[16..]);
+        Self([u128::from_le_bytes(array_1), u128::from_le_bytes(array_2)])
+    }
+}
+
+impl BigGaloisField for BigGF<u128, 2, 192> {
+    const LENGTH: u32 = 192;
+
+    const MODULUS: Self = Self([<Self as Modulus<u128>>::MODULUS, 0]);
+
+    const MAX: Self = Self([u128::MAX, u64::MAX as u128]);
+
+    fn new(first_value: u128, second_value: u128) -> Self {
+        Self([first_value, second_value]).clear_high_bits()
+    }
+
+    fn get_value(&self) -> (u128, u128) {
+        (self.0[0], self.0[1])
+    }
+
+    fn to_bytes(input: Self) -> Vec<u8> {
+        let mut res = Vec::with_capacity(Self::LENGTH as usize / 8);
+        res.append(&mut input.0[0].to_le_bytes().to_vec());
+        res.append(&mut input.0[1].to_le_bytes()[..8].to_vec());
+        res
+    }
+
+    fn switch_left_1(self) -> Self {
+        self.shift_left_1()
+    }
+
+    fn and(left: &Self, right: &Self) -> Self {
+        todo!()
+    }
+}
+
+#[cfg(test)]
+impl FromBit for BigGF<u128, 2, 192> {}
+
+/// Type representing binary Galois field of size `2^128`
+pub type GF192 = BigGF<u128, 2, 192>;
+
+#[cfg(test)]
+impl Distribution<GF192> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF192 {
+        BigGF([rng.sample(self), {
+            let v: u64 = rng.sample(self);
+            v as u128
+        }])
+    }
+}
+
 impl Modulus<u128> for BigGF<u128, 2, 256> {
     const MODULUS: u128 = 0b10000100101u128;
+}
+
+impl ClearHighBits for BigGF<u128, 2, 256> {
+    #[inline(always)]
+    fn clear_high_bits(self) -> Self {
+        self
+    }
 }
 
 impl Field for BigGF<u128, 2, 256> {
@@ -4583,7 +4249,7 @@ mod test {
     #[test]
     //input : two GF192
     //output : the result of the and bitwise operation on the two inputs
-    fn gf192_test_and() {
+    fn gf192_test_xor() {
         let mut rng = rand::thread_rng();
 
         for _i in 0..10000 {
@@ -4603,7 +4269,7 @@ mod test {
     #[test]
     //input : two GF192
     //output : the result of the xor bitwise operation on the two inputs
-    fn gf192_test_xor() {
+    fn gf192_test_and() {
         let mut rng = rand::thread_rng();
 
         for _i in 0..10000 {
