@@ -3,7 +3,7 @@ pub(crate) mod small_fields;
 
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 
-pub use large_fields::{BigGaloisField, GF128, GF192, GF256};
+pub use large_fields::{BigGaloisField, ByteCombine, SumPoly, GF128, GF192, GF256};
 pub use small_fields::{GaloisField, GF64, GF8};
 
 /// Trait covering the basic functionality of a field
