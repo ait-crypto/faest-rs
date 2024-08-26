@@ -824,10 +824,7 @@ impl Alphas for BigGF<u128, 2, 256> {
 
 impl From<&[u8]> for BigGF<u128, 2, 256> {
     fn from(value: &[u8]) -> Self {
-        // FIXME
-        // assert_eq!(value.len(), 16);
-        let mut array = [0u8; 16];
-        array.copy_from_slice(&value[..16]);
+        assert_eq!(value.len(), 32);
         Self(array::from_fn(|idx| {
             let mut array = [0u8; 16];
             array.copy_from_slice(&value[idx * 16..(idx + 1) * 16]);
