@@ -145,37 +145,31 @@ where
     }
 }
 
-// generic implementations of Add and AddASsign
+// generic implementations of Add and AddAssign
 
 impl<T, const N: usize, const LENGTH: usize> Add for BigGF<T, N, LENGTH>
 where
-    T: BitXorAssign + Copy,
+    T: BitXor<Output = T> + Copy,
 {
     type Output = Self;
 
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
-    fn add(mut self, rhs: Self) -> Self::Output {
-        for idx in 0..N {
-            self.0[idx] ^= rhs.0[idx];
-        }
-        self
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(array::from_fn(|idx| self.0[idx] ^ rhs.0[idx]))
     }
 }
 
 impl<T, const N: usize, const LENGTH: usize> Add<&Self> for BigGF<T, N, LENGTH>
 where
-    T: BitXorAssign<T> + Copy,
+    T: BitXor<Output = T> + Copy,
 {
     type Output = Self;
 
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
-    fn add(mut self, rhs: &Self) -> Self::Output {
-        for idx in 0..N {
-            self.0[idx] ^= rhs.0[idx];
-        }
-        self
+    fn add(self, rhs: &Self) -> Self::Output {
+        Self(array::from_fn(|idx| self.0[idx] ^ rhs.0[idx]))
     }
 }
 
@@ -222,59 +216,49 @@ where
 
 impl<T, const N: usize, const LENGTH: usize> Sub for BigGF<T, N, LENGTH>
 where
-    T: BitXorAssign + Copy,
+    Self: Add<Output = Self>,
 {
     type Output = Self;
 
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
-    fn sub(mut self, rhs: Self) -> Self::Output {
-        for idx in 0..N {
-            self.0[idx] ^= rhs.0[idx];
-        }
-        self
+    fn sub(self, rhs: Self) -> Self::Output {
+        self + rhs
     }
 }
 
 impl<T, const N: usize, const LENGTH: usize> Sub<&Self> for BigGF<T, N, LENGTH>
 where
-    T: BitXorAssign<T> + Copy,
+    Self: for<'a> Add<&'a Self, Output = Self>,
 {
     type Output = Self;
 
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
-    fn sub(mut self, rhs: &Self) -> Self::Output {
-        for idx in 0..N {
-            self.0[idx] ^= rhs.0[idx];
-        }
-        self
+    fn sub(self, rhs: &Self) -> Self::Output {
+        self + rhs
     }
 }
 
 impl<T, const N: usize, const LENGTH: usize> SubAssign for BigGF<T, N, LENGTH>
 where
-    T: BitXorAssign<T> + Copy,
+    Self: AddAssign,
 {
     #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: Self) {
-        for idx in 0..N {
-            self.0[idx] ^= rhs.0[idx];
-        }
+        *self += rhs;
     }
 }
 
 impl<T, const N: usize, const LENGTH: usize> SubAssign<&Self> for BigGF<T, N, LENGTH>
 where
-    T: BitXorAssign<T> + Copy,
+    Self: for<'a> AddAssign<&'a Self>,
 {
     #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: &Self) {
-        for idx in 0..N {
-            self.0[idx] ^= rhs.0[idx];
-        }
+        *self += rhs
     }
 }
 
