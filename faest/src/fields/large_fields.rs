@@ -54,7 +54,7 @@ where
 
     fn get_value(&self) -> (u128, u128);
 
-    fn to_bytes(input: Self) -> Vec<u8>;
+    fn to_bytes(&self) -> Vec<u8>;
 
     fn to_field(x: &[u8]) -> Vec<Self> {
         let n = (8 * x.len()) / (Self::LENGTH as usize);
@@ -664,8 +664,8 @@ impl BigGaloisField for BigGF<u128, 1, 128> {
         (self.0[0], 0)
     }
 
-    fn to_bytes(input: Self) -> Vec<u8> {
-        input.0[0].to_le_bytes().to_vec()
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0[0].to_le_bytes().to_vec()
     }
 }
 
@@ -752,10 +752,10 @@ impl BigGaloisField for BigGF<u128, 2, 192> {
         (self.0[0], self.0[1])
     }
 
-    fn to_bytes(input: Self) -> Vec<u8> {
+    fn to_bytes(&self) -> Vec<u8> {
         let mut res = Vec::with_capacity(Self::LENGTH as usize / 8);
-        res.append(&mut input.0[0].to_le_bytes().to_vec());
-        res.append(&mut input.0[1].to_le_bytes()[..8].to_vec());
+        res.extend_from_slice(&self.0[0].to_le_bytes());
+        res.extend_from_slice(&self.0[1].to_le_bytes()[..8]);
         res
     }
 }
@@ -847,10 +847,11 @@ impl BigGaloisField for BigGF<u128, 2, 256> {
         (self.0[0], self.0[1])
     }
 
-    fn to_bytes(input: Self) -> Vec<u8> {
-        let mut bytes = input.0[0].to_le_bytes().to_vec();
-        bytes.extend_from_slice(&input.0[1].to_le_bytes());
-        bytes
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut res = Vec::with_capacity(Self::LENGTH as usize / 8);
+        res.extend_from_slice(&self.0[0].to_le_bytes());
+        res.extend_from_slice(&self.0[1].to_le_bytes());
+        res
     }
 }
 
