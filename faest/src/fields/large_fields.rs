@@ -876,7 +876,9 @@ impl Distribution<GF256> for Standard {
 #[cfg(test)]
 mod test {
     use super::*;
+
     use num_bigint::BigUint;
+    use rand::{rngs::SmallRng, SeedableRng};
 
     //GF128
     #[test]
@@ -899,7 +901,7 @@ mod test {
     //input : two GF128
     //output : the product of the two according to the rules of Galois Fields arithmetic
     fn gf128_test_mul() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         //0 * anything = 0
         let pol_0 = GF128::default();
@@ -1917,7 +1919,7 @@ mod test {
     //output : the product of the two according to the rules of Galois Fields arithmetic
     #[allow(clippy::erasing_op)]
     fn gf128_test_mul_64() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         let pol_0 = GF128::default();
         for _i in 0..1000 {
@@ -1974,7 +1976,7 @@ mod test {
     //input : one GF128 and one GF128 restricted to 1 memory bits
     #[allow(clippy::erasing_op)] //output : the product of the two according to the rules of Galois Fields arithmetic
     fn gf128_test_mul_bit() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         for _i in 0..1000 {
             //anything * 0 = 0
@@ -2008,7 +2010,7 @@ mod test {
     //input : two GF128
     //output : the result of the xor bitwise operation on the two inputs
     fn gf128_test_add() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         for _i in 0..10000 {
             let random_1_1 = rng.gen();
@@ -2277,7 +2279,7 @@ mod test {
     #[test]
     //We see if the to field function give the same result that what we could have with BigUint
     fn gf128_test_to_field() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         for _i in 0..1000 {
             let random: [u8; 16] = rng.gen();
@@ -2338,7 +2340,7 @@ mod test {
     //input : two GF192
     //output : the product of the two according to te rules of Galois Fields arithmetic
     fn gf192_test_mul() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         //0 * anything = 0
         let pol_0 = GF192::default();
@@ -3929,7 +3931,7 @@ mod test {
     //output : the product of the two according to the rules of Galois Fields arithmetic
     #[allow(clippy::erasing_op)]
     fn gf192_test_mul_64() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         let pol_0 = GF192::default();
         for _i in 0..1000 {
@@ -3992,7 +3994,7 @@ mod test {
     //output : the product of the two according to the rules of Galois Fields arithmetic
     #[allow(clippy::erasing_op)]
     fn gf192_test_mul_bit() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         for _i in 0..1000 {
             //anything * 0 = 0
@@ -4026,7 +4028,7 @@ mod test {
     //input : two GF192
     //output : the result of the and bitwise operation on the two inputs
     fn gf192_test_xor() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         for _i in 0..10000 {
             let random_1_1 = rng.gen();
@@ -4517,7 +4519,7 @@ mod test {
     #[test]
     //We see if the to field function give the same result that what we could have with BigUint
     fn gf192_test_to_field() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         for _i in 0..1000 {
             let random: [u8; 24] = rng.gen();
@@ -4567,7 +4569,7 @@ mod test {
     //input : two GF256
     //output : the product of the two according to te rules of Galois Fields arithmetic
     fn gf256_test_mul() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         //0 * anything = 0
         let pol_0 = GF256::default();
@@ -6157,7 +6159,7 @@ mod test {
     //output : the product of the two according to the rules of Galois Fields arithmetic
     #[allow(clippy::erasing_op)]
     fn gf256_test_mul_64() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         let pol_0 = GF256::default();
         for _i in 0..1000 {
@@ -6220,7 +6222,7 @@ mod test {
     //output : the product of the two according to the rules of Galois Fields arithmetic
     #[allow(clippy::erasing_op)]
     fn gf256_test_mul_bit() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         for _i in 0..1000 {
             //anything * 0 = 0
@@ -6254,7 +6256,7 @@ mod test {
     //input : two GF256
     //output : the result of the xor bitwise operation on the two inputs
     fn gf256_test_xor() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         for _i in 0..10000 {
             let random_1_1 = rng.gen();
@@ -6745,7 +6747,7 @@ mod test {
     #[test]
     //We see if the to field function give the same result that what we could have with BigUint
     fn gf256_test_to_field() {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_entropy();
 
         for _i in 0..1000 {
             let random: [u8; 32] = rng.gen();

@@ -251,15 +251,18 @@ impl GaloisField<u64> for GF64 {}
 
 #[cfg(test)]
 mod test {
+    use rand::{rngs::SmallRng, Rng, SeedableRng};
+
     use super::*;
-    use rand::random;
 
     //GF8
     #[test]
     //Precondition = None
     //Post contidtion = GF8 whose get_value is as expected
     fn gf8_test_from_and_get_value() {
-        let x: u8 = random();
+        let mut rng = SmallRng::from_entropy();
+
+        let x: u8 = rng.gen();
         let polynome = GF8::from(x);
         assert_eq!(polynome, x);
     }
@@ -278,10 +281,12 @@ mod test {
     //1 * anything should be equal to anything
     //anything * 1 should be equal to anything
     fn gf8_test_mul() {
+        let mut rng = SmallRng::from_entropy();
+
         let pol_2 = GF8::from(2u8);
         let pol_135 = GF8::from(135u8);
         let pol_21 = GF8::from(21u8);
-        let anything: u8 = random();
+        let anything: u8 = rng.gen();
         let pol_anything = GF8::from(anything);
         let pol_0 = GF8::from(0u8);
         let pol_1 = GF8::from(1u8);
@@ -670,9 +675,11 @@ mod test {
     //anything * inv(anything) should be equal to 1
     //anything * inv(0) should be equal to 0
     fn gf8_test_inv() {
+        let mut rng = SmallRng::from_entropy();
+
         let pol_1 = GF8::from(1u8);
         let pol_0 = GF8::from(0u8);
-        let anything: u8 = random();
+        let anything: u8 = rng.gen();
         let pol_anything = GF8::from(anything);
         assert_eq!(pol_anything * GF8::inv(GF8::from(anything)), pol_1);
         assert_eq!(pol_anything * GF8::inv(GF8::from(0u8)), pol_0);
@@ -743,7 +750,9 @@ mod test {
     //Precondition = None
     //Post contidtion = GF64 whose get_value is as expected
     fn gf64_test_from_and_get_value() {
-        let x: u64 = random();
+        let mut rng = SmallRng::from_entropy();
+
+        let x: u64 = rng.gen();
         let polynome = GF64::from(x);
         assert_eq!(polynome, x);
     }
@@ -761,7 +770,9 @@ mod test {
     //1 * anything should be equal to anything
     //anything * 1 should be equal to anything
     fn gf64_test_mul() {
-        let anything: u64 = random();
+        let mut rng = SmallRng::from_entropy();
+
+        let anything: u64 = rng.gen();
         let pol_anything = GF64::from(anything);
         let pol_0 = GF64::from(0u64);
         let pol_1 = GF64::from(1u64);
@@ -1125,15 +1136,17 @@ mod test {
 
     #[test]
     fn gf64_test_to_field() {
+        let mut rng = SmallRng::from_entropy();
+
         for _i in 0..1000 {
-            let random = random::<[u8; 8]>();
+            let random: [u8; 8] = rng.gen();
             let res = GF64::to_field(&random);
             let verif = u64::from_le_bytes(random);
             assert_eq!(res[0], verif);
         }
         //with many
         for _i in 0..1000 {
-            let random = random::<[u8; 16]>();
+            let random: [u8; 16] = rng.gen();
             let res = GF64::to_field(&random);
             let verif_1 = u64::from_le_bytes(random[0..8].try_into().expect("REASON"));
             let verif_2 = u64::from_le_bytes(random[8..16].try_into().expect("REASON"));
