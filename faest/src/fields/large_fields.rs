@@ -53,7 +53,7 @@ where
     Self: for<'a> MulAssign<&'a Self>,
     Self: for<'a> Mul<&'a Self, Output = Self>,
 {
-    const LENGTH: u32;
+    const LENGTH: usize;
 
     fn new(first_value: u128, second_value: u128) -> Self;
 
@@ -62,14 +62,13 @@ where
     fn to_bytes(&self) -> Vec<u8>;
 
     fn to_field(x: &[u8]) -> Vec<Self> {
-        let n = (8 * x.len()) / (Self::LENGTH as usize);
+        let n = (8 * x.len()) / Self::LENGTH;
         let mut res = vec![];
         let padding_array = [0u8; 16];
         for i in 0..n {
-            let padded_value = &mut x
-                [(i * (Self::LENGTH as usize) / 8)..((i + 1) * (Self::LENGTH as usize) / 8)]
-                .to_vec();
-            padded_value.append(&mut padding_array[..(32 - (Self::LENGTH as usize) / 8)].to_vec());
+            let padded_value =
+                &mut x[(i * Self::LENGTH / 8)..((i + 1) * Self::LENGTH / 8)].to_vec();
+            padded_value.append(&mut padding_array[..(32 - Self::LENGTH / 8)].to_vec());
             res.push(Self::from(padded_value));
         }
         res
@@ -665,7 +664,7 @@ impl From<&[u8]> for BigGF<u128, 1, 128> {
 }
 
 impl BigGaloisField for BigGF<u128, 1, 128> {
-    const LENGTH: u32 = 128;
+    const LENGTH: usize = 128;
 
     fn new(first_value: u128, _second_value: u128) -> Self {
         Self([first_value])
@@ -753,7 +752,7 @@ impl From<&[u8]> for BigGF<u128, 2, 192> {
 }
 
 impl BigGaloisField for BigGF<u128, 2, 192> {
-    const LENGTH: u32 = 192;
+    const LENGTH: usize = 192;
 
     fn new(first_value: u128, second_value: u128) -> Self {
         Self([first_value, second_value]).clear_high_bits()
@@ -764,7 +763,7 @@ impl BigGaloisField for BigGF<u128, 2, 192> {
     }
 
     fn to_bytes(&self) -> Vec<u8> {
-        let mut res = Vec::with_capacity(Self::LENGTH as usize / 8);
+        let mut res = Vec::with_capacity(Self::LENGTH / 8);
         res.extend_from_slice(&self.0[0].to_le_bytes());
         res.extend_from_slice(&self.0[1].to_le_bytes()[..8]);
         res
@@ -845,7 +844,7 @@ impl From<&[u8]> for BigGF<u128, 2, 256> {
 }
 
 impl BigGaloisField for BigGF<u128, 2, 256> {
-    const LENGTH: u32 = 256;
+    const LENGTH: usize = 256;
 
     fn new(first_value: u128, second_value: u128) -> Self {
         Self([first_value, second_value])
@@ -856,7 +855,7 @@ impl BigGaloisField for BigGF<u128, 2, 256> {
     }
 
     fn to_bytes(&self) -> Vec<u8> {
-        let mut res = Vec::with_capacity(Self::LENGTH as usize / 8);
+        let mut res = Vec::with_capacity(Self::LENGTH / 8);
         res.extend_from_slice(&self.0[0].to_le_bytes());
         res.extend_from_slice(&self.0[1].to_le_bytes());
         res
@@ -6618,10 +6617,7 @@ mod test {
             ],
         ];
         for data in database {
-            let mut tab = [GF256::default(); 8];
-            for i in 0..8 {
-                tab[i] = GF256::new(data[2 * i], data[(2 * i) + 1]);
-            }
+            let tab = array::from_fn(|i| GF256::new(data[2 * i], data[(2 * i) + 1]));
             let result = GF256::new(data[16], data[17]);
             assert_eq!(GF256::byte_combine(&tab), result);
         }
