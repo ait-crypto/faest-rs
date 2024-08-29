@@ -220,23 +220,20 @@ mod test {
                     res.1 .0,
                     data.k
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect::<Vec::<GenericArray<u8, _>>>()
                 );
                 assert_eq!(
                     res.1 .1,
                     data.com
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect::<Vec::<GenericArray<u8, _>>>()
                 );
                 assert_eq!(
                     res.2,
                     sd.iter()
-                        .map(|x| match x {
-                            Some(y) => Some(*GenericArray::from_slice(y)),
-                            None => None,
-                        })
+                        .map(|x| x.as_ref().map(|y| *GenericArray::from_slice(y)))
                         .collect::<Vec::<Option::<GenericArray<u8, _>>>>()
                 );
             } else if lamdabytes == 24 {
@@ -257,23 +254,20 @@ mod test {
                     res.1 .0,
                     data.k
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect::<Vec::<GenericArray<u8, _>>>()
                 );
                 assert_eq!(
                     res.1 .1,
                     data.com
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect::<Vec::<GenericArray<u8, _>>>()
                 );
                 assert_eq!(
                     res.2,
                     sd.iter()
-                        .map(|x| match x {
-                            Some(y) => Some(*GenericArray::from_slice(y)),
-                            None => None,
-                        })
+                        .map(|x| x.as_ref().map(|y| *GenericArray::from_slice(y)))
                         .collect::<Vec::<Option::<GenericArray<u8, _>>>>()
                 );
             } else {
@@ -293,23 +287,20 @@ mod test {
                     res.1 .0,
                     data.k
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect::<Vec::<GenericArray<u8, _>>>()
                 );
                 assert_eq!(
                     res.1 .1,
                     data.com
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect::<Vec::<GenericArray<u8, _>>>()
                 );
                 assert_eq!(
                     res.2,
                     sd.iter()
-                        .map(|x| match x {
-                            Some(y) => Some(*GenericArray::from_slice(y)),
-                            None => None,
-                        })
+                        .map(|x| x.as_ref().map(|y| *GenericArray::from_slice(y)))
                         .collect::<Vec::<Option::<GenericArray<u8, _>>>>()
                 );
             }
@@ -331,14 +322,14 @@ mod test {
                             &data
                                 .k
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>(),
                         ),
                         *GenericArray::from_slice(
                             &data
                                 .com
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>(),
                         ),
                     ),
@@ -350,7 +341,7 @@ mod test {
                         &data
                             .cop
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec::<GenericArray<u8, _>>>()
                     )
                 );
@@ -365,14 +356,14 @@ mod test {
                             &data
                                 .k
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>(),
                         ),
                         *GenericArray::from_slice(
                             &data
                                 .com
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>(),
                         ),
                     ),
@@ -384,7 +375,7 @@ mod test {
                         &data
                             .cop
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec::<GenericArray<u8, _>>>()
                     )
                 );
@@ -399,14 +390,14 @@ mod test {
                             &data
                                 .k
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>(),
                         ),
                         *GenericArray::from_slice(
                             &data
                                 .com
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>(),
                         ),
                     ),
@@ -418,7 +409,7 @@ mod test {
                         &data
                             .cop
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec::<GenericArray<u8, _>>>()
                     )
                 );
@@ -433,14 +424,14 @@ mod test {
                             &data
                                 .k
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>(),
                         ),
                         *GenericArray::from_slice(
                             &data
                                 .com
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>(),
                         ),
                     ),
@@ -452,7 +443,7 @@ mod test {
                         &data
                             .cop
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec::<GenericArray<u8, _>>>()
                     )
                 );
