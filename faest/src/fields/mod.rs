@@ -1,7 +1,7 @@
 pub(crate) mod large_fields;
 pub(crate) mod small_fields;
 
-use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 pub use large_fields::{BigGaloisField, ByteCombine, SumPoly, GF128, GF192, GF256};
 pub use small_fields::{GaloisField, GF64, GF8};
@@ -17,6 +17,7 @@ pub trait Field:
     + AddAssign
     + Sub<Self, Output = Self>
     + SubAssign
+    + Neg
     + Mul<Self, Output = Self>
     + MulAssign
 {

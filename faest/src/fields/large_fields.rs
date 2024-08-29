@@ -2,8 +2,8 @@ use std::{
     array, mem,
     num::Wrapping,
     ops::{
-        Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitXor, BitXorAssign, Mul, MulAssign, Shl,
-        Shr, Sub, SubAssign,
+        Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitXor, BitXorAssign, Mul, MulAssign, Neg,
+        Shl, Shr, Sub, SubAssign,
     },
 };
 
@@ -264,6 +264,17 @@ where
     #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: &Self) {
         *self += rhs
+    }
+}
+
+// generic implementation of Neg
+
+impl<T, const N: usize, const LENGTH: usize> Neg for BigGF<T, N, LENGTH> {
+    type Output = Self;
+
+    #[inline(always)]
+    fn neg(self) -> Self::Output {
+        self
     }
 }
 

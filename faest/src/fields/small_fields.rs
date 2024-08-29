@@ -145,6 +145,18 @@ where
     }
 }
 
+impl<T> Neg for SmallGF<T>
+where
+    T: Copy,
+{
+    type Output = Self;
+
+    #[inline(always)]
+    fn neg(self) -> Self::Output {
+        self
+    }
+}
+
 impl GaloisFieldHelper<u8> for SmallGF<u8> {
     const BITS: usize = u8::BITS as usize;
 
