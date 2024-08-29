@@ -2234,10 +2234,7 @@ mod test {
             ],
         ];
         for data in database {
-            let mut tab = [GF128::default(); 8];
-            for i in 0..8 {
-                tab[i] = GF128::new(data[i], 0u128);
-            }
+            let tab = array::from_fn(|idx| GF128::new(data[idx], 0u128));
             let result = GF128::new(data[8], 0);
             assert_eq!(GF128::byte_combine(&tab), result);
         }
@@ -2266,9 +2263,8 @@ mod test {
             (0xd3u8, 0xd7272761ca8e287777eda49fad5950dbu128),
             (0xf2u8, 0x83bf3780d006f6d252c6edb8d642d26eu128),
         ];
-        for data in database {
-            let x = data.0;
-            let result = GF128::new(data.1, 0);
+        for (x, data) in database {
+            let result = GF128::new(data, 0);
             assert_eq!(GF128::byte_combine_bits(x), result);
         }
     }
@@ -4400,10 +4396,7 @@ mod test {
             ],
         ];
         for data in database {
-            let mut tab = [GF192::default(); 8];
-            for i in 0..8 {
-                tab[i] = GF192::new(data[2 * i], data[(2 * i) + 1]);
-            }
+            let tab = array::from_fn(|i| GF192::new(data[2 * i], data[(2 * i) + 1]));
             let result = GF192::new(data[16], data[17]);
             assert_eq!(GF192::byte_combine(&tab), result);
         }
@@ -4546,7 +4539,7 @@ mod test {
             let mut random_1 = rng.gen::<[u8; 24]>().to_vec();
             let mut random_2 = rng.gen::<[u8; 24]>().to_vec();
             random_1.append(&mut random_2);
-            let pol = GF192::to_field(&random_1.clone());
+            let pol = GF192::to_field(&random_1);
             let verif_big = BigUint::from_bytes_le(&random_1);
             let verif_0_0 = verif_big.to_u64_digits()[0] as u128
                 + ((verif_big.to_u64_digits()[1] as u128) << 64);
@@ -6772,7 +6765,7 @@ mod test {
             let mut random_1 = rng.gen::<[u8; 32]>().to_vec();
             let mut random_2 = rng.gen::<[u8; 32]>().to_vec();
             random_1.append(&mut random_2);
-            let pol = GF256::to_field(&random_1.clone());
+            let pol = GF256::to_field(&random_1);
             let verif_big = BigUint::from_bytes_le(&random_1);
             let verif_0_0 = verif_big.to_u64_digits()[0] as u128
                 + ((verif_big.to_u64_digits()[1] as u128) << 64);
