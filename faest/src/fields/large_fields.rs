@@ -690,6 +690,26 @@ impl BigGaloisField for BigGF<u128, 1, 128> {
     }
 }
 
+#[cfg(test)]
+impl serde::Serialize for BigGF<u128, 1, 128> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0[0].to_le_bytes().serialize(serializer)
+    }
+}
+
+#[cfg(test)]
+impl<'de> serde::Deserialize<'de> for BigGF<u128, 1, 128> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[u8; 16]>::deserialize(deserializer).map(|buffer| Self::from(buffer.as_slice()))
+    }
+}
+
 /// Type representing binary Galois field of size `2^128`
 pub type GF128 = BigGF<u128, 1, 128>;
 
@@ -778,6 +798,29 @@ impl BigGaloisField for BigGF<u128, 2, 192> {
         res.extend_from_slice(&self.0[0].to_le_bytes());
         res.extend_from_slice(&self.0[1].to_le_bytes()[..8]);
         res
+    }
+}
+
+#[cfg(test)]
+impl serde::Serialize for BigGF<u128, 2, 192> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut buffer = [0u8; 24];
+        buffer[..16].copy_from_slice(&self.0[0].to_le_bytes());
+        buffer[16..].copy_from_slice(&self.0[1].to_le_bytes()[..8]);
+        buffer.serialize(serializer)
+    }
+}
+
+#[cfg(test)]
+impl<'de> serde::Deserialize<'de> for BigGF<u128, 2, 192> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[u8; 24]>::deserialize(deserializer).map(|buffer| Self::from(buffer.as_slice()))
     }
 }
 
@@ -870,6 +913,29 @@ impl BigGaloisField for BigGF<u128, 2, 256> {
         res.extend_from_slice(&self.0[0].to_le_bytes());
         res.extend_from_slice(&self.0[1].to_le_bytes());
         res
+    }
+}
+
+#[cfg(test)]
+impl serde::Serialize for BigGF<u128, 2, 256> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut buffer = [0u8; 32];
+        buffer[..16].copy_from_slice(&self.0[0].to_le_bytes());
+        buffer[16..].copy_from_slice(&self.0[1].to_le_bytes());
+        buffer.serialize(serializer)
+    }
+}
+
+#[cfg(test)]
+impl<'de> serde::Deserialize<'de> for BigGF<u128, 2, 256> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <[u8; 32]>::deserialize(deserializer).map(|buffer| Self::from(buffer.as_slice()))
     }
 }
 
