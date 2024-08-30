@@ -1,40 +1,44 @@
-use crate::{fields::{self, Field, GaloisField, GF64}, parameter::PARAMOWF};
+use crate::{
+    fields::{BigGaloisField, Field, GaloisField, GF64},
+    parameter::PARAMOWF,
+};
 use cipher::Unsigned;
-
 use generic_array::{sequence::GenericSequence, GenericArray};
 
-
-
 #[allow(dead_code)]
-pub fn volehash<T, O>(sd: &GenericArray<u8, O::CHALL1>, x0: &GenericArray<u8, O::LAMBDALBYTES>, x1: &GenericArray<u8, O::LAMBDAPLUS2>) ->  GenericArray<u8, O::LAMBDAPLUS2>
+pub fn volehash<T, O>(
+    sd: &GenericArray<u8, O::CHALL1>,
+    x0: &GenericArray<u8, O::LAMBDALBYTES>,
+    x1: &GenericArray<u8, O::LAMBDAPLUS2>,
+) -> GenericArray<u8, O::LAMBDAPLUS2>
 where
-    T: fields::BigGaloisField + std::fmt::Debug,
+    T: BigGaloisField + std::fmt::Debug,
     O: PARAMOWF,
-
 {
-    let l =  <O::L as Unsigned>::to_usize()/ 8;
-    let lambda = (T::LENGTH as usize) / 8; 
-    let l_p : usize = lambda * 8 * (l + lambda * 8).div_ceil(lambda * 8);
+    let l = <O::L as Unsigned>::to_usize() / 8;
+    let lambda = (T::LENGTH as usize) / 8;
+    let l_p: usize = lambda * 8 * (l + lambda * 8).div_ceil(lambda * 8);
     let mut r: [T; 4] = [T::new(0u128, 0u128); 4];
     for i in 0..4 {
         r[i] = T::to_field(&sd[i * lambda..(i + 1) * lambda])[0];
     }
-    
+
     let s = T::to_field(&sd[4 * lambda..5 * lambda])[0];
-    
+
     let t = &GF64::to_field(&sd[5 * lambda..(5 * lambda) + 8])[0];
-    
-    let x0 : GenericArray<u8, O::LPRIMEBYTE> = GenericArray::generate(|i : usize| if i < lambda + l {x0[i]} else {0u8});
-    
+
+    let x0: GenericArray<u8, O::LPRIMEBYTE> =
+        GenericArray::generate(|i: usize| if i < lambda + l { x0[i] } else { 0u8 });
+
     //use resize to get rid of the vec
     let y_h = T::to_field(&x0.clone());
-    
+
     let y_b = GF64::to_field(&x0);
-    
+
     let mut h0 = T::new(0u128, 0u128);
     let mut s_add = T::ONE;
-    for i in 0..l_p/(lambda*8) {
-        h0 += s_add * y_h[(l_p/(lambda*8)) - 1 - i];
+    for i in 0..l_p / (lambda * 8) {
+        h0 += s_add * y_h[(l_p / (lambda * 8)) - 1 - i];
         s_add *= s;
     }
     let mut h1 = GF64::default();
@@ -53,44 +57,102 @@ where
     (*GenericArray::from_slice(&h)).clone()
 }
 
-#[allow(dead_code)]
-pub fn zkhash<T, O>(sd: &GenericArray<u8, O::CHALL>, x0: &GenericArray<T, O::C>, x1: T) -> GenericArray<u8, O::LAMBDABYTES>
+// this is may not be the best approach, but it works
+mod sealed {
+    use generic_array::{
+        typenum::{Prod, Sum, U3},
+        ArrayLength,
+    };
+
+    use crate::fields::{Field, GF128, GF192, GF256, GF64};
+
+    pub trait SDLength {
+        type Output: ArrayLength;
+    }
+
+    impl SDLength for GF128 {
+        type Output = Sum<Prod<<Self as Field>::Length, U3>, <GF64 as Field>::Length>;
+    }
+
+    impl SDLength for GF192 {
+        type Output = Sum<Prod<<Self as Field>::Length, U3>, <GF64 as Field>::Length>;
+    }
+
+    impl SDLength for GF256 {
+        type Output = Sum<Prod<<Self as Field>::Length, U3>, <GF64 as Field>::Length>;
+    }
+}
+
+use sealed::SDLength;
+
+struct ZKHasher<'a, F>
 where
-    T: fields::BigGaloisField + std::default::Default + std::fmt::Debug,
-    O: PARAMOWF, 
-
+    F: BigGaloisField,
 {
-    let l: usize = x0.len();
-    let lambda = T::LENGTH as usize / 8;
-    let r0 = T::to_field(&sd[..lambda])[0];
-   
-    let r1 = T::to_field(&sd[lambda..2 * lambda])[0];
-    
-    let s = T::to_field(&sd[2 * lambda..3 * lambda])[0];
-    
-    let mut t_vec = sd[3 * lambda..].to_vec();  
-    t_vec.append(&mut vec![0u8; lambda - 8]);
-    
-    let t = T::to_field(&t_vec)[0];
-    
-    let mut h0 = T::default();
-    let mut s_add = T::ONE;
-    for i in 0..l {
-        h0 += x0[l - 1 - i] * s_add;
-        s_add *= s;
-    }
-    
-    let mut h1 = T::default();
-    let mut t_add = T::ONE;
-    for i in 0..l {
-        h1 += x0[l - 1 - i] * t_add;
-        t_add *= t;
+    h0: F,
+    h1: F,
+    s: F,
+    t: GF64,
+    sd: &'a [u8],
+}
+
+trait ZKHasherProcess<'a, F>
+where
+    F: BigGaloisField + SDLength,
+{
+    fn new(sd: &'a GenericArray<u8, <F as SDLength>::Output>) -> Self;
+
+    fn update(&mut self, v: &F);
+
+    fn finalize(self, x1: &F) -> F;
+}
+
+impl<'a, F> ZKHasherProcess<'a, F> for ZKHasher<'a, F>
+where
+    F: BigGaloisField + SDLength,
+{
+    fn new(sd: &'a GenericArray<u8, <F as SDLength>::Output>) -> Self {
+        let s = F::from(&sd[2 * F::Length::USIZE..3 * F::Length::USIZE]);
+        let t = GF64::from(
+            &sd[3 * F::Length::USIZE..3 * F::Length::USIZE + <GF64 as Field>::Length::USIZE],
+        );
+
+        Self {
+            h0: F::ZERO,
+            h1: F::ZERO,
+            sd: sd.as_slice(),
+            s,
+            t,
+        }
     }
 
-    let gf_h = ((r0 * h0) + (r1 * h1)) + x1;
-    let mut h = gf_h.get_value().0.to_le_bytes().to_vec();
-    h.append(&mut gf_h.get_value().1.to_le_bytes()[..lambda - 16].to_vec());
-    (*GenericArray::from_slice(&h)).clone()
+    fn update(&mut self, v: &F) {
+        self.h0 = (self.h0 * self.s) + v;
+        self.h1 = (self.h1 * self.t) + v;
+    }
+
+    fn finalize(self, x1: &F) -> F {
+        let r0 = F::from(&self.sd[..F::Length::USIZE]);
+        let r1 = F::from(&self.sd[F::Length::USIZE..2 * F::Length::USIZE]);
+
+        (r0 * self.h0) + (r1 * self.h1) + x1
+    }
+}
+
+#[allow(dead_code)]
+pub fn zkhash<F>(
+    sd: &GenericArray<u8, <F as SDLength>::Output>,
+    x0: &[F],
+    x1: &F,
+) -> GenericArray<u8, F::Length>
+where
+    F: BigGaloisField + SDLength,
+{
+    let mut hasher = ZKHasher::new(sd);
+    for x in x0 {
+        hasher.update(x);
+    }
+    hasher.finalize(x1).as_bytes()
 }
 
 #[cfg(test)]
@@ -167,52 +229,61 @@ mod test {
 
     #[test]
     fn test_zkhash_128() {
-        //starting with zkhash128
-        //We get the data from the reference implementation
         let database: Vec<ZKHashDatabaseEntry<GF128>> =
             serde_json::from_str(include_str!("../tests/data/zkhash_128.json")).unwrap();
 
         for data in database {
-            let sd = GenericArray::from_slice(&data.sd);
-            let x0 = GenericArray::from_slice(&data.x0);
-            let x1 = data.x1;
-            let h = GenericArray::from_slice(&data.h);
-            let res = zkhash::<GF128, PARAMOWF128>(sd, x0, x1);
-            assert_eq!(*h, res);
+            let sd = *GenericArray::from_slice(&data.sd);
+
+            let mut hasher = ZKHasher::new(&sd);
+            for v in &data.x0 {
+                hasher.update(v);
+            }
+            let res = hasher.finalize(&data.x1);
+            assert_eq!(GF128::from(data.h.as_slice()), res);
+
+            let res = zkhash(&sd, &data.x0, &data.x1);
+            assert_eq!(data.h.as_slice(), res.as_slice());
         }
     }
 
     #[test]
     fn test_zkhash_192() {
-        //starting with zkhash192
-        //We get the data from the reference implementation
         let database: Vec<ZKHashDatabaseEntry<GF192>> =
             serde_json::from_str(include_str!("../tests/data/zkhash_192.json")).unwrap();
 
         for data in database {
-            let sd = GenericArray::from_slice(&data.sd);
-            let x0 = GenericArray::from_slice(&data.x0);
-            let x1 = data.x1;
-            let h = GenericArray::from_slice(&data.h);
-            let res = zkhash::<GF192, PARAMOWF192>(sd, x0, x1);
-            assert_eq!(*h, res);
+            let sd = *GenericArray::from_slice(&data.sd);
+
+            let mut hasher = ZKHasher::new(&sd);
+            for v in &data.x0 {
+                hasher.update(v);
+            }
+            let res = hasher.finalize(&data.x1);
+            assert_eq!(GF192::from(data.h.as_slice()), res);
+
+            let res = zkhash(&sd, &data.x0, &data.x1);
+            assert_eq!(data.h.as_slice(), res.as_slice());
         }
     }
 
     #[test]
     fn test_zkhash_256() {
-        //starting with zkhash192
-        //We get the data from the reference implementation
         let database: Vec<ZKHashDatabaseEntry<GF256>> =
             serde_json::from_str(include_str!("../tests/data/zkhash_256.json")).unwrap();
 
         for data in database {
-            let sd = GenericArray::from_slice(&data.sd);
-            let x0 = GenericArray::from_slice(&data.x0);
-            let x1 = data.x1;
-            let h = GenericArray::from_slice(&data.h);
-            let res = zkhash::<GF256, PARAMOWF256>(sd, x0, x1);
-            assert_eq!(*h, res);
+            let sd = *GenericArray::from_slice(&data.sd);
+
+            let mut hasher = ZKHasher::new(&sd);
+            for v in &data.x0 {
+                hasher.update(v);
+            }
+            let res = hasher.finalize(&data.x1);
+            assert_eq!(GF256::from(data.h.as_slice()), res);
+
+            let res = zkhash(&sd, &data.x0, &data.x1);
+            assert_eq!(data.h.as_slice(), res.as_slice());
         }
     }
 }
