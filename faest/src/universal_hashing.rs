@@ -89,3 +89,79 @@ where
     h.append(&mut gf_h.get_value().1.to_le_bytes()[..lambda - 16].to_vec());
     (*GenericArray::from_slice(&h)).clone()
 }
+
+#[cfg(test)]
+mod test {
+    use std::fs::File;
+    use std::io::{BufWriter, Write};
+
+    use super::*;
+
+    use generic_array::GenericArray;
+    use serde::de::DeserializeOwned;
+    use serde::{Deserialize, Serialize};
+    use typenum::{U104, U128, U168, U18, U26, U34, U56, U80, U88};
+
+    use crate::fields::{BigGaloisField, GF128, GF192, GF256};
+    use crate::parameter::{PARAMOWF128, PARAMOWF192, PARAMOWF256};
+
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(bound = "F: Serialize + DeserializeOwned")]
+    struct ZKHashDatabaseEntry<F> {
+        sd: Vec<u8>,
+        x0: Vec<F>,
+        x1: F,
+        h: Vec<u8>,
+    }
+
+    #[test]
+    fn test_zkhash_128() {
+        //starting with zkhash128
+        //We get the data from the reference implementation
+        let database: Vec<ZKHashDatabaseEntry<GF128>> =
+            serde_json::from_str(include_str!("../tests/data/zkhash_128.json")).unwrap();
+
+        for data in database {
+            let sd = *GenericArray::from_slice(&data.sd);
+            let x0 = *GenericArray::from_slice(&data.x0);
+            let x1 = data.x1;
+            let h = GenericArray::from_slice(&data.h);
+            let res = zkhash::<PARAMOWF128>(sd, x0, x1);
+            assert_eq!(*h, res);
+        }
+    }
+
+    #[test]
+    fn test_zkhash_192() {
+        //starting with zkhash192
+        //We get the data from the reference implementation
+        let database: Vec<ZKHashDatabaseEntry<GF192>> =
+            serde_json::from_str(include_str!("../tests/data/zkhash_192.json")).unwrap();
+
+        for data in database {
+            let sd = *GenericArray::from_slice(&data.sd);
+            let x0 = *GenericArray::from_slice(&data.x0);
+            let x1 = data.x1;
+            let h = GenericArray::from_slice(&data.h);
+            let res = zkhash::<PARAMOWF192>(sd, x0, x1);
+            assert_eq!(*h, res);
+        }
+    }
+
+    #[test]
+    fn test_zkhash_256() {
+        //starting with zkhash192
+        //We get the data from the reference implementation
+        let database: Vec<ZKHashDatabaseEntry<GF256>> =
+            serde_json::from_str(include_str!("../tests/data/zkhash_256.json")).unwrap();
+
+        for data in database {
+            let sd = *GenericArray::from_slice(&data.sd);
+            let x0 = *GenericArray::from_slice(&data.x0);
+            let x1 = data.x1;
+            let h = GenericArray::from_slice(&data.h);
+            let res = zkhash::<PARAMOWF256>(sd, x0, x1);
+            assert_eq!(*h, res);
+        }
+    }
+}
