@@ -92,26 +92,74 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::fs::File;
-    use std::io::{BufWriter, Write};
-
     use super::*;
 
     use generic_array::GenericArray;
-    use serde::de::DeserializeOwned;
-    use serde::{Deserialize, Serialize};
-    use typenum::{U104, U128, U168, U18, U26, U34, U56, U80, U88};
+    use serde::{de::DeserializeOwned, Deserialize};
 
-    use crate::fields::{BigGaloisField, GF128, GF192, GF256};
+    use crate::fields::{GF128, GF192, GF256};
     use crate::parameter::{PARAMOWF128, PARAMOWF192, PARAMOWF256};
 
-    #[derive(Debug, Serialize, Deserialize)]
-    #[serde(bound = "F: Serialize + DeserializeOwned")]
+    #[derive(Debug, Deserialize)]
+    #[serde(bound = "F: DeserializeOwned")]
     struct ZKHashDatabaseEntry<F> {
         sd: Vec<u8>,
         x0: Vec<F>,
         x1: F,
         h: Vec<u8>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct VoleHashDatabaseEntry {
+        sd: Vec<u8>,
+        x0: Vec<u8>,
+        x1: Vec<u8>,
+        h: Vec<u8>,
+    }
+
+    #[test]
+    fn test_volehash_128() {
+        let database: Vec<VoleHashDatabaseEntry> =
+            serde_json::from_str(include_str!("../tests/data/volehash_128.json")).unwrap();
+
+        for data in database {
+            let sd = *GenericArray::from_slice(&data.sd);
+            let x0 = *GenericArray::from_slice(&data.x0);
+            let x1 = *GenericArray::from_slice(&data.x1);
+            let h = *GenericArray::from_slice(&data.h);
+            let res = volehash::<PARAMOWF128>(sd, x0, x1);
+            assert_eq!(h, res);
+        }
+    }
+
+    #[test]
+    fn test_volehash_192() {
+        let database: Vec<VoleHashDatabaseEntry> =
+            serde_json::from_str(include_str!("../tests/data/volehash_192.json")).unwrap();
+
+        for data in database {
+            let sd = *GenericArray::from_slice(&data.sd);
+            let x0 = *GenericArray::from_slice(&data.x0);
+            let x1 = *GenericArray::from_slice(&data.x1);
+            let h = *GenericArray::from_slice(&data.h);
+            let res = volehash::<PARAMOWF192>(sd, x0, x1);
+            assert_eq!(h, res);
+        }
+    }
+
+    #[test]
+    fn test_volehash_256() {
+        let database: Vec<VoleHashDatabaseEntry> =
+            serde_json::from_str(include_str!("../tests/data/volehash_256.json")).unwrap();
+
+        for data in database {
+            let sd = *GenericArray::from_slice(&data.sd);
+            let x0 = *GenericArray::from_slice(&data.x0);
+            let x1 = *GenericArray::from_slice(&data.x1);
+            let h = *GenericArray::from_slice(&data.h);
+            let res = volehash::<PARAMOWF256>(sd, x0, x1);
+            assert_eq!(h, res);
+        }
     }
 
     #[test]
