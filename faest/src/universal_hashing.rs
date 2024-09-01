@@ -1,9 +1,14 @@
+use generic_array::{
+    sequence::GenericSequence,
+    typenum::Unsigned,
+    typenum::{Prod, Sum, U3},
+    ArrayLength, GenericArray,
+};
+
 use crate::{
-    fields::{BigGaloisField, Field, GaloisField, GF64},
+    fields::{BigGaloisField, Field, GF128, GF192, GF256, GF64},
     parameter::PARAMOWF,
 };
-use cipher::Unsigned;
-use generic_array::{sequence::GenericSequence, GenericArray};
 
 #[allow(dead_code)]
 pub fn volehash<T, O>(
@@ -57,35 +62,28 @@ where
     (*GenericArray::from_slice(&h)).clone()
 }
 
-// this is may not be the best approach, but it works
-mod sealed {
-    use generic_array::{
-        typenum::{Prod, Sum, U3},
-        ArrayLength,
-    };
+/// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Init part
+pub trait ZKHasherInit<'a, F>
+where
+    F: BigGaloisField,
+{
+    type SDLength: ArrayLength;
+    type Hasher: ZKHasherProcess<F>;
 
-    use crate::fields::{Field, GF128, GF192, GF256, GF64};
-
-    pub trait SDLength {
-        type Output: ArrayLength;
-    }
-
-    impl SDLength for GF128 {
-        type Output = Sum<Prod<<Self as Field>::Length, U3>, <GF64 as Field>::Length>;
-    }
-
-    impl SDLength for GF192 {
-        type Output = Sum<Prod<<Self as Field>::Length, U3>, <GF64 as Field>::Length>;
-    }
-
-    impl SDLength for GF256 {
-        type Output = Sum<Prod<<Self as Field>::Length, U3>, <GF64 as Field>::Length>;
-    }
+    fn new_zk_hasher(sd: &'a GenericArray<u8, Self::SDLength>) -> Self::Hasher;
 }
 
-use sealed::SDLength;
+/// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Update and Finalize part
+pub trait ZKHasherProcess<F>
+where
+    F: BigGaloisField,
+{
+    fn update(&mut self, v: &F);
 
-struct ZKHasher<'a, F>
+    fn finalize(self, x1: &F) -> F;
+}
+
+pub struct ZKHasher<'a, F>
 where
     F: BigGaloisField,
 {
@@ -96,36 +94,66 @@ where
     sd: &'a [u8],
 }
 
-trait ZKHasherProcess<'a, F>
-where
-    F: BigGaloisField + SDLength,
-{
-    fn new(sd: &'a GenericArray<u8, <F as SDLength>::Output>) -> Self;
+impl<'a> ZKHasherInit<'a, Self> for GF128 {
+    type SDLength = Sum<Prod<<Self as Field>::Length, U3>, <GF64 as Field>::Length>;
+    type Hasher = ZKHasher<'a, Self>;
 
-    fn update(&mut self, v: &F);
-
-    fn finalize(self, x1: &F) -> F;
-}
-
-impl<'a, F> ZKHasherProcess<'a, F> for ZKHasher<'a, F>
-where
-    F: BigGaloisField + SDLength,
-{
-    fn new(sd: &'a GenericArray<u8, <F as SDLength>::Output>) -> Self {
-        let s = F::from(&sd[2 * F::Length::USIZE..3 * F::Length::USIZE]);
+    fn new_zk_hasher(sd: &'a GenericArray<u8, Self::SDLength>) -> Self::Hasher {
+        let s =
+            Self::from(&sd[2 * <Self as Field>::Length::USIZE..3 * <Self as Field>::Length::USIZE]);
         let t = GF64::from(
-            &sd[3 * F::Length::USIZE..3 * F::Length::USIZE + <GF64 as Field>::Length::USIZE],
+            &sd[3 * <Self as Field>::Length::USIZE
+                ..3 * <Self as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
         );
 
-        Self {
-            h0: F::ZERO,
-            h1: F::ZERO,
+        ZKHasher {
+            h0: Self::ZERO,
+            h1: Self::ZERO,
             sd: sd.as_slice(),
             s,
             t,
         }
     }
+}
 
+impl<'a> ZKHasherInit<'a, Self> for GF192 {
+    type SDLength = Sum<Prod<<Self as Field>::Length, U3>, <GF64 as Field>::Length>;
+    type Hasher = ZKHasher<'a, Self>;
+
+    fn new_zk_hasher(sd: &'a GenericArray<u8, Self::SDLength>) -> Self::Hasher {
+        let s =
+            Self::from(&sd[2 * <Self as Field>::Length::USIZE..3 * <Self as Field>::Length::USIZE]);
+        let t = GF64::from(
+            &sd[3 * <Self as Field>::Length::USIZE
+                ..3 * <Self as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
+        );
+
+        ZKHasher {
+            h0: Self::ZERO,
+            h1: Self::ZERO,
+            sd: sd.as_slice(),
+            s,
+            t,
+        }
+    }
+}
+
+impl<'a, F> ZKHasherInit<'a, F> for ZKHasher<'a, F>
+where
+    F: BigGaloisField + ZKHasherInit<'a, F>,
+{
+    type SDLength = <F as ZKHasherInit<'a, F>>::SDLength;
+    type Hasher = <F as ZKHasherInit<'a, F>>::Hasher;
+
+    fn new_zk_hasher(sd: &'a GenericArray<u8, Self::SDLength>) -> Self::Hasher {
+        <F as ZKHasherInit<'a, F>>::new_zk_hasher(sd)
+    }
+}
+
+impl<'a, F> ZKHasherProcess<F> for ZKHasher<'a, F>
+where
+    F: BigGaloisField,
+{
     fn update(&mut self, v: &F) {
         self.h0 = (self.h0 * self.s) + v;
         self.h1 = (self.h1 * self.t) + v;
@@ -139,16 +167,38 @@ where
     }
 }
 
+impl<'a> ZKHasherInit<'a, Self> for GF256 {
+    type SDLength = Sum<Prod<<Self as Field>::Length, U3>, <GF64 as Field>::Length>;
+    type Hasher = ZKHasher<'a, Self>;
+
+    fn new_zk_hasher(sd: &'a GenericArray<u8, Self::SDLength>) -> Self::Hasher {
+        let s =
+            Self::from(&sd[2 * <Self as Field>::Length::USIZE..3 * <Self as Field>::Length::USIZE]);
+        let t = GF64::from(
+            &sd[3 * <Self as Field>::Length::USIZE
+                ..3 * <Self as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
+        );
+
+        ZKHasher {
+            h0: Self::ZERO,
+            h1: Self::ZERO,
+            sd: sd.as_slice(),
+            s,
+            t,
+        }
+    }
+}
+
 #[allow(dead_code)]
-pub fn zkhash<F>(
-    sd: &GenericArray<u8, <F as SDLength>::Output>,
+pub fn zkhash<'a, F>(
+    sd: &'a GenericArray<u8, <F as ZKHasherInit<'a, F>>::SDLength>,
     x0: &[F],
     x1: &F,
 ) -> GenericArray<u8, F::Length>
 where
-    F: BigGaloisField + SDLength,
+    F: BigGaloisField + ZKHasherInit<'a, F>,
 {
-    let mut hasher = ZKHasher::new(sd);
+    let mut hasher = F::new_zk_hasher(sd);
     for x in x0 {
         hasher.update(x);
     }
@@ -233,16 +283,16 @@ mod test {
             serde_json::from_str(include_str!("../tests/data/zkhash_128.json")).unwrap();
 
         for data in database {
-            let sd = *GenericArray::from_slice(&data.sd);
+            let sd = GenericArray::from_slice(&data.sd);
 
-            let mut hasher = ZKHasher::new(&sd);
+            let mut hasher = ZKHasher::<GF128>::new_zk_hasher(sd);
             for v in &data.x0 {
                 hasher.update(v);
             }
             let res = hasher.finalize(&data.x1);
             assert_eq!(GF128::from(data.h.as_slice()), res);
 
-            let res = zkhash(&sd, &data.x0, &data.x1);
+            let res = zkhash(sd, &data.x0, &data.x1);
             assert_eq!(data.h.as_slice(), res.as_slice());
         }
     }
@@ -253,16 +303,16 @@ mod test {
             serde_json::from_str(include_str!("../tests/data/zkhash_192.json")).unwrap();
 
         for data in database {
-            let sd = *GenericArray::from_slice(&data.sd);
+            let sd = GenericArray::from_slice(&data.sd);
 
-            let mut hasher = ZKHasher::new(&sd);
+            let mut hasher = ZKHasher::<GF192>::new_zk_hasher(sd);
             for v in &data.x0 {
                 hasher.update(v);
             }
             let res = hasher.finalize(&data.x1);
             assert_eq!(GF192::from(data.h.as_slice()), res);
 
-            let res = zkhash(&sd, &data.x0, &data.x1);
+            let res = zkhash(sd, &data.x0, &data.x1);
             assert_eq!(data.h.as_slice(), res.as_slice());
         }
     }
@@ -273,16 +323,16 @@ mod test {
             serde_json::from_str(include_str!("../tests/data/zkhash_256.json")).unwrap();
 
         for data in database {
-            let sd = *GenericArray::from_slice(&data.sd);
+            let sd = GenericArray::from_slice(&data.sd);
 
-            let mut hasher = ZKHasher::new(&sd);
+            let mut hasher = ZKHasher::<GF256>::new_zk_hasher(sd);
             for v in &data.x0 {
                 hasher.update(v);
             }
             let res = hasher.finalize(&data.x1);
             assert_eq!(GF256::from(data.h.as_slice()), res);
 
-            let res = zkhash(&sd, &data.x0, &data.x1);
+            let res = zkhash(sd, &data.x0, &data.x1);
             assert_eq!(data.h.as_slice(), res.as_slice());
         }
     }
