@@ -3,10 +3,10 @@ use sha3::{
     digest::{core_api::CoreWrapper, ExtendableOutput, Update, XofReader},
     Shake128, Shake256,
 };
-use cipher::Unsigned;
-use std::ops::{Add, Sub};
-use generic_array::{sequence::GenericSequence, ArrayLength, GenericArray};
-use typenum::{Prod, U128, U16, U192, U24, U256, U3, U32, U40, U48, U64, U72, U96};
+
+
+use generic_array::{ArrayLength, GenericArray};
+use typenum::{U16, U24, U32, U40, U48, U64, U72, U96};
 
 use aes::cipher::{KeyIvInit, StreamCipher};
 type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
@@ -17,12 +17,12 @@ use crate::random_oracles;
 
 pub trait RandomOracle{
     type Hasher: Hasher;
-    type LAMBDA : ArrayLength<u8>;
-    type LAMBDA16 : ArrayLength<u8>;
-    type PRODLAMBDA3 : ArrayLength<u8>;
-    type PRODLAMBDA2 : ArrayLength<u8>;
+    type LAMBDA : ArrayLength;
+    type LAMBDA16 : ArrayLength;
+    type PRODLAMBDA3 : ArrayLength;
+    type PRODLAMBDA2 : ArrayLength;
 
-    fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128,) -> GenericArray<u8, LH> where LH : ArrayLength<u8>;
+    fn prg<LH>(k: &GenericArray<u8, Self::LAMBDA>, iv: u128,) -> GenericArray<u8, LH> where LH : ArrayLength;
 
     fn h0(data: GenericArray<u8, Self::LAMBDA16>, dest: &mut GenericArray<u8, Self::PRODLAMBDA3>) {
         let mut hasher = Self::h0_init();
@@ -42,10 +42,10 @@ pub trait RandomOracle{
         hasher.h2_finish(dest);
     }
 
-    fn h3(data: &[u8], mut dest: GenericArray<u8, Self::LAMBDA16>) {
+    fn h3(data: &[u8], dest: &mut GenericArray<u8, Self::LAMBDA16>) {
         let mut hasher = Self::h3_init();
         hasher.h3_update(data);
-        hasher.h3_finish(&mut dest);
+        hasher.h3_finish(dest);
     }
 
     fn h0_init() -> Self::Hasher;
@@ -108,9 +108,9 @@ impl RandomOracle for RandomOracleShake128 {
         }
     }
 
-    fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH> where LH : ArrayLength<u8>{
-        let mut buf = GenericArray::generate(|i : usize| 0u8);
-        let mut cipher = Aes128Ctr128BE::new(&k, &iv.to_be_bytes().into());
+    fn prg<LH>(k: &GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH> where LH : ArrayLength{
+        let mut buf = GenericArray::default();
+        let mut cipher = Aes128Ctr128BE::new(generic_array_0_14::GenericArray::from_slice(&k.to_vec()), &iv.to_be_bytes().into());
         cipher.apply_keystream(&mut buf);
         buf
     }
@@ -203,9 +203,9 @@ impl RandomOracle for RandomOracleShake192 {
         }
     }
 
-    fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH> where LH : ArrayLength<u8>{
-        let mut buf = GenericArray::generate(|i:usize|0u8);
-        let mut cipher = Aes192Ctr128BE::new(&k, &iv.to_be_bytes().into());
+    fn prg<LH>(k: &GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH> where LH : ArrayLength{
+        let mut buf = GenericArray::default();
+        let mut cipher = Aes192Ctr128BE::new(generic_array_0_14::GenericArray::from_slice(&k.to_vec()), &iv.to_be_bytes().into());
         cipher.apply_keystream(&mut buf);
         buf
     }
@@ -302,9 +302,9 @@ impl RandomOracle for RandomOracleShake256 {
         }
     }
 
-    fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH> where LH : ArrayLength<u8>{
-        let mut buf = GenericArray::generate(|i:usize| 0u8);
-        let mut cipher = Aes256Ctr128BE::new(&k, &iv.to_be_bytes().into());
+    fn prg<LH>(k: &GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH> where LH : ArrayLength{
+        let mut buf = GenericArray::default();
+        let mut cipher = Aes256Ctr128BE::new(generic_array_0_14::GenericArray::from_slice(&k.to_vec()), &iv.to_be_bytes().into());
         cipher.apply_keystream(&mut buf);
         buf
     }

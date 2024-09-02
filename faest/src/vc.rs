@@ -1,11 +1,11 @@
 use std::vec;
 
 use cipher::Unsigned;
-use generic_array::sequence::GenericSequence;
-use generic_array::{ArrayLength, GenericArray};
+
+use generic_array::{GenericArray};
 
 use crate::fields::BigGaloisField;
-use crate::parameter::PARAMOWF;
+
 use crate::random_oracles::RandomOracle;
 
 #[allow(clippy::type_complexity)]
@@ -16,46 +16,46 @@ pub fn commit<T, R>(
 ) -> (GenericArray<u8, R::PRODLAMBDA2>, (Vec<GenericArray<u8, R::LAMBDA>>, Vec<GenericArray<u8, R::PRODLAMBDA2>>), Vec<Option<GenericArray<u8, R::LAMBDA>>>)
 where
     T: BigGaloisField,
-    R: RandomOracle,
+    R: RandomOracle, 
+    
 {
     let length = T::LENGTH as usize / 8;
-    let mut k : Vec<GenericArray<u8, R::LAMBDA>> = vec![GenericArray::generate(|j:usize| 0u8); 2 * (n as usize) - 1];
+    let mut k : Vec<GenericArray<u8, R::LAMBDA>> = vec![GenericArray::default(); 2 * (n as usize) - 1];
     //step 2..3
     k[0] = (*GenericArray::from_slice(&[&r.get_value().0.to_le_bytes(), &r.get_value().1.to_le_bytes()[..length - 16_usize]].concat())).clone();
     
     for i in 0..n - 1 {
-        let new_ks = &R::prg::<R::PRODLAMBDA2>(k[i as usize].clone(), iv);
+        let new_ks = &R::prg::<R::PRODLAMBDA2>(&k[i as usize].clone(), iv);
         (k[((2 * i) + 1) as usize], k[((2 * i) + 2) as usize]) =
             ((*GenericArray::from_slice(&new_ks[..length])).clone(), (*GenericArray::from_slice(&new_ks[length..])).clone());
     }
     //step 4..5
-    let mut sd : Vec<Option<GenericArray<u8, R::LAMBDA>>> = vec![Some(GenericArray::generate(|j : usize| 0u8)); n as usize];
-    let mut com : Vec<GenericArray<u8, R::PRODLAMBDA2>> = vec![GenericArray::generate(|i : usize| 0u8); n as usize];
+    let mut sd : Vec<Option<GenericArray<u8, R::LAMBDA>>> = vec![Some(GenericArray::default()); n as usize];
+    let mut com : Vec<GenericArray<u8, R::PRODLAMBDA2>> = vec![GenericArray::default(); n as usize];
     let mut pre_h = Vec::new();
     for j in 0..n as usize {
         let seed = (*GenericArray::from_slice(&[k[(n - 1) as usize + j].clone().to_vec(), iv.to_be_bytes().to_vec()].concat())).clone();
-        let mut hash : GenericArray<u8, R::PRODLAMBDA3> = GenericArray::generate(|i : usize| 0u8);
+        let mut hash : GenericArray<u8, R::PRODLAMBDA3> = GenericArray::default();
         R::h0(seed, &mut hash);
         sd[j] = Some((*GenericArray::from_slice(&hash[..length])).clone());
         com[j] = (*GenericArray::from_slice(&hash[length..])).clone();
         pre_h.append(&mut com[j].to_vec());
     }
     //step 6
-    let mut h : GenericArray<u8, R::PRODLAMBDA2> = GenericArray::generate(|i : usize| 0u8);
+    let mut h : GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
     R::h1(&pre_h, &mut h);
     (h, (k, com), sd)
 }
 
-pub fn open<R, DPOW /*2N - 1 */, D, N>(decom: &(GenericArray<GenericArray<u8, R::LAMBDA>, DPOW>, GenericArray<GenericArray<u8, R::PRODLAMBDA2>, N>), b: GenericArray<u8, D>) -> (GenericArray<GenericArray<u8, R::LAMBDA>, D>, GenericArray<u8, R::PRODLAMBDA2>) 
+pub fn open<R, DPOW /*2N - 1 */, D, N>(decom: &(Vec<GenericArray<u8, R::LAMBDA>>, Vec<GenericArray<u8, R::PRODLAMBDA2>>), b: GenericArray<u8, D>) -> (Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>) 
 where 
-R: RandomOracle,
-DPOW: ArrayLength<GenericArray<u8, R::LAMBDA>>,
-D: ArrayLength<GenericArray<u8, R::LAMBDA>> + ArrayLength<u8>,
-N: ArrayLength<GenericArray<u8, R::PRODLAMBDA2>>
+R: RandomOracle, 
+D: generic_array::ArrayLength,
+
 {
     let mut a = 0;
     let d = (usize::BITS - decom.0.len().leading_zeros() - 1) as usize;
-    let mut cop = GenericArray::generate(|i : usize| GenericArray::generate(|j :usize| 0u8));
+    let mut cop :GenericArray<GenericArray<u8, <R as RandomOracle>::LAMBDA>, D> = GenericArray::default();
     //step 4
 
     for i in 0..d {
@@ -64,26 +64,23 @@ N: ArrayLength<GenericArray<u8, R::PRODLAMBDA2>>
         
         a = 2 * a + b[d - i - 1] as u32;
     }
-    (cop, decom.1[a as usize].clone())
+    (cop.to_vec(), decom.1[a as usize].clone().to_vec())
 }
 
 #[allow(clippy::type_complexity)]
-pub fn reconstruct<T, R, D, POWD, N>(
-    mut pdecom: (GenericArray<GenericArray<u8, R::LAMBDA>, D>, GenericArray<u8, R::PRODLAMBDA2>),
-    b: GenericArray<u8, D>,
+pub fn reconstruct<T, R>(
+    pdecom: &(Vec<GenericArray<u8, R::LAMBDA>>, GenericArray<u8, R::PRODLAMBDA2>),
+    b: Vec<u8>,
     iv: u128,
-) -> (GenericArray<u8, R::PRODLAMBDA2>, GenericArray<GenericArray<u8, R::LAMBDA>, N>)
+) -> (GenericArray<u8, R::PRODLAMBDA2>, Vec<GenericArray<u8, R::LAMBDA>>)
 where
     R: RandomOracle,
     T: BigGaloisField,
-    D: ArrayLength<GenericArray<u8, R::LAMBDA>> + ArrayLength<u8>,
-    POWD : ArrayLength<Option::<GenericArray<u8, R::LAMBDA>>>, //(1 << (d + 1)) - 1
-    N: ArrayLength<GenericArray<u8, R::LAMBDA>> + ArrayLength<GenericArray<u8, R::PRODLAMBDA2>>
 {
     let length = <R::LAMBDA as Unsigned>::to_usize();
     let mut a = 0;
     let d = b.len() as u32;
-    let mut k : GenericArray<Option::<GenericArray<u8, R::LAMBDA>>, POWD> = GenericArray::generate(|i : usize| Some(GenericArray::generate(|i : usize| 0u8)));
+    let mut k : Vec<Option::<GenericArray<u8, R::LAMBDA>>> = vec![Some(GenericArray::default()); (1 << (d + 1)) - 1];
     k[0] = None;
     
     //step 4
@@ -96,7 +93,7 @@ where
         for j in 0..1 << (i - 1) {
             if j != a {
                 let rank = (1 << (i - 1)) - 1 + j;
-                let new_ks = R::prg::<R::PRODLAMBDA2>(k[rank as usize].clone().unwrap(), iv);
+                let new_ks = R::prg::<R::PRODLAMBDA2>(&k[rank as usize].clone().unwrap(), iv);
                 (k[(rank * 2 + 1) as usize], k[(rank * 2 + 2) as usize]) = (
                     Some((*GenericArray::from_slice(&new_ks[..length])).clone()),
                     Some((*GenericArray::from_slice(&new_ks[length..])).clone()),
@@ -105,14 +102,14 @@ where
         }
         a = 2 * a + b_d_i;
     }
-    let mut sd : GenericArray<GenericArray<u8, R::LAMBDA>, N> = GenericArray::generate(|i : usize| GenericArray::generate(|i : usize| 0u8));
-    let mut com : GenericArray<GenericArray<u8, R::PRODLAMBDA2>, N> = GenericArray::generate(|i : usize| GenericArray::generate(|i : usize| 0u8));
+    let mut sd : Vec<GenericArray<u8, R::LAMBDA>> = vec![GenericArray::default(); 1<<d];
+    let mut com : Vec<GenericArray<u8, R::PRODLAMBDA2>> = vec![GenericArray::default(); 1<<d];
     let mut pre_h = Vec::new();
     //step 11
     for j in 0..(1_u16 << d) {
         if j != a {
-            let mut seed: GenericArray<u8, <R as RandomOracle>::LAMBDA16> = (*GenericArray::from_slice(&[k[(1 << d) - 1 + j as usize].clone().unwrap().to_vec(), iv.to_be_bytes().to_vec()].concat())).clone();
-            let mut hash : GenericArray<u8, R::PRODLAMBDA3> = GenericArray::generate(|i : usize| 0u8);
+            let seed: GenericArray<u8, <R as RandomOracle>::LAMBDA16> = (*GenericArray::from_slice(&[k[(1 << d) - 1 + j as usize].clone().unwrap().to_vec(), iv.to_be_bytes().to_vec()].concat())).clone();
+            let mut hash : GenericArray<u8, R::PRODLAMBDA3> = GenericArray::default();
             R::h0(seed, &mut hash);
             sd[j as usize] = (*GenericArray::from_slice(&hash[..length])).clone();
             com[j as usize] = (*GenericArray::from_slice(&hash[length..])).clone();
@@ -121,7 +118,7 @@ where
             pre_h.append(&mut pdecom.1.to_vec());
         }
     }
-    let mut h: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::generate(|i : usize| 0u8);
+    let mut h: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
     R::h1(&pre_h, &mut h);
     (h, sd)
 }
@@ -129,18 +126,17 @@ where
 #[allow(clippy::type_complexity)]
 pub fn verify<T, R, D, POWD, N>(
     com: GenericArray<u8, R::PRODLAMBDA2>,
-    pdecom: (GenericArray<GenericArray<u8, R::LAMBDA>, D>, GenericArray<u8, R::PRODLAMBDA2>),
+    pdecom: (Vec<GenericArray<u8, R::LAMBDA>>, GenericArray<u8, R::PRODLAMBDA2>),
     b: GenericArray<u8, D>,
     iv: u128,
 ) -> u8
 where
-    R: RandomOracle,
+    R: RandomOracle, 
+    D: generic_array::ArrayLength,
     T: BigGaloisField,
-    D: ArrayLength<GenericArray<u8, R::LAMBDA>> + ArrayLength<u8>,
-    POWD: ArrayLength<Option::<GenericArray<u8, R::LAMBDA>>>, //(1 << (d + 1)) - 1
-    N: ArrayLength<GenericArray<u8, R::LAMBDA>> + ArrayLength<GenericArray<u8, R::PRODLAMBDA2>>
+
 {
-    let (com_b, _sd) = reconstruct::<T, R, D, POWD, N>(pdecom, b, iv);
+    let (com_b, _sd) = reconstruct::<T, R>(&pdecom, b.to_vec(), iv);
     if com_b == com {
         1
     } else {

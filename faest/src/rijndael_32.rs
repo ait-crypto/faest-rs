@@ -26,7 +26,8 @@ pub(crate) type State = [u32; 8];
 
 /// Fully bitsliced Rijndael key schedule to match the fully-fixsliced representation.
 #[allow(dead_code)]
-pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8, r: u8, ske: u8) -> Vec<u32> {
+pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8, r: u8, ske: u8) -> (Vec<u32>, bool) {
+    let mut valid = true;
     let mut rkeys = vec![0u32; (((nst.div_ceil(nk)) * 8 * (r + 1)) + 8).into()];
     let mut sd_part = [0u8; 16];
     for i in 0..(nk * 4) - 16 {
@@ -35,7 +36,21 @@ pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8, r: u8, ske: u8)
     bitslice(&mut rkeys[..8], &key[..16], &sd_part);
 
     let mut rk_off = 0;
+    let mut count = 0;
     for i in 0..ske / 4 {
+        if nk == 8 {
+            if count < ske / 4 {
+                for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][12..].to_vec(){
+                valid &= 0!=i;}
+                count += 1
+            }
+        } else if nk == 6 {
+            for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][4..8].to_vec(){
+            valid &= 0!=i;}
+        } else {
+            for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..].to_vec(){
+            valid &= 0!=i;}
+        }
         memshift32(&mut rkeys, rk_off);
         rk_off += 8;
         sub_bytes(&mut rkeys[rk_off..(rk_off + 8)]);
@@ -120,7 +135,7 @@ pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8, r: u8, ske: u8)
                 &final_res[(32 * i) + 16..32 * (i + 1)],
             );
         }
-        final_bitsliced_res
+        (final_bitsliced_res, valid)
     } else if nk == 6 {
         let mut final_res: Vec<u8> = vec![];
         for i in 0..rkeys.len() / 8 {
@@ -180,7 +195,7 @@ pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8, r: u8, ske: u8)
                 &final_res[(32 * i) + 16..32 * (i + 1)],
             );
         }
-        final_bitsliced_res
+        (final_bitsliced_res, valid)
     } else {
         let mut final_res: Vec<u8> = vec![];
         for i in 0..rkeys.len() / 8 {
@@ -256,7 +271,7 @@ pub(crate) fn rijndael_key_schedule(key: &[u8], nst: u8, nk: u8, r: u8, ske: u8)
                 &final_res[(32 * i) + 16..32 * (i + 1)],
             );
         }
-        final_bitsliced_res
+        (final_bitsliced_res, valid)
     }
 }
 

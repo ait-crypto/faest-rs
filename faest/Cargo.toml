@@ -15,7 +15,9 @@ signature = "2.2.0"
 hex = "0.4.3"
 nist-pqc-seeded-rng = "0.1.2"
 typenum = "1.17.0"
-generic-array = "0.14.7"
+generic-array = "1"
+generic_array_0_14 = { version = "0.14", package = "generic-array" }
+stacker = "0.1.17"
 
 [dev-dependencies]
 num-bigint = "0.4.4"

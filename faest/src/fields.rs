@@ -242,8 +242,8 @@ where
     fn switch_left_1(self) -> Self {
         let (first_value, second_value) = self.get_value();
         let carry = (first_value & (1u128 << 127)) >> 127;
-        let first_res = first_value.wrapping_shl(1);
-        let second_res = (second_value.wrapping_shl(1)) | carry;
+        let first_res = first_value << 1;
+        let second_res = (second_value << 1) | carry;
         Self::new(first_res, second_res)
     }
 

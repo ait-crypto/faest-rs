@@ -1,3 +1,5 @@
+//#![warn(clippy::pedantic)]
+
 pub mod fields;
 #[cfg(test)]
 mod fields_test;
@@ -18,7 +20,7 @@ pub mod vole;
 #[cfg(test)]
 pub mod vole_test;
 
-/* pub mod aes;
+pub mod aes;
 #[cfg(test)]
 pub mod aes_test;
 
@@ -32,7 +34,7 @@ pub mod faest_test;
 
 pub mod em;
 #[cfg(test)]
-pub mod em_test; */
+pub mod em_test;
 
 pub mod parameter;
 

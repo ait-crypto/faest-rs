@@ -1,11 +1,13 @@
-use cipher::Unsigned;
+
+
 //use faest::{faest::{faest_sign, faest_verify, AesCypher, Variant}, fields::{BigGaloisField, GF128}, parameter::{PARAM, PARAM128S, PARAMOWF, PARAMOWF128}, random_oracles::{RandomOracle, RandomOracleShake128}};
 use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
-use rand::random;
+
 
 mod fields;
 
 fn main() {
+    
     //let _ = bench_sign::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(generate_sign_input_aes::<AesCypher, PARAM128S, PARAMOWF128>());
     //let res = bench_verify_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(generate_verify_input_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>());
 

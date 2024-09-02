@@ -1,15 +1,16 @@
-use crate::{fields::{self, GaloisField, GF64}, parameter::PARAMOWF};
+use crate::{fields::{self, GaloisField, GF64}, parameter::{PARAMOWF}};
 use cipher::Unsigned;
-use std::ops::{Add, Sub};
-use generic_array::{sequence::GenericSequence, ArrayLength, GenericArray};
-use typenum::{Prod, U128, U16, U192, U24, U256, U3, U32, U40, U48, U64, U72, U96};
+
+use generic_array::{sequence::GenericSequence, GenericArray};
+
 
 
 #[allow(dead_code)]
-pub fn volehash<T, O>(sd: GenericArray<u8, O::CHALL1>, mut x0: GenericArray<u8, O::LAMBDALBYTES>, x1: GenericArray<u8, O::LAMBDAPLUSTWO>) ->  GenericArray<u8, O::LAMBDAPLUSTWO>
+pub fn volehash<T, O>(sd: &GenericArray<u8, O::CHALL1>, x0: &GenericArray<u8, O::LAMBDALBYTES>, x1: &GenericArray<u8, O::LAMBDAPLUS2>) ->  GenericArray<u8, O::LAMBDAPLUS2>
 where
     T: fields::BigGaloisField + std::fmt::Debug,
-    O: PARAMOWF<T>,
+    O: PARAMOWF,
+
 {
     let l =  <O::L as Unsigned>::to_usize()/ 8;
     let lambda = (T::LENGTH as usize) / 8; 
@@ -55,23 +56,25 @@ where
 }
 
 #[allow(dead_code)]
-pub fn zkhash<T, O>(sd: GenericArray<u8, O::CHALL2>, x0: GenericArray<T, O::L>, x1: T) -> GenericArray<u8, O::LAMBDABYTES>
+pub fn zkhash<T, O>(sd: &GenericArray<u8, O::CHALL>, x0: &GenericArray<T, O::C>, x1: T) -> GenericArray<u8, O::LAMBDABYTES>
 where
     T: fields::BigGaloisField + std::default::Default + std::fmt::Debug,
-    O: PARAMOWF<T>,
+    O: PARAMOWF, 
+
 {
-    let l: usize = <O::L as Unsigned>::to_usize()/8;
+    let l: usize = x0.len();
     let lambda = T::LENGTH as usize / 8;
     let r0 = T::to_field(&sd[..lambda])[0];
-    
+   
     let r1 = T::to_field(&sd[lambda..2 * lambda])[0];
     
     let s = T::to_field(&sd[2 * lambda..3 * lambda])[0];
     
-    let mut t_vec = sd[3 * lambda..].to_vec();
+    let mut t_vec = sd[3 * lambda..].to_vec();  
     t_vec.append(&mut vec![0u8; lambda - 8]);
     
     let t = T::to_field(&t_vec)[0];
+    
     let mut h0 = T::default();
     let mut s_add = T::ONE;
     for i in 0..l {

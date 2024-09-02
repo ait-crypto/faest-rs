@@ -734,17 +734,17 @@ fn test_h0() {
         let output = &data.2;
         if lambda == 128 {
             let input : GenericArray<u8, U32> = *GenericArray::from_slice(&data.1);
-            let mut res : GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA3> = GenericArray::generate(|i : usize| 0u8);
+            let mut res : GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA3> = GenericArray::default();
             RandomOracleShake128::h0(input, &mut res);
             assert_eq!(res[..], output[..]);
         } else if lambda == 192 {
             let input : GenericArray<u8, U40> = *GenericArray::from_slice(&data.1);
-            let mut res : GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA3> = GenericArray::generate(|i : usize| 0u8);
+            let mut res : GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA3> = GenericArray::default();
             RandomOracleShake192::h0(input, &mut res);
             assert_eq!(res[..], output[..]);
         } else {
             let input : GenericArray<u8, U48> = *GenericArray::from_slice(&data.1);
-            let mut res : GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA3> = GenericArray::generate(|i : usize| 0u8);
+            let mut res : GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA3> = GenericArray::default();
             RandomOracleShake256::h0(input, &mut res);
             assert_eq!(res[..], output[..]);
         }
@@ -3011,15 +3011,15 @@ fn test_h1() {
         let input = data.1;
         let output = data.2;
         if lambda == 128 {
-            let mut res : GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2> = GenericArray::generate(|i : usize| 0u8);
+            let mut res : GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2> = GenericArray::default();
             RandomOracleShake128::h1(&input, &mut res);
             assert_eq!(res[..], output[..]);
         } else if lambda == 192 {
-            let mut res : GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2> = GenericArray::generate(|i : usize| 0u8);
+            let mut res : GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2> = GenericArray::default();
             RandomOracleShake192::h1(&input, &mut res);
             assert_eq!(res[..], output[..]);
         } else {
-            let mut res : GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2> = GenericArray::generate(|i : usize| 0u8);
+            let mut res : GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2> = GenericArray::default();
             RandomOracleShake256::h1(&input, &mut res);
             assert_eq!(res[..], output[..]);
         }
@@ -3028,7 +3028,7 @@ fn test_h1() {
 
 #[test]
 fn test_prg128() {
-    let key = GenericArray::clone_from_slice(&[
+    let key = GenericArray::from_slice(&[
         0x9d, 0x79, 0xb1, 0xa3, 0x7f, 0x31, 0x80, 0x1c, 0xd1, 0x1a, 0x67, 0x06, 0xfb, 0x40, 0xd6,
         0xbd,
     ]);
@@ -3055,13 +3055,13 @@ fn test_prg128() {
         0x53, 0x49, 0x87, 0x80, 0xbd, 0x2a, 0x7f, 0xe2, 0xb0, 0x5e, 0xc4, 0xf4, 0x7b, 0xdd, 0xda,
     ];
 
-    let res = RandomOracleShake128::prg::<U240>(key, u128::from_be_bytes(iv));
+    let res = RandomOracleShake128::prg::<U240>(&key, u128::from_be_bytes(iv));
     assert_eq!(res, *GenericArray::from_slice(&output))
 }
 
 #[test]
 fn test_prg192() {
-    let key = GenericArray::clone_from_slice(&[
+    let key = GenericArray::from_slice(&[
         0x50, 0xe1, 0x65, 0xe4, 0x34, 0x24, 0x9d, 0x8b, 0x82, 0x9f, 0x41, 0x16, 0x69, 0x84, 0x2a,
         0x97, 0x99, 0x11, 0x03, 0x6c, 0xf3, 0xe8, 0x22, 0x08,
     ]);
@@ -3088,13 +3088,13 @@ fn test_prg192() {
         0xaa, 0xd2, 0x3b, 0xe6, 0x67, 0xc0, 0x8e, 0x4c, 0xf6, 0xda, 0x8d, 0x19, 0x2d, 0x5a, 0x90,
     ];
 
-    let res = RandomOracleShake192::prg::<U240>(key, u128::from_be_bytes(iv));
+    let res = RandomOracleShake192::prg::<U240>(&key, u128::from_be_bytes(iv));
     assert_eq!(res, *GenericArray::from_slice(&output))
 }
 
 #[test]
 fn test_prg256() {
-    let key = GenericArray::clone_from_slice(&[
+    let key = GenericArray::from_slice(&[
         0xf6, 0x48, 0x81, 0x8b, 0xa4, 0xa6, 0x65, 0x6b, 0xe0, 0xcb, 0x6e, 0x38, 0x2a, 0x5d, 0xff,
         0x72, 0xac, 0x1d, 0xda, 0x96, 0x90, 0x81, 0x37, 0x47, 0x8b, 0xd5, 0x36, 0xcf, 0x4b, 0x77,
         0x8a, 0xde,
@@ -3122,6 +3122,6 @@ fn test_prg256() {
         0x21, 0x51, 0x8f, 0x34, 0x63, 0x46, 0x62, 0x2c, 0x37, 0x50, 0xbc, 0x1e, 0x74, 0x62, 0x63,
     ];
 
-    let res = RandomOracleShake256::prg::<U240>(key, u128::from_be_bytes(iv));
+    let res = RandomOracleShake256::prg::<U240>(&key, u128::from_be_bytes(iv));
     assert_eq!(res, *GenericArray::from_slice(&output))
 }

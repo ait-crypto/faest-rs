@@ -131,30 +131,30 @@ fn open_test() {
             type D = U4;
             type DPOW = U31;
             type N = U16;
-            let res = open::<RandomOracleShake128, DPOW, D, N>(&(*GenericArray::from_slice(&data.k.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>()), *GenericArray::from_slice(&data.com.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>())), *GenericArray::from_slice(&data.b));
-            assert_eq!(res.0, *GenericArray::from_slice(&data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>()));
-            assert_eq!(res.1, *GenericArray::<u8, _>::from_slice(&data.com_j));
+            let res = open::<RandomOracleShake128, DPOW, D, N>(&(data.k.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>(), data.com.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>()), *GenericArray::from_slice(&data.b));
+            assert_eq!(res.0.to_vec(), data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA>>>());
+            assert_eq!(res.1, data.com_j);
         } else if data.k[0].len()==24 {
             type D = U4;
             type DPOW = U31;
             type N = U16;
-            let res = open::<RandomOracleShake192, DPOW, D, N>(&(*GenericArray::from_slice(&data.k.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>()), *GenericArray::from_slice(&data.com.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>())), *GenericArray::from_slice(&data.b));
-            assert_eq!(res.0, *GenericArray::from_slice(&data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>()));
-            assert_eq!(res.1, *GenericArray::<u8, _>::from_slice(&data.com_j));
+            let res = open::<RandomOracleShake192, DPOW, D, N>(&(data.k.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>(), data.com.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>()), *GenericArray::from_slice(&data.b));
+            assert_eq!(res.0.to_vec(), data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA>>>());
+            assert_eq!(res.1, data.com_j);
         } else if data.b.len() == 4 {
             type D = U4;
             type DPOW = U31;
             type N = U16;
-            let res = open::<RandomOracleShake256, DPOW, D, N>(&(*GenericArray::from_slice(&data.k.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>()), *GenericArray::from_slice(&data.com.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>())), *GenericArray::from_slice(&data.b));
-            assert_eq!(res.0, *GenericArray::from_slice(&data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>()));
-            assert_eq!(res.1, *GenericArray::<u8, _>::from_slice(&data.com_j));
+            let res = open::<RandomOracleShake256, DPOW, D, N>(&(data.k.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>(), data.com.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>()), *GenericArray::from_slice(&data.b));
+            assert_eq!(res.0.to_vec(), data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>>());
+            assert_eq!(res.1, data.com_j);
         } else {
             type D = U5;
             type DPOW = U63;
             type N = U32;
-            let res = open::<RandomOracleShake256, DPOW, D, N>(&(*GenericArray::from_slice(&data.k.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>()), *GenericArray::from_slice(&data.com.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>())), *GenericArray::from_slice(&data.b));
-            assert_eq!(res.0, *GenericArray::from_slice(&data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>()));
-            assert_eq!(res.1, *GenericArray::<u8, _>::from_slice(&data.com_j));
+            let res = open::<RandomOracleShake256, DPOW, D, N>(&(data.k.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>(), data.com.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, _>>>()), *GenericArray::from_slice(&data.b));;
+            assert_eq!(res.0.to_vec(), data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>>());
+            assert_eq!(res.1, data.com_j);
         }
     }
 }
@@ -167,38 +167,29 @@ fn reconstruct_test() {
     for data in database {
         let lambdabyte = data.com_j.len();
         if lambdabyte == 32 {
-            type D = U4;
-            type POWD = U31;
-            type N = U16;
-            let res = reconstruct::<GF128, RandomOracleShake128, D, POWD, N>(
-                (*GenericArray::from_slice(&data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA>>>()), *GenericArray::<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2>::from_slice(&data.com_j)),
-                *GenericArray::from_slice(&data.b),
+            let res = reconstruct::<GF128, RandomOracleShake128>(
+                &(data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA>>>(), *GenericArray::<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2>::from_slice(&data.com_j)),
+                data.b,
                 u128::from_be_bytes(data.iv),
             );
             assert_eq!(res.0, *GenericArray::from_slice(&data.h));
-            assert_eq!(res.1, *GenericArray::from_slice(&data.sd.iter().map(|x| match x[..] { [] => GenericArray::generate(|i:usize| 0u8), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA>>>()));
+            assert_eq!(res.1, data.sd.iter().map(|x| match x[..] { [] => GenericArray::default(), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA>>>());
         } else if lambdabyte == 48 {
-            type D = U4;
-            type POWD = U31;
-            type N = U16;
-            let res = reconstruct::<GF192, RandomOracleShake192, D, POWD, N>(
-                (*GenericArray::from_slice(&data.cop.iter().map(|x| match x[..] { [] => GenericArray::generate(|i:usize| 0u8), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA>>>()), *GenericArray::<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2>::from_slice(&data.com_j)),
-                *GenericArray::from_slice(&data.b),
+            let res = reconstruct::<GF192, RandomOracleShake192>(
+                &(data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA>>>(), *GenericArray::<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2>::from_slice(&data.com_j)),
+                data.b,
                 u128::from_be_bytes(data.iv),
             );
             assert_eq!(res.0, *GenericArray::from_slice(&data.h));
-            assert_eq!(res.1, *GenericArray::from_slice(&data.sd.iter().map(|x| match x[..] { [] => GenericArray::generate(|i:usize| 0u8), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA>>>()));
+            assert_eq!(res.1, data.sd.iter().map(|x| match x[..] { [] => GenericArray::default(), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA>>>());
         } else {
-            type D = U5;
-            type POWD = U63;
-            type N = U32;
-            let res = reconstruct::<GF256, RandomOracleShake256, D, POWD, N>(
-                (*GenericArray::from_slice(&data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>>()), *GenericArray::<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2>::from_slice(&data.com_j)),
-                *GenericArray::from_slice(&data.b),
+            let res = reconstruct::<GF256, RandomOracleShake256>(
+                &(data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>>(), *GenericArray::<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2>::from_slice(&data.com_j)),
+                data.b,
                 u128::from_be_bytes(data.iv),
             );
             assert_eq!(res.0, *GenericArray::from_slice(&data.h));
-            assert_eq!(res.1, *GenericArray::from_slice(&data.sd.iter().map(|x| match x[..] { [] => GenericArray::generate(|i:usize| 0u8), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>>()));
+            assert_eq!(res.1, data.sd.iter().map(|x| match x[..] { [] => GenericArray::default(), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>>());
         }
     }
 }

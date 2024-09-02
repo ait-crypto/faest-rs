@@ -1,14 +1,15 @@
 use std::fs::File;
 
+use generic_array::GenericArray;
 use serde::Deserialize;
+use typenum::{U1, U8};
 
 use crate::{
     aes::convert_to_bit,
     em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_extendedwitness, em_prove, em_verify},
     fields::{BigGaloisField, GF128, GF192, GF256},
     parameter::{
-        PARAM128F, PARAM128S, PARAM192F, PARAM192S, PARAM256F, PARAM256S, PARAMOWF128EM,
-        PARAMOWF192EM, PARAMOWF256EM,
+        self, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S, PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF128, PARAMOWF128EM, PARAMOWF192, PARAMOWF192EM, PARAMOWF256, PARAMOWF256EM
     },
 };
 
@@ -31,14 +32,14 @@ fn em_extended_witness_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let res = em_extendedwitness::<PARAM128S, PARAMOWF128EM>(&data.key, &data.input);
-            assert_eq!(res, data.w);
+            let res = em_extendedwitness::<PARAM128S, PARAMOWF128EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&data.input));
+            assert_eq!(res.0, *GenericArray::from_slice(&data.w));
         } else if data.lambda == 192 {
-            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(&data.key, &data.input);
-            assert_eq!(res, data.w);
+            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&data.input));
+            assert_eq!(res.0, *GenericArray::from_slice(&data.w));
         } else {
-            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(&data.key, &data.input);
-            assert_eq!(res, data.w);
+            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&data.input));
+            assert_eq!(res.0, *GenericArray::from_slice(&data.w));
         }
     }
 }
@@ -68,11 +69,11 @@ fn em_enc_fwd_test() {
                 (
                     data.x
                         .iter()
-                        .flat_map(|x| convert_to_bit(&x[0].to_le_bytes()[..1]))
+                        .flat_map(|x| convert_to_bit::<GF128, PARAMOWF128, U8, U1>(GenericArray::from_slice(&x[0].to_le_bytes()[..1])))
                         .collect(),
                     data.z
                         .iter()
-                        .flat_map(|z| convert_to_bit(&z[0].to_le_bytes()[..1]))
+                        .flat_map(|z| convert_to_bit::<GF128, PARAMOWF128, U8, U1>(GenericArray::from_slice(&z[0].to_le_bytes()[..1])))
                         .collect(),
                 )
             } else {
@@ -87,24 +88,24 @@ fn em_enc_fwd_test() {
                         .collect(),
                 )
             };
-            let res = em_enc_fwd::<GF128, PARAMOWF128EM>(&input_z, &input_x);
+            let res = em_enc_fwd::<GF128, PARAMOWF128EM>(GenericArray::from_slice(&input_z), GenericArray::from_slice(&input_x));
             assert_eq!(
                 res,
-                data.res
+                *GenericArray::from_slice(&data.res
                     .iter()
                     .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
-                    .collect::<Vec<GF128>>()
+                    .collect::<Vec<GF128>>())
             )
         } else if data.lambda == 192 {
             let (input_x, input_z): (Vec<GF192>, Vec<GF192>) = if data.m == 1 {
                 (
                     data.x
                         .iter()
-                        .flat_map(|x| convert_to_bit(&x[0].to_le_bytes()[..1]))
+                        .flat_map(|x| convert_to_bit::<GF192, PARAMOWF192, U8, U1>(GenericArray::from_slice(&x[0].to_le_bytes()[..1])))
                         .collect(),
                     data.z
                         .iter()
-                        .flat_map(|z| convert_to_bit(&z[0].to_le_bytes()[..1]))
+                        .flat_map(|z| convert_to_bit::<GF192, PARAMOWF192, U8, U1>(GenericArray::from_slice(&z[0].to_le_bytes()[..1])))
                         .collect(),
                 )
             } else {
@@ -119,24 +120,24 @@ fn em_enc_fwd_test() {
                         .collect(),
                 )
             };
-            let res = em_enc_fwd::<GF192, PARAMOWF192EM>(&input_z, &input_x);
+            let res = em_enc_fwd::<GF192, PARAMOWF192EM>(GenericArray::from_slice(&input_z), GenericArray::from_slice(&input_x));
             assert_eq!(
                 res,
-                data.res
+                *GenericArray::from_slice(&data.res
                     .iter()
                     .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
-                    .collect::<Vec<GF192>>()
+                    .collect::<Vec<GF192>>())
             )
         } else {
             let (input_x, input_z): (Vec<GF256>, Vec<GF256>) = if data.m == 1 {
                 (
                     data.x
                         .iter()
-                        .flat_map(|x| convert_to_bit(&x[0].to_le_bytes()[..1]))
+                        .flat_map(|x| convert_to_bit::<GF256, PARAMOWF256, U8, U1>(GenericArray::from_slice(&x[0].to_le_bytes()[..1])))
                         .collect(),
                     data.z
                         .iter()
-                        .flat_map(|z| convert_to_bit(&z[0].to_le_bytes()[..1]))
+                        .flat_map(|z| convert_to_bit::<GF256, PARAMOWF256, U8, U1>(GenericArray::from_slice(&z[0].to_le_bytes()[..1])))
                         .collect(),
                 )
             } else {
@@ -161,16 +162,16 @@ fn em_enc_fwd_test() {
                         .collect(),
                 )
             };
-            let res = em_enc_fwd::<GF256, PARAMOWF256EM>(&input_z, &input_x);
+            let res = em_enc_fwd::<GF256, PARAMOWF256EM>(GenericArray::from_slice(&input_z), GenericArray::from_slice(&input_x));
             assert_eq!(
                 res,
-                data.res
+                *GenericArray::from_slice(&data.res
                     .iter()
                     .map(|z| GF256::new(
                         z[0] as u128 + ((z[1] as u128) << 64),
                         z[2] as u128 + ((z[3] as u128) << 64)
                     ))
-                    .collect::<Vec<GF256>>()
+                    .collect::<Vec<GF256>>())
             )
         }
     }
@@ -205,19 +206,19 @@ fn em_enc_bkwd_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let (x_in, z_in, z_out_in) = if data.m == 1 {
+            let (x_in , z_in, z_out_in) : (Vec<GF128>, Vec<GF128>, Vec<GF128>)= if data.m == 1 {
                 (
                     data.x
                         .iter()
-                        .flat_map(|x| convert_to_bit::<GF128>(&x[0].to_le_bytes()[..1]))
+                        .flat_map(|x| convert_to_bit::<GF128, PARAMOWF128, U8, U1>(GenericArray::from_slice(&x[0].to_le_bytes()[..1])))
                         .collect::<Vec<GF128>>(),
                     data.z
                         .iter()
-                        .flat_map(|z| convert_to_bit::<GF128>(&z[0].to_le_bytes()[..1]))
+                        .flat_map(|z| convert_to_bit::<GF128, PARAMOWF128, U8, U1>(GenericArray::from_slice(&z[0].to_le_bytes()[..1])))
                         .collect::<Vec<GF128>>(),
                     data.zout
                         .iter()
-                        .flat_map(|z| convert_to_bit::<GF128>(&z[0].to_le_bytes()[..1]))
+                        .flat_map(|z| convert_to_bit::<GF128, PARAMOWF128, U8, U1>(GenericArray::from_slice(&z[0].to_le_bytes()[..1])))
                         .collect::<Vec<GF128>>(),
                 )
             } else {
@@ -225,46 +226,46 @@ fn em_enc_bkwd_test() {
                     data.x
                         .iter()
                         .map(|x| GF128::new(x[0] as u128 + ((x[1] as u128) << 64), 0))
-                        .collect(),
+                        .collect::<Vec<GF128>>(),
                     data.z
                         .iter()
                         .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
-                        .collect(),
+                        .collect::<Vec<GF128>>(),
                     data.zout
                         .iter()
                         .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
-                        .collect(),
+                        .collect::<Vec<GF128>>(),
                 )
             };
             let res = em_enc_bkwd::<GF128, PARAM128S, PARAMOWF128EM>(
-                &x_in,
-                &z_in,
-                &z_out_in,
+                GenericArray::from_slice(&x_in),
+                GenericArray::from_slice(&z_in),
+                GenericArray::from_slice(&z_out_in),
                 data.mkey != 0,
                 data.mtag != 0,
                 GF128::from(&data.delta[..]),
             );
             assert_eq!(
                 res,
-                data.res
+                *GenericArray::from_slice(&data.res
                     .iter()
                     .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
-                    .collect::<Vec<GF128>>()
+                    .collect::<Vec<GF128>>())
             )
         } else if data.lambda == 192 {
             let (x_in, z_in, z_out_in) = if data.m == 1 {
                 (
                     data.x
                         .iter()
-                        .flat_map(|x| convert_to_bit::<GF192>(&x[0].to_le_bytes()[..1]))
+                        .flat_map(|x| convert_to_bit::<GF192, PARAMOWF192, U8, U1>(GenericArray::from_slice(&x[0].to_le_bytes()[..1])))
                         .collect::<Vec<GF192>>(),
                     data.z
                         .iter()
-                        .flat_map(|z| convert_to_bit::<GF192>(&z[0].to_le_bytes()[..1]))
+                        .flat_map(|z| convert_to_bit::<GF192, PARAMOWF192, U8, U1>(GenericArray::from_slice(&z[0].to_le_bytes()[..1])))
                         .collect::<Vec<GF192>>(),
                     data.zout
                         .iter()
-                        .flat_map(|z| convert_to_bit::<GF192>(&z[0].to_le_bytes()[..1]))
+                        .flat_map(|z| convert_to_bit::<GF192, PARAMOWF192, U8, U1>(GenericArray::from_slice(&z[0].to_le_bytes()[..1])))
                         .collect::<Vec<GF192>>(),
                 )
             } else {
@@ -284,34 +285,34 @@ fn em_enc_bkwd_test() {
                 )
             };
             let res = em_enc_bkwd::<GF192, PARAM192S, PARAMOWF192EM>(
-                &x_in,
-                &z_in,
-                &z_out_in,
+                GenericArray::from_slice(&x_in),
+                GenericArray::from_slice(&z_in),
+                GenericArray::from_slice(&z_out_in),
                 data.mkey != 0,
                 data.mtag != 0,
                 GF192::from(&data.delta[..]),
             );
             assert_eq!(
                 res,
-                data.res
+                *GenericArray::from_slice(&data.res
                     .iter()
                     .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
-                    .collect::<Vec<GF192>>()
+                    .collect::<Vec<GF192>>())
             )
         } else {
             let (x_in, z_in, z_out_in) = if data.m == 1 {
                 (
                     data.x
                         .iter()
-                        .flat_map(|x| convert_to_bit::<GF256>(&x[0].to_le_bytes()[..1]))
+                        .flat_map(|x| convert_to_bit::<GF256, PARAMOWF256, U8, U1>(GenericArray::from_slice(&x[0].to_le_bytes()[..1])))
                         .collect::<Vec<GF256>>(),
                     data.z
                         .iter()
-                        .flat_map(|z| convert_to_bit::<GF256>(&z[0].to_le_bytes()[..1]))
+                        .flat_map(|z| convert_to_bit::<GF256, PARAMOWF256, U8, U1>(GenericArray::from_slice(&z[0].to_le_bytes()[..1])))
                         .collect::<Vec<GF256>>(),
                     data.zout
                         .iter()
-                        .flat_map(|z| convert_to_bit::<GF256>(&z[0].to_le_bytes()[..1]))
+                        .flat_map(|z| convert_to_bit::<GF256, PARAMOWF256, U8, U1>(GenericArray::from_slice(&z[0].to_le_bytes()[..1])))
                         .collect::<Vec<GF256>>(),
                 )
             } else {
@@ -346,23 +347,23 @@ fn em_enc_bkwd_test() {
                 )
             };
             let res = em_enc_bkwd::<GF256, PARAM256S, PARAMOWF256EM>(
-                &x_in,
-                &z_in,
-                &z_out_in,
+                GenericArray::from_slice(&x_in),
+                GenericArray::from_slice(&z_in),
+                GenericArray::from_slice(&z_out_in),
                 data.mkey != 0,
                 data.mtag != 0,
                 GF256::from(&data.delta[..]),
             );
             assert_eq!(
                 res,
-                data.res
+                *GenericArray::from_slice(&data.res
                     .iter()
                     .map(|z| GF256::new(
                         z[0] as u128 + ((z[1] as u128) << 64),
                         z[2] as u128 + ((z[3] as u128) << 64)
                     ))
                     .collect::<Vec<GF256>>()
-            )
+            ))
         }
     }
 }
@@ -399,12 +400,12 @@ fn em_enc_cstrnts_test() {
                 .iter()
                 .map(|v| GF128::new(v[0] as u128 + ((v[1] as u128) << 64), 0))
                 .collect::<Vec<GF128>>()[..];
-            let res = em_enc_cstrnts::<GF128, PARAM128S, PARAMOWF128EM>(
-                &data.out,
-                &data.x,
-                &data.w,
-                vq,
-                vq,
+            let res = em_enc_cstrnts::<GF128, PARAM128SEM, PARAMOWF128EM>(
+                GenericArray::from_slice(&data.out),
+                GenericArray::from_slice(&data.x),
+                GenericArray::from_slice(&data.w),
+                GenericArray::from_slice(&vq),
+                GenericArray::from_slice(&vq),
                 data.mkey != 0,
                 GF128::to_field(&data.delta)[0],
             );
@@ -428,12 +429,12 @@ fn em_enc_cstrnts_test() {
                 .iter()
                 .map(|v| GF192::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128))
                 .collect::<Vec<GF192>>()[..];
-            let res = em_enc_cstrnts::<GF192, PARAM192S, PARAMOWF192EM>(
-                &data.out,
-                &data.x,
-                &data.w,
-                vq,
-                vq,
+            let res = em_enc_cstrnts::<GF192, PARAM192SEM, PARAMOWF192EM>(
+                GenericArray::from_slice(&data.out),
+                GenericArray::from_slice(&data.x),
+                GenericArray::from_slice(&data.w),
+                GenericArray::from_slice(&vq),
+                GenericArray::from_slice(&vq),
                 data.mkey != 0,
                 GF192::to_field(&data.delta)[0],
             );
@@ -462,12 +463,12 @@ fn em_enc_cstrnts_test() {
                     )
                 })
                 .collect::<Vec<GF256>>()[..];
-            let res = em_enc_cstrnts::<GF256, PARAM256S, PARAMOWF256EM>(
-                &data.out,
-                &data.x,
-                &data.w,
-                vq,
-                vq,
+            let res = em_enc_cstrnts::<GF256, PARAM256SEM, PARAMOWF256EM>(
+                GenericArray::from_slice(&data.out),
+                GenericArray::from_slice(&data.x),
+                GenericArray::from_slice(&data.w),
+                GenericArray::from_slice(&vq),
+                GenericArray::from_slice(&vq),
                 data.mkey != 0,
                 GF256::to_field(&data.delta)[0],
             );
@@ -518,32 +519,33 @@ fn em_prove_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let res = em_prove::<GF128, PARAM128S, PARAMOWF128EM>(
-                &data.w,
-                &[[0u8; 160].to_vec(), data.u].concat(),
-                &data.gv,
-                &[data.input, data.output].concat(),
-                &data.chall,
+            let res = em_prove::<GF128, PARAM128SEM, PARAMOWF128EM>(
+                GenericArray::from_slice(&data.w),
+                &GenericArray::from_slice(&[[0u8; 160].to_vec(), data.u].concat()),
+                GenericArray::from_slice(&data.gv.iter().map(|x| *GenericArray::from_slice(x)).collect::<Vec<GenericArray<u8, _>>>()),
+                GenericArray::from_slice(&[data.input, data.output].concat()),
+                GenericArray::from_slice(&data.chall),
             );
-            assert_eq!((data.at, data.bt), res);
-        } else if data.lambda == 192 {
-            let res = em_prove::<GF192, PARAM192S, PARAMOWF192EM>(
-                &data.w,
-                &[[0u8; 288].to_vec(), data.u].concat(),
-                &data.gv,
-                &[data.input, data.output].concat(),
-                &data.chall,
+            assert_eq!((*GenericArray::from_slice(&data.at), *GenericArray::from_slice(&data.bt)), res);
+            break;
+        }  else if data.lambda == 192 {
+            let res = em_prove::<GF192, PARAM192SEM, PARAMOWF192EM>(
+                GenericArray::from_slice(&data.w),
+                &GenericArray::from_slice(&[[0u8; 288].to_vec(), data.u].concat()),
+                GenericArray::from_slice(&data.gv.iter().map(|x| *GenericArray::from_slice(x)).collect::<Vec<GenericArray<u8, _>>>()),
+                GenericArray::from_slice(&[data.input, data.output].concat()),
+                GenericArray::from_slice(&data.chall)
             );
-            assert_eq!((data.at, data.bt), res);
+            assert_eq!((*GenericArray::from_slice(&data.at), *GenericArray::from_slice(&data.bt)), res);
         } else {
-            let res = em_prove::<GF256, PARAM256S, PARAMOWF256EM>(
-                &data.w,
-                &[[0u8; 448].to_vec(), data.u].concat(),
-                &data.gv,
-                &[data.input, data.output].concat(),
-                &data.chall,
+            let res = em_prove::<GF256, PARAM256SEM, PARAMOWF256EM>(
+                GenericArray::from_slice(&data.w),
+                GenericArray::from_slice(&([[0u8; 448].to_vec(), data.u].concat()).to_vec()),
+                GenericArray::from_slice(&data.gv.iter().map(|x| *GenericArray::from_slice(x)).collect::<Vec<GenericArray<u8, _>>>()),
+                GenericArray::from_slice(&[data.input, data.output].concat()),
+                GenericArray::from_slice(&data.chall)
             );
-            assert_eq!((data.at, data.bt), res);
+            assert_eq!((*GenericArray::from_slice(&data.at), *GenericArray::from_slice(&data.bt)), res);
         }
     }
 }
@@ -580,67 +582,67 @@ fn em_verify_test() {
     for data in database {
         if data.lambda == 128 {
             let res = if data.tau == 11 {
-                em_verify::<GF128, PARAM128S, PARAMOWF128EM>(
-                    &data.d,
-                    data.gq,
-                    &data.at,
-                    &data.chall2,
-                    &data.chall3,
-                    &[data.input, data.output].concat(),
+                em_verify::<GF128, PARAM128SEM, PARAMOWF128EM>(
+                    GenericArray::from_slice(&data.d),
+                    &mut GenericArray::from_slice(&data.gq.iter().map(|x| *GenericArray::from_slice(x)).collect::<Vec<GenericArray<u8, _>>>()),
+                    GenericArray::from_slice(&data.at),
+                    GenericArray::from_slice(&data.chall2),
+                    GenericArray::from_slice(&data.chall3),
+                    GenericArray::from_slice(&[data.input, data.output].concat()),
                 )
             } else {
-                em_verify::<GF128, PARAM128F, PARAMOWF128EM>(
-                    &data.d,
-                    data.gq,
-                    &data.at,
-                    &data.chall2,
-                    &data.chall3,
-                    &[data.input, data.output].concat(),
+                em_verify::<GF128, PARAM128FEM, PARAMOWF128EM>(
+                    GenericArray::from_slice(&data.d),
+                    &mut GenericArray::from_slice(&data.gq.iter().map(|x| *GenericArray::from_slice(x)).collect::<Vec<GenericArray<u8, _>>>()),
+                    GenericArray::from_slice(&data.at),
+                    GenericArray::from_slice(&data.chall2),
+                    GenericArray::from_slice(&data.chall3),
+                    GenericArray::from_slice(&[data.input, data.output].concat()),
                 )
             };
-            assert_eq!(res, data.qt);
+            assert_eq!(res, *GenericArray::from_slice(&data.qt));
         } else if data.lambda == 192 {
             let res = if data.tau == 16 {
-                em_verify::<GF192, PARAM192S, PARAMOWF192EM>(
-                    &data.d,
-                    data.gq,
-                    &data.at,
-                    &data.chall2,
-                    &data.chall3,
-                    &[data.input, data.output].concat(),
+                em_verify::<GF192, PARAM192SEM, PARAMOWF192EM>(
+                    GenericArray::from_slice(&data.d),
+                    &mut GenericArray::from_slice(&data.gq.iter().map(|x| *GenericArray::from_slice(x)).collect::<Vec<GenericArray<u8, _>>>()),
+                    GenericArray::from_slice(&data.at),
+                    GenericArray::from_slice(&data.chall2),
+                    GenericArray::from_slice(&data.chall3),
+                    GenericArray::from_slice(&[data.input, data.output].concat()),
                 )
             } else {
-                em_verify::<GF192, PARAM192F, PARAMOWF192EM>(
-                    &data.d,
-                    data.gq,
-                    &data.at,
-                    &data.chall2,
-                    &data.chall3,
-                    &[data.input, data.output].concat(),
+                em_verify::<GF192, PARAM192FEM, PARAMOWF192EM>(
+                    GenericArray::from_slice(&data.d),
+                    &mut GenericArray::from_slice(&data.gq.iter().map(|x| *GenericArray::from_slice(x)).collect::<Vec<GenericArray<u8, _>>>()),
+                    GenericArray::from_slice(&data.at),
+                    GenericArray::from_slice(&data.chall2),
+                    GenericArray::from_slice(&data.chall3),
+                    GenericArray::from_slice(&[data.input, data.output].concat()),
                 )
             };
-            assert_eq!(res, data.qt);
+            assert_eq!(res, *GenericArray::from_slice(&data.qt));
         } else {
             let res = if data.tau == 22 {
-                em_verify::<GF256, PARAM256S, PARAMOWF256EM>(
-                    &data.d,
-                    data.gq,
-                    &data.at,
-                    &data.chall2,
-                    &data.chall3,
-                    &[data.input, data.output].concat(),
+                em_verify::<GF256, PARAM256SEM, PARAMOWF256EM>(
+                    GenericArray::from_slice(&data.d),
+                    &mut GenericArray::from_slice(&data.gq.iter().map(|x| *GenericArray::from_slice(x)).collect::<Vec<GenericArray<u8, _>>>()),
+                    GenericArray::from_slice(&data.at),
+                    GenericArray::from_slice(&data.chall2),
+                    GenericArray::from_slice(&data.chall3),
+                    GenericArray::from_slice(&[data.input, data.output].concat()),
                 )
             } else {
-                em_verify::<GF256, PARAM256F, PARAMOWF256EM>(
-                    &data.d,
-                    data.gq,
-                    &data.at,
-                    &data.chall2,
-                    &data.chall3,
-                    &[data.input, data.output].concat(),
+                em_verify::<GF256, PARAM256FEM, PARAMOWF256EM>(
+                    GenericArray::from_slice(&data.d),
+                    &mut GenericArray::from_slice(&data.gq.iter().map(|x| *GenericArray::from_slice(x)).collect::<Vec<GenericArray<u8, _>>>()),
+                    GenericArray::from_slice(&data.at),
+                    GenericArray::from_slice(&data.chall2),
+                    GenericArray::from_slice(&data.chall3),
+                    GenericArray::from_slice(&[data.input, data.output].concat()),
                 )
             };
-            assert_eq!(res, data.qt);
+            assert_eq!(res, *GenericArray::from_slice(&data.qt));
         }
     }
 }

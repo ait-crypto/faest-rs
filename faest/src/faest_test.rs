@@ -1,4 +1,6 @@
 use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
+use generic_array::GenericArray;
+use generic_array_0_14;
 use rand::random;
 
 #[cfg(test)]
@@ -642,10 +644,7 @@ fn faest_sign_test() {
         0x78, 0xc2, 0xb7, 0x90, 0x00, 0xc7, 0xf3, 0x01, 0x26, 0x20, 0x97, 0xad, 0x8f, 0x49, 0x6e,
         0x41, 0x0d, 0x69, 0x8a, 0xa1, 0x3e, 0x4a, 0xd2, 0xcc, 0x58, 0xee, 0x20, 0xbf, 0xea, 0xef,
         0x0c, 0xa7, 0x06, 0x73, 0x43, 0xf0, 0x78, 0x17, 0x22, 0x5c, 0x97, 0x22, 0x68, 0x78, 0x20,
-        0x3d, 0x7f, 0xdc, 0x27, 0x3c, 0x6d, 0x84, 0x3a, 0x4f, 0x31, 0xf2, 0x5c, 0xeb, 0x4a, 0x9f,
-        0xf7, 0x21, 0xf4, 0xfc, 0x8c, 0xb2, 0x7a, 0xde, 0x1e, 0x3e, 0x1f, 0xf3, 0xb1, 0xd3, 0x48,
-        0xe7, 0x67, 0xcc, 0xaf, 0xcc, 0xe2, 0xc9, 0x45, 0xdd, 0xdf, 0xc9, 0x90, 0xdc, 0x78, 0x32,
-        0xb1, 0xa0, 0xc1, 0x26, 0x58, 0x0a, 0xda, 0xdf, 0xfa, 0x22, 0x31, 0x54, 0x3d, 0xe1, 0x4a,
+        0x3d, 0x7f, 0xdc, 0x27, 0x3c, 0x6d, 0x84, 0x3a, 0x4f, 0x31, 0xf2, 0x5c, 0xeb, 0x4a, 0x4a,
         0xd4, 0xf5, 0x4a, 0x9c, 0x37, 0x9b, 0x20, 0x47, 0x64, 0x87, 0x60, 0x08, 0x0e, 0xe2, 0xaf,
         0x58, 0x45, 0x93, 0x5f, 0xba, 0xea, 0x81, 0x60, 0x37, 0x3c, 0x9d, 0x06, 0x06, 0xbf, 0xb4,
         0x7c, 0x1e, 0xda, 0xfe, 0xb5, 0x5b, 0x0c, 0xa8, 0x9c, 0x11, 0xc1, 0x80, 0xab, 0x7d, 0xa9,
@@ -807,31 +806,31 @@ fn faest_sign_test() {
 
     let s128sign = faest_sign::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(
         &message,
-        &sk[16..],
-        &pk,
-        randomness.to_vec(),
+        GenericArray::from_slice(&sk[16..]),
+        GenericArray::from_slice(&pk),
+        GenericArray::from_slice(&randomness)
     );
-    let res128s = sigma_to_signature(s128sign);
-    assert_eq!(res128s, sig128s);
+    let res128s = sigma_to_signature::<PARAM128S, PARAMOWF128, RandomOracleShake128>(s128sign);
+    assert_eq!(res128s, *GenericArray::from_slice(&sig128s));
     let res = faest_verify::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(
         &message,
-        (&pk[..16], &pk[16..]),
-        signature_to_sigma::<PARAM128S, PARAMOWF128>(&sig128s),
+        *GenericArray::from_slice(&pk),
+        signature_to_sigma::<PARAM128S, PARAMOWF128, RandomOracleShake128>(&sig128s),
     );
     assert!(res);
 
     let f128sign = faest_sign::<GF128, RandomOracleShake128, AesCypher, PARAM128F, PARAMOWF128>(
         &message,
-        &sk[16..],
-        &pk,
-        randomness.to_vec(),
+        GenericArray::from_slice(&sk[16..]),
+        GenericArray::from_slice(&pk),
+        GenericArray::from_slice(&randomness),
     );
-    let res128f = sigma_to_signature(f128sign);
-    assert_eq!(res128f, sig128f);
+    let res128f = sigma_to_signature::<PARAM128F, PARAMOWF128, RandomOracleShake128>(f128sign);
+    assert_eq!(res128f, *GenericArray::from_slice(&sig128f));
     let res = faest_verify::<GF128, RandomOracleShake128, AesCypher, PARAM128F, PARAMOWF128>(
         &message,
-        (&pk[..16], &pk[16..]),
-        signature_to_sigma::<PARAM128F, PARAMOWF128>(&sig128f),
+        *GenericArray::from_slice(&pk),
+        signature_to_sigma::<PARAM128F, PARAMOWF128, RandomOracleShake128>(&sig128f),
     );
     assert!(res);
 
@@ -2832,31 +2831,31 @@ fn faest_sign_test() {
 
     let s192sign = faest_sign::<GF192, RandomOracleShake192, AesCypher, PARAM192S, PARAMOWF192>(
         &message,
-        &sk192[32..],
-        &pk192,
-        random192.to_vec(),
+        GenericArray::from_slice(&sk192[32..]),
+        GenericArray::from_slice(&pk192),
+        GenericArray::from_slice(&random192),
     );
-    let res192s = sigma_to_signature(s192sign);
-    assert_eq!(res192s, sign192s);
+    let res192s = sigma_to_signature::<PARAM192S, PARAMOWF192, RandomOracleShake192>(s192sign);
+    assert_eq!(res192s, *GenericArray::from_slice(&sign192s));
     let res = faest_verify::<GF192, RandomOracleShake192, AesCypher, PARAM192S, PARAMOWF192>(
         &message,
-        (&pk192[..32], &pk192[32..]),
-        signature_to_sigma::<PARAM192S, PARAMOWF192>(&sign192s),
+        *GenericArray::from_slice(&pk192),
+        signature_to_sigma::<PARAM192S, PARAMOWF192, RandomOracleShake192>(&sign192s),
     );
     assert!(res);
 
     let f192sign = faest_sign::<GF192, RandomOracleShake192, AesCypher, PARAM192F, PARAMOWF192>(
         &message,
-        &sk192[32..],
-        &pk192,
-        random192.to_vec(),
+        GenericArray::from_slice(&sk192[32..]),
+        GenericArray::from_slice(&pk192),
+        GenericArray::from_slice(&random192),
     );
-    let res192f = sigma_to_signature(f192sign);
-    assert_eq!(res192f, sign192f);
+    let res192f = sigma_to_signature::<PARAM192F, PARAMOWF192, RandomOracleShake192>(f192sign);
+    assert_eq!(res192f, *GenericArray::from_slice(&sign192f));
     let res = faest_verify::<GF192, RandomOracleShake192, AesCypher, PARAM192F, PARAMOWF192>(
         &message,
-        (&pk192[..32], &pk192[32..]),
-        signature_to_sigma::<PARAM192F, PARAMOWF192>(&sign192f),
+            *GenericArray::from_slice(&pk192),
+        signature_to_sigma::<PARAM192F, PARAMOWF192, RandomOracleShake192>(&sign192f),
     );
     assert!(res);
 
@@ -6254,31 +6253,31 @@ fn faest_sign_test() {
 
     let s256sign = faest_sign::<GF256, RandomOracleShake256, AesCypher, PARAM256S, PARAMOWF256>(
         &message,
-        &sk256[32..],
-        &pk256,
-        random256.to_vec(),
+        &GenericArray::from_slice(&sk256[32..]),
+        &GenericArray::from_slice(&pk256),
+        &GenericArray::from_slice(&random256),
     );
-    let res256s = sigma_to_signature(s256sign);
-    assert_eq!(res256s, sign256s);
+    let res256s = sigma_to_signature::<PARAM256S, PARAMOWF256, RandomOracleShake256>(s256sign);
+    assert_eq!(res256s, *GenericArray::from_slice(&sign256s));
     let res = faest_verify::<GF256, RandomOracleShake256, AesCypher, PARAM256S, PARAMOWF256>(
         &message,
-        (&pk256[..32], &pk256[32..]),
-        signature_to_sigma::<PARAM256S, PARAMOWF256>(&sign256s),
+        *GenericArray::from_slice(&pk256),
+        signature_to_sigma::<PARAM256S, PARAMOWF256, RandomOracleShake256>(&sign256s),
     );
     assert!(res);
 
     let f256sign = faest_sign::<GF256, RandomOracleShake256, AesCypher, PARAM256F, PARAMOWF256>(
         &message,
-        &sk256[32..],
-        &pk256,
-        random256.to_vec(),
+        &GenericArray::from_slice(&sk256[32..]),
+        &GenericArray::from_slice(&pk256),
+        &GenericArray::from_slice(&random256),
     );
-    let res256f = sigma_to_signature(f256sign);
-    assert_eq!(res256f, sign256f);
+    let res256f = sigma_to_signature::<PARAM256F, PARAMOWF256, RandomOracleShake256>(f256sign);
+    assert_eq!(res256f, *GenericArray::from_slice(&sign256f));
     let res = faest_verify::<GF256, RandomOracleShake256, AesCypher, PARAM256F, PARAMOWF256>(
         &message,
-        (&pk256[..32], &pk256[32..]),
-        signature_to_sigma::<PARAM256F, PARAMOWF256>(&sign256f),
+        *GenericArray::from_slice(&pk256),
+        signature_to_sigma::<PARAM256F, PARAMOWF256, RandomOracleShake256>(&sign256f),
     );
     assert!(res);
 
@@ -6996,31 +6995,31 @@ fn faest_sign_test() {
 
     let sem128sign = faest_sign::<GF128, RandomOracleShake128, EmCypher, PARAM128SEM, PARAMOWF128EM>(
         &msg,
-        &sk128em[16..],
-        &pk128em,
-        randomness.to_vec(),
+        GenericArray::from_slice(&sk128em[16..]),
+        GenericArray::from_slice(&pk128em),
+            GenericArray::from_slice(&randomness),
     );
-    let res128sem = sigma_to_signature(sem128sign);
-    assert_eq!(res128sem, sig128sem);
+    let res128sem = sigma_to_signature::<PARAM128SEM, PARAMOWF128EM, RandomOracleShake128>(sem128sign);
+    assert_eq!(res128sem, *GenericArray::from_slice(&sig128sem));
     let res = faest_verify::<GF128, RandomOracleShake128, EmCypher, PARAM128SEM, PARAMOWF128EM>(
         &msg,
-        (&pk128em[..16], &pk128em[16..]),
-        signature_to_sigma::<PARAM128SEM, PARAMOWF128EM>(&sig128sem),
+        *GenericArray::from_slice(&pk128em),
+        signature_to_sigma::<PARAM128SEM, PARAMOWF128EM, RandomOracleShake128>(&sig128sem),
     );
     assert!(res);
 
     let fem128sign = faest_sign::<GF128, RandomOracleShake128, EmCypher, PARAM128FEM, PARAMOWF128EM>(
         &msg,
-        &sk128em[16..],
-        &pk128em,
-        randomness.to_vec(),
+        GenericArray::from_slice(&sk128em[16..]),
+        GenericArray::from_slice(&pk128em),
+        GenericArray::from_slice(&randomness),
     );
-    let res128fem = sigma_to_signature(fem128sign);
-    assert_eq!(res128fem, sig128fem);
+    let res128fem = sigma_to_signature::<PARAM128FEM, PARAMOWF128EM, RandomOracleShake128>(fem128sign);
+    assert_eq!(res128fem, *GenericArray::from_slice(&sig128fem));
     let res = faest_verify::<GF128, RandomOracleShake128, EmCypher, PARAM128FEM, PARAMOWF128EM>(
         &msg,
-        (&pk128em[..16], &pk128em[16..]),
-        signature_to_sigma::<PARAM128FEM, PARAMOWF128EM>(&sig128fem),
+        *GenericArray::from_slice(&pk128em),
+        signature_to_sigma::<PARAM128FEM, PARAMOWF128EM, RandomOracleShake128>(&sig128fem),
     );
     assert!(res);
 
@@ -8701,31 +8700,31 @@ fn faest_sign_test() {
 
     let sem192sign = faest_sign::<GF192, RandomOracleShake192, EmCypher, PARAM192SEM, PARAMOWF192EM>(
         &msg,
-        &sk192em[24..],
-        &pk192em,
-        random192.to_vec(),
+        GenericArray::from_slice(&sk192em[24..]),
+        GenericArray::from_slice(&pk192em),
+            GenericArray::from_slice(&random192),
     );
-    let res192sem = sigma_to_signature(sem192sign);
-    assert_eq!(res192sem, sign192sem);
+    let res192sem = sigma_to_signature::<PARAM192SEM, PARAMOWF192EM, RandomOracleShake192>(sem192sign);
+    assert_eq!(res192sem, *GenericArray::from_slice(&sign192sem));
     let res = faest_verify::<GF192, RandomOracleShake192, EmCypher, PARAM192SEM, PARAMOWF192EM>(
         &msg,
-        (&pk192em[..24], &pk192em[24..]),
-        signature_to_sigma::<PARAM192SEM, PARAMOWF192EM>(&sign192sem),
+        *GenericArray::from_slice(&pk192em),
+        signature_to_sigma::<PARAM192SEM, PARAMOWF192EM, RandomOracleShake192>(&sign192sem),
     );
     assert!(res);
 
     let fem192sign = faest_sign::<GF192, RandomOracleShake192, EmCypher, PARAM192FEM, PARAMOWF192EM>(
         &msg,
-        &sk192em[24..],
-        &pk192em,
-        random192.to_vec(),
+        &GenericArray::from_slice(&sk192em[24..]),
+        &GenericArray::from_slice(&pk192em),
+        &GenericArray::from_slice(&random192),
     );
-    let res192fem = sigma_to_signature(fem192sign);
-    assert_eq!(res192fem, sign192fem);
+    let res192fem = sigma_to_signature::<PARAM192FEM, PARAMOWF192EM, RandomOracleShake192>(fem192sign);
+    assert_eq!(res192fem, *GenericArray::from_slice(&sign192fem));
     let res = faest_verify::<GF192, RandomOracleShake192, EmCypher, PARAM192FEM, PARAMOWF192EM>(
         &msg,
-        (&pk192em[..24], &pk192em[24..]),
-        signature_to_sigma::<PARAM192FEM, PARAMOWF192EM>(&sign192fem),
+        *GenericArray::from_slice(&pk192em),
+        signature_to_sigma::<PARAM192FEM, PARAMOWF192EM, RandomOracleShake192>(&sign192fem),
     );
     assert!(res);
 
@@ -11938,31 +11937,31 @@ fn faest_sign_test() {
 
     let sem256sign = faest_sign::<GF256, RandomOracleShake256, EmCypher, PARAM256SEM, PARAMOWF256EM>(
         &msg,
-        &sk256em[32..],
-        &pk256em,
-        random256.to_vec(),
+        GenericArray::from_slice(&sk256em[32..]),
+        GenericArray::from_slice(&pk256em),
+        GenericArray::from_slice(&random256),
     );
-    let res256sem = sigma_to_signature(sem256sign);
-    assert_eq!(res256sem, sign256sem);
+    let res256sem = sigma_to_signature::<PARAM256SEM, PARAMOWF256EM, RandomOracleShake256>(sem256sign);
+    assert_eq!(res256sem, *GenericArray::from_slice(&sign256sem));
     let res = faest_verify::<GF256, RandomOracleShake256, EmCypher, PARAM256SEM, PARAMOWF256EM>(
         &msg,
-        (&pk256em[..32], &pk256em[32..]),
-        signature_to_sigma::<PARAM256SEM, PARAMOWF256EM>(&sign256sem),
+        *GenericArray::from_slice(&pk256em),
+        signature_to_sigma::<PARAM256SEM, PARAMOWF256EM, RandomOracleShake256>(&sign256sem),
     );
     assert!(res);
 
     let fem256sign = faest_sign::<GF256, RandomOracleShake256, EmCypher, PARAM256FEM, PARAMOWF256EM>(
         &msg,
-        &sk256em[32..],
-        &pk256em,
-        random256.to_vec(),
+        GenericArray::from_slice(&sk256em[32..]),
+        GenericArray::from_slice(&pk256em),
+        GenericArray::from_slice(&random256),
     );
-    let res256fem = sigma_to_signature(fem256sign);
-    assert_eq!(res256fem, sign256fem);
+    let res256fem = sigma_to_signature::<PARAM256FEM, PARAMOWF256EM, RandomOracleShake256>(fem256sign);
+    assert_eq!(res256fem, *GenericArray::from_slice(&sign256fem));
     let res = faest_verify::<GF256, RandomOracleShake256, EmCypher, PARAM256FEM, PARAMOWF256EM>(
         &msg,
-        (&pk256em[..32], &pk256em[32..]),
-        signature_to_sigma::<PARAM256FEM, PARAMOWF256EM>(&sign256fem),
+        *GenericArray::from_slice(&pk256em),
+        signature_to_sigma::<PARAM256FEM, PARAMOWF256EM, RandomOracleShake256>(&sign256fem),
     );
     assert!(res);
 }
@@ -11981,14 +11980,14 @@ fn faest_aes_test_128s() {
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let sigma = faest_sign::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(
             msg,
-            &sk[16..],
-            &pk,
-            rho[..16].to_vec(),
+            GenericArray::from_slice(&sk[16..]),
+            GenericArray::from_slice(&pk),
+            GenericArray::from_slice(&rho[..16]),
         );
         let res_true = faest_verify::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(
             msg,
-            (&pk[..16], &pk[16..]),
-            sigma.clone(),
+            *GenericArray::from_slice(&pk),
+            sigma,
         );
         assert!(res_true);
     }
@@ -12008,14 +12007,14 @@ fn faest_aes_test_128f() {
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let sigma = faest_sign::<GF128, RandomOracleShake128, AesCypher, PARAM128F, PARAMOWF128>(
             msg,
-            &sk[16..],
-            &pk,
-            rho[..16].to_vec(),
+            GenericArray::from_slice(&sk[16..]),
+            GenericArray::from_slice(&pk),
+            GenericArray::from_slice(&rho[..16]),
         );
         let res_true = faest_verify::<GF128, RandomOracleShake128, AesCypher, PARAM128F, PARAMOWF128>(
             msg,
-            (&pk[..16], &pk[16..]),
-            sigma.clone(),
+            *GenericArray::from_slice(&pk),
+            sigma,
         );
 
         assert!(res_true);
@@ -12036,13 +12035,13 @@ fn faest_aes_test_192s() {
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let sigma = faest_sign::<GF192, RandomOracleShake192, AesCypher, PARAM192S, PARAMOWF192>(
             msg,
-            &sk[32..],
-            &pk,
-            rho[..24].to_vec(),
+            GenericArray::from_slice(&sk[32..]),
+            GenericArray::from_slice(&pk),
+            GenericArray::from_slice(&rho[..24]),
         );
         let res_true = faest_verify::<GF192, RandomOracleShake192, AesCypher, PARAM192S, PARAMOWF192>(
             msg,
-            (&pk[..24], &pk[24..]),
+            *GenericArray::from_slice(&pk),
             sigma.clone(),
         );
 
@@ -12064,13 +12063,13 @@ fn faest_aes_test_192f() {
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let sigma = faest_sign::<GF192, RandomOracleShake192, AesCypher, PARAM192F, PARAMOWF192>(
             msg,
-            &sk[32..],
-            &pk,
-            rho[..24].to_vec(),
+            GenericArray::from_slice(&sk[32..]),
+            GenericArray::from_slice(&pk),
+            GenericArray::from_slice(&rho[..24]),
         );
         let res_true = faest_verify::<GF192, RandomOracleShake192, AesCypher, PARAM192F, PARAMOWF192>(
             msg,
-            (&pk[..32], &pk[32..]),
+            *GenericArray::from_slice(&pk),
             sigma.clone(),
         );
         assert!(res_true);
@@ -12091,13 +12090,13 @@ fn faest_aes_test_256s() {
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let sigma = faest_sign::<GF256, RandomOracleShake256, AesCypher, PARAM256S, PARAMOWF256>(
             msg,
-            &sk[32..],
-            &pk,
-            rho.to_vec(),
+            GenericArray::from_slice(&sk[32..]),
+            GenericArray::from_slice(&pk),
+            GenericArray::from_slice(&rho),
         );
         let res_true = faest_verify::<GF256, RandomOracleShake256, AesCypher, PARAM256S, PARAMOWF256>(
             msg,
-            (&pk[..16], &pk[16..]),
+            *GenericArray::from_slice(&pk),
             sigma.clone(),
         );
         assert!(res_true);
@@ -12118,13 +12117,13 @@ fn faest_aes_test_256f() {
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let sigma = faest_sign::<GF256, RandomOracleShake256, AesCypher, PARAM256F, PARAMOWF256>(
             msg,
-            &sk[32..],
-            &pk,
-            rho.to_vec(),
+            GenericArray::from_slice(&sk[32..]),
+            GenericArray::from_slice(&pk),
+            GenericArray::from_slice(&rho),
         );
         let res_true = faest_verify::<GF256, RandomOracleShake256, AesCypher, PARAM256F, PARAMOWF256>(
             msg,
-            (&pk[..16], &pk[16..]),
+            *GenericArray::from_slice(&pk),
             sigma.clone(),
         );
         assert!(res_true);
@@ -12145,14 +12144,14 @@ fn faest_em_test_128s() {
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let sigma = faest_sign::<GF128, RandomOracleShake128, EmCypher, PARAM128SEM, PARAMOWF128EM>(
             msg,
-            &sk[16..],
-            &pk,
-            rho[..16].to_vec(),
+            GenericArray::from_slice(&sk[16..]),
+            GenericArray::from_slice(&pk),
+            GenericArray::from_slice(&rho[..16]),
         );
         let res_true =
             faest_verify::<GF128, RandomOracleShake128, EmCypher, PARAM128SEM, PARAMOWF128EM>(
                 msg,
-                (&pk[..16], &pk[16..]),
+                *GenericArray::from_slice(&pk),
                 sigma.clone(),
             );
         assert!(res_true);
@@ -12173,14 +12172,14 @@ fn faest_em_test_128f() {
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let sigma = faest_sign::<GF128, RandomOracleShake128, EmCypher, PARAM128FEM, PARAMOWF128EM>(
             msg,
-            &sk[16..],
-            &pk,
-            rho[..16].to_vec(),
+            GenericArray::from_slice(&sk[16..]),
+            GenericArray::from_slice(&pk),
+            GenericArray::from_slice(&rho[..16]),
         );
         let res_true =
             faest_verify::<GF128, RandomOracleShake128, EmCypher, PARAM128FEM, PARAMOWF128EM>(
                 msg,
-                (&pk[..16], &pk[16..]),
+                *GenericArray::from_slice(&pk),
                 sigma.clone(),
             );
         assert!(res_true);
@@ -12201,14 +12200,14 @@ fn faest_em_test_192s() {
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let sigma = faest_sign::<GF192, RandomOracleShake192, EmCypher, PARAM192SEM, PARAMOWF192EM>(
             msg,
-            &sk[24..],
-            &pk,
-            rho[..24].to_vec(),
+            GenericArray::from_slice(&sk[24..]),
+            GenericArray::from_slice(&pk),
+            GenericArray::from_slice(&rho[..24]),
         );
         let res_true =
             faest_verify::<GF192, RandomOracleShake192, EmCypher, PARAM192SEM, PARAMOWF192EM>(
                 msg,
-                (&pk[..24], &pk[24..]),
+                *GenericArray::from_slice(&pk),
                 sigma.clone(),
             );
         assert!(res_true);
@@ -12229,14 +12228,14 @@ fn faest_em_test_192f() {
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let sigma = faest_sign::<GF192, RandomOracleShake192, EmCypher, PARAM192FEM, PARAMOWF192EM>(
             msg,
-            &sk[24..],
-            &pk,
-            rho[..24].to_vec(),
+            GenericArray::from_slice(&sk[24..]),
+            GenericArray::from_slice(&pk),
+            GenericArray::from_slice(&rho[..24]),
         );
         let res_true =
             faest_verify::<GF192, RandomOracleShake192, EmCypher, PARAM192FEM, PARAMOWF192EM>(
                 msg,
-                (&pk[..24], &pk[24..]),
+                *GenericArray::from_slice(&pk),
                 sigma.clone(),
             );
         assert!(res_true);
@@ -12258,14 +12257,14 @@ fn faest_em_test_256s() {
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let sigma = faest_sign::<GF256, RandomOracleShake256, EmCypher, PARAM256SEM, PARAMOWF256EM>(
             msg,
-            &sk[32..],
-            &pk,
-            rho.to_vec(),
+            GenericArray::from_slice(&sk[32..]),
+            GenericArray::from_slice(&pk),
+            GenericArray::from_slice(&rho),
         );
         let res_true =
             faest_verify::<GF256, RandomOracleShake256, EmCypher, PARAM256SEM, PARAMOWF256EM>(
                 msg,
-                (&pk[..16], &pk[16..]),
+                *GenericArray::from_slice(&pk),
                 sigma.clone(),
             );
         assert!(res_true);
@@ -12286,14 +12285,14 @@ fn faest_em_test_256f() {
         let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
         let sigma = faest_sign::<GF256, RandomOracleShake256, EmCypher, PARAM256FEM, PARAMOWF256EM>(
             msg,
-            &sk[32..],
-            &pk,
-            rho.to_vec(),
+            GenericArray::from_slice(&sk[32..]),
+            GenericArray::from_slice(&pk),
+            GenericArray::from_slice(&rho),
         );
         let res_true =
             faest_verify::<GF256, RandomOracleShake256, EmCypher, PARAM256FEM, PARAMOWF256EM>(
                 msg,
-                (&pk[..16], &pk[16..]),
+                *GenericArray::from_slice(&pk),
                 sigma.clone(),
             );
         assert!(res_true);
@@ -12372,20 +12371,20 @@ fn test_nyst_faest() {
 
         let keypair = AesCypher::keygen_with_rng::<PARAM128S, PARAMOWF128>(rng);
 
-        assert!(pk == keypair.1);
+        assert!(*GenericArray::from_slice(&pk) == keypair.1);
         assert_eq!(
             sig,
             [
                 msg.clone(),
-                sigma_to_signature(faest_sign::<
+                sigma_to_signature::<PARAM128S, PARAMOWF128, RandomOracleShake128>(faest_sign::<
                     GF128,
                     RandomOracleShake128,
                     AesCypher,
                     PARAM128S,
                     PARAMOWF128,
                 >(
-                    &msg, &keypair.0[16..], &pk, keypair.2[..16].to_vec()
-                ))
+                    &msg, GenericArray::from_slice(&keypair.0[16..]), GenericArray::from_slice(&pk), GenericArray::from_slice(&keypair.2[..16])
+                )).to_vec()
             ]
             .concat()
         );
@@ -12401,20 +12400,20 @@ fn test_nyst_faest() {
 
         let keypair = AesCypher::keygen_with_rng::<PARAM128F, PARAMOWF128>(rng);
 
-        assert!(pk == keypair.1);
+        assert!(*GenericArray::from_slice(&pk) == keypair.1);
         assert_eq!(
             sig,
             [
                 msg.clone(),
-                sigma_to_signature(faest_sign::<
+                sigma_to_signature::<PARAM128F, PARAMOWF128, RandomOracleShake128>(faest_sign::<
                     GF128,
                     RandomOracleShake128,
                     AesCypher,
                     PARAM128F,
                     PARAMOWF128,
                 >(
-                    &msg, &keypair.0[16..], &pk, keypair.2[..16].to_vec()
-                ))
+                    &msg, GenericArray::from_slice(&keypair.0[16..]), GenericArray::from_slice(&pk), GenericArray::from_slice(&keypair.2[..16])
+                )).to_vec()
             ]
             .concat()
         );
@@ -12429,20 +12428,20 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = AesCypher::keygen_with_rng::<PARAM192S, PARAMOWF192>(rng);
-        assert_eq!(pk, keypair.1);
+        assert_eq!(*GenericArray::from_slice(&pk), keypair.1);
         assert_eq!(
             sig,
             [
                 msg.clone(),
-                sigma_to_signature(faest_sign::<
+                sigma_to_signature::<PARAM192S, PARAMOWF192, RandomOracleShake192>(faest_sign::<
                     GF192,
                     RandomOracleShake192,
                     AesCypher,
                     PARAM192S,
                     PARAMOWF192,
                 >(
-                    &msg, &keypair.0[32..], &pk, keypair.2[..24].to_vec()
-                ))
+                    &msg, GenericArray::from_slice(&keypair.0[32..]), GenericArray::from_slice(&pk), GenericArray::from_slice(&keypair.2[..24])
+                )).to_vec()
             ]
             .concat()
         )
@@ -12461,15 +12460,15 @@ fn test_nyst_faest() {
             sig,
             [
                 msg.clone(),
-                sigma_to_signature(faest_sign::<
+                sigma_to_signature::<PARAM192F, PARAMOWF192, RandomOracleShake192>(faest_sign::<
                     GF192,
                     RandomOracleShake192,
                     AesCypher,
                     PARAM192F,
                     PARAMOWF192,
                 >(
-                    &msg, &keypair.0[32..], &pk, keypair.2[..24].to_vec()
-                ))
+                    &msg, GenericArray::from_slice(&keypair.0[32..]), GenericArray::from_slice(&pk), GenericArray::from_slice(&keypair.2[..24])
+                )).to_vec()
             ]
             .concat()
         );
@@ -12488,15 +12487,15 @@ fn test_nyst_faest() {
             sig,
             [
                 msg.clone(),
-                sigma_to_signature(faest_sign::<
+                sigma_to_signature::<PARAM256S, PARAMOWF256, RandomOracleShake256>(faest_sign::<
                     GF256,
                     RandomOracleShake256,
                     AesCypher,
                     PARAM256S,
                     PARAMOWF256,
                 >(
-                    &msg, &keypair.0[32..], &pk, keypair.2[..32].to_vec()
-                ))
+                    &msg, GenericArray::from_slice(&keypair.0[32..]), GenericArray::from_slice(&pk), GenericArray::from_slice(&keypair.2[..32])
+                )).to_vec()
             ]
             .concat()
         );
@@ -12511,20 +12510,20 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = AesCypher::keygen_with_rng::<PARAM256F, PARAMOWF256>(rng);
-        assert!(pk == keypair.1);
+        assert!(*GenericArray::from_slice(&pk) == keypair.1);
         assert_eq!(
             sig,
             [
                 msg.clone(),
-                sigma_to_signature(faest_sign::<
+                sigma_to_signature::<PARAM256F, PARAMOWF256, RandomOracleShake256>(faest_sign::<
                     GF256,
                     RandomOracleShake256,
                     AesCypher,
                     PARAM256F,
                     PARAMOWF256,
                 >(
-                    &msg, &keypair.0[32..], &pk, keypair.2[..32].to_vec()
-                ))
+                    &msg, GenericArray::from_slice(&keypair.0[32..]), GenericArray::from_slice(&pk), GenericArray::from_slice(&keypair.2[..32])
+                )).to_vec()
             ]
             .concat()
         );
@@ -12538,20 +12537,20 @@ fn test_nyst_faest() {
         let msg = data.message;
         let sig = data.sm;
         let keypair = EmCypher::keygen_with_rng::<PARAM128SEM, PARAMOWF128EM>(rng);
-        assert!(pk == keypair.1);
+        assert!(*GenericArray::from_slice(&pk) == keypair.1);
         assert_eq!(
             sig,
             [
                 msg.clone(),
-                sigma_to_signature(faest_sign::<
+                sigma_to_signature::<PARAM128SEM, PARAMOWF128EM, RandomOracleShake128>(faest_sign::<
                     GF128,
                     RandomOracleShake128,
                     EmCypher,
                     PARAM128SEM,
                     PARAMOWF128EM,
                 >(
-                    &msg, &keypair.0[16..], &pk, keypair.2[..16].to_vec()
-                ))
+                    &msg, GenericArray::from_slice(&keypair.0[32..]), GenericArray::from_slice(&pk), GenericArray::from_slice(&keypair.2[..32])
+                )).to_vec()
             ]
             .concat()
         )
@@ -12566,20 +12565,20 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = EmCypher::keygen_with_rng::<PARAM128FEM, PARAMOWF128EM>(rng);
-        assert_eq!(pk, keypair.1);
+        assert_eq!(*GenericArray::from_slice(&pk), keypair.1);
         assert_eq!(
             sig,
             [
                 msg.clone(),
-                sigma_to_signature(faest_sign::<
+                sigma_to_signature::<PARAM128FEM, PARAMOWF128EM, RandomOracleShake128>(faest_sign::<
                     GF128,
                     RandomOracleShake128,
                     EmCypher,
                     PARAM128FEM,
                     PARAMOWF128EM,
                 >(
-                    &msg, &keypair.0[16..], &pk, keypair.2[..16].to_vec()
-                ))
+                    &msg, GenericArray::from_slice(&keypair.0[32..]), GenericArray::from_slice(&pk), GenericArray::from_slice(&keypair.2[..32])
+                )).to_vec()
             ]
             .concat()
         );
@@ -12594,20 +12593,20 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = EmCypher::keygen_with_rng::<PARAM192SEM, PARAMOWF192EM>(rng);
-        assert_eq!(pk, keypair.1);
+        assert_eq!(*GenericArray::from_slice(&pk),keypair.1);
         assert_eq!(
             sig,
             [
                 msg.clone(),
-                sigma_to_signature(faest_sign::<
+                sigma_to_signature::<PARAM192SEM, PARAMOWF192EM, RandomOracleShake192>(faest_sign::<
                     GF192,
                     RandomOracleShake192,
                     EmCypher,
                     PARAM192SEM,
                     PARAMOWF192EM,
                 >(
-                    &msg, &keypair.0[24..], &pk, keypair.2[..24].to_vec()
-                ))
+                    &msg, GenericArray::from_slice(&keypair.0[24..]), GenericArray::from_slice(&pk), GenericArray::from_slice(&keypair.2[..24])
+                )).to_vec()
             ]
             .concat()
         )
@@ -12622,20 +12621,20 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = EmCypher::keygen_with_rng::<PARAM192FEM, PARAMOWF192EM>(rng);
-        assert_eq!(pk, keypair.1);
+        assert_eq!(*GenericArray::from_slice(&pk), keypair.1);
         assert_eq!(
             sig,
             [
                 msg.clone(),
-                sigma_to_signature(faest_sign::<
+                sigma_to_signature::<PARAM192FEM, PARAMOWF192EM, RandomOracleShake192>(faest_sign::<
                     GF192,
                     RandomOracleShake192,
                     EmCypher,
                     PARAM192FEM,
                     PARAMOWF192EM,
                 >(
-                    &msg, &keypair.0[24..], &pk, keypair.2[..24].to_vec()
-                ))
+                    &msg, GenericArray::from_slice(&keypair.0[24..]), GenericArray::from_slice(&pk), GenericArray::from_slice(&keypair.2[..24])
+                )).to_vec()
             ]
             .concat()
         )
@@ -12650,20 +12649,20 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = EmCypher::keygen_with_rng::<PARAM256SEM, PARAMOWF256EM>(rng);
-        assert_eq!(pk, keypair.1);
+        assert_eq!(*GenericArray::from_slice(&pk), keypair.1);
         assert_eq!(
             sig,
             [
                 msg.clone(),
-                sigma_to_signature(faest_sign::<
+                sigma_to_signature::<PARAM256SEM, PARAMOWF256EM, RandomOracleShake256>(faest_sign::<
                     GF256,
                     RandomOracleShake256,
                     EmCypher,
                     PARAM256SEM,
                     PARAMOWF256EM,
                 >(
-                    &msg, &keypair.0[32..], &pk, keypair.2[..32].to_vec()
-                ))
+                    &msg, GenericArray::from_slice(&keypair.0[32..]), GenericArray::from_slice(&pk), GenericArray::from_slice(&keypair.2[..32])
+                )).to_vec()
             ]
             .concat()
         )
@@ -12679,20 +12678,20 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = EmCypher::keygen_with_rng::<PARAM256FEM, PARAMOWF256EM>(rng);
-        assert_eq!(pk, keypair.1);
+        assert_eq!(*GenericArray::from_slice(&pk), keypair.1);
         assert_eq!(
             sig,
             [
                 msg.clone(),
-                sigma_to_signature(faest_sign::<
+                sigma_to_signature::<PARAM256FEM, PARAMOWF256EM, RandomOracleShake256>(faest_sign::<
                     GF256,
                     RandomOracleShake256,
                     EmCypher,
                     PARAM256FEM,
                     PARAMOWF256EM,
                 >(
-                    &msg, &keypair.0[32..], &pk, keypair.2[..32].to_vec()
-                ))
+                    &msg, GenericArray::from_slice(&keypair.0[32..]), GenericArray::from_slice(&pk), GenericArray::from_slice(&keypair.2[..32])
+                )).to_vec()
             ]
             .concat()
         );
