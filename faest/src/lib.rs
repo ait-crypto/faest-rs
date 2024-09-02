@@ -5,8 +5,6 @@
 pub mod fields;
 
 mod universal_hashing;
-//#[cfg(test)]
-mod universal_hashing_test;
 
 pub mod random_oracles;
 pub mod vc;
