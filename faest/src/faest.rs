@@ -346,11 +346,7 @@ where
         .concat(),
         &mut chall1,
     );
-    let u_t = volehash::<T, O>(
-        &chall1,
-        GenericArray::from_slice(&u[..l + lambda]),
-        GenericArray::from_slice(&u[l + lambda..]),
-    );
+    let u_t = volehash::<O>(&chall1, &u[..l + lambda], &u[l + lambda..]);
     let gv_t: GenericArray<
         GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>,
         O::LAMBDALBYTES,
@@ -358,13 +354,7 @@ where
         .iter()
         .map(|v| {
             v.iter()
-                .map(|v| {
-                    volehash::<T, O>(
-                        &chall1,
-                        GenericArray::from_slice(&v[..l + lambda]),
-                        GenericArray::from_slice(&v[l + lambda..]),
-                    )
-                })
+                .map(|v| volehash::<O>(&chall1, &v[..l + lambda], &v[l + lambda..]))
                 .collect()
         })
         .collect();
@@ -558,10 +548,10 @@ where
         .map(|q| {
             q.iter()
                 .map(|q| {
-                    volehash::<T, O>(
+                    volehash::<O>(
                         GenericArray::from_slice(&chall1),
-                        GenericArray::from_slice(&q[..l + lambda]),
-                        GenericArray::from_slice(&q[l + lambda..]),
+                        &q[..l + lambda],
+                        &q[l + lambda..],
                     )
                 })
                 .collect()

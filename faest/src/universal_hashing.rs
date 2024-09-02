@@ -1,7 +1,7 @@
+use std::array;
+
 use generic_array::{
-    sequence::GenericSequence,
-    typenum::Unsigned,
-    typenum::{Prod, Sum, U3},
+    typenum::{Prod, Quot, Sum, Unsigned, U16, U3, U8},
     ArrayLength, GenericArray,
 };
 
@@ -10,56 +10,156 @@ use crate::{
     parameter::PARAMOWF,
 };
 
-#[allow(dead_code)]
-pub fn volehash<T, O>(
+type BBits = U16;
+// Additional bytes returned by VOLE hash
+pub type B = Quot<BBits, U8>;
+
+/*
+struct VoleHasher<F>
+where
+    F: BigGaloisField,
+{
+    h0: F,
+    h1: GF64,
+    r: [F; 4],
+    s: F,
+    t: GF64,
+}
+
+impl<F, L> VoleHasher<F>
+where
+    F: BigGaloisField,
+    L: ArrayLength,
+    F::Length: std::ops::Add<B, Output = L>,
+{
+    fn new(sd: &[u8]) -> Self {
+        assert_eq!(
+            sd.len(),
+            F::Length::USIZE * 5 + <GF64 as Field>::Length::USIZE
+        );
+
+        let r = array::from_fn(|i| F::from(&sd[i * F::Length::USIZE..(i + 1) * F::Length::USIZE]));
+        let s = F::from(&sd[4 * F::Length::USIZE..5 * F::Length::USIZE]);
+        let t = GF64::from(
+            &sd[5 * F::Length::USIZE..5 * F::Length::USIZE + <GF64 as Field>::Length::USIZE],
+        );
+
+        Self {
+            h0: F::ZERO,
+            h1: GF64::ZERO,
+            r,
+            s,
+            t,
+        }
+    }
+
+    fn process_block(&mut self, data: &[u8]) {
+        self.h0 = self.h0 * self.s + F::from(data);
+        data.chunks_exact(<GF64 as Field>::Length::USIZE)
+            .for_each(|data| {
+                self.h1 = self.h1 * self.t + GF64::from(data);
+            });
+    }
+
+    fn process_unpadded_block(&mut self, data: &[u8]) {
+        let mut buf = GenericArray::<u8, F::Length>::default();
+        buf[..data.len()].copy_from_slice(data);
+        self.process_block(&buf);
+    }
+
+    fn finalize(mut self, x0: &[u8], x1: &[u8]) -> GenericArray<u8, L> {
+        let iter = x0.chunks_exact(F::Length::USIZE);
+        let remainder = iter.remainder();
+        iter.for_each(|data| self.process_block(data));
+        if !remainder.is_empty() {
+            self.process_unpadded_block(remainder);
+        }
+
+        assert_eq!(x1.len(), L::USIZE);
+
+        let h2 = self.r[0] * self.h0 + self.r[1] * self.h1;
+        let h3 = self.r[2] * self.h0 + self.r[3] * self.h1;
+
+        let mut ret = GenericArray::default();
+        ret[..F::Length::USIZE].copy_from_slice(&h2.as_bytes());
+        ret[F::Length::USIZE..].copy_from_slice(&h3.as_bytes()[0..B::USIZE]);
+        ret.iter_mut()
+            .zip(x1.iter())
+            .for_each(|(x1, x2)| *x1 ^= *x2);
+        ret
+    }
+}
+*/
+
+fn process_block<T: BigGaloisField>(
+    mut h0: T,
+    mut h1: GF64,
+    data: &[u8],
+    s: &T,
+    t: GF64,
+) -> (T, GF64) {
+    h0 = h0 * s + T::from(data);
+    data.chunks_exact(<GF64 as Field>::Length::USIZE)
+        .for_each(|data| {
+            h1 = h1 * t + GF64::from(data);
+        });
+    (h0, h1)
+}
+
+fn process_unpadded_block<T: BigGaloisField>(
+    h0: T,
+    h1: GF64,
+    data: &[u8],
+    s: &T,
+    t: GF64,
+) -> (T, GF64) {
+    let mut buf = GenericArray::<u8, T::Length>::default();
+    buf[..data.len()].copy_from_slice(data);
+    process_block(h0, h1, &buf, s, t)
+}
+
+pub fn volehash<O>(
     sd: &GenericArray<u8, O::CHALL1>,
-    x0: &GenericArray<u8, O::LAMBDALBYTES>,
-    x1: &GenericArray<u8, O::LAMBDAPLUS2>,
+    x0: &[u8],
+    x1: &[u8],
 ) -> GenericArray<u8, O::LAMBDAPLUS2>
 where
-    T: BigGaloisField + std::fmt::Debug,
     O: PARAMOWF,
 {
-    let l = <O::L as Unsigned>::to_usize() / 8;
-    let lambda = (T::LENGTH as usize) / 8;
-    let l_p: usize = lambda * 8 * (l + lambda * 8).div_ceil(lambda * 8);
-    let mut r: [T; 4] = [T::new(0u128, 0u128); 4];
-    for i in 0..4 {
-        r[i] = T::to_field(&sd[i * lambda..(i + 1) * lambda])[0];
+    let r: [_; 4] = array::from_fn(|i| {
+        O::Field::from(
+            &sd[i * <O::Field as Field>::Length::USIZE
+                ..(i + 1) * <O::Field as Field>::Length::USIZE],
+        )
+    });
+    let s = O::Field::from(
+        &sd[4 * <O::Field as Field>::Length::USIZE..5 * <O::Field as Field>::Length::USIZE],
+    );
+    let t = GF64::from(
+        &sd[5 * <O::Field as Field>::Length::USIZE
+            ..5 * <O::Field as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
+    );
+
+    let mut h0 = O::Field::ZERO;
+    let mut h1 = GF64::ZERO;
+
+    let iter = x0.chunks_exact(<O::Field as Field>::Length::USIZE);
+    let remainder = iter.remainder();
+    iter.for_each(|data| (h0, h1) = process_block(h0, h1, data, &s, t));
+    if !remainder.is_empty() {
+        (h0, h1) = process_unpadded_block(h0, h1, remainder, &s, t);
     }
 
-    let s = T::to_field(&sd[4 * lambda..5 * lambda])[0];
+    let h2 = r[0] * h0 + r[1] * h1;
+    let h3 = r[2] * h0 + r[3] * h1;
 
-    let t = &GF64::to_field(&sd[5 * lambda..(5 * lambda) + 8])[0];
-
-    let x0: GenericArray<u8, O::LPRIMEBYTE> =
-        GenericArray::generate(|i: usize| if i < lambda + l { x0[i] } else { 0u8 });
-
-    //use resize to get rid of the vec
-    let y_h = T::to_field(&x0.clone());
-
-    let y_b = GF64::to_field(&x0);
-
-    let mut h0 = T::new(0u128, 0u128);
-    let mut s_add = T::ONE;
-    for i in 0..l_p / (lambda * 8) {
-        h0 += s_add * y_h[(l_p / (lambda * 8)) - 1 - i];
-        s_add *= s;
-    }
-    let mut h1 = GF64::default();
-    let mut t_add = GF64::ONE;
-    for i in 0..(l_p / 64) {
-        h1 += t_add * y_b[(l_p / 64) - 1 - i];
-        t_add *= *t;
-    }
-
-    let (h2, h3) = ((r[0] * h0) + (r[1] * h1), ((r[2] * h0) + (r[3] * h1)));
-    let mut h = h2.get_value().0.to_le_bytes().to_vec();
-    h.append(&mut h2.get_value().1.to_le_bytes()[..(lambda) - 16].to_vec());
-    //taking the B first bytes of h3
-    h.append(&mut h3.get_value().0.to_le_bytes()[..2].to_vec());
-    h.iter_mut().zip(x1.iter()).for_each(|(x1, x2)| *x1 ^= *x2);
-    (*GenericArray::from_slice(&h)).clone()
+    let mut ret = GenericArray::default();
+    ret[..<O::Field as Field>::Length::USIZE].copy_from_slice(&h2.as_bytes());
+    ret[<O::Field as Field>::Length::USIZE..].copy_from_slice(&h3.as_bytes()[0..B::USIZE]);
+    ret.iter_mut()
+        .zip(x1.iter())
+        .for_each(|(x1, x2)| *x1 ^= *x2);
+    ret
 }
 
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Init part
@@ -249,10 +349,8 @@ mod test {
 
         for data in database {
             let sd = GenericArray::from_slice(&data.sd);
-            let x0 = GenericArray::from_slice(&data.x0);
-            let x1 = GenericArray::from_slice(&data.x1);
             let h = *GenericArray::from_slice(&data.h);
-            let res = volehash::<GF128, PARAMOWF128>(sd, x0, x1);
+            let res = volehash::<PARAMOWF128>(sd, &data.x0, &data.x1);
             assert_eq!(h, res);
         }
     }
@@ -264,10 +362,8 @@ mod test {
 
         for data in database {
             let sd = GenericArray::from_slice(&data.sd);
-            let x0 = GenericArray::from_slice(&data.x0);
-            let x1 = GenericArray::from_slice(&data.x1);
             let h = *GenericArray::from_slice(&data.h);
-            let res = volehash::<GF192, PARAMOWF192>(sd, x0, x1);
+            let res = volehash::<PARAMOWF192>(sd, &data.x0, &data.x1);
             assert_eq!(h, res);
         }
     }
@@ -279,10 +375,8 @@ mod test {
 
         for data in database {
             let sd = GenericArray::from_slice(&data.sd);
-            let x0 = GenericArray::from_slice(&data.x0);
-            let x1 = GenericArray::from_slice(&data.x1);
             let h = *GenericArray::from_slice(&data.h);
-            let res = volehash::<GF256, PARAMOWF256>(sd, x0, x1);
+            let res = volehash::<PARAMOWF256>(sd, &data.x0, &data.x1);
             assert_eq!(h, res);
         }
     }
