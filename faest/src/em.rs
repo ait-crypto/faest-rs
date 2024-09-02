@@ -5,7 +5,7 @@ use generic_array::GenericArray;
 
 use crate::{
     aes::convert_to_bit,
-    fields::{BigGaloisField, ByteCombine, Field},
+    fields::{BigGaloisField, ByteCombine, Field, SumPoly},
     parameter::{PARAM, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
@@ -357,13 +357,7 @@ where
         O::Field::default(),
     );
     let u_s = O::Field::to_field(&u[l / 8..])[0];
-    let mut v_s = new_v[l];
-    let alpha = O::Field::new(2, 0);
-    let mut cur_alpha = alpha;
-    for i in 1..lambda {
-        v_s += new_v[l + i] * cur_alpha;
-        cur_alpha *= alpha;
-    }
+    let v_s = O::Field::sum_poly(&new_v[l..l + lambda]);
     let a_t = zkhash::<O::Field>(chall, &a1, &u_s);
     let b_t = zkhash::<O::Field>(chall, &a0, &v_s);
     (a_t, b_t)
@@ -446,13 +440,8 @@ where
         true,
         delta,
     );
-    let mut q_s = new_q[l];
-    let alpha = O::Field::new(2, 0);
-    let mut cur_alpha = alpha;
-    for i in 1..lambda {
-        q_s += new_q[l + i] * cur_alpha;
-        cur_alpha *= alpha;
-    }
+    let q_s = O::Field::sum_poly(&new_q[l..l + lambda]);
+
     (*GenericArray::from_slice(&O::Field::to_bytes(
         &(O::Field::to_field(&zkhash::<O::Field>(chall2, &b, &q_s))[0]
             + O::Field::to_field(a_t)[0] * delta),
