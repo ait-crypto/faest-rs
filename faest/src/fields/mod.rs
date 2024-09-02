@@ -29,7 +29,7 @@ pub trait Field:
     const ONE: Self;
 
     /// Length of the byte representation of the field
-    type Length: ArrayLength<u8>;
+    type Length: ArrayLength;
 
     /// Obtain byte representation of the field element
     fn as_bytes(&self) -> GenericArray<u8, Self::Length>;

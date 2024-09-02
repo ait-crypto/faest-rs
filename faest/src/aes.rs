@@ -1,43 +1,42 @@
-use std::{iter::zip};
-use generic_array::{GenericArray};
+use generic_array::GenericArray;
+use std::iter::zip;
 use typenum::{Unsigned, U8};
 
 use crate::{
-    fields::BigGaloisField,
+    fields::{BigGaloisField, ByteCombine, Field},
     parameter::{self, PARAM, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
-        rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes,
-        sub_bytes_nots, State,
+        rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     },
-    universal_hashing::zkhash,
+    universal_hashing::{zkhash, ZKHasherInit},
     vole::chaldec,
 };
 
-pub fn convert_to_bit<T, O, S, I>(input: &GenericArray<u8, I>) -> GenericArray<T, S>
+pub fn convert_to_bit<O, S, I>(input: &GenericArray<u8, I>) -> GenericArray<O::Field, S>
 where
-    T: BigGaloisField + std::default::Default  + std::fmt::Debug,
-    O: PARAMOWF, 
-    I: generic_array::ArrayLength, 
-    S: generic_array::ArrayLength, 
-
+    O: PARAMOWF,
+    I: generic_array::ArrayLength,
+    S: generic_array::ArrayLength,
 {
-    
-    let mut res: GenericArray<T, S> = GenericArray::default();
-    for i in 0..res.len()/8 {
+    let mut res: GenericArray<_, S> = GenericArray::default();
+    for i in 0..res.len() / 8 {
         for j in 0..8 {
-            res[i*8 + j] = T::new(((input[i] >> j) & 1) as u128, 0)
+            res[i * 8 + j] = O::Field::new(((input[i] >> j) & 1) as u128, 0)
         }
     }
-    
+
     res
 }
 
 //The first member of the tuples are the effectives witness while the second is the validity according Faest requiremenbt of the keypair at the origin of the operation
-pub fn aes_extendedwitness<P, O>(key: &GenericArray<u8, O::LAMBDABYTES>, pk: &GenericArray<u8, O::PK>) -> (GenericArray<u8, O::LBYTES>, bool)
+pub fn aes_extendedwitness<P, O>(
+    key: &GenericArray<u8, O::LAMBDABYTES>,
+    pk: &GenericArray<u8, O::PK>,
+) -> (GenericArray<u8, O::LBYTES>, bool)
 where
     P: PARAM,
-    O: PARAMOWF, 
+    O: PARAMOWF,
     <O as parameter::PARAMOWF>::KBLENGTH: generic_array::ArrayLength,
 {
     let mut valid = true;
@@ -49,32 +48,41 @@ where
     let mut input = [0u8; 32];
     //step 0
     input[..16 * beta].clone_from_slice(&pk[..16 * beta]);
-    let mut w : GenericArray<u8, O::LBYTES> = GenericArray::default();
+    let mut w: GenericArray<u8, O::LBYTES> = GenericArray::default();
     let mut index = 0;
     //step 3
-    let (temp_kb, temp_val) = rijndael_key_schedule(key, bc, nk as u8, r, <O::SKE as Unsigned>::to_u8()); //modify rijndael_key_schedule
-    let (kb, _temp_val) : (GenericArray<u32, O::KBLENGTH>, bool) = ((*GenericArray::from_slice(&temp_kb[..kblen])).clone(), temp_val & valid);
+    let (temp_kb, temp_val) =
+        rijndael_key_schedule(key, bc, nk as u8, r, <O::SKE as Unsigned>::to_u8()); //modify rijndael_key_schedule
+    let (kb, _temp_val): (GenericArray<u32, O::KBLENGTH>, bool) = (
+        (*GenericArray::from_slice(&temp_kb[..kblen])).clone(),
+        temp_val & valid,
+    );
     //step 4
     for i in convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4]
-    .to_vec()
-    .iter()
-    .flat_map(|x| x.to_le_bytes())
-    .collect::<Vec<u8>>() {
+        .to_vec()
+        .iter()
+        .flat_map(|x| x.to_le_bytes())
+        .collect::<Vec<u8>>()
+    {
         w[index] = i;
         index += 1;
     }
     for i in convert_from_batchblocks(inv_bitslice(&kb[8..16]))[..nk / 2 - (4 - (nk / 2))]
-    .to_vec()
-    .iter()
-    .flat_map(|x| x.to_le_bytes())
-    .collect::<Vec<u8>>() {
+        .to_vec()
+        .iter()
+        .flat_map(|x| x.to_le_bytes())
+        .collect::<Vec<u8>>()
+    {
         w[index] = i;
         index += 1;
     }
-    for j in
-        1 + (nk / 8)..1 + (nk / 8) + ((<O::SKE as Unsigned>::to_usize()) * ((2 - (nk % 4)) * 2 + (nk % 4) * 3)) / 16
+    for j in 1 + (nk / 8)
+        ..1 + (nk / 8)
+            + ((<O::SKE as Unsigned>::to_usize()) * ((2 - (nk % 4)) * 2 + (nk % 4) * 3)) / 16
     {
-        let key : GenericArray<u32, U8> = *GenericArray::from_slice(&convert_from_batchblocks(inv_bitslice(&kb[8*j..8*(j + 1)])));
+        let key: GenericArray<u32, U8> = *GenericArray::from_slice(&convert_from_batchblocks(
+            inv_bitslice(&kb[8 * j..8 * (j + 1)]),
+        ));
         if nk == 6 {
             if j % 3 == 1 {
                 for i in key[2].to_le_bytes().to_vec() {
@@ -109,7 +117,7 @@ where
     (w, valid)
 }
 
- ///This function allow to get the directs antecedents of subbyte when calling extendwitness to check quicly if the key is valid or not
+///This function allow to get the directs antecedents of subbyte when calling extendwitness to check quicly if the key is valid or not
 /*pub fn aes_witness_has0<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8>
 where
     P: PARAM,
@@ -141,23 +149,33 @@ where
 } */
 
 #[allow(clippy::too_many_arguments)]
-fn round_with_save<O>(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mut GenericArray<u8, O::LBYTES>, index : &mut usize, valid: &mut bool) 
-where O:PARAMOWF{
+fn round_with_save<O>(
+    input1: [u8; 16],
+    input2: [u8; 16],
+    kb: &[u32],
+    r: u8,
+    w: &mut GenericArray<u8, O::LBYTES>,
+    index: &mut usize,
+    valid: &mut bool,
+) where
+    O: PARAMOWF,
+{
     let mut state = State::default();
     bitslice(&mut state, &input1, &input2);
     rijndael_add_round_key(&mut state, &kb[..8]);
     for j in 1..r as usize {
         for i in inv_bitslice(&state)[0][..].to_vec() {
-            *valid &= i!=0
+            *valid &= i != 0
         }
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, 4);
         for i in convert_from_batchblocks(inv_bitslice(&state))[..4][..4]
-        .to_vec()
-        .iter()
-        .flat_map(|x| x.to_le_bytes())
-        .collect::<Vec<u8>>() {
+            .to_vec()
+            .iter()
+            .flat_map(|x| x.to_le_bytes())
+            .collect::<Vec<u8>>()
+        {
             w[*index] = i;
             *index += 1
         }
@@ -187,34 +205,35 @@ fn round_with_save_has0(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
 #[allow(clippy::ptr_arg)]
-pub fn aes_key_exp_fwd<T, O>(x: &GenericArray<T, O::LKE>) -> GenericArray<T, O::PRODRUN128>
+pub fn aes_key_exp_fwd<O>(
+    x: &GenericArray<O::Field, O::LKE>,
+) -> GenericArray<O::Field, O::PRODRUN128>
 where
-    T: BigGaloisField + std::ops::Add<Output = T> + std::default::Default,
-    O: PARAMOWF, 
+    O: PARAMOWF,
 {
     //Step 1 is ok by construction
     let r = <O::R as Unsigned>::to_usize();
     let nk = <O::NK as Unsigned>::to_usize();
-    let mut out : GenericArray<T, O::PRODRUN128> = GenericArray::default();
+    let mut out: GenericArray<O::Field, O::PRODRUN128> = GenericArray::default();
     let lambda = <O::LAMBDA as Unsigned>::to_usize();
     let mut index = 0;
     for i in x.iter().take(lambda).cloned() {
         out[index] = i;
-        index+=1;
+        index += 1;
     }
     let mut indice = lambda;
     for j in nk as u16..(4 * (r + 1)) as u16 {
         if (j % (nk as u16) == 0) || ((nk > 6) && (j % (nk as u16) == 4)) {
             for i in x[indice..indice + 32].to_vec() {
                 out[index] = i;
-                index+=1;
+                index += 1;
             }
             indice += 32;
         } else {
             for i in 0..32 {
                 out[index] =
                     out[((32 * (j - nk as u16)) + i) as usize] + out[((32 * (j - 1)) + i) as usize];
-                index+=1;
+                index += 1;
             }
         }
     }
@@ -226,19 +245,22 @@ where
 ///One of the first path to optimize the code could be to do the distinction
 ///Beware when calling it : if Mtag = 1 ∧ Mkey = 1 or Mkey = 1 ∧ ∆ = ⊥ return ⊥
 #[allow(clippy::ptr_arg)]
-pub fn aes_key_exp_bwd<T, O>(x: &GenericArray<T, O::LKE>, xk: &GenericArray<T, O::PRODRUN128>, mtag: bool, mkey: bool, delta: T) -> GenericArray<T, O::PRODSKE8>
+pub fn aes_key_exp_bwd<O>(
+    x: &GenericArray<O::Field, O::LKE>,
+    xk: &GenericArray<O::Field, O::PRODRUN128>,
+    mtag: bool,
+    mkey: bool,
+    delta: O::Field,
+) -> GenericArray<O::Field, O::PRODSKE8>
 where
     O: PARAMOWF,
-    T: BigGaloisField + std::default::Default + std::marker::Sized + std::fmt::Debug,
-    T: std::ops::Add<T>, 
-
 {
     let rcon_table = [
         1, 2, 4, 8, 16, 32, 64, 128, 27, 54, 108, 216, 171, 77, 154, 47, 94, 188, 99, 198, 151, 53,
         106, 212, 179, 125, 250, 239, 197, 145,
     ];
     let ske = <O::SKE as Unsigned>::to_usize();
-    let mut out : GenericArray<T, O::PRODSKE8> = GenericArray::default();
+    let mut out: GenericArray<O::Field, O::PRODSKE8> = GenericArray::default();
     let mut indice = 0u16;
     let mut index = 0u16;
     let mut c = 0u8;
@@ -247,45 +269,47 @@ where
     //Step 6
     for j in 0..ske {
         //Step 7
-        let mut x_tilde : GenericArray<T, U8> = *GenericArray::from_slice(&zip(
-            x.iter().skip((8 * j).into()).take(8),
-            xk.iter().skip((indice + (8 * (c as u16))).into()).take(8),
-        )
-        .map(|(x, xk)| *x + *xk)
-        .collect::<GenericArray<T, U8>>());
+        let mut x_tilde: GenericArray<O::Field, U8> = *GenericArray::from_slice(
+            &zip(
+                x.iter().skip((8 * j).into()).take(8),
+                xk.iter().skip((indice + (8 * (c as u16))).into()).take(8),
+            )
+            .map(|(x, xk)| *x + *xk)
+            .collect::<GenericArray<O::Field, U8>>(),
+        );
         //Step 8
         if !mtag && rmvrcon && (c == 0) {
             let rcon = rcon_table[ircon];
             ircon += 1;
-            let mut r = [T::default(); 8];
+            let mut r = [O::Field::default(); 8];
             //Step 11
             for i in 0..8 {
                 r[i] = if mkey {
                     delta * ((rcon >> i) & 1)
                 } else {
-                    T::ONE * ((rcon >> i) & 1)
+                    O::Field::ONE * ((rcon >> i) & 1)
                 };
                 x_tilde[i] += r[i];
             }
         }
-        let mut y_tilde = [T::default(); 8];
+        let mut y_tilde = [O::Field::default(); 8];
         //Step 15
         for i in 0..8 {
             y_tilde[i] = x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8];
         }
         y_tilde[0] += if mtag {
-            T::default()
+            O::Field::default()
         } else if mkey {
             delta
         } else {
-            T::ONE
+            O::Field::ONE
         };
         y_tilde[2] += if mtag {
-            T::default()
+            O::Field::default()
         } else if mkey {
             delta
         } else {
-            T::ONE
+            O::Field::ONE
         };
         for i in y_tilde.to_vec() {
             out[index as usize] = i;
@@ -295,11 +319,11 @@ where
         //Step 21
         if c == 4 {
             c = 0;
-            if T::LENGTH == 192 {
+            if O::Field::LENGTH == 192 {
                 indice += 192;
             } else {
                 indice += 128;
-                if T::LENGTH == 256 {
+                if O::Field::LENGTH == 256 {
                     rmvrcon = !rmvrcon;
                 }
             }
@@ -321,64 +345,77 @@ where
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
-pub fn aes_key_exp_cstrnts<T, O>(
+pub fn aes_key_exp_cstrnts<O>(
     w: &GenericArray<u8, O::LBYTES>,
-    v: &GenericArray<T, O::LKE>,
+    v: &GenericArray<O::Field, O::LKE>,
     mkey: bool,
-    q: &GenericArray<T, O::LKE>,
-    delta: T,
-) -> (GenericArray<T, O::SKE>, GenericArray<T, O::SKE>, GenericArray<T, O::PRODRUN128>, GenericArray<T, O::PRODRUN128>)
+    q: &GenericArray<O::Field, O::LKE>,
+    delta: O::Field,
+) -> (
+    GenericArray<O::Field, O::SKE>,
+    GenericArray<O::Field, O::SKE>,
+    GenericArray<O::Field, O::PRODRUN128>,
+    GenericArray<O::Field, O::PRODRUN128>,
+)
 where
-    T: BigGaloisField
-        + std::default::Default
-        + std::marker::Sized
-        + std::fmt::Debug
-        + std::ops::Add<T>,
-    O: PARAMOWF, 
-    
+    O: PARAMOWF,
 {
-    let lambda = T::LENGTH as usize;
+    let lambda = O::Field::LENGTH as usize;
     let kc = <O::NK as Unsigned>::to_u8();
     let ske = <O::SKE as Unsigned>::to_u16();
     let lke = <O::LKE as Unsigned>::to_usize();
     let mut iwd: u16 = 32 * (kc - 1) as u16;
     let mut dorotword = true;
     if !mkey {
-        let mut a : (GenericArray<T, O::SKE>, GenericArray<T, O::SKE>) = (
-            GenericArray::default(),
-            GenericArray::default(),
+        let mut a: (
+            GenericArray<O::Field, O::SKE>,
+            GenericArray<O::Field, O::SKE>,
+        ) = (GenericArray::default(), GenericArray::default());
+        let bits_w = &convert_to_bit::<O, O::PRODRUN128, O::LBYTES>(&w)[..lke];
+        let k = aes_key_exp_fwd::<O>(GenericArray::from_slice(bits_w));
+        let vk = aes_key_exp_fwd::<O>(&v);
+        let w_b = aes_key_exp_bwd::<O>(
+            GenericArray::from_slice(
+                &[&bits_w[lambda..], &vec![O::Field::default(); lambda]].concat(),
+            ),
+            GenericArray::from_slice(&k),
+            false,
+            false,
+            delta,
         );
-        let bits_w = &convert_to_bit::<T, O, O::PRODRUN128, O::LBYTES>(&w)[..lke];
-        let k = aes_key_exp_fwd::<T, O>(GenericArray::from_slice(bits_w));
-        let vk = aes_key_exp_fwd::<T, O>(&v);
-        let w_b = aes_key_exp_bwd::<T, O>(GenericArray::from_slice(&[&bits_w[lambda..], &vec![T::default(); lambda]].concat()), GenericArray::from_slice(&k), false, false, delta);
-        let v_w_b = aes_key_exp_bwd::<T, O>(GenericArray::from_slice(&[&v[lambda..], &vec![T::default(); lambda]].concat()), GenericArray::from_slice(&vk), true, false, delta);
+        let v_w_b = aes_key_exp_bwd::<O>(
+            GenericArray::from_slice(&[&v[lambda..], &vec![O::Field::default(); lambda]].concat()),
+            GenericArray::from_slice(&vk),
+            true,
+            false,
+            delta,
+        );
         for j in 0..ske / 4 {
-            let mut k_hat = [T::default(); 4];
-            let mut v_k_hat = [T::default(); 4];
-            let mut w_hat = [T::default(); 4];
-            let mut v_w_hat = [T::default(); 4];
+            let mut k_hat = [O::Field::default(); 4];
+            let mut v_k_hat = [O::Field::default(); 4];
+            let mut w_hat = [O::Field::default(); 4];
+            let mut v_w_hat = [O::Field::default(); 4];
             for r in 0..4 {
                 let r_p = if dorotword { (r + 3) % 4 } else { r };
-                k_hat[r_p] = T::byte_combine(&into_array::<T>(
+                k_hat[r_p] = O::Field::byte_combine(&into_array(
                     &k[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
                 ));
-                v_k_hat[r_p] = T::byte_combine(&into_array::<T>(
+                v_k_hat[r_p] = O::Field::byte_combine(&into_array(
                     &vk[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
                 ));
-                w_hat[r] = T::byte_combine(&into_array::<T>(
+                w_hat[r] = O::Field::byte_combine(&into_array(
                     &w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
                 ));
-                v_w_hat[r] = T::byte_combine(&into_array::<T>(
+                v_w_hat[r] = O::Field::byte_combine(&into_array(
                     &v_w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
                 ));
             }
             for r in 0..4 {
-                a.0[j as usize *4 + r as usize] = v_k_hat[r] * v_w_hat[r];
-                a.1[j as usize *4 + r as usize] = 
-                    ((k_hat[r] + v_k_hat[r]) * (w_hat[r] + v_w_hat[r]))
-                        + T::ONE
-                        + a.0[(4 * j as usize) + r];
+                a.0[j as usize * 4 + r as usize] = v_k_hat[r] * v_w_hat[r];
+                a.1[j as usize * 4 + r as usize] = ((k_hat[r] + v_k_hat[r])
+                    * (w_hat[r] + v_w_hat[r]))
+                    + O::Field::ONE
+                    + a.0[(4 * j as usize) + r];
             }
             if lambda == 256 {
                 dorotword = !dorotword;
@@ -392,23 +429,29 @@ where
         (a.0, a.1, k, vk)
     } else {
         let _kc = <O::SKE as Unsigned>::to_u8();
-        let mut b : GenericArray<T, O::SKE> = GenericArray::default();
-        let q_k = aes_key_exp_fwd::<T, O>(q);
-        let q_w_b = aes_key_exp_bwd::<T, O>(GenericArray::from_slice(&[&q[lambda..], &vec![T::default(); lambda]].concat()), GenericArray::from_slice(&q_k), false, true, delta);
+        let mut b: GenericArray<O::Field, O::SKE> = GenericArray::default();
+        let q_k = aes_key_exp_fwd::<O>(q);
+        let q_w_b = aes_key_exp_bwd::<O>(
+            GenericArray::from_slice(&[&q[lambda..], &vec![O::Field::default(); lambda]].concat()),
+            GenericArray::from_slice(&q_k),
+            false,
+            true,
+            delta,
+        );
         for j in 0..ske / 4 {
-            let mut q_h_k = [T::default(); 4];
-            let mut q_h_w_b = [T::default(); 4];
+            let mut q_h_k = [O::Field::default(); 4];
+            let mut q_h_w_b = [O::Field::default(); 4];
             for r in 0..4 {
                 let r_p = if dorotword { (r + 3) % 4 } else { r };
-                q_h_k[r_p] = T::byte_combine(&into_array::<T>(
+                q_h_k[r_p] = O::Field::byte_combine(&into_array(
                     &q_k[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
                 ));
-                q_h_w_b[r] = T::byte_combine(&into_array::<T>(
+                q_h_w_b[r] = O::Field::byte_combine(&into_array(
                     &q_w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
                 ));
             }
             for r in 0..4 {
-                b[j as usize *4 +r as usize] = q_h_k[r] * q_h_w_b[r] + delta * delta;
+                b[j as usize * 4 + r as usize] = q_h_k[r] * q_h_w_b[r] + delta * delta;
             }
             if lambda == 128 {
                 iwd += 128;
@@ -426,41 +469,35 @@ where
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
-pub fn aes_enc_fwd<T, O>(
-    x: &GenericArray<T, O::LENC>,
-    xk: &GenericArray<T, O::PRODRUN128>,
+pub fn aes_enc_fwd<O>(
+    x: &GenericArray<O::Field, O::LENC>,
+    xk: &GenericArray<O::Field, O::PRODRUN128>,
     mkey: bool,
     mtag: bool,
     input: [u8; 16],
-    delta: T,
-) -> GenericArray<T, O::SENC>
+    delta: O::Field,
+) -> GenericArray<O::Field, O::SENC>
 where
-    T: BigGaloisField
-        + std::default::Default
-        + std::marker::Sized
-        + std::fmt::Debug
-        + std::ops::Add<T>,
-    O: PARAMOWF, 
-
+    O: PARAMOWF,
 {
     let mut index = 0;
-    let mut res : GenericArray<T, O::SENC> = GenericArray::default();
+    let mut res: GenericArray<O::Field, O::SENC> = GenericArray::default();
     //Step 2-5
     for i in 0..16 {
-        let mut xin = [T::default(); 8];
+        let mut xin = [O::Field::default(); 8];
         for (j, xin_item) in xin.iter_mut().enumerate() {
             let bit = (input[i] >> j) & 1;
             let temp_xin = if mtag {
-                T::default()
+                O::Field::default()
             } else if mkey {
                 delta * bit
             } else {
-                T::ONE * bit
+                O::Field::ONE * bit
             };
             *xin_item = temp_xin;
         }
-        res[index] = T::byte_combine(xin[0..8].try_into().unwrap())
-            + T::byte_combine(xk[8 * i..(8 * i) + 8].try_into().unwrap());
+        res[index] = O::Field::byte_combine(xin[0..8].try_into().unwrap())
+            + O::Field::byte_combine(xk[8 * i..(8 * i) + 8].try_into().unwrap());
         index += 1;
     }
     //Step 6
@@ -468,40 +505,42 @@ where
         for c in 0..4 {
             let ix: usize = 128 * (j - 1) + 32 * c;
             let ik: usize = 128 * j + 32 * c;
-            let mut x_hat: [T; 4] = [T::default(); 4];
-            let mut x_hat_k: [T; 4] = [T::default(); 4];
+            let mut x_hat = [O::Field::default(); 4];
+            let mut x_hat_k = [O::Field::default(); 4];
             for r in 0..4 {
-                x_hat[r] = T::byte_combine(x[ix + 8 * r..ix + 8 * r + 8].try_into().unwrap());
-                x_hat_k[r] = T::byte_combine(xk[ik + 8 * r..ik + 8 * r + 8].try_into().unwrap());
+                x_hat[r] =
+                    O::Field::byte_combine(x[ix + 8 * r..ix + 8 * r + 8].try_into().unwrap());
+                x_hat_k[r] =
+                    O::Field::byte_combine(xk[ik + 8 * r..ik + 8 * r + 8].try_into().unwrap());
             }
             let (a, b, c) = (
-                T::ONE,
-                T::byte_combine(&[
-                    T::default(),
-                    T::ONE,
-                    T::default(),
-                    T::default(),
-                    T::default(),
-                    T::default(),
-                    T::default(),
-                    T::default(),
+                O::Field::ONE,
+                O::Field::byte_combine(&[
+                    O::Field::default(),
+                    O::Field::ONE,
+                    O::Field::default(),
+                    O::Field::default(),
+                    O::Field::default(),
+                    O::Field::default(),
+                    O::Field::default(),
+                    O::Field::default(),
                 ]),
-                T::byte_combine(&[
-                    T::ONE,
-                    T::ONE,
-                    T::default(),
-                    T::default(),
-                    T::default(),
-                    T::default(),
-                    T::default(),
-                    T::default(),
+                O::Field::byte_combine(&[
+                    O::Field::ONE,
+                    O::Field::ONE,
+                    O::Field::default(),
+                    O::Field::default(),
+                    O::Field::default(),
+                    O::Field::default(),
+                    O::Field::default(),
+                    O::Field::default(),
                 ]),
             );
             //Step 16
             res[index] = x_hat[0] * b + x_hat[1] * c + x_hat[2] * a + x_hat[3] * a + x_hat_k[0];
-            res[index+1] = x_hat[0] * a + x_hat[1] * b + x_hat[2] * c + x_hat[3] * a + x_hat_k[1];
-            res[index+2] = x_hat[0] * a + x_hat[1] * a + x_hat[2] * b + x_hat[3] * c + x_hat_k[2];
-            res[index+3] = x_hat[0] * c + x_hat[1] * a + x_hat[2] * a + x_hat[3] * b + x_hat_k[3];
+            res[index + 1] = x_hat[0] * a + x_hat[1] * b + x_hat[2] * c + x_hat[3] * a + x_hat_k[1];
+            res[index + 2] = x_hat[0] * a + x_hat[1] * a + x_hat[2] * b + x_hat[3] * c + x_hat_k[2];
+            res[index + 3] = x_hat[0] * c + x_hat[1] * a + x_hat[2] * a + x_hat[3] * b + x_hat_k[3];
             index += 4;
         }
     }
@@ -511,31 +550,25 @@ where
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
-pub fn aes_enc_bkwd<T, O>(
-    x: &GenericArray<T, O::LENC>,
-    xk: &GenericArray<T, O::PRODRUN128>,
+pub fn aes_enc_bkwd<O>(
+    x: &GenericArray<O::Field, O::LENC>,
+    xk: &GenericArray<O::Field, O::PRODRUN128>,
     mkey: bool,
     mtag: bool,
     out: [u8; 16],
-    delta: T,
-) -> GenericArray<T, O::SENC>
+    delta: O::Field,
+) -> GenericArray<O::Field, O::SENC>
 where
-    T: BigGaloisField
-        + std::default::Default
-        + std::marker::Sized
-        + std::fmt::Debug
-        + std::ops::Add<T>,
-    O: PARAMOWF, 
-
+    O: PARAMOWF,
 {
-    let mut res : GenericArray<T, O::SENC> = GenericArray::default();
+    let mut res: GenericArray<O::Field, O::SENC> = GenericArray::default();
     let r = <O::R as Unsigned>::to_usize() as usize;
     let immut = if mtag {
-        T::default()
+        O::Field::default()
     } else if mkey {
         delta
     } else {
-        T::ONE
+        O::Field::ONE
     };
     //Step 2
     for j in 0..r {
@@ -543,28 +576,28 @@ where
             //Step 4
             for k in 0..4 {
                 let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
-                let x_t: [T; 8];
+                let x_t: [O::Field; 8];
                 if j < r - 1 {
                     x_t = x[ird..ird + 8].try_into().unwrap();
                 } else {
-                    let mut x_out = [T::default(); 8];
+                    let mut x_out = [O::Field::default(); 8];
                     for i in 0..8 {
                         x_out[i] = immut
                             * ((out[(ird - 128 * j + i) / 8] >> ((ird - 128 * j + i) % 8)) & 1);
                     }
                     x_t = zip(x_out, &xk[128 + ird..136 + ird])
                         .map(|(out, &k)| out + k)
-                        .collect::<Vec<T>>()
+                        .collect::<Vec<O::Field>>()
                         .try_into()
                         .unwrap();
                 }
-                let mut y_t = [T::default(); 8];
+                let mut y_t = [O::Field::default(); 8];
                 for i in 0..8 {
                     y_t[i] = x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8];
                 }
                 y_t[0] += immut;
                 y_t[2] += immut;
-                res[k + c*4 + j*16] = T::byte_combine(&y_t);
+                res[k + c * 4 + j * 16] = O::Field::byte_combine(&y_t);
             }
         }
     }
@@ -572,49 +605,75 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn aes_enc_cstrnts<T, O>(
+pub fn aes_enc_cstrnts<O>(
     input: [u8; 16],
     output: [u8; 16],
     w: &GenericArray<u8, O::QUOTLENC8>,
-    v: &GenericArray<T, O::LENC>,
-    k: &GenericArray<T, O::PRODRUN128>,
-    vk: &GenericArray<T, O::PRODRUN128>,
+    v: &GenericArray<O::Field, O::LENC>,
+    k: &GenericArray<O::Field, O::PRODRUN128>,
+    vk: &GenericArray<O::Field, O::PRODRUN128>,
     mkey: bool,
-    q: &GenericArray<T, O::LENC>,
-    qk: &GenericArray<T, O::PRODRUN128>,
-    delta: T,
-) -> GenericArray<T, O::SENC2>
+    q: &GenericArray<O::Field, O::LENC>,
+    qk: &GenericArray<O::Field, O::PRODRUN128>,
+    delta: O::Field,
+) -> GenericArray<O::Field, O::SENC2>
 where
-    T: BigGaloisField
-        + std::default::Default
-        + std::marker::Sized
-        + std::fmt::Debug
-        + std::ops::Add<T>,
-    O: PARAMOWF, 
-
+    O: PARAMOWF,
 {
     let senc = <O::SENC as Unsigned>::to_usize();
     if !mkey {
-        let mut field_w : GenericArray<T, O::LENC> = GenericArray::default();
+        let mut field_w: GenericArray<O::Field, O::LENC> = GenericArray::default();
         for i in 0..w.len() {
-            for j in 0..8{
-                field_w[i*8 + j] = T::new(((w[i] >> j) & 1) as u128, 0)
+            for j in 0..8 {
+                field_w[i * 8 + j] = O::Field::new(((w[i] >> j) & 1) as u128, 0)
             }
         }
-        let s = Box::< GenericArray<T, O::SENC>>::new(aes_enc_fwd::<T, O>(&field_w, k, false, false, input, T::default()));
-        let vs = Box::<GenericArray<T, O::SENC>>::new(aes_enc_fwd::<T, O>(v, vk, false, true, input, T::default()));
-        let s_b = Box::<GenericArray<T, O::SENC>>::new(aes_enc_bkwd::<T, O>(&field_w, k, false, false, output, T::default()));
-        let v_s_b = Box::<GenericArray<T, O::SENC>>::new(aes_enc_bkwd::<T, O>(v, vk, false, true, output, T::default()));
-        let mut a0 /* : GenericArray<T, O::SENC2> */ = Box::< GenericArray<T, O::SENC2>>::new(GenericArray::default());
+        let s = Box::<GenericArray<O::Field, O::SENC>>::new(aes_enc_fwd::<O>(
+            &field_w,
+            k,
+            false,
+            false,
+            input,
+            O::Field::default(),
+        ));
+        let vs = Box::<GenericArray<O::Field, O::SENC>>::new(aes_enc_fwd::<O>(
+            v,
+            vk,
+            false,
+            true,
+            input,
+            O::Field::default(),
+        ));
+        let s_b = Box::<GenericArray<O::Field, O::SENC>>::new(aes_enc_bkwd::<O>(
+            &field_w,
+            k,
+            false,
+            false,
+            output,
+            O::Field::default(),
+        ));
+        let v_s_b = Box::<GenericArray<O::Field, O::SENC>>::new(aes_enc_bkwd::<O>(
+            v,
+            vk,
+            false,
+            true,
+            output,
+            O::Field::default(),
+        ));
+        let mut a0 /* : GenericArray<O::Field, O::SENC2> */ = Box::< GenericArray<O::Field, O::SENC2>>::new(GenericArray::default());
         for j in 0..senc {
             a0[j] = vs[j] * v_s_b[j];
-            a0[senc + j] = (s[j] + vs[j]) * (s_b[j] + v_s_b[j]) + T::ONE + a0[j];
+            a0[senc + j] = (s[j] + vs[j]) * (s_b[j] + v_s_b[j]) + O::Field::ONE + a0[j];
         }
         *a0
     } else {
-        let qs = Box::< GenericArray<T, O::SENC>>::new(aes_enc_fwd::<T, O>(q, qk, true, false, input, delta));
-        let q_s_b = Box::<GenericArray<T, O::SENC>>::new(aes_enc_bkwd::<T, O>(q, qk, true, false, output, delta));
-        let mut b : GenericArray<T, O::SENC2> = GenericArray::default();
+        let qs = Box::<GenericArray<O::Field, O::SENC>>::new(aes_enc_fwd::<O>(
+            q, qk, true, false, input, delta,
+        ));
+        let q_s_b = Box::<GenericArray<O::Field, O::SENC>>::new(aes_enc_bkwd::<O>(
+            q, qk, true, false, output, delta,
+        ));
+        let mut b: GenericArray<O::Field, O::SENC2> = GenericArray::default();
         let delta_square = delta * delta;
         for j in 0..senc {
             b[j] = (qs[j] * q_s_b[j]) + delta_square;
@@ -624,19 +683,19 @@ where
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
-pub fn aes_prove<T, P, O>(
+pub fn aes_prove<P, O>(
     w: &GenericArray<u8, O::L>,
     u: &GenericArray<u8, O::LAMBDALBYTES>,
     gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     pk: &GenericArray<u8, O::PK>,
     chall: &GenericArray<u8, O::CHALL>,
-) -> (GenericArray<u8, O::LAMBDABYTES>, GenericArray<u8, O::LAMBDABYTES>)
+) -> (
+    GenericArray<u8, O::LAMBDABYTES>,
+    GenericArray<u8, O::LAMBDABYTES>,
+)
 where
-    T: BigGaloisField + std::default::Default + std::fmt::Debug,
     P: PARAM,
-    O: PARAMOWF, 
-
-
+    O: PARAMOWF,
 {
     let l = <O::L as Unsigned>::to_usize();
     let _c = <O::C as Unsigned>::to_usize();
@@ -645,25 +704,34 @@ where
     let senc = <O::SENC as Unsigned>::to_usize();
     let lambda = <P::LAMBDA as Unsigned>::to_usize();
     let pk_val = <O::PK as Unsigned>::to_usize();
-    let new_w : GenericArray<u8, O::LKE> = (*GenericArray::from_slice(&w[..lke])).clone();
-    let mut temp_v : GenericArray<u8, O::LAMBDALBYTESLAMBDA> = GenericArray::default();
-     for i in 0..(l + lambda) / 8 {
+    let new_w: GenericArray<u8, O::LKE> = (*GenericArray::from_slice(&w[..lke])).clone();
+    let mut temp_v: GenericArray<u8, O::LAMBDALBYTESLAMBDA> = GenericArray::default();
+    for i in 0..(l + lambda) / 8 {
         for k in 0..8 {
-            for j in 0..(lambda/8) {
+            for j in 0..(lambda / 8) {
                 let mut temp = 0;
                 for l in 0..8 {
                     temp += ((gv[(j * 8) + l][i] >> k) & 1) << l;
                 }
-                temp_v[i*lambda + k*lambda/8 + j] = temp;
+                temp_v[i * lambda + k * lambda / 8 + j] = temp;
             }
         }
     }
-    let new_v : GenericArray<T, O::LAMBDAL> = (*GenericArray::from_slice(&T::to_field(&temp_v))).clone();
-    
-    let (input, output) : (&GenericArray<u8, O::QUOTPK2>, &GenericArray<u8, O::QUOTPK2>) = (GenericArray::from_slice(&pk[..pk_val/2]), GenericArray::from_slice(&pk[pk_val/2..]));
-    let (a0, a1, k, vk) =
-        aes_key_exp_cstrnts::<T, O>(GenericArray::from_slice(&new_w[..l/8]), GenericArray::from_slice(&new_v[..lke]), false, &GenericArray::default(), T::default());
-     let a_01 = Box::<GenericArray<T, O::SENC2>>::new(aes_enc_cstrnts::<T, O>(
+    let new_v: GenericArray<_, O::LAMBDAL> =
+        (*GenericArray::from_slice(&O::Field::to_field(&temp_v))).clone();
+
+    let (input, output): (&GenericArray<u8, O::QUOTPK2>, &GenericArray<u8, O::QUOTPK2>) = (
+        GenericArray::from_slice(&pk[..pk_val / 2]),
+        GenericArray::from_slice(&pk[pk_val / 2..]),
+    );
+    let (a0, a1, k, vk) = aes_key_exp_cstrnts::<O>(
+        GenericArray::from_slice(&new_w[..l / 8]),
+        GenericArray::from_slice(&new_v[..lke]),
+        false,
+        &GenericArray::default(),
+        O::Field::default(),
+    );
+    let a_01 = Box::<GenericArray<O::Field, O::SENC2>>::new(aes_enc_cstrnts::<O>(
         input[..16].try_into().unwrap(),
         output[..16].try_into().unwrap(),
         GenericArray::from_slice(&new_w[lke / 8..(lke + lenc) / 8]),
@@ -673,13 +741,13 @@ where
         false,
         &GenericArray::default(),
         &GenericArray::default(),
-        T::default(),
+        O::Field::default(),
     ));
-    
-    /*let mut a_01_bis : GenericArray<T, O::SENC2> = GenericArray::default();
+
+    /*let mut a_01_bis : GenericArray<O::Field, O::SENC2> = GenericArray::default();
     println!("{:?}", lambda);
     /* if lambda > 128 {
-        a_01_bis = aes_enc_cstrnts::<T, O>(
+        a_01_bis = aes_enc_cstrnts::<O::Field, O>(
             input[16..].try_into().unwrap(),
             output[16..].try_into().unwrap(),
             GenericArray::from_slice(&new_w[(lke + lenc) / 8..l / 8]),
@@ -689,34 +757,32 @@ where
             false,
             &GenericArray::default(),
             &GenericArray::default(),
-            T::default(),
+            O::Field::default(),
         );
-        
+
     } */
     let a0_array = if lambda == 128 {(GenericArray::from_slice(&[&a0[..], &a_01[..senc]].concat())).clone()} else {(GenericArray::from_slice(&[&a0[..], &a_01[..senc], &a_01_bis[..senc]].concat())).clone()};
     let a1_array = if lambda == 128 {(GenericArray::from_slice(&[&a1[..], &a_01[senc..]].concat())).clone()} else {(GenericArray::from_slice(&[&a1[..], &a_01[senc..], &a_01_bis[senc..]].concat())).clone()};
-    let u_s: T = T::to_field(&u[l / 8..])[0];
-    
+    let u_s: T = O::Field::to_field(&u[l / 8..])[0];
+
 
     let mut v_s = new_v[l];
-    let alpha = T::new(2, 0);
+    let alpha = O::Field::new(2, 0);
     let mut cur_alpha = alpha;
     for i in 1..lambda {
         v_s += new_v[l + i] * cur_alpha;
         cur_alpha *= alpha;
     }
-    
-    let a_t = zkhash::<T, O>(chall, &a1_array, u_s);
-    let b_t = zkhash::<T, O>(chall, &a0_array, v_s); */
 
-    
-    
-    (GenericArray::default(), GenericArray::default())//(a_t, b_t)
+    let a_t = zkhash::<O::Field, O>(chall, &a1_array, u_s);
+    let b_t = zkhash::<O::Field, O>(chall, &a0_array, v_s); */
+
+    (GenericArray::default(), GenericArray::default()) //(a_t, b_t)
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 #[allow(clippy::too_many_arguments)]
-pub fn aes_verify<T, P, O>(
+pub fn aes_verify<P, O>(
     d: &GenericArray<u8, O::LBYTES>,
     gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     a_t: &GenericArray<u8, O::LAMBDABYTES>,
@@ -725,40 +791,38 @@ pub fn aes_verify<T, P, O>(
     pk: &GenericArray<u8, O::PK>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
 where
-    T: BigGaloisField + std::default::Default + std::fmt::Debug,
     P: PARAM,
     O: PARAMOWF,
 {
-    let lambda = T::LENGTH as usize;
+    let lambda = O::Field::LENGTH as usize;
     let k0 = <P::K0 as Unsigned>::to_usize();
     let k1 = <P::K1 as Unsigned>::to_usize();
     let t0 = <P::TAU0 as Unsigned>::to_usize();
     let t1 = <P::TAU1 as Unsigned>::to_usize();
     let l = <P::L as Unsigned>::to_usize();
     let _c = <O::C as Unsigned>::to_usize();
-    let delta = T::to_field(chall3)[0];
+    let delta = O::Field::to_field(chall3)[0];
     let lke = <O::LKE as Unsigned>::to_usize();
     let lenc = <O::LENC as Unsigned>::to_usize();
     let senc = <O::SENC as Unsigned>::to_usize();
     let pk_len = <O::PK as Unsigned>::to_usize();
-    let (input, output) : (GenericArray<u8, O::QUOTPK2>, GenericArray<u8, O::QUOTPK2>) = ((*GenericArray::from_slice(&pk[..pk_len/2])).clone(), (*GenericArray::from_slice(&pk[pk_len/2..])).clone());
-    let mut new_gq: GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = gq.clone(); 
+    let (input, output): (GenericArray<u8, O::QUOTPK2>, GenericArray<u8, O::QUOTPK2>) = (
+        (*GenericArray::from_slice(&pk[..pk_len / 2])).clone(),
+        (*GenericArray::from_slice(&pk[pk_len / 2..])).clone(),
+    );
+    let mut new_gq: GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = gq.clone();
     for i in 0..t0 {
         let sdelta = chaldec::<P>(chall3, i as u16);
         for j in 0..k0 {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate().take(l / 8) {
-                    new_gq[k0 * i + j][k]  = gq[k0 * i + j][k] ^ d[k];
-                    
+                    new_gq[k0 * i + j][k] = gq[k0 * i + j][k] ^ d[k];
                 }
             }
         }
     }
     for i in 0..t1 {
-        let sdelta = chaldec::<P>(
-            chall3,
-            (t0 + i) as u16,
-        );
+        let sdelta = chaldec::<P>(chall3, (t0 + i) as u16);
         for j in 0..k1 {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate().take(l / 8) {
@@ -768,9 +832,7 @@ where
         }
     }
 
-    
-
-    let mut temp_q : GenericArray<u8, O::LAMBDALBYTESLAMBDA> = GenericArray::default();
+    let mut temp_q: GenericArray<u8, O::LAMBDALBYTESLAMBDA> = GenericArray::default();
     for i in 0..(l + lambda) / 8 {
         for k in 0..8 {
             for j in 0..lambda / 8 {
@@ -778,17 +840,23 @@ where
                 for l in 0..8_usize {
                     temp += ((new_gq[(j * 8) + l][i] >> k) & 1) << l;
                 }
-                temp_q[i*lambda + k *lambda/8 + j] =temp;
+                temp_q[i * lambda + k * lambda / 8 + j] = temp;
             }
         }
     }
-    
-    let new_q = T::to_field(&temp_q);
-    
-    let mut b_array : GenericArray<T, O::C> = GenericArray::default();
-    let (b1, _, _, qk) = aes_key_exp_cstrnts::<T, O>(&GenericArray::default(), &GenericArray::default(), true, GenericArray::from_slice(&new_q[0..lke]), delta);
+
+    let new_q = O::Field::to_field(&temp_q);
+
+    let mut b_array: GenericArray<O::Field, O::C> = GenericArray::default();
+    let (b1, _, _, qk) = aes_key_exp_cstrnts::<O>(
+        &GenericArray::default(),
+        &GenericArray::default(),
+        true,
+        GenericArray::from_slice(&new_q[0..lke]),
+        delta,
+    );
     println!("{:?}, {:?}", &input[..16], &output[..16]);
-    let b2 = aes_enc_cstrnts::<T, O>(
+    let b2 = aes_enc_cstrnts::<O>(
         input[..16].try_into().unwrap(),
         output[..16].try_into().unwrap(),
         &GenericArray::default(),
@@ -800,29 +868,33 @@ where
         GenericArray::from_slice(&qk[..]),
         delta,
     );
-    let mut b3 : GenericArray<T, O::SENC2> = GenericArray::default();
+    let mut b3: GenericArray<O::Field, O::SENC2> = GenericArray::default();
     if lambda > 128 {
-        b3 = aes_enc_cstrnts::<T, O>(
+        b3 = aes_enc_cstrnts::<O>(
             input[16..].try_into().unwrap(),
             output[16..].try_into().unwrap(),
             &GenericArray::default(),
-        &GenericArray::default(),
-        &GenericArray::default(),
-        &GenericArray::default(),
+            &GenericArray::default(),
+            &GenericArray::default(),
+            &GenericArray::default(),
             true,
             GenericArray::from_slice(&new_q[lke + lenc..l]),
-                GenericArray::from_slice(&qk[..]),
+            GenericArray::from_slice(&qk[..]),
             delta,
         );
     }
     b_array = (*GenericArray::from_slice(&[&b1[..], &b2[..senc], &b3[..senc]].concat())).clone();
     let mut q_s = new_q[l];
-    let alpha = T::new(2, 0);
+    let alpha = O::Field::new(2, 0);
     let mut cur_alpha = alpha;
     for i in 1..lambda {
         q_s += new_q[l + i] * cur_alpha;
         cur_alpha *= alpha;
     }
-    
-    (*GenericArray::from_slice(&T::to_bytes(&(T::to_field(&zkhash::<T, O>(chall2, &b_array, q_s))[0] + T::to_field(a_t)[0] * delta)))).clone()
+
+    (*GenericArray::from_slice(&O::Field::to_bytes(
+        &(O::Field::to_field(&zkhash::<O::Field>(chall2, &b_array, &q_s))[0]
+            + O::Field::to_field(a_t)[0] * delta),
+    )))
+    .clone()
 }
