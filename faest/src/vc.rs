@@ -25,7 +25,7 @@ where
     k[0] = (*GenericArray::from_slice(&[&r.get_value().0.to_le_bytes(), &r.get_value().1.to_le_bytes()[..length - 16_usize]].concat())).clone();
     
     for i in 0..n - 1 {
-        let new_ks = &R::prg::<R::PRODLAMBDA2>(&k[i as usize].clone(), iv);
+        let new_ks = &R::prg::<R::PRODLAMBDA2>(k[i as usize].clone(), iv);
         (k[((2 * i) + 1) as usize], k[((2 * i) + 2) as usize]) =
             ((*GenericArray::from_slice(&new_ks[..length])).clone(), (*GenericArray::from_slice(&new_ks[length..])).clone());
     }
@@ -93,7 +93,7 @@ where
         for j in 0..1 << (i - 1) {
             if j != a {
                 let rank = (1 << (i - 1)) - 1 + j;
-                let new_ks = R::prg::<R::PRODLAMBDA2>(&k[rank as usize].clone().unwrap(), iv);
+                let new_ks = R::prg::<R::PRODLAMBDA2>(k[rank as usize].clone().unwrap(), iv);
                 (k[(rank * 2 + 1) as usize], k[(rank * 2 + 2) as usize]) = (
                     Some((*GenericArray::from_slice(&new_ks[..length])).clone()),
                     Some((*GenericArray::from_slice(&new_ks[length..])).clone()),
@@ -145,3 +145,336 @@ where
 }
 
 //reconstruct is tested in the integration_test_vc test_commitment_and_decomitment() function.
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use generic_array::{sequence::GenericSequence, GenericArray};
+    use serde::Deserialize;
+    use typenum::{U15, U16, U3, U31, U32, U4, U5, U63};
+
+    use crate::{
+        fields::{GF128, GF192, GF256},
+        random_oracles::{self, RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
+    };
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct DataCommit {
+        keyroot: Vec<u8>,
+        iv: u128,
+        depth: u8,
+        h: Vec<u8>,
+        k: Vec<Vec<u8>>,
+        com: Vec<Vec<u8>>,
+        sd: Vec<Vec<u8>>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct DataOpen {
+        k: Vec<Vec<u8>>,
+        b: Vec<u8>,
+        com: Vec<Vec<u8>>,
+        cop: Vec<Vec<u8>>,
+        com_j: Vec<u8>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct DataReconstruct {
+        cop: Vec<Vec<u8>>,
+        com_j: Vec<u8>,
+        b: Vec<u8>,
+        iv: [u8; 16],
+        h: Vec<u8>,
+        sd: Vec<Vec<u8>>,
+    }
+
+    #[test]
+    fn commit_test() {
+        let database: Vec<DataCommit> = serde_json::from_str(include_str!("../DataVc.json"))
+            .expect("error while reading or parsing");
+        for mut data in database {
+            let lamdabytes = data.keyroot.len();
+            if lamdabytes == 16 {
+                data.keyroot.append(&mut vec![0; 16]);
+                type D = U31;
+                type N = U16;
+                let res = commit::<GF128, RandomOracleShake128>(
+                    GF128::from(&data.keyroot[..]),
+                    data.iv,
+                    1 << data.depth,
+                );
+                let mut sd = Vec::new();
+                for val in data.sd {
+                    sd.push(Some(val));
+                }
+                assert_eq!(res.0, *GenericArray::from_slice(&data.h));
+                assert_eq!(
+                    res.1 .0,
+                    data.k
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec::<GenericArray<u8, _>>>()
+                );
+                assert_eq!(
+                    res.1 .1,
+                    data.com
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec::<GenericArray<u8, _>>>()
+                );
+                assert_eq!(
+                    res.2,
+                    sd.iter()
+                        .map(|x| x.as_ref().map(|y| *GenericArray::from_slice(y)))
+                        .collect::<Vec::<Option::<GenericArray<u8, _>>>>()
+                );
+            } else if lamdabytes == 24 {
+                data.keyroot.append(&mut vec![0; 8]);
+                type D = U31;
+                type N = U16;
+                let res = commit::<GF192, RandomOracleShake192>(
+                    GF192::from(&data.keyroot[..]),
+                    data.iv,
+                    1 << data.depth,
+                );
+                let mut sd = Vec::new();
+                for val in data.sd {
+                    sd.push(Some(val));
+                }
+                assert_eq!(res.0, *GenericArray::from_slice(&data.h));
+                assert_eq!(
+                    res.1 .0,
+                    data.k
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec::<GenericArray<u8, _>>>()
+                );
+                assert_eq!(
+                    res.1 .1,
+                    data.com
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec::<GenericArray<u8, _>>>()
+                );
+                assert_eq!(
+                    res.2,
+                    sd.iter()
+                        .map(|x| x.as_ref().map(|y| *GenericArray::from_slice(y)))
+                        .collect::<Vec::<Option::<GenericArray<u8, _>>>>()
+                );
+            } else {
+                type D = U31;
+                type N = U16;
+                let res = commit::<GF256, RandomOracleShake256>(
+                    GF256::from(&data.keyroot[0..32]),
+                    data.iv,
+                    1 << data.depth,
+                );
+                let mut sd = Vec::new();
+                for val in data.sd {
+                    sd.push(Some(val));
+                }
+                assert_eq!(res.0, *GenericArray::from_slice(&data.h));
+                assert_eq!(
+                    res.1 .0,
+                    data.k
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec::<GenericArray<u8, _>>>()
+                );
+                assert_eq!(
+                    res.1 .1,
+                    data.com
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec::<GenericArray<u8, _>>>()
+                );
+                assert_eq!(
+                    res.2,
+                    sd.iter()
+                        .map(|x| x.as_ref().map(|y| *GenericArray::from_slice(y)))
+                        .collect::<Vec::<Option::<GenericArray<u8, _>>>>()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn open_test() {
+        let database: Vec<DataOpen> = serde_json::from_str(include_str!("../Dataopen.json"))
+            .expect("error while reading or parsing");
+        for data in database {
+            if data.k[0].len() == 16 {
+                type D = U4;
+                type DPOW = U31;
+                type N = U16;
+                let res = open::<RandomOracleShake128, DPOW, D, N>(
+                    &(
+                       
+                            data
+                                .k
+                                .iter()
+                                .map(|x| *GenericArray::from_slice(x))
+                                .collect::<Vec<GenericArray<u8, _>>>(),
+                        
+                        data
+                                .com
+                                .iter()
+                                .map(|x| *GenericArray::from_slice(x))
+                                .collect::<Vec<GenericArray<u8, _>>>(),
+                        
+                    ),
+                    *GenericArray::from_slice(&data.b),
+                );
+                assert_eq!(
+                    res.0,
+                    data
+                            .cop
+                            .iter()
+                            .map(|x| *GenericArray::from_slice(x))
+                            .collect::<Vec::<GenericArray<u8, _>>>()
+                    
+                );
+                assert_eq!(res.1, data.com_j);
+            } else if data.k[0].len() == 24 {
+                type D = U4;
+                type DPOW = U31;
+                type N = U16;
+                let res = open::<RandomOracleShake192, DPOW, D, N>(
+                    &(
+                        data
+                                .k
+                                .iter()
+                                .map(|x| *GenericArray::from_slice(x))
+                                .collect::<Vec<GenericArray<u8, _>>>(),
+                        data
+                                .com
+                                .iter()
+                                .map(|x| *GenericArray::from_slice(x))
+                                .collect::<Vec<GenericArray<u8, _>>>(),
+                        
+                    ),
+                    *GenericArray::from_slice(&data.b),
+                );
+                assert_eq!(
+                    res.0,
+                    data
+                            .cop
+                            .iter()
+                            .map(|x| *GenericArray::from_slice(x))
+                            .collect::<Vec::<GenericArray<u8, _>>>()
+                
+                );
+                assert_eq!(res.1, data.com_j);
+            } else if data.b.len() == 4 {
+                type D = U4;
+                type DPOW = U31;
+                type N = U16;
+                let res = open::<RandomOracleShake256, DPOW, D, N>(
+                    &(
+                        data
+                                .k
+                                .iter()
+                                .map(|x| *GenericArray::from_slice(x))
+                                .collect::<Vec<GenericArray<u8, _>>>(),
+                        data
+                                .com
+                                .iter()
+                                .map(|x| *GenericArray::from_slice(x))
+                                .collect::<Vec<GenericArray<u8, _>>>(),
+                        
+                    ),
+                    *GenericArray::from_slice(&data.b),
+                );
+                assert_eq!(
+                    res.0,
+                   data
+                            .cop
+                            .iter()
+                            .map(|x| *GenericArray::from_slice(x))
+                            .collect::<Vec::<GenericArray<u8, _>>>()
+                    
+                );
+                assert_eq!(res.1, data.com_j);
+            } else {
+                type D = U5;
+                type DPOW = U63;
+                type N = U32;
+                let res = open::<RandomOracleShake256, DPOW, D, N>(
+                    &(
+                        data
+                                .k
+                                .iter()
+                                .map(|x| *GenericArray::from_slice(x))
+                                .collect::<Vec<GenericArray<u8, _>>>(),
+                       data
+                                .com
+                                .iter()
+                                .map(|x| *GenericArray::from_slice(x))
+                                .collect::<Vec<GenericArray<u8, _>>>(),
+                        
+                    ),
+                    *GenericArray::from_slice(&data.b),
+                );
+                assert_eq!(
+                    res.0,
+                    data
+                            .cop
+                            .iter()
+                            .map(|x| *GenericArray::from_slice(x))
+                            .collect::<Vec::<GenericArray<u8, _>>>()
+                    
+                );
+                assert_eq!(res.1, data.com_j);
+            }
+        }
+    }
+
+    #[test]
+    fn reconstruct_test() {
+        let database: Vec<DataReconstruct> =
+            serde_json::from_str(include_str!("../DataReconstruct.json"))
+                .expect("error while reading or parsing");
+        for data in database {
+            let lambdabyte = data.com_j.len();
+            if lambdabyte == 32 {
+                type D = U4;
+                type POWD = U31;
+                type N = U16;
+                let res = reconstruct::<GF128, RandomOracleShake128>(
+                &(data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA>>>(), *GenericArray::<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2>::from_slice(&data.com_j)),
+                data.b,
+                u128::from_be_bytes(data.iv),
+            );
+                assert_eq!(res.0, *GenericArray::from_slice(&data.h));
+                assert_eq!(res.1, data.sd.iter().map(|x| match x[..] { [] => GenericArray::generate(|i:usize| 0u8), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA>>>());
+            } else if lambdabyte == 48 {
+                type D = U4;
+                type POWD = U31;
+                type N = U16;
+                let res = reconstruct::<GF192, RandomOracleShake192>(
+                &(data.cop.iter().map(|x| match x[..] { [] => GenericArray::generate(|i:usize| 0u8), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA>>>(), *GenericArray::<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2>::from_slice(&data.com_j)),
+                data.b,
+                u128::from_be_bytes(data.iv),
+            );
+                assert_eq!(res.0, *GenericArray::from_slice(&data.h));
+                assert_eq!(res.1, data.sd.iter().map(|x| match x[..] { [] => GenericArray::generate(|i:usize| 0u8), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA>>>());
+            } else {
+                type D = U5;
+                type POWD = U63;
+                type N = U32;
+                let res = reconstruct::<GF256, RandomOracleShake256>(
+                &(data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>>(), *GenericArray::<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2>::from_slice(&data.com_j)),
+                data.b,
+                u128::from_be_bytes(data.iv),
+            );
+                assert_eq!(res.0, *GenericArray::from_slice(&data.h));
+                assert_eq!(res.1, data.sd.iter().map(|x| match x[..] { [] => GenericArray::generate(|i:usize| 0u8), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>>());
+            }
+        }
+    }
+}

@@ -3,17 +3,15 @@ name = "faest"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-ctr = "0.9.2"
-rand = "0.8.5"
-sha3 = "0.10.8"
 aes = "0.8.4"
 cipher = "=0.5.0-pre.4"
-signature = "2.2.0"
+ctr = "0.9.2"
 hex = "0.4.3"
 nist-pqc-seeded-rng = "0.1.2"
+sha3 = "0.10.8"
+signature = "2.2.0"
+subtle = { version = "2.6", features = ["const-generics"] }
 typenum = "1.17.0"
 generic-array = "1"
 generic_array_0_14 = { version = "0.14", package = "generic-array" }
@@ -25,6 +23,7 @@ serde_derive = "1.0.200"
 serde = { version = "1.0.200", features = ["derive"] }
 serde_json = "1.0.116"
 criterion = "0.5.1"
+rand = { version = "0.8", features = ["small_rng"] }
 
 [[bench]]
 name = "benchmark_faest_rs"

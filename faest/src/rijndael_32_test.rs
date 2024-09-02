@@ -1,4 +1,3 @@
-#[cfg(test)]
 use rand::Rng;
 use serde::Deserialize;
 use std::{cmp::max, fs::File};

@@ -20,11 +20,11 @@ where R : RandomOracle,
     let mut r : Vec<Vec<GenericArray<u8, LH>>> = vec![vec![GenericArray::default();n];d+1];
     match &sd[0] {
         None => (),
-        Some(sd0) => r[0][0] = R::prg::<LH>(sd0, iv,),
+        Some(sd0) => r[0][0] = R::prg::<LH>(*sd0, iv,),
     }
     for (i, _) in sd.iter().enumerate().skip(1).take(n) {
         r[0][i] = R::prg::<LH>(
-            &sd[i].as_ref().unwrap(),
+            *sd[i].as_ref().unwrap(),
             iv,
         );
     }
@@ -99,7 +99,7 @@ where
     let k0 = <P::K0 as Unsigned>::to_u16();
     let k1 = <P::K1 as Unsigned>::to_u16();
     let _t1 = <P::TAU1 as Unsigned>::to_u16();
-    let tau_res = R::prg::<P::PRODLAMBDATAU>(&r, iv);
+    let tau_res = R::prg::<P::PRODLAMBDATAU>(*r, iv);
     let mut r : GenericArray<T, P::TAU> = GenericArray::default();
     let mut com : GenericArray<GenericArray<u8, R::PRODLAMBDA2>, P::TAU> = GenericArray::default();
     let mut decom : GenericArray<(Vec::<GenericArray<u8, R::LAMBDA>>, Vec::<GenericArray<u8, R::PRODLAMBDA2>>), P::TAU> = GenericArray::default();
@@ -110,7 +110,7 @@ where
     for i in 0..tau {
         r[i] = T::from(&tau_res[i * (T::LENGTH / 8) as usize..(i + 1) * (T::LENGTH / 8) as usize]);
     }
-    let tau_0 = T::LENGTH % (tau as u32);
+    let tau_0 = T::LENGTH % tau;
     let mut hasher = R::h1_init();
     for i in 0..tau {
         let b = 1 - (i < tau_0.try_into().unwrap()) as u16;

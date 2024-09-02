@@ -2,7 +2,7 @@
 
 //use faest::{faest::{faest_sign, faest_verify, AesCypher, Variant}, fields::{BigGaloisField, GF128}, parameter::{PARAM, PARAM128S, PARAMOWF, PARAMOWF128}, random_oracles::{RandomOracle, RandomOracleShake128}};
 use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
-
+// use rand::random;
 
 mod fields;
 
@@ -10,14 +10,15 @@ fn main() {
     
     //let _ = bench_sign::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(generate_sign_input_aes::<AesCypher, PARAM128S, PARAMOWF128>());
     //let res = bench_verify_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(generate_verify_input_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>());
-
 }
 
-
-fn generate_rng() -> NistPqcAes256CtrRng {
-    let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()[..48].try_into().unwrap();
+// FIXME: this is only for tests
+/* fn generate_rng() -> NistPqcAes256CtrRng {
+    let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()[..48]
+        .try_into()
+        .unwrap();
     NistPqcAes256CtrRng::from(seed)
-}
+} */
 
 /* fn generate_sign_input_aes<C, P, O>() -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) where P: PARAM, O:PARAMOWF, C:Variant{
     let rng = generate_rng();

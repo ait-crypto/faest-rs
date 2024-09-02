@@ -138,7 +138,7 @@ where
             }
             let (a, b, c) = (
                 T::ONE,
-                T::byte_combine([
+                T::byte_combine(&[
                     T::default(),
                     T::ONE,
                     T::default(),
@@ -148,7 +148,7 @@ where
                     T::default(),
                     T::default(),
                 ]),
-                T::byte_combine([
+                T::byte_combine(&[
                     T::ONE,
                     T::ONE,
                     T::default(),
@@ -229,7 +229,7 @@ where
                 }
                 y_t[0] += immut;
                 y_t[2] += immut;
-                res[index] = T::byte_combine(y_t);
+                res[index] = T::byte_combine(&y_t);
                 index += 1;
             }
         }
@@ -477,5 +477,5 @@ where
         q_s += new_q[l + i] * cur_alpha;
         cur_alpha *= alpha;
     }
-    (*GenericArray::from_slice(&T::to_bytes(T::to_field(&zkhash::<T, O>(chall2, &b, q_s))[0] + T::to_field(a_t)[0] * delta))).clone()
+    (*GenericArray::from_slice(&T::to_bytes(&(T::to_field(&zkhash::<T, O>(chall2, &b, q_s))[0] + T::to_field(a_t)[0] * delta)))).clone()
 }

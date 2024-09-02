@@ -1,6 +1,6 @@
 use cipher::Unsigned;
-use rand::RngCore;
 use typenum::{U16};
+use nist_pqc_seeded_rng::RngCore;
 use std::{iter::zip};
 use generic_array::{GenericArray};
 use crate::{

@@ -360,16 +360,16 @@ where
             let mut v_w_hat = [T::default(); 4];
             for r in 0..4 {
                 let r_p = if dorotword { (r + 3) % 4 } else { r };
-                k_hat[r_p] = T::byte_combine(into_array::<T>(
+                k_hat[r_p] = T::byte_combine(&into_array::<T>(
                     &k[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
                 ));
-                v_k_hat[r_p] = T::byte_combine(into_array::<T>(
+                v_k_hat[r_p] = T::byte_combine(&into_array::<T>(
                     &vk[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
                 ));
-                w_hat[r] = T::byte_combine(into_array::<T>(
+                w_hat[r] = T::byte_combine(&into_array::<T>(
                     &w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
                 ));
-                v_w_hat[r] = T::byte_combine(into_array::<T>(
+                v_w_hat[r] = T::byte_combine(&into_array::<T>(
                     &v_w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
                 ));
             }
@@ -400,10 +400,10 @@ where
             let mut q_h_w_b = [T::default(); 4];
             for r in 0..4 {
                 let r_p = if dorotword { (r + 3) % 4 } else { r };
-                q_h_k[r_p] = T::byte_combine(into_array::<T>(
+                q_h_k[r_p] = T::byte_combine(&into_array::<T>(
                     &q_k[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
                 ));
-                q_h_w_b[r] = T::byte_combine(into_array::<T>(
+                q_h_w_b[r] = T::byte_combine(&into_array::<T>(
                     &q_w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
                 ));
             }
@@ -476,7 +476,7 @@ where
             }
             let (a, b, c) = (
                 T::ONE,
-                T::byte_combine([
+                T::byte_combine(&[
                     T::default(),
                     T::ONE,
                     T::default(),
@@ -486,7 +486,7 @@ where
                     T::default(),
                     T::default(),
                 ]),
-                T::byte_combine([
+                T::byte_combine(&[
                     T::ONE,
                     T::ONE,
                     T::default(),
@@ -564,7 +564,7 @@ where
                 }
                 y_t[0] += immut;
                 y_t[2] += immut;
-                res[k + c*4 + j*16] = T::byte_combine(y_t);
+                res[k + c*4 + j*16] = T::byte_combine(&y_t);
             }
         }
     }
@@ -824,5 +824,5 @@ where
         cur_alpha *= alpha;
     }
     
-    (*GenericArray::from_slice(&T::to_bytes(T::to_field(&zkhash::<T, O>(chall2, &b_array, q_s))[0] + T::to_field(a_t)[0] * delta))).clone()
+    (*GenericArray::from_slice(&T::to_bytes(&(T::to_field(&zkhash::<T, O>(chall2, &b_array, q_s))[0] + T::to_field(a_t)[0] * delta)))).clone()
 }

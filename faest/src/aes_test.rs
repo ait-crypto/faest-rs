@@ -4,6 +4,7 @@ use crate::aes::{
     convert_to_bit,
 };
 use crate::fields::{self, BigGaloisField, GF128, GF192, GF256};
+
 use crate::parameter::{self, PARAM128S, PARAM192S, PARAM256S, PARAMOWF128, PARAMOWF192, PARAMOWF256};
 use cipher::Unsigned;
 use generic_array::GenericArray;
@@ -1076,7 +1077,6 @@ struct AesProve {
 
 #[test]
 fn aes_prove_test() {
-    unsafe { backtrace_on_stack_overflow::enable() };
     let file = File::open("AesProve.json").unwrap();
     let database: Vec<AesProve> =
         serde_json::from_reader(file).expect("error while reading or parsing");

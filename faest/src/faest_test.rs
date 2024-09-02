@@ -3,7 +3,6 @@ use generic_array::GenericArray;
 use generic_array_0_14;
 use rand::random;
 
-#[cfg(test)]
 use crate::{
     faest::{
         faest_sign, faest_verify, sigma_to_signature, signature_to_sigma, AesCypher, EmCypher,

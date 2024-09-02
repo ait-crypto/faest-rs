@@ -1,4 +1,3 @@
-#[cfg(test)]
 use std::fs::File;
 
 use cipher::Unsigned;
