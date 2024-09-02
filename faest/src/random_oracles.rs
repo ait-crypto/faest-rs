@@ -104,7 +104,10 @@ impl RandomOracle for RandomOracleShake128 {
         LH: ArrayLength,
     {
         let mut buf = GenericArray::default();
-        let mut cipher = Aes128Ctr128BE::new(generic_array_0_14::GenericArray::from_slice(&k), &iv.to_be_bytes().into());
+        let mut cipher = Aes128Ctr128BE::new(
+            generic_array_0_14::GenericArray::from_slice(&k),
+            &iv.to_be_bytes().into(),
+        );
         cipher.apply_keystream(&mut buf);
         buf
     }
@@ -141,7 +144,10 @@ impl RandomOracle for RandomOracleShake192 {
         LH: ArrayLength,
     {
         let mut buf = GenericArray::default();
-        let mut cipher = Aes192Ctr128BE::new(generic_array_0_14::GenericArray::from_slice(&k), &iv.to_be_bytes().into());
+        let mut cipher = Aes192Ctr128BE::new(
+            generic_array_0_14::GenericArray::from_slice(&k),
+            &iv.to_be_bytes().into(),
+        );
         cipher.apply_keystream(&mut buf);
         buf
     }
@@ -191,7 +197,10 @@ impl RandomOracle for RandomOracleShake256 {
         LH: ArrayLength,
     {
         let mut buf = GenericArray::default();
-        let mut cipher = Aes256Ctr128BE::new(generic_array_0_14::GenericArray::from_slice(&k), &iv.to_be_bytes().into());
+        let mut cipher = Aes256Ctr128BE::new(
+            generic_array_0_14::GenericArray::from_slice(&k),
+            &iv.to_be_bytes().into(),
+        );
         cipher.apply_keystream(&mut buf);
         buf
     }
