@@ -20,11 +20,11 @@ where R : RandomOracle,
     let mut r : Vec<Vec<GenericArray<u8, LH>>> = vec![vec![GenericArray::default();n];d+1];
     match &sd[0] {
         None => (),
-        Some(sd0) => r[0][0] = R::prg::<LH>(*sd0, iv,),
+        Some(sd0) => r[0][0] = R::prg::<LH>(sd0.clone(), iv,),
     }
     for (i, _) in sd.iter().enumerate().skip(1).take(n) {
         r[0][i] = R::prg::<LH>(
-            *sd[i].as_ref().unwrap(),
+            sd[i].as_ref().unwrap().clone(),
             iv,
         );
     }
@@ -99,7 +99,7 @@ where
     let k0 = <P::K0 as Unsigned>::to_u16();
     let k1 = <P::K1 as Unsigned>::to_u16();
     let _t1 = <P::TAU1 as Unsigned>::to_u16();
-    let tau_res = R::prg::<P::PRODLAMBDATAU>(*r, iv);
+    let tau_res = R::prg::<P::PRODLAMBDATAU>(r.clone(), iv);
     let mut r : GenericArray<T, P::TAU> = GenericArray::default();
     let mut com : GenericArray<GenericArray<u8, R::PRODLAMBDA2>, P::TAU> = GenericArray::default();
     let mut decom : GenericArray<(Vec::<GenericArray<u8, R::LAMBDA>>, Vec::<GenericArray<u8, R::PRODLAMBDA2>>), P::TAU> = GenericArray::default();
@@ -116,7 +116,7 @@ where
         let b = 1 - (i < tau_0.try_into().unwrap()) as u16;
         let k = ((1 - b) * k0) + b * k1;
         (com[i], decom[i], sd[i]) = commit::<T, R>(r[i], iv, 1u32 << k);
-        hasher.h1_update(&com[i]);
+        hasher.update(&com[i]);
         (u[i], v[i]) = convert_to_vole::<R, P::LH>(&sd[i], iv);
     }
     for i in 1..tau {
@@ -127,7 +127,7 @@ where
             .collect();
     }
     let mut hcom : GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
-    hasher.h1_finish(&mut hcom);
+    hasher.finish();
     (hcom, decom, c, u[0].clone(), v)
 }
 
@@ -164,7 +164,7 @@ where
             delta[i] += (delta_p[j] as u32) << j;
         }
         (com[i], s[i]) = vc::reconstruct::<T, R>(&pdecom[i], delta_p.to_vec(), iv);
-        hasher.h1_update(&com[i]);
+        hasher.update(&com[i]);
         for j in 0..(1_u16 << (k)) as usize {
             sd[i].push(Some(s[i][j ^ delta[i] as usize].clone()));
         }
@@ -174,6 +174,6 @@ where
         
     }
     let mut hcom : GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
-    hasher.h1_finish(&mut hcom);
+    hasher.finish();
     (hcom, q)
 }
