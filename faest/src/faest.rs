@@ -218,7 +218,7 @@ impl Variant for EmCypher {
         P: PARAM,
         O: PARAMOWF,
     {
-        em_prove::<O::Field, P, O>(w, u, gv, pk, chall)
+        em_prove::<P, O>(w, u, gv, pk, chall)
     }
 
     fn verify<P, O>(
@@ -233,7 +233,7 @@ impl Variant for EmCypher {
         P: PARAM,
         O: PARAMOWF,
     {
-        em_verify::<O::Field, P, O>(d, gq, a_t, chall2, chall3, pk)
+        em_verify::<P, O>(d, gq, a_t, chall2, chall3, pk)
     }
 
     fn keygen_with_rng<P, O>(
