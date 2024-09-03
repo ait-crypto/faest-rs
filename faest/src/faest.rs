@@ -3,7 +3,7 @@ use crate::{
     em::{em_extendedwitness, em_prove, em_verify},
     fields::BigGaloisField,
     parameter::{PARAM, PARAMOWF},
-    random_oracles::RandomOracle,
+    random_oracles::{Hasher, RandomOracle, Reader},
     rijndael_32::{rijndael_encrypt, rijndael_key_schedule},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
     vc::open,
@@ -333,19 +333,15 @@ where
         GenericArray::from_slice(&riv[..lambda]),
         GenericArray::from_slice(&riv[lambda..]),
     );
-    let (hcom, decom, c, mut u, gv) =
-        volecommit::<P, T, R>(r, u128::from_le_bytes(iv[..16].try_into().unwrap()));
+    let (hcom, decom, c, mut u, gv) = volecommit::<P, T, R>(r, &iv[..16].try_into().unwrap());
     let mut chall1: GenericArray<u8, O::CHALL1> = GenericArray::default();
-    R::h2(
-        &[
-            mu.to_vec(),
-            hcom.to_vec(),
-            c.clone().into_iter().flatten().collect::<Vec<u8>>(),
-            iv.to_vec(),
-        ]
-        .concat(),
-        &mut chall1,
-    );
+    let mut h2_hasher = R::h2_init();
+    h2_hasher.update(&mu);
+    h2_hasher.update(&hcom);
+    c.iter().for_each(|buf| h2_hasher.update(&buf));
+    h2_hasher.update(&iv);
+    let mut reader = h2_hasher.finish();
+    reader.read(&mut chall1);
 
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
 
@@ -355,11 +351,7 @@ where
         O::LAMBDALBYTES,
     > = gv
         .iter()
-        .map(|v| {
-            v.iter()
-                .map(|v| vole_hasher.process(v))
-                .collect()
-        })
+        .map(|v| v.iter().map(|v| vole_hasher.process(v)).collect())
         .collect();
     let mut hv: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
     R::h1(
@@ -476,19 +468,17 @@ where
                 ),
                 P::TAU,
             >>(),
-        u128::from_le_bytes(iv[..16].try_into().unwrap()),
+        &iv[..16].try_into().unwrap(),
     );
     let mut chall1: GenericArray<u8, O::CHALL1> = GenericArray::default();
-    R::h2(
-        &[
-            mu.to_vec(),
-            hcom.to_vec(),
-            (c.clone()).into_iter().flatten().collect::<Vec<_>>(),
-            iv.to_vec(),
-        ]
-        .concat(),
-        &mut chall1,
-    );
+    let mut h2_hasher = R::h2_init();
+    h2_hasher.update(&mu);
+    h2_hasher.update(&hcom);
+    c.iter().for_each(|buf| h2_hasher.update(&buf));
+    h2_hasher.update(&iv);
+    let mut reader = h2_hasher.finish();
+    reader.read(&mut chall1);
+
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let mut gq: GenericArray<Vec<GenericArray<u8, <P as PARAM>::LH>>, P::TAU> =
         GenericArray::default();
@@ -549,11 +539,7 @@ where
         O::LAMBDALBYTES,
     > = gq
         .iter()
-        .map(|q| {
-            q.iter()
-                .map(|q| vole_hasher.process(&q))
-                .collect()
-        })
+        .map(|q| q.iter().map(|q| vole_hasher.process(&q)).collect())
         .collect();
     let mut hv: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
     R::h1(

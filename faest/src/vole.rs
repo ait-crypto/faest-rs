@@ -3,14 +3,14 @@ use cipher::Unsigned;
 use generic_array::{ArrayLength, GenericArray};
 
 use crate::parameter::PARAM;
-use crate::random_oracles::Hasher;
+use crate::random_oracles::{Hasher, IV};
 use crate::vc;
 use crate::{fields::BigGaloisField, random_oracles::RandomOracle, vc::commit};
 
 #[allow(clippy::type_complexity)]
 pub fn convert_to_vole<R, LH>(
     sd: &Vec<Option<GenericArray<u8, R::LAMBDA>>>,
-    iv: u128,
+    iv: &IV,
 ) -> (GenericArray<u8, LH>, Vec<GenericArray<u8, LH>>)
 where
     R: RandomOracle,
@@ -85,7 +85,7 @@ where
 #[allow(clippy::type_complexity)]
 pub fn volecommit<P, T, R>(
     r: &GenericArray<u8, <R as RandomOracle>::LAMBDA>,
-    iv: u128,
+    iv: &IV,
 ) -> (
     GenericArray<u8, R::PRODLAMBDA2>,
     //Here decom can have two diferent length, depending on if it's a i < t0 or > 0 so we use vectors
@@ -160,7 +160,7 @@ pub fn volereconstruct<T, R, P>(
         ),
         P::TAU,
     >,
-    iv: u128,
+    iv: &IV,
 ) -> (
     GenericArray<u8, R::PRODLAMBDA2>,
     GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>,

@@ -1,5 +1,6 @@
 use aes::cipher::{KeyIvInit, StreamCipher};
 use generic_array::{ArrayLength, GenericArray};
+use generic_array_0_14::GenericArray as GenericArray_0_14;
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128, Shake128Reader, Shake256, Shake256Reader,
@@ -10,6 +11,8 @@ type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
 type Aes192Ctr128BE = ctr::Ctr128BE<aes::Aes192>;
 type Aes256Ctr128BE = ctr::Ctr128BE<aes::Aes256>;
 
+pub type IV = [u8; 16];
+
 pub trait RandomOracle {
     type Hasher<const SEP: u8>: Hasher + Default;
     type LAMBDA: ArrayLength;
@@ -17,7 +20,7 @@ pub trait RandomOracle {
     type PRODLAMBDA3: ArrayLength;
     type PRODLAMBDA2: ArrayLength;
 
-    fn prg<LH>(k: generic_array::GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH>
+    fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: &IV) -> GenericArray<u8, LH>
     where
         LH: ArrayLength;
 
@@ -99,14 +102,14 @@ impl Reader for Hasher128Reader {
 impl RandomOracle for RandomOracleShake128 {
     type Hasher<const SEP: u8> = Hasher128<SEP>;
 
-    fn prg<LH>(k: generic_array::GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH>
+    fn prg<LH>(k: generic_array::GenericArray<u8, Self::LAMBDA>, iv: &IV) -> GenericArray<u8, LH>
     where
         LH: ArrayLength,
     {
         let mut buf = GenericArray::default();
         let mut cipher = Aes128Ctr128BE::new(
-            generic_array_0_14::GenericArray::from_slice(&k),
-            &iv.to_be_bytes().into(),
+            GenericArray_0_14::from_slice(&k),
+            GenericArray_0_14::from_slice(iv.as_slice()),
         );
         cipher.apply_keystream(&mut buf);
         buf
@@ -139,14 +142,14 @@ pub struct RandomOracleShake192 {}
 impl RandomOracle for RandomOracleShake192 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
 
-    fn prg<LH>(k: generic_array::GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH>
+    fn prg<LH>(k: generic_array::GenericArray<u8, Self::LAMBDA>, iv: &IV) -> GenericArray<u8, LH>
     where
         LH: ArrayLength,
     {
         let mut buf = GenericArray::default();
         let mut cipher = Aes192Ctr128BE::new(
-            generic_array_0_14::GenericArray::from_slice(&k),
-            &iv.to_be_bytes().into(),
+            GenericArray_0_14::from_slice(&k),
+            GenericArray_0_14::from_slice(iv.as_slice()),
         );
         cipher.apply_keystream(&mut buf);
         buf
@@ -192,14 +195,14 @@ impl Reader for Hasher256Reader {
 impl RandomOracle for RandomOracleShake256 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
 
-    fn prg<LH>(k: generic_array::GenericArray<u8, Self::LAMBDA>, iv: u128) -> GenericArray<u8, LH>
+    fn prg<LH>(k: generic_array::GenericArray<u8, Self::LAMBDA>, iv: &IV) -> GenericArray<u8, LH>
     where
         LH: ArrayLength,
     {
         let mut buf = GenericArray::default();
         let mut cipher = Aes256Ctr128BE::new(
-            generic_array_0_14::GenericArray::from_slice(&k),
-            &iv.to_be_bytes().into(),
+            GenericArray_0_14::from_slice(&k),
+            GenericArray_0_14::from_slice(iv.as_slice()),
         );
         cipher.apply_keystream(&mut buf);
         buf
@@ -3288,7 +3291,7 @@ mod test {
             0xdd, 0xda,
         ];
 
-        let res = RandomOracleShake128::prg::<U240>(*key, u128::from_be_bytes(iv));
+        let res = RandomOracleShake128::prg::<U240>(*key, &iv);
         assert_eq!(res, *GenericArray::from_slice(&output))
     }
 
@@ -3323,7 +3326,7 @@ mod test {
             0x5a, 0x90,
         ];
 
-        let res = RandomOracleShake192::prg::<U240>(*key, u128::from_be_bytes(iv));
+        let res = RandomOracleShake192::prg::<U240>(*key, &iv);
         assert_eq!(res, *GenericArray::from_slice(&output))
     }
 
@@ -3359,7 +3362,7 @@ mod test {
             0x62, 0x63,
         ];
 
-        let res = RandomOracleShake256::prg::<U240>(*key, u128::from_be_bytes(iv));
+        let res = RandomOracleShake256::prg::<U240>(*key, &iv);
         assert_eq!(res, *GenericArray::from_slice(&output))
     }
 }
