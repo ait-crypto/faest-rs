@@ -2,6 +2,7 @@
 name = "faest"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.76"
 
 [dependencies]
 aes = "0.8.4"

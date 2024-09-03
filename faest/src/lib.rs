@@ -5,8 +5,6 @@
 pub mod fields;
 
 mod universal_hashing;
-//#[cfg(test)]
-mod universal_hashing_test;
 
 pub mod random_oracles;
 pub mod vc;
@@ -20,8 +18,6 @@ pub mod aes;
 pub mod aes_test;
 
 pub mod rijndael_32;
-#[cfg(test)]
-pub mod rijndael_32_test;
 
 pub mod faest;
 #[cfg(test)]

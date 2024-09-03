@@ -1,5 +1,3 @@
-
-
 //use faest::{faest::{faest_sign, faest_verify, AesCypher, Variant}, fields::{BigGaloisField, GF128}, parameter::{PARAM, PARAM128S, PARAMOWF, PARAMOWF128}, random_oracles::{RandomOracle, RandomOracleShake128}};
 use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
 // use rand::random;
@@ -7,6 +5,7 @@ use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
 mod fields;
 
 fn main() {
+    
     //let _ = bench_sign::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(generate_sign_input_aes::<AesCypher, PARAM128S, PARAMOWF128>());
     //let res = bench_verify_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(generate_verify_input_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>());
 }
@@ -43,7 +42,7 @@ fn bench_sign<T, R, C, P, O>(input : (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>)) -> (
     Vec<(Vec<Vec<u8>>, Vec<u8>)>,
     Vec<u8>,
     [u8; 16],
-) 
+)
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
     C: Variant,

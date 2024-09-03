@@ -5,6 +5,11 @@ use std::{
     },
 };
 
+use generic_array::{
+    typenum::{U1, U8},
+    GenericArray,
+};
+
 use super::Field;
 
 /// Marker trait for binary Galois fields up to a size of `2^64`
@@ -196,11 +201,23 @@ pub type GF64 = SmallGF<u64>;
 impl Field for GF8 {
     const ZERO: Self = Self(Wrapping(0));
     const ONE: Self = Self(Wrapping(1));
+
+    type Length = U1;
+
+    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
+        GenericArray::from([self.0 .0])
+    }
 }
 
 impl Field for GF64 {
     const ZERO: Self = Self(Wrapping(0));
     const ONE: Self = Self(Wrapping(1));
+
+    type Length = U8;
+
+    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
+        GenericArray::from(self.0 .0.to_le_bytes())
+    }
 }
 
 impl GF8 {

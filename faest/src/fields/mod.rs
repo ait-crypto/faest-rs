@@ -3,6 +3,7 @@ pub(crate) mod small_fields;
 
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
+use generic_array::{ArrayLength, GenericArray};
 pub use large_fields::{BigGaloisField, ByteCombine, SumPoly, GF128, GF192, GF256};
 pub use small_fields::{GaloisField, GF64, GF8};
 
@@ -26,4 +27,10 @@ pub trait Field:
 
     /// Representation of `0`
     const ONE: Self;
+
+    /// Length of the byte representation of the field
+    type Length: ArrayLength;
+
+    /// Obtain byte representation of the field element
+    fn as_bytes(&self) -> GenericArray<u8, Self::Length>;
 }

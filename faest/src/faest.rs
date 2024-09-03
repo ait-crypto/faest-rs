@@ -1,20 +1,19 @@
-use cipher::Unsigned;
-use typenum::{U16};
-use nist_pqc_seeded_rng::RngCore;
-use std::{iter::zip};
-use generic_array::{GenericArray};
 use crate::{
     aes::{aes_extendedwitness, aes_prove, aes_verify},
     em::{em_extendedwitness, em_prove, em_verify},
     fields::BigGaloisField,
     parameter::{PARAM, PARAMOWF},
-    random_oracles::{RandomOracle},
+    random_oracles::{Hasher, RandomOracle, Reader},
     rijndael_32::{rijndael_encrypt, rijndael_key_schedule},
-    universal_hashing::volehash,
+    universal_hashing::{VoleHasherInit, VoleHasherProcess},
     vc::open,
     vole::{chaldec, volecommit, volereconstruct},
 };
-
+use cipher::Unsigned;
+use generic_array::GenericArray;
+use nist_pqc_seeded_rng::RngCore;
+use std::iter::zip;
+use typenum::U16;
 
 pub trait Variant {
     ///input : key (len lambda, snd part of sk); public key
@@ -22,12 +21,11 @@ pub trait Variant {
     fn witness<P, O, T>(k: &GenericArray<u8, O::LAMBDABYTES>, pk: &GenericArray<u8, O::PK>) -> Box<GenericArray<u8, O::LBYTES>>
     where
         P: PARAM,
-        O: PARAMOWF,
-        T: BigGaloisField;
-       
+        O: PARAMOWF;
+
     ///input : witness of l bits, masking values (l+lambda in aes, lambda in em), Vole tag ((l + lambda) *lambda bits), public key, chall(3lambda + 64)
     ///Output : QuickSilver response (Lambda bytes)
-    fn prove<P, O, T>(
+    fn prove<P, O>(
         w: &GenericArray<u8, O::L>,
         u: &GenericArray<u8, O::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
@@ -36,12 +34,11 @@ pub trait Variant {
     ) -> (Box<GenericArray<u8, O::LAMBDABYTES>>, Box<GenericArray<u8, O::LAMBDABYTES>>)
     where
         P: PARAM,
-        O: PARAMOWF,
-        T: BigGaloisField + std::default::Default + std::fmt::Debug;
+        O: PARAMOWF;
 
     ///input : Masked witness (l bits), Vole Key ((l + lambda) * Lambda bits), hash of constrints values (lambda bits), chall2 (3*lambda + 64 bits), chall3 (lambda bits), public key
     ///output q_tilde - delta * a_tilde (lambda bytes)
-    fn verify<P, O, T>(
+    fn verify<P, O>(
         d: &GenericArray<u8, O::LBYTES>,
         gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         a_t: &GenericArray<u8, O::LAMBDABYTES>,
@@ -51,16 +48,14 @@ pub trait Variant {
     ) -> GenericArray<u8, O::LAMBDABYTES>
     where
         P: PARAM,
-        O: PARAMOWF,
-        T: BigGaloisField + std::default::Default + std::fmt::Debug, 
-        ;
+        O: PARAMOWF;
 
     ///input : a random number generator
     /// output = pk : input, output; sk : input, key; rho (len = Lambda bytes)
     fn keygen_with_rng<P, O>(rng: impl RngCore) -> (GenericArray<u8, O::PK>, Box<GenericArray<u8, O::SK>>, Box<GenericArray<u8, O::LAMBDABYTES>>)
     where
         P: PARAM,
-        O: PARAMOWF; 
+        O: PARAMOWF;
 }
 
 pub struct AesCypher {}
@@ -69,13 +64,12 @@ impl Variant for AesCypher {
     fn witness<P, O, T>(k: &GenericArray<u8, O::LAMBDABYTES>, pk: &GenericArray<u8, O::PK>) -> Box<GenericArray<u8, O::LBYTES>>
     where
         P: PARAM,
-        O: PARAMOWF, 
-        T: BigGaloisField,
+        O: PARAMOWF,
     {
         aes_extendedwitness::<P, O>(k, pk).0
     }
 
-    fn prove<P, O, T>(
+    fn prove<P, O>(
         w: &GenericArray<u8, O::L>,
         u: &GenericArray<u8, O::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
@@ -85,13 +79,11 @@ impl Variant for AesCypher {
     where
         P: PARAM,
         O: PARAMOWF,
-        T: BigGaloisField + std::default::Default + std::fmt::Debug, 
-        
     {
         aes_prove::<T, P, O>(w, u, Box::new(gv), pk, chall)
     }
 
-    fn verify<P, O, T>(
+    fn verify<P, O>(
         d: &GenericArray<u8, O::LBYTES>,
         gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         a_t: &GenericArray<u8, O::LAMBDABYTES>,
@@ -102,10 +94,8 @@ impl Variant for AesCypher {
     where
         P: PARAM,
         O: PARAMOWF,
-        T: BigGaloisField + std::default::Default + std::fmt::Debug, 
-        
     {
-        aes_verify::<T, P, O>(d, gq, a_t, chall2, chall3, pk)
+        aes_verify::<P, O>(d, gq, a_t, chall2, chall3, pk)
     }
 
     ///Input : the parameter of the faest protocol
@@ -114,18 +104,22 @@ impl Variant for AesCypher {
     fn keygen_with_rng<P, O>(mut rng: impl RngCore) -> (GenericArray<u8, O::PK>, Box<GenericArray<u8, O::SK>>, Box<GenericArray<u8, O::LAMBDABYTES>>)
     where
         P: PARAM,
-        O: PARAMOWF, 
+        O: PARAMOWF,
     {
         let nk = <O::NK as Unsigned>::to_u8();
         let r = <O::R as Unsigned>::to_u8();
         let beta = <P::BETA as Unsigned>::to_u8();
-        let pk_len = <O::PK as Unsigned>::to_usize()/2;
+        let pk_len = <O::PK as Unsigned>::to_usize() / 2;
         'boucle: loop {
             let mut rho : Box<GenericArray<u8, O::LAMBDABYTES>> = GenericArray::default_boxed();
             let mut sk: Box<GenericArray<u8, O::SK>> = GenericArray::default_boxed();
             let test: bool;
             rng.fill_bytes(&mut sk);
-            test = aes_extendedwitness::<P, O>(GenericArray::from_slice(&sk[pk_len..]), GenericArray::from_slice(&sk[..pk_len])).1;
+            test = aes_extendedwitness::<P, O>(
+                GenericArray::from_slice(&sk[pk_len..]),
+                GenericArray::from_slice(&sk[..pk_len]),
+            )
+            .1;
             if test == false {
                 continue 'boucle;
             }
@@ -138,25 +132,26 @@ impl Variant for AesCypher {
             let mut index = 0;
             if beta == 1 {
                 cypher = rijndael_encrypt(&rk, &[&sk[..16], &[0u8; 16]].concat(), 4, nk, r);
-                for i in cypher.into_iter().flatten().take(16).collect::<Vec<_>>(){
+                for i in cypher.into_iter().flatten().take(16).collect::<Vec<_>>() {
                     y[index] = i;
-                    index+=1;
+                    index += 1;
                 }
             } else {
                 cypher = rijndael_encrypt(&rk, &[&sk[..16], &[0u8; 16]].concat(), 4, nk, r);
-                for i in cypher.into_iter().flatten().take(16).collect::<Vec<_>>(){
+                for i in cypher.into_iter().flatten().take(16).collect::<Vec<_>>() {
                     y[index] = i;
-                    index+=1;
+                    index += 1;
                 }
                 cypher = rijndael_encrypt(&rk, &[&sk[16..32], &[0u8; 16]].concat(), 4, nk, r);
-                for i in cypher.into_iter().flatten().take(16).collect::<Vec<_>>(){
+                for i in cypher.into_iter().flatten().take(16).collect::<Vec<_>>() {
                     y[index] = i;
-                    index+=1;
+                    index += 1;
                 }
             };
             rng.fill_bytes(&mut rho);
             return (
-                (*GenericArray::from_slice(&[&sk[..16 * beta as usize], &y[..pk_len]].concat())).clone(),
+                (*GenericArray::from_slice(&[&sk[..16 * beta as usize], &y[..pk_len]].concat()))
+                    .clone(),
                 sk,
                 rho,
             );
@@ -169,15 +164,13 @@ pub struct EmCypher {}
 impl Variant for EmCypher {
     fn witness<P, O, T>(k: &GenericArray<u8, O::LAMBDABYTES>, pk: &GenericArray<u8, O::PK>) -> Box<GenericArray<u8, O::LBYTES>>
     where
-        T: BigGaloisField,
         P: PARAM,
-        O: PARAMOWF, 
-        
+        O: PARAMOWF,
     {
         em_extendedwitness::<P, O>(k, pk).0
     }
 
-    fn prove<P, O, T>(
+    fn prove<P, O>(
         w: &GenericArray<u8, O::L>,
         u: &GenericArray<u8, O::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
@@ -187,13 +180,11 @@ impl Variant for EmCypher {
     where
         P: PARAM,
         O: PARAMOWF,
-        T: BigGaloisField + std::default::Default + std::fmt::Debug, 
-        
     {
-        em_prove::<T, P, O>(w, u, gv, pk, chall)
+        em_prove::<P, O>(w, u, gv, pk, chall)
     }
 
-    fn verify<P, O, T>(
+    fn verify<P, O>(
         d: &GenericArray<u8, O::LBYTES>,
         gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         a_t: &GenericArray<u8, O::LAMBDABYTES>,
@@ -204,10 +195,8 @@ impl Variant for EmCypher {
     where
         P: PARAM,
         O: PARAMOWF,
-        T: BigGaloisField + std::default::Default + std::fmt::Debug, 
-        
     {
-        em_verify::<T, P, O>(d, gq, a_t, chall2, chall3, pk)
+        em_verify::<P, O>(d, gq, a_t, chall2, chall3, pk)
     }
 
     fn keygen_with_rng<P, O>(mut rng: impl RngCore) -> (GenericArray<u8, O::PK>, Box<GenericArray<u8, O::SK>>, Box<GenericArray<u8, O::LAMBDABYTES>>)
@@ -223,11 +212,15 @@ impl Variant for EmCypher {
             let mut rho :Box<GenericArray<u8, O::LAMBDABYTES>> = GenericArray::default_boxed();
             let mut sk :Box<GenericArray<u8, O::SK>> = GenericArray::default_boxed();
             rng.fill_bytes(&mut sk);
-            let test = em_extendedwitness::<P, O>(GenericArray::from_slice(&sk[lambda..]), GenericArray::from_slice(&sk[..lambda])).1;
-            if test ==false {
+            let test = em_extendedwitness::<P, O>(
+                GenericArray::from_slice(&sk[lambda..]),
+                GenericArray::from_slice(&sk[..lambda]),
+            )
+            .1;
+            if test == false {
                 continue 'boucle;
             }
-            
+
             let rk = rijndael_key_schedule(&sk[..lambda], nst, nk, r, 4 * (((r + 1) * nst) / nk));
             let cypher = rijndael_encrypt(
                 &rk.0,
@@ -236,8 +229,8 @@ impl Variant for EmCypher {
                 nk,
                 r,
             );
-            
-            let y : GenericArray<u8, O::LAMBDA>= cypher
+
+            let y: GenericArray<u8, O::LAMBDA> = cypher
                 .into_iter()
                 .flatten()
                 .take(lambda)
@@ -245,14 +238,18 @@ impl Variant for EmCypher {
                 .map(|(y, k)| y ^ k)
                 .collect();
             rng.fill_bytes(&mut rho);
-            return ((*GenericArray::from_slice(&[&sk[..lambda], &y[..]].concat())).clone(), sk, rho);
+            return (
+                (*GenericArray::from_slice(&[&sk[..lambda], &y[..]].concat())).clone(),
+                sk,
+                rho,
+            );
         }
     }
 }
 
 ///input : Message (an array of bytes), sk : secret key, pk : public key, rho : lambda bits
 ///output : correction string (tau - 1 * (l_hat bits)), Hash of VOLE sceet (LAMBDA + 16 bits), Commitment to the witness (l bits)
-/// Quicksilver proof (Lambda), Partial decommitment (Tau * (t0 * k0*lambda + t1 * k1*lambda  +  2Lambda) bits), 
+/// Quicksilver proof (Lambda), Partial decommitment (Tau * (t0 * k0*lambda + t1 * k1*lambda  +  2Lambda) bits),
 ///last challenge (lambda bits), initialisation vector
 #[allow(clippy::needless_range_loop)]
 #[allow(clippy::type_complexity)]
@@ -276,9 +273,8 @@ where
     C: Variant,
     R: RandomOracle,
     P: PARAM,
-    O: PARAMOWF, 
-    
-    {
+    O: PARAMOWF,
+{
     let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
     let l = <P::L as Unsigned>::to_usize() / 8;
     let _b = <P::B as Unsigned>::to_usize() / 8;
@@ -313,24 +309,14 @@ where
     );
     let gv_t: GenericArray<GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>, O::LAMBDALBYTES> = gv
         .iter()
-        .map(|v| {
-            v.iter()
-                .map(|v| {
-                    volehash::<T,O>(
-                        &chall1,
-                        GenericArray::from_slice(&v[..l + lambda]),
-                        GenericArray::from_slice(&v[l + lambda..])
-                    )
-                })
-                .collect()
-        })
+        .map(|v| v.iter().map(|v| vole_hasher.process(v)).collect())
         .collect();
     let mut hv : Box<GenericArray<u8, R::PRODLAMBDA2>> = GenericArray::default_boxed();
     R::h1(
         &gv_t.into_iter().flatten().flatten().collect::<Vec<u8>>()[..],
         &mut hv,
     );
-    let w = C::witness::<P, O, T>(sk, pk);
+    let w = C::witness::<P, O>(sk, pk);
     let d = &zip(
         w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
         &mut u[..l],
@@ -340,7 +326,7 @@ where
     let mut chall2 : Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
     R::h2(&[chall1.to_vec(), u_t.to_vec(), hv.to_vec(), d.to_vec()].concat(), &mut chall2);
     let new_u = GenericArray::from_slice(&u[..l + lambda]);
-    let new_gv : &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = &gv
+    let new_gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = &gv
         .iter()
         .map(|x| {
             x.iter()
@@ -349,7 +335,7 @@ where
         })
         .collect::<GenericArray<GenericArray<u8, _>, _>>();
 
-    let (a_t, b_t) = C::prove::<P, O, T>(
+    let (a_t, b_t) = C::prove::<P, O>(
         GenericArray::from_slice(&w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>()),
         new_u,
         new_gv,
@@ -360,19 +346,18 @@ where
     R::h2(&[chall2.to_vec(), a_t.to_vec(), b_t.to_vec()].concat(), &mut chall3);
     let mut pdecom : Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>> = GenericArray::default_boxed();
     for i in 0..tau {
-        if i < t0{
-            let s = chaldec::<P>(
-            &chall3,
-            i as u16
-        );
-        pdecom[i] = open::<R, P::POWK0, P::K0, P::N0>(&decom[i], (*GenericArray::from_slice(&s)).clone());
-        }
-        else {
-            let s = chaldec::<P>(
-                &chall3,
-                i as u16
+        if i < t0 {
+            let s = chaldec::<P>(&chall3, i as u16);
+            pdecom[i] = open::<R, P::POWK0, P::K0, P::N0>(
+                &decom[i],
+                (*GenericArray::from_slice(&s)).clone(),
             );
-            pdecom[i] = open::<R, P::POWK1, P::K1, P::N1>(&decom[i], (*GenericArray::from_slice(&s)).clone());
+        } else {
+            let s = chaldec::<P>(&chall3, i as u16);
+            pdecom[i] = open::<R, P::POWK1, P::K1, P::N1>(
+                &decom[i],
+                (*GenericArray::from_slice(&s)).clone(),
+            );
         }
     }
     (
@@ -406,8 +391,7 @@ where
     R: RandomOracle,
     C: Variant,
     P: PARAM,
-    O: PARAMOWF, 
-    
+    O: PARAMOWF,
 {
     let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
     let l = <P::L as Unsigned>::to_usize() / 8;
@@ -423,8 +407,17 @@ where
     R::h1(&[pk.to_vec(), msg.to_vec()].concat(), &mut mu);
     let (hcom, gq_p) = volereconstruct::<T, R, P>(
         &chall3,
-        &pdecom.into_iter().map(|(x, y)| (x, (*GenericArray::from_slice(&y)).clone())).collect::<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, GenericArray<u8, R::PRODLAMBDA2>), P::TAU>>(),
-        u128::from_le_bytes(iv[..16].try_into().unwrap())
+        &pdecom
+            .into_iter()
+            .map(|(x, y)| (x, (*GenericArray::from_slice(&y)).clone()))
+            .collect::<GenericArray<
+                (
+                    Vec<GenericArray<u8, R::LAMBDA>>,
+                    GenericArray<u8, R::PRODLAMBDA2>,
+                ),
+                P::TAU,
+            >>(),
+        &iv[..16].try_into().unwrap(),
     );
     let mut chall1 : Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
     R::h2(
@@ -441,17 +434,16 @@ where
     let mut gd_t : Box<GenericArray<GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>, O::LAMBDALBYTES>> = GenericArray::default_boxed();
     gq[0] = gq_p[0].clone();
     let delta0 = chaldec::<P>(&chall3, 0);
-    gd_t[0] = 
-        delta0
-            .iter()
-            .map(|d| {
-                if *d == 1 {
-                    u_t.clone()
-                } else {
-                    GenericArray::default()
-                }
-            })
-            .collect();
+    gd_t[0] = delta0
+        .iter()
+        .map(|d| {
+            if *d == 1 {
+                u_t.clone()
+            } else {
+                GenericArray::default()
+            }
+        })
+        .collect();
     for i in 1..tau {
         /* ok */
         let delta = chaldec::<P>(&chall3, i as u16);
@@ -479,29 +471,33 @@ where
             .collect::<Vec<GenericArray<u8, O::LHATBYTES>>>();
         let mut temp : Vec<GenericArray<u8, P::LH>> = vec![GenericArray::default()];
         temp = zip(gq_p[i].clone(), dtemp)
-            .map(|(q, d)| (*GenericArray::from_slice(&zip(q, d).map(|(q, d)| q ^ d).collect::<GenericArray<u8, P::LH>>())).clone())
+            .map(|(q, d)| {
+                (*GenericArray::from_slice(
+                    &zip(q, d)
+                        .map(|(q, d)| q ^ d)
+                        .collect::<GenericArray<u8, P::LH>>(),
+                ))
+                .clone()
+            })
             .collect();
         gq[i] = temp;
     }
-    let gq_t: GenericArray<GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>, O::LAMBDALBYTES> = gq
+    let gq_t: GenericArray<
+        GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>,
+        O::LAMBDALBYTES,
+    > = gq
         .iter()
-        .map(|q| {
-            q.iter()
-                .map(|q| {
-                    volehash::<T, O>(
-                        GenericArray::from_slice(&chall1),
-                        GenericArray::from_slice(&q[..l + lambda]),
-                        GenericArray::from_slice(&q[l + lambda..])
-                    )
-                })
-                .collect()
-        })
+        .map(|q| q.iter().map(|q| vole_hasher.process(&q)).collect())
         .collect();
     let mut hv : Box<GenericArray<u8, R::PRODLAMBDA2>> = GenericArray::default_boxed();
     R::h1(
         &zip(
-            gq_t.into_iter().flatten().collect::<GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDALBYTESLAMBDA>>(),
-            gd_t.into_iter().flatten().collect::<GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDALBYTESLAMBDA>>(),
+            gq_t.into_iter()
+                .flatten()
+                .collect::<GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDALBYTESLAMBDA>>(),
+            gd_t.into_iter()
+                .flatten()
+                .collect::<GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDALBYTESLAMBDA>>(),
         )
         .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d).collect::<Vec<u8>>())
         .collect::<Vec<u8>>(),
@@ -514,9 +510,15 @@ where
         &gq.iter()
             .flat_map(|x| {
                 x.iter()
-                    .map(|y| y.clone().into_iter().take(l + lambda).collect::<GenericArray<u8, _>>())
+                    .map(|y| {
+                        y.clone()
+                            .into_iter()
+                            .take(l + lambda)
+                            .collect::<GenericArray<u8, _>>()
+                    })
                     .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>()
-            }).collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
+            })
+            .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
         &a_t,
         &chall2,
         &chall3,
@@ -626,7 +628,8 @@ where
     }
     for i in 0..tau1 {
         for j in 0..k1 {
-            pdecom[tau0 + i].0[j] = (*GenericArray::from_slice(&signature[index..index + lambda])).clone();
+            pdecom[tau0 + i].0[j] =
+                (*GenericArray::from_slice(&signature[index..index + lambda])).clone();
             index += lambda;
         }
         pdecom[tau0 + i]

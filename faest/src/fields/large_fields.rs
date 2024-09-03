@@ -9,6 +9,10 @@ use std::{
 
 use super::{Field, GF64};
 
+use generic_array::{
+    typenum::{U16, U24, U32},
+    GenericArray,
+};
 #[cfg(test)]
 use rand::{
     distributions::{Distribution, Standard},
@@ -53,6 +57,7 @@ where
     Self: for<'a> MulAssign<&'a Self>,
     Self: for<'a> Mul<&'a Self, Output = Self>,
 {
+    // Length of the field (in bits)
     const LENGTH: usize;
 
     fn new(first_value: u128, second_value: u128) -> Self;
@@ -650,6 +655,12 @@ impl ClearHighBits for BigGF<u128, 1, 128> {
 impl Field for BigGF<u128, 1, 128> {
     const ZERO: Self = Self([0]);
     const ONE: Self = Self([1]);
+
+    type Length = U16;
+
+    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
+        GenericArray::from(self.0[0].to_le_bytes())
+    }
 }
 
 impl Alphas for BigGF<u128, 1, 128> {
@@ -735,6 +746,15 @@ impl ClearHighBits for BigGF<u128, 2, 192> {
 impl Field for BigGF<u128, 2, 192> {
     const ZERO: Self = Self([0, 0]);
     const ONE: Self = Self([1, 0]);
+
+    type Length = U24;
+
+    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
+        let mut ret = GenericArray::default();
+        ret[..16].copy_from_slice(&self.0[0].to_le_bytes());
+        ret[16..].copy_from_slice(&self.0[1].to_le_bytes()[..8]);
+        ret
+    }
 }
 
 impl Alphas for BigGF<u128, 2, 192> {
@@ -773,11 +793,11 @@ impl Alphas for BigGF<u128, 2, 192> {
 impl From<&[u8]> for BigGF<u128, 2, 192> {
     fn from(value: &[u8]) -> Self {
         // FIXME
-        // assert_eq!(value.len(), 16);
+        // assert_eq!(value.len(), 24);
         let mut array_1 = [0u8; 16];
         array_1.copy_from_slice(&value[..16]);
         let mut array_2 = [0u8; 16];
-        array_2.copy_from_slice(&value[16..]);
+        array_2[..8].copy_from_slice(&value[16..24]);
         Self([u128::from_le_bytes(array_1), u128::from_le_bytes(array_2)])
     }
 }
@@ -851,6 +871,15 @@ impl ClearHighBits for BigGF<u128, 2, 256> {
 impl Field for BigGF<u128, 2, 256> {
     const ZERO: Self = Self([0, 0]);
     const ONE: Self = Self([1, 0]);
+
+    type Length = U32;
+
+    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
+        let mut ret = GenericArray::default();
+        ret[..16].copy_from_slice(&self.0[0].to_le_bytes());
+        ret[16..].copy_from_slice(&self.0[1].to_le_bytes());
+        ret
+    }
 }
 
 impl Alphas for BigGF<u128, 2, 256> {
