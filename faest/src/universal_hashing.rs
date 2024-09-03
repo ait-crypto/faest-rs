@@ -183,6 +183,7 @@ where
     fn finalize(self, x1: &F) -> F;
 }
 
+#[derive(Debug, Clone)]
 pub struct ZKHasher<F>
 where
     F: BigGaloisField,
@@ -195,24 +196,25 @@ where
     r1: F,
 }
 
-impl ZKHasherInit<Self> for GF128 {
-    type SDLength = Sum<Prod<<Self as Field>::Length, U3>, <GF64 as Field>::Length>;
-    type Hasher = ZKHasher<Self>;
+impl ZKHasherInit<GF128> for ZKHasher<GF128> {
+    type SDLength = Sum<Prod<<GF128 as Field>::Length, U3>, <GF64 as Field>::Length>;
+    type Hasher = Self;
 
     fn new_zk_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher {
-        let s =
-            Self::from(&sd[2 * <Self as Field>::Length::USIZE..3 * <Self as Field>::Length::USIZE]);
-        let t = GF64::from(
-            &sd[3 * <Self as Field>::Length::USIZE
-                ..3 * <Self as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
+        let s = GF128::from(
+            &sd[2 * <GF128 as Field>::Length::USIZE..3 * <GF128 as Field>::Length::USIZE],
         );
-        let r0 = Self::from(&sd[..<Self as Field>::Length::USIZE]);
+        let t = GF64::from(
+            &sd[3 * <GF128 as Field>::Length::USIZE
+                ..3 * <GF128 as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
+        );
+        let r0 = GF128::from(&sd[..<GF128 as Field>::Length::USIZE]);
         let r1 =
-            Self::from(&sd[<Self as Field>::Length::USIZE..2 * <Self as Field>::Length::USIZE]);
+            GF128::from(&sd[<GF128 as Field>::Length::USIZE..2 * <GF128 as Field>::Length::USIZE]);
 
         ZKHasher {
-            h0: Self::ZERO,
-            h1: Self::ZERO,
+            h0: GF128::ZERO,
+            h1: GF128::ZERO,
             s,
             t,
             r0,
@@ -221,24 +223,25 @@ impl ZKHasherInit<Self> for GF128 {
     }
 }
 
-impl ZKHasherInit<Self> for GF192 {
-    type SDLength = Sum<Prod<<Self as Field>::Length, U3>, <GF64 as Field>::Length>;
-    type Hasher = ZKHasher<Self>;
+impl ZKHasherInit<GF192> for ZKHasher<GF192> {
+    type SDLength = Sum<Prod<<GF192 as Field>::Length, U3>, <GF64 as Field>::Length>;
+    type Hasher = Self;
 
     fn new_zk_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher {
-        let s =
-            Self::from(&sd[2 * <Self as Field>::Length::USIZE..3 * <Self as Field>::Length::USIZE]);
-        let t = GF64::from(
-            &sd[3 * <Self as Field>::Length::USIZE
-                ..3 * <Self as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
+        let s = GF192::from(
+            &sd[2 * <GF192 as Field>::Length::USIZE..3 * <GF192 as Field>::Length::USIZE],
         );
-        let r0 = Self::from(&sd[..<Self as Field>::Length::USIZE]);
+        let t = GF64::from(
+            &sd[3 * <GF192 as Field>::Length::USIZE
+                ..3 * <GF192 as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
+        );
+        let r0 = GF192::from(&sd[..<GF192 as Field>::Length::USIZE]);
         let r1 =
-            Self::from(&sd[<Self as Field>::Length::USIZE..2 * <Self as Field>::Length::USIZE]);
+            GF192::from(&sd[<GF192 as Field>::Length::USIZE..2 * <GF192 as Field>::Length::USIZE]);
 
         ZKHasher {
-            h0: Self::ZERO,
-            h1: Self::ZERO,
+            h0: GF192::ZERO,
+            h1: GF192::ZERO,
             s,
             t,
             r0,
@@ -247,41 +250,30 @@ impl ZKHasherInit<Self> for GF192 {
     }
 }
 
-impl ZKHasherInit<Self> for GF256 {
-    type SDLength = Sum<Prod<<Self as Field>::Length, U3>, <GF64 as Field>::Length>;
-    type Hasher = ZKHasher<Self>;
+impl ZKHasherInit<GF256> for ZKHasher<GF256> {
+    type SDLength = Sum<Prod<<GF256 as Field>::Length, U3>, <GF64 as Field>::Length>;
+    type Hasher = Self;
 
     fn new_zk_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher {
-        let s =
-            Self::from(&sd[2 * <Self as Field>::Length::USIZE..3 * <Self as Field>::Length::USIZE]);
-        let t = GF64::from(
-            &sd[3 * <Self as Field>::Length::USIZE
-                ..3 * <Self as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
+        let s = GF256::from(
+            &sd[2 * <GF256 as Field>::Length::USIZE..3 * <GF256 as Field>::Length::USIZE],
         );
-        let r0 = Self::from(&sd[..<Self as Field>::Length::USIZE]);
+        let t = GF64::from(
+            &sd[3 * <GF256 as Field>::Length::USIZE
+                ..3 * <GF256 as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
+        );
+        let r0 = GF256::from(&sd[..<GF256 as Field>::Length::USIZE]);
         let r1 =
-            Self::from(&sd[<Self as Field>::Length::USIZE..2 * <Self as Field>::Length::USIZE]);
+            GF256::from(&sd[<GF256 as Field>::Length::USIZE..2 * <GF256 as Field>::Length::USIZE]);
 
         ZKHasher {
-            h0: Self::ZERO,
-            h1: Self::ZERO,
+            h0: GF256::ZERO,
+            h1: GF256::ZERO,
             s,
             t,
             r0,
             r1,
         }
-    }
-}
-
-impl<F> ZKHasherInit<F> for ZKHasher<F>
-where
-    F: BigGaloisField + ZKHasherInit<F>,
-{
-    type SDLength = <F as ZKHasherInit<F>>::SDLength;
-    type Hasher = <F as ZKHasherInit<F>>::Hasher;
-
-    fn new_zk_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher {
-        <F as ZKHasherInit<F>>::new_zk_hasher(sd)
     }
 }
 
@@ -299,16 +291,17 @@ where
     }
 }
 
-#[deprecated]
+#[deprecated = "Use O::ZKHasher instead"]
 pub fn zkhash<F>(
-    sd: &GenericArray<u8, <F as ZKHasherInit<F>>::SDLength>,
+    sd: &GenericArray<u8, <ZKHasher<F> as ZKHasherInit<F>>::SDLength>,
     x0: &[F],
     x1: &F,
 ) -> GenericArray<u8, F::Length>
 where
-    F: BigGaloisField + ZKHasherInit<F>,
+    F: BigGaloisField,
+    ZKHasher<F>: ZKHasherInit<F>,
 {
-    let mut hasher = F::new_zk_hasher(sd);
+    let mut hasher = ZKHasher::<F>::new_zk_hasher(sd);
     for x in x0 {
         hasher.update(x);
     }

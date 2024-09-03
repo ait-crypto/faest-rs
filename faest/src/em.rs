@@ -11,7 +11,7 @@ use crate::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     },
-    universal_hashing::{zkhash, ZKHasherInit, ZKHasherProcess},
+    universal_hashing::{ZKHasherInit, ZKHasherProcess},
     vole::chaldec,
 };
 
