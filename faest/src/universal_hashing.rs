@@ -333,7 +333,6 @@ mod test {
     use serde::{de::DeserializeOwned, Deserialize};
 
     use crate::fields::{GF128, GF192, GF256};
-    use crate::parameter::{PARAMOWF128, PARAMOWF192, PARAMOWF256};
 
     #[derive(Debug, Deserialize)]
     #[serde(bound = "F: DeserializeOwned")]
