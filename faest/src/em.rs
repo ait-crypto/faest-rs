@@ -17,7 +17,7 @@ use crate::{
     vole::chaldec
 };
 
-pub fn em_extendedwitness<P, O>(k: &GenericArray<u8, O::LAMBDABYTES>, pk: &GenericArray<u8, O::PK>) -> (GenericArray<u8, O::LBYTES>, bool)
+pub fn em_extendedwitness<P, O>(k: &GenericArray<u8, O::LAMBDABYTES>, pk: &GenericArray<u8, O::PK>) -> (Box<GenericArray<u8, O::LBYTES>>, bool)
 where
     P: PARAM,
     O: PARAMOWF,
@@ -26,7 +26,7 @@ where
     let nst = <O::NST as Unsigned>::to_usize();
     let r = <O::R as Unsigned>::to_usize();
     let kc = <O::NK as Unsigned>::to_u8();
-    let mut res : GenericArray<u8, O::LBYTES> = GenericArray::default();
+    let mut res : Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
     let mut index = 0; 
     let x = rijndael_key_schedule(
         &pk[..lambda],
@@ -107,7 +107,7 @@ where
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
-pub fn em_enc_fwd<T, O>(z: &GenericArray<T, O::L>, x: &GenericArray<T, O::LAMBDAR1>) -> GenericArray<T, O::SENC>
+pub fn em_enc_fwd<T, O>(z: &GenericArray<T, O::L>, x: &GenericArray<T, O::LAMBDAR1>) -> Box<GenericArray<T, O::SENC>>
 where
     T: BigGaloisField
         + std::default::Default
@@ -117,7 +117,7 @@ where
     O: PARAMOWF, 
 
 {
-    let mut res : GenericArray<T, O::SENC> = GenericArray::default();
+    let mut res : Box<GenericArray<T, O::SENC>> = GenericArray::default_boxed();
     let mut index = 0;
     let nst = <O::NST as Unsigned>::to_usize();
     //Step 2-3
@@ -181,7 +181,7 @@ pub fn em_enc_bkwd<T, P, O>(
     mkey: bool,
     mtag: bool,
     delta: T,
-) -> GenericArray<T, O::SENC>
+) -> Box<GenericArray<T, O::SENC>>
 where
     T: BigGaloisField
         + std::default::Default
@@ -191,7 +191,7 @@ where
     P: PARAM,
     O: PARAMOWF, 
 {
-    let mut res :GenericArray<T, O::SENC> = GenericArray::default();
+    let mut res : Box<GenericArray<T, O::SENC>> = GenericArray::default_boxed();
     let mut index = 0;
     let r = <O::R as Unsigned>::to_usize();
     let nst = <O::NST as Unsigned>::to_usize();
@@ -246,7 +246,7 @@ pub fn em_enc_cstrnts<T, P, O>(
     q: &GenericArray<T, O::L>,
     mkey: bool,
     delta: T,
-) -> (GenericArray<T, O::C>, GenericArray<T, O::C>)
+) -> (Box<GenericArray<T, O::C>>, Box<GenericArray<T, O::C>>)
 where
     T: BigGaloisField
         + std::default::Default
@@ -264,7 +264,7 @@ where
     if !mkey {
         let new_w = convert_to_bit::<T, O, O::L, O::LBYTES>(w);
         let new_x = convert_to_bit::<T, O, O::LAMBDAR1, O::LAMBDAR1BYTE>(GenericArray::from_slice(&x[..4 * nst * (r + 1)]));
-        let mut w_out : GenericArray<T, O::LAMBDA> = GenericArray::default();
+        let mut w_out : Box<GenericArray<T, O::LAMBDA>> = GenericArray::default_boxed();
         let mut index = 0;
         for i in 0..lambda / 8 {
             for j in 0..8 {
@@ -274,17 +274,17 @@ where
         }
         let v_out = GenericArray::from_slice(&v[..lambda]);
         let s = em_enc_fwd::<T, O>(&new_w, &new_x);
-        let vs = em_enc_fwd::<T, O>(v, &GenericArray::default());
+        let vs = em_enc_fwd::<T, O>(v, &GenericArray::default_boxed());
         let s_b = em_enc_bkwd::<T, P, O>(&new_x, &new_w, &w_out, false, false, T::default());
         let v_s_b = em_enc_bkwd::<T, P, O>(
-            &GenericArray::default(),
+            &GenericArray::default_boxed(),
             v,
             v_out,
             false,
             true,
             T::default(),
         );
-        let (mut a0, mut a1) : (GenericArray<T, O::C>, GenericArray<T, O::C>) = (GenericArray::default(), GenericArray::default());
+        let (mut a0, mut a1) : (Box<GenericArray<T, O::C>>, Box<GenericArray<T, O::C>>) = (GenericArray::default_boxed(), GenericArray::default_boxed());
         for j in 0..senc {
             a0[j] = v_s_b[j] * vs[j];
             a1[j] = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + T::ONE + a0[j];
@@ -292,7 +292,7 @@ where
         (a0, a1)
     } else {
         let new_output = &convert_to_bit::<T, O, O::LAMBDA, O::LAMBDABYTES>(output);
-        let mut new_x : GenericArray<T, O::LAMBDAR1> = GenericArray::default();
+        let mut new_x : Box<GenericArray<T, O::LAMBDAR1>> = GenericArray::default_boxed();
         let mut index = 0;
         for byte in x.iter().take(4 * nst * (r + 1)) {
             for j in 0..8 {
@@ -300,7 +300,8 @@ where
                 index += 1;
             }
         }
-        let mut q_out : GenericArray<T, O::LAMBDA> = GenericArray::default();
+        let mut new_x : Box<GenericArray<T, O::LAMBDAR1>> = GenericArray::default_boxed();
+        let mut q_out : Box<GenericArray<T, O::LAMBDA>> = GenericArray::default_boxed();
         for i in 0..lambda {
             q_out[i] = T::ONE * (&[new_output[i]])[0] * delta + q[i];
         }
@@ -308,7 +309,7 @@ where
         let qs_b = em_enc_bkwd::<T, P, O>(&new_x, q, &q_out, true, false, delta);
         let immut = delta * delta;
         let b = zip(qs, qs_b).map(|(q, qb)| (q * qb) + immut).collect();
-        (b, GenericArray::default())
+        (b, GenericArray::default_boxed())
     }
 }
 
@@ -319,7 +320,7 @@ pub fn em_prove<T, P, O>(
     gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     pk: &GenericArray<u8, O::PK>,
     chall: &GenericArray<u8, O::CHALL>,
-) -> (GenericArray<u8, O::LAMBDABYTES>, GenericArray<u8, O::LAMBDABYTES>)
+) -> (Box<GenericArray<u8, O::LAMBDABYTES>>, Box<GenericArray<u8, O::LAMBDABYTES>>)
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
     P: PARAM,
@@ -332,7 +333,7 @@ where
     let l = <O::L as Unsigned>::to_usize();
     let lambda = <P::LAMBDA as Unsigned>::to_usize();
     let new_w  = GenericArray::from_slice(&w[..l]);
-    let mut temp_v : GenericArray<u8, O::LAMBDALBYTESLAMBDA> = GenericArray::default();
+    let mut temp_v : Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
     for i in 0..(l + lambda) / 8 {
         for k in 0..8 {
             for j in 0..lambda / 8 {
@@ -365,7 +366,7 @@ where
             .collect::<GenericArray<u8,_>>(),
         new_w,
         GenericArray::from_slice(&new_v[..l]),
-        &GenericArray::default(),
+        &GenericArray::default_boxed(),
         false,
         T::default(),
     );
@@ -379,7 +380,7 @@ where
     }
     let a_t = zkhash::<T, O>(chall, &a1, u_s);
     let b_t = zkhash::<T, O>(chall, &a0, v_s);
-    (a_t, b_t)
+    (Box::new(a_t), Box::new(b_t))
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
@@ -389,7 +390,7 @@ pub fn em_verify<T, P, O>(
     gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     a_t: &GenericArray<u8, O::LAMBDABYTES>,
     chall2: &GenericArray<u8, O::CHALL>,
-    chall3: &GenericArray<u8, P::LAMBDA>,
+    chall3: &GenericArray<u8, P::LAMBDABYTES>,
     pk: &GenericArray<u8, O::PK>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
 where
@@ -433,7 +434,7 @@ where
             }
         }
     }
-    let mut temp_q : GenericArray<u8, O::LAMBDALBYTESLAMBDA> = GenericArray::default();
+    let mut temp_q : Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
     for i in 0..(l + lambda) / 8 {
         for k in 0..8 {
             for j in 0..lambda / 8 {
@@ -464,8 +465,8 @@ where
                     .collect::<Vec<u8>>()
             })
             .collect::<GenericArray<u8, _>>(),
-        &GenericArray::default(),
-        &GenericArray::default(),
+        &GenericArray::default_boxed(),
+        &GenericArray::default_boxed(),
         GenericArray::from_slice(&new_q),
         true,
         delta,

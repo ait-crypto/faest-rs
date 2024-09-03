@@ -52,7 +52,7 @@ where R : RandomOracle,
 
 //constant time checking the value of i : if i is not correct, then the output will be an empty vec
 //K = k0 if i < tau0 else k1
-pub fn chaldec<P>(chal: &GenericArray<u8, P::LAMBDA>, i: u16) -> Vec<u8>
+pub fn chaldec<P>(chal: &GenericArray<u8, P::LAMBDABYTES>, i: u16) -> Vec<u8>
 where P: PARAM,
 {
     let mut lo = 1_u16;
@@ -134,7 +134,7 @@ where
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::type_complexity)]
 pub fn volereconstruct<T, R, P>(
-    chal: &GenericArray<u8, P::LAMBDA>,
+    chal: &GenericArray<u8, P::LAMBDABYTES>,
     pdecom: &GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, GenericArray<u8, R::PRODLAMBDA2>), P::TAU>,
     iv: u128,
 ) -> (GenericArray<u8, R::PRODLAMBDA2>, GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>)

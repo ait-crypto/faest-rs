@@ -13,7 +13,7 @@ sha3 = "0.10.8"
 signature = "2.2.0"
 subtle = { version = "2.6", features = ["const-generics"] }
 typenum = "1.17.0"
-generic-array = "1"
+generic-array = { version = "1", features = ["alloc"] }
 generic_array_0_14 = { version = "0.14", package = "generic-array" }
 stacker = "0.1.17"
 
@@ -28,3 +28,8 @@ rand = { version = "0.8", features = ["small_rng"] }
 [[bench]]
 name = "benchmark_faest_rs"
 harness = false
+
+
+[profile.release]
+# `lto = true` should also work
+lto = 'fat'

@@ -12370,7 +12370,7 @@ fn test_nyst_faest() {
 
         let keypair = AesCypher::keygen_with_rng::<PARAM128S, PARAMOWF128>(rng);
 
-        assert!(*GenericArray::from_slice(&pk) == keypair.1);
+        assert!(*GenericArray::from_slice(&pk) == *keypair.1);
         assert_eq!(
             sig,
             [
@@ -12399,7 +12399,7 @@ fn test_nyst_faest() {
 
         let keypair = AesCypher::keygen_with_rng::<PARAM128F, PARAMOWF128>(rng);
 
-        assert!(*GenericArray::from_slice(&pk) == keypair.1);
+        assert!(*GenericArray::from_slice(&pk) == *keypair.1);
         assert_eq!(
             sig,
             [
@@ -12427,7 +12427,7 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = AesCypher::keygen_with_rng::<PARAM192S, PARAMOWF192>(rng);
-        assert_eq!(*GenericArray::from_slice(&pk), keypair.1);
+        assert_eq!(*GenericArray::from_slice(&pk), *keypair.1);
         assert_eq!(
             sig,
             [
@@ -12509,7 +12509,7 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = AesCypher::keygen_with_rng::<PARAM256F, PARAMOWF256>(rng);
-        assert!(*GenericArray::from_slice(&pk) == keypair.1);
+        assert!(*GenericArray::from_slice(&pk) == *keypair.1);
         assert_eq!(
             sig,
             [
@@ -12536,7 +12536,7 @@ fn test_nyst_faest() {
         let msg = data.message;
         let sig = data.sm;
         let keypair = EmCypher::keygen_with_rng::<PARAM128SEM, PARAMOWF128EM>(rng);
-        assert!(*GenericArray::from_slice(&pk) == keypair.1);
+        assert!(*GenericArray::from_slice(&pk) == *keypair.1);
         assert_eq!(
             sig,
             [
@@ -12564,7 +12564,7 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = EmCypher::keygen_with_rng::<PARAM128FEM, PARAMOWF128EM>(rng);
-        assert_eq!(*GenericArray::from_slice(&pk), keypair.1);
+        assert_eq!(*GenericArray::from_slice(&pk), *keypair.1);
         assert_eq!(
             sig,
             [
@@ -12592,7 +12592,7 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = EmCypher::keygen_with_rng::<PARAM192SEM, PARAMOWF192EM>(rng);
-        assert_eq!(*GenericArray::from_slice(&pk),keypair.1);
+        assert_eq!(*GenericArray::from_slice(&pk), *keypair.1);
         assert_eq!(
             sig,
             [
@@ -12620,7 +12620,7 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = EmCypher::keygen_with_rng::<PARAM192FEM, PARAMOWF192EM>(rng);
-        assert_eq!(*GenericArray::from_slice(&pk), keypair.1);
+        assert_eq!(*GenericArray::from_slice(&pk), *keypair.1);
         assert_eq!(
             sig,
             [
@@ -12648,7 +12648,7 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = EmCypher::keygen_with_rng::<PARAM256SEM, PARAMOWF256EM>(rng);
-        assert_eq!(*GenericArray::from_slice(&pk), keypair.1);
+        assert_eq!(*GenericArray::from_slice(&pk), *keypair.1);
         assert_eq!(
             sig,
             [
@@ -12677,7 +12677,7 @@ fn test_nyst_faest() {
         let sig = data.sm;
 
         let keypair = EmCypher::keygen_with_rng::<PARAM256FEM, PARAMOWF256EM>(rng);
-        assert_eq!(*GenericArray::from_slice(&pk), keypair.1);
+        assert_eq!(*GenericArray::from_slice(&pk), *keypair.1);
         assert_eq!(
             sig,
             [

@@ -130,6 +130,7 @@ fn chaldec_test() {
             assert_eq!(res, data.res);
         }
         else {
+            println!("{:?}", data.chal);
             let res = chaldec::<PARAM256F>(
                 GenericArray::<u8, _>::from_slice(&data.chal), data.i[0],
                 );

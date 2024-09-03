@@ -564,6 +564,7 @@ pub trait PARAM {
     type B : ArrayLength;
     type BETA : ArrayLength;
     type LAMBDA : ArrayLength;
+    type LAMBDABYTES : ArrayLength;
     type PRODLAMBDATAU : ArrayLength;
     type LH :ArrayLength;
     type SIG :ArrayLength;
@@ -610,6 +611,8 @@ impl PARAM for PARAM128S {
     
     type SIG = Sum<U142, Sum<U256, Sum<U512, U4096>>>;
     
+    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+    
     
 } 
 
@@ -654,6 +657,8 @@ impl PARAM for PARAM128F {
     
     type SIG = Sum<U192, Sum<U2048, U4096>>;
 
+    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
 } 
 
 pub struct PARAM192S;
@@ -695,6 +700,8 @@ impl PARAM for PARAM192S {
     type LH = U458;
     
     type SIG = Sum<U200, Sum<U256, Sum<U8192, U4096>>>;
+
+    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
 
     
 } 
@@ -739,6 +746,8 @@ impl PARAM for PARAM192F {
     type LH = U458;
     
     type SIG = Sum<U152, Sum<U256, U16384>>;
+
+    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
  
 } 
 
@@ -782,6 +791,8 @@ impl PARAM for PARAM256S {
     type LH = U566;
     
     type SIG = Sum<U596, Sum<U1024, Sum<U4096, U16384>>>;
+
+    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
     
 } 
 
@@ -825,6 +836,8 @@ impl PARAM for PARAM256F {
     type LH = U566;
     
     type SIG = Sum<U752, Sum<U1024, Sum<U2048, Sum<U8192, U16384>>>>;
+
+    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
  
 } 
 
@@ -869,6 +882,8 @@ impl PARAM for PARAM128SEM {
     
     type SIG = Sum<U470, U4096>;
 
+    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
 } 
 
 pub struct PARAM128FEM;
@@ -912,6 +927,7 @@ impl PARAM for PARAM128FEM {
     
     type SIG = Sum<U576, Sum<U1024, U4096>>;
     
+    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
     
 } 
 
@@ -956,6 +972,8 @@ impl PARAM for PARAM192SEM {
     
     type SIG = Sum<U584, Sum<U2048, U8192>>;
 
+    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
     
 } 
 
@@ -997,6 +1015,8 @@ impl PARAM for PARAM192FEM {
     type LH = U338;
     
     type SIG = Sum<U600, Sum<U1024, Sum<U4096, U8192>>>;
+
+    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
 
 } 
 
@@ -1040,6 +1060,8 @@ impl PARAM for PARAM256SEM {
     
     type SIG = Sum<U476, Sum<U4096, U16384>>;
 
+    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
    
 } 
 
@@ -1082,6 +1104,8 @@ impl PARAM for PARAM256FEM {
     type LH = U514;
     
     type SIG = Sum<U112, Sum<U2048, Sum<U8192, U16384>>>;
+
+    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
 
 } 
 
