@@ -11,7 +11,7 @@ use crate::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     },
-    universal_hashing::{zkhash, ZKHasherInit},
+    universal_hashing::{zkhash, ZKHasherInit, ZKHasherProcess},
     vole::chaldec,
 };
 
@@ -358,9 +358,17 @@ where
     );
     let u_s = O::Field::to_field(&u[l / 8..])[0];
     let v_s = O::Field::sum_poly(&new_v[l..l + lambda]);
-    let a_t = zkhash::<O::Field>(chall, &a1, &u_s);
-    let b_t = zkhash::<O::Field>(chall, &a0, &v_s);
-    (a_t, b_t)
+
+    let mut a_t_hasher = O::ZKHasher::new_zk_hasher(chall);
+    let mut b_t_hasher = O::ZKHasher::new_zk_hasher(chall);
+
+    a1.into_iter().for_each(|value| a_t_hasher.update(&value));
+    a0.into_iter().for_each(|value| b_t_hasher.update(&value));
+
+    let a_t = a_t_hasher.finalize(&u_s);
+    let b_t = b_t_hasher.finalize(&v_s);
+
+    (a_t.as_bytes(), b_t.as_bytes())
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
@@ -440,11 +448,10 @@ where
         true,
         delta,
     );
-    let q_s = O::Field::sum_poly(&new_q[l..l + lambda]);
 
-    (*GenericArray::from_slice(&O::Field::to_bytes(
-        &(O::Field::to_field(&zkhash::<O::Field>(chall2, &b, &q_s))[0]
-            + O::Field::to_field(a_t)[0] * delta),
-    )))
-    .clone()
+    let mut zk_hasher = O::ZKHasher::new_zk_hasher(chall2);
+    b.into_iter().for_each(|value| zk_hasher.update(&value));
+
+    let q_s = O::Field::sum_poly(&new_q[l..l + lambda]);
+    (zk_hasher.finalize(&q_s) + O::Field::from(a_t) * delta).as_bytes()
 }

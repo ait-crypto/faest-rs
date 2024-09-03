@@ -13,14 +13,13 @@ use generic_array::{
 
 use crate::{
     fields::{BigGaloisField, Field, GF128, GF192, GF256},
-    universal_hashing::ZKHasherInit,
+    universal_hashing::{ZKHasher, ZKHasherInit},
 };
 
 pub trait PARAMOWF {
-    type Field: BigGaloisField
-        + Field<Length = Self::LAMBDABYTES>
-        + ZKHasherInit<Self::Field, SDLength = Self::CHALL>
-        + std::fmt::Debug;
+    /// The field that is of size `2^λ` which is defined as [Self::LAMBDA]
+    type Field: BigGaloisField + Field<Length = Self::LAMBDABYTES> + std::fmt::Debug;
+    type ZKHasher: ZKHasherInit<Self::Field, SDLength = Self::CHALL>;
     type XK: ArrayLength;
     type LAMBDA: ArrayLength;
     type LAMBDABYTES: ArrayLength;
@@ -65,6 +64,7 @@ pub struct PARAMOWF128;
 
 impl PARAMOWF for PARAMOWF128 {
     type Field = GF128;
+    type ZKHasher = ZKHasher<Self::Field>;
 
     type LAMBDA = U128;
 
@@ -147,6 +147,7 @@ pub struct PARAMOWF192;
 
 impl PARAMOWF for PARAMOWF192 {
     type Field = GF192;
+    type ZKHasher = ZKHasher<Self::Field>;
 
     type LAMBDA = U192;
 
@@ -229,6 +230,7 @@ pub struct PARAMOWF256;
 
 impl PARAMOWF for PARAMOWF256 {
     type Field = GF256;
+    type ZKHasher = ZKHasher<Self::Field>;
 
     type LAMBDA = U256;
 
@@ -311,6 +313,7 @@ pub struct PARAMOWF128EM;
 
 impl PARAMOWF for PARAMOWF128EM {
     type Field = GF128;
+    type ZKHasher = ZKHasher<Self::Field>;
 
     type LAMBDA = U128;
 
@@ -392,6 +395,7 @@ pub struct PARAMOWF192EM;
 
 impl PARAMOWF for PARAMOWF192EM {
     type Field = GF192;
+    type ZKHasher = ZKHasher<Self::Field>;
 
     type LAMBDA = U192;
 
@@ -474,6 +478,7 @@ pub struct PARAMOWF256EM;
 
 impl PARAMOWF for PARAMOWF256EM {
     type Field = GF256;
+    type ZKHasher = ZKHasher<Self::Field>;
 
     type LAMBDA = U256;
 

@@ -9,7 +9,7 @@ use crate::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     },
-    universal_hashing::{zkhash, ZKHasherInit},
+    universal_hashing::{zkhash, ZKHasherInit, ZKHasherProcess},
     vole::chaldec,
 };
 
@@ -798,7 +798,6 @@ where
     let delta = O::Field::to_field(chall3)[0];
     let lke = <O::LKE as Unsigned>::to_usize();
     let lenc = <O::LENC as Unsigned>::to_usize();
-    let senc = <O::SENC as Unsigned>::to_usize();
     let pk_len = <O::PK as Unsigned>::to_usize();
     let (input, output): (GenericArray<u8, O::QUOTPK2>, GenericArray<u8, O::QUOTPK2>) = (
         (*GenericArray::from_slice(&pk[..pk_len / 2])).clone(),
@@ -839,9 +838,10 @@ where
         }
     }
 
+    let mut zk_hasher = O::ZKHasher::new_zk_hasher(chall2);
+
     let new_q = O::Field::to_field(&temp_q);
 
-    let mut b_array: GenericArray<O::Field, O::C> = GenericArray::default();
     let (b1, _, _, qk) = aes_key_exp_cstrnts::<O>(
         &GenericArray::default(),
         &GenericArray::default(),
@@ -849,6 +849,8 @@ where
         GenericArray::from_slice(&new_q[0..lke]),
         delta,
     );
+    b1.into_iter().for_each(|value| zk_hasher.update(&value));
+
     println!("{:?}, {:?}", &input[..16], &output[..16]);
     let b2 = aes_enc_cstrnts::<O>(
         input[..16].try_into().unwrap(),
@@ -862,9 +864,9 @@ where
         GenericArray::from_slice(&qk[..]),
         delta,
     );
-    let mut b3: GenericArray<O::Field, O::SENC2> = GenericArray::default();
+    b2.into_iter().for_each(|value| zk_hasher.update(&value));
     if lambda > 128 {
-        b3 = aes_enc_cstrnts::<O>(
+        let b3 = aes_enc_cstrnts::<O>(
             input[16..].try_into().unwrap(),
             output[16..].try_into().unwrap(),
             &GenericArray::default(),
@@ -876,13 +878,9 @@ where
             GenericArray::from_slice(&qk[..]),
             delta,
         );
+        b3.into_iter().for_each(|value| zk_hasher.update(&value));
     }
-    b_array = (*GenericArray::from_slice(&[&b1[..], &b2[..senc], &b3[..senc]].concat())).clone();
-    let q_s = O::Field::sum_poly(&new_q[l..l + lambda]);
 
-    (*GenericArray::from_slice(&O::Field::to_bytes(
-        &(O::Field::to_field(&zkhash::<O::Field>(chall2, &b_array, &q_s))[0]
-            + O::Field::to_field(a_t)[0] * delta),
-    )))
-    .clone()
+    let q_s = O::Field::sum_poly(&new_q[l..l + lambda]);
+    (zk_hasher.finalize(&q_s) + O::Field::from(a_t) * delta).as_bytes()
 }

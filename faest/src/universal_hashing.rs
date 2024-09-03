@@ -299,7 +299,7 @@ where
     }
 }
 
-#[allow(dead_code)]
+#[deprecated]
 pub fn zkhash<F>(
     sd: &GenericArray<u8, <F as ZKHasherInit<F>>::SDLength>,
     x0: &[F],
@@ -395,9 +395,6 @@ mod test {
             }
             let res = hasher.finalize(&data.x1);
             assert_eq!(GF128::from(data.h.as_slice()), res);
-
-            let res = zkhash(sd, &data.x0, &data.x1);
-            assert_eq!(data.h.as_slice(), res.as_slice());
         }
     }
 
@@ -415,9 +412,6 @@ mod test {
             }
             let res = hasher.finalize(&data.x1);
             assert_eq!(GF192::from(data.h.as_slice()), res);
-
-            let res = zkhash(sd, &data.x0, &data.x1);
-            assert_eq!(data.h.as_slice(), res.as_slice());
         }
     }
 
@@ -435,9 +429,6 @@ mod test {
             }
             let res = hasher.finalize(&data.x1);
             assert_eq!(GF256::from(data.h.as_slice()), res);
-
-            let res = zkhash(sd, &data.x0, &data.x1);
-            assert_eq!(data.h.as_slice(), res.as_slice());
         }
     }
 }
