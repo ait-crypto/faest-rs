@@ -1,11 +1,6 @@
-use std::vec;
-
-use cipher::Unsigned;
-
-use generic_array::GenericArray;
+use generic_array::{typenum::Unsigned, GenericArray};
 
 use crate::fields::BigGaloisField;
-
 use crate::random_oracles::RandomOracle;
 
 #[allow(clippy::type_complexity)]
@@ -25,7 +20,7 @@ where
     T: BigGaloisField,
     R: RandomOracle,
 {
-    let length = T::LENGTH as usize / 8;
+    let length = T::LENGTH / 8;
     let mut k: Vec<GenericArray<u8, R::LAMBDA>> =
         vec![GenericArray::default(); 2 * (n as usize) - 1];
     //step 2..3
@@ -113,7 +108,7 @@ where
     R: RandomOracle,
     T: BigGaloisField,
 {
-    let length = <R::LAMBDA as Unsigned>::to_usize();
+    let length = R::LAMBDA::USIZE;
     let mut a = 0;
     let d = b.len() as u32;
     let mut k: Vec<Option<GenericArray<u8, R::LAMBDA>>> =
@@ -198,7 +193,7 @@ mod test {
 
     use generic_array::{sequence::GenericSequence, GenericArray};
     use serde::Deserialize;
-    use typenum::{U15, U16, U3, U31, U32, U4, U5, U63};
+    use typenum::{U16, U31, U32, U4, U5, U63};
 
     use crate::{
         fields::{GF128, GF192, GF256},
