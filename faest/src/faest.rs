@@ -5,7 +5,7 @@ use crate::{
     parameter::{PARAM, PARAMOWF},
     random_oracles::RandomOracle,
     rijndael_32::{rijndael_encrypt, rijndael_key_schedule},
-    universal_hashing::volehash,
+    universal_hashing::{VoleHasherInit, VoleHasherProcess},
     vc::open,
     vole::{chaldec, volecommit, volereconstruct},
 };
@@ -346,7 +346,10 @@ where
         .concat(),
         &mut chall1,
     );
-    let u_t = volehash::<O>(&chall1, &u[..l + lambda], &u[l + lambda..]);
+
+    let base_vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
+
+    let u_t = base_vole_hasher.clone().process(&u);
     let gv_t: GenericArray<
         GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>,
         O::LAMBDALBYTES,
@@ -354,7 +357,7 @@ where
         .iter()
         .map(|v| {
             v.iter()
-                .map(|v| volehash::<O>(&chall1, &v[..l + lambda], &v[l + lambda..]))
+                .map(|v| base_vole_hasher.clone().process(v))
                 .collect()
         })
         .collect();
@@ -486,6 +489,7 @@ where
         .concat(),
         &mut chall1,
     );
+    let base_vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let mut gq: GenericArray<Vec<GenericArray<u8, <P as PARAM>::LH>>, P::TAU> =
         GenericArray::default();
     let mut gd_t: GenericArray<
@@ -547,13 +551,7 @@ where
         .iter()
         .map(|q| {
             q.iter()
-                .map(|q| {
-                    volehash::<O>(
-                        GenericArray::from_slice(&chall1),
-                        &q[..l + lambda],
-                        &q[l + lambda..],
-                    )
-                })
+                .map(|q| base_vole_hasher.clone().process(&q))
                 .collect()
         })
         .collect();

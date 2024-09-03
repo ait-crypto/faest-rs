@@ -1,21 +1,54 @@
 use std::array;
 
 use generic_array::{
-    typenum::{Prod, Quot, Sum, Unsigned, U16, U3, U8},
+    typenum::{Prod, Quot, Sum, Unsigned, U16, U3, U5, U8},
     ArrayLength, GenericArray,
 };
 
-use crate::{
-    fields::{BigGaloisField, Field, GF128, GF192, GF256, GF64},
-    parameter::PARAMOWF,
-};
+use crate::fields::{BigGaloisField, Field, GF128, GF192, GF256, GF64};
 
 type BBits = U16;
 // Additional bytes returned by VOLE hash
 pub type B = Quot<BBits, U8>;
 
-/*
-struct VoleHasher<F>
+/// Interface to instantiate a VOLE hasher
+pub trait VoleHasherInit<F>
+where
+    F: BigGaloisField,
+{
+    type SDLength: ArrayLength;
+    type OutputLength: ArrayLength;
+    type Hasher: VoleHasherProcess<F, Self::OutputLength>;
+
+    fn new_vole_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher;
+}
+
+/// Process the input to VOLE hash and produce the hash
+pub trait VoleHasherProcess<F, OutputLength>
+where
+    Self: Clone + Sized,
+    F: BigGaloisField,
+    OutputLength: ArrayLength,
+{
+    fn process_split(
+        self,
+        x0: &[u8],
+        x1: &GenericArray<u8, OutputLength>,
+    ) -> GenericArray<u8, OutputLength>;
+
+    fn process(self, x: &[u8]) -> GenericArray<u8, OutputLength> {
+        debug_assert!(x.len() > OutputLength::USIZE);
+
+        let x0 = &x[..x.len() - OutputLength::USIZE];
+        let x1 = &x[x.len() - OutputLength::USIZE..];
+
+        self.process_split(x0, GenericArray::from_slice(x1))
+    }
+}
+
+/// The VOLE hasher
+#[derive(Debug, Clone)]
+pub struct VoleHasher<F>
 where
     F: BigGaloisField,
 {
@@ -26,33 +59,127 @@ where
     t: GF64,
 }
 
-impl<F, L> VoleHasher<F>
-where
-    F: BigGaloisField,
-    L: ArrayLength,
-    F::Length: std::ops::Add<B, Output = L>,
-{
-    fn new(sd: &[u8]) -> Self {
-        assert_eq!(
-            sd.len(),
-            F::Length::USIZE * 5 + <GF64 as Field>::Length::USIZE
-        );
+impl VoleHasherInit<GF128> for VoleHasher<GF128> {
+    type SDLength = Sum<Prod<<GF128 as Field>::Length, U5>, <GF64 as Field>::Length>;
+    type OutputLength = Sum<<GF128 as Field>::Length, B>;
+    type Hasher = VoleHasher<GF128>;
 
-        let r = array::from_fn(|i| F::from(&sd[i * F::Length::USIZE..(i + 1) * F::Length::USIZE]));
-        let s = F::from(&sd[4 * F::Length::USIZE..5 * F::Length::USIZE]);
+    fn new_vole_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher {
+        let r = array::from_fn(|i| {
+            GF128::from(
+                &sd[i * <GF128 as Field>::Length::USIZE..(i + 1) * <GF128 as Field>::Length::USIZE],
+            )
+        });
+        let s = GF128::from(
+            &sd[4 * <GF128 as Field>::Length::USIZE..5 * <GF128 as Field>::Length::USIZE],
+        );
         let t = GF64::from(
-            &sd[5 * F::Length::USIZE..5 * F::Length::USIZE + <GF64 as Field>::Length::USIZE],
+            &sd[5 * <GF128 as Field>::Length::USIZE
+                ..5 * <GF128 as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
         );
 
         Self {
-            h0: F::ZERO,
+            h0: GF128::ZERO,
             h1: GF64::ZERO,
             r,
             s,
             t,
         }
     }
+}
 
+impl VoleHasherInit<GF192> for VoleHasher<GF192> {
+    type SDLength = Sum<Prod<<GF192 as Field>::Length, U5>, <GF64 as Field>::Length>;
+    type OutputLength = Sum<<GF192 as Field>::Length, B>;
+    type Hasher = VoleHasher<GF192>;
+
+    fn new_vole_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher {
+        let r = array::from_fn(|i| {
+            GF192::from(
+                &sd[i * <GF192 as Field>::Length::USIZE..(i + 1) * <GF192 as Field>::Length::USIZE],
+            )
+        });
+        let s = GF192::from(
+            &sd[4 * <GF192 as Field>::Length::USIZE..5 * <GF192 as Field>::Length::USIZE],
+        );
+        let t = GF64::from(
+            &sd[5 * <GF192 as Field>::Length::USIZE
+                ..5 * <GF192 as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
+        );
+
+        Self {
+            h0: GF192::ZERO,
+            h1: GF64::ZERO,
+            r,
+            s,
+            t,
+        }
+    }
+}
+
+impl VoleHasherInit<GF256> for VoleHasher<GF256> {
+    type SDLength = Sum<Prod<<GF256 as Field>::Length, U5>, <GF64 as Field>::Length>;
+    type OutputLength = Sum<<GF256 as Field>::Length, B>;
+    type Hasher = VoleHasher<GF256>;
+
+    fn new_vole_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher {
+        let r = array::from_fn(|i| {
+            GF256::from(
+                &sd[i * <GF256 as Field>::Length::USIZE..(i + 1) * <GF256 as Field>::Length::USIZE],
+            )
+        });
+        let s = GF256::from(
+            &sd[4 * <GF256 as Field>::Length::USIZE..5 * <GF256 as Field>::Length::USIZE],
+        );
+        let t = GF64::from(
+            &sd[5 * <GF256 as Field>::Length::USIZE
+                ..5 * <GF256 as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
+        );
+
+        Self {
+            h0: GF256::ZERO,
+            h1: GF64::ZERO,
+            r,
+            s,
+            t,
+        }
+    }
+}
+
+impl<F> VoleHasherProcess<F, <Self as VoleHasherInit<F>>::OutputLength> for VoleHasher<F>
+where
+    F: BigGaloisField,
+    Self: VoleHasherInit<F>,
+{
+    fn process_split(
+        mut self,
+        x0: &[u8],
+        x1: &GenericArray<u8, <Self as VoleHasherInit<F>>::OutputLength>,
+    ) -> GenericArray<u8, <Self as VoleHasherInit<F>>::OutputLength> {
+        let iter = x0.chunks_exact(<F as Field>::Length::USIZE);
+        let remainder = iter.remainder();
+        iter.for_each(|data| self.process_block(data));
+        if !remainder.is_empty() {
+            self.process_unpadded_block(remainder);
+        }
+
+        let h2 = self.r[0] * self.h0 + self.r[1] * self.h1;
+        let h3 = self.r[2] * self.h0 + self.r[3] * self.h1;
+
+        let mut ret = GenericArray::default();
+        ret[..<F as Field>::Length::USIZE].copy_from_slice(&h2.as_bytes());
+        ret[<F as Field>::Length::USIZE..B::USIZE].copy_from_slice(&h3.as_bytes()[0..B::USIZE]);
+        ret.iter_mut()
+            .zip(x1.iter())
+            .for_each(|(x1, x2)| *x1 ^= *x2);
+        ret
+    }
+}
+
+impl<F> VoleHasher<F>
+where
+    F: BigGaloisField,
+{
     fn process_block(&mut self, data: &[u8]) {
         self.h0 = self.h0 * self.s + F::from(data);
         data.chunks_exact(<GF64 as Field>::Length::USIZE)
@@ -66,100 +193,6 @@ where
         buf[..data.len()].copy_from_slice(data);
         self.process_block(&buf);
     }
-
-    fn finalize(mut self, x0: &[u8], x1: &[u8]) -> GenericArray<u8, L> {
-        let iter = x0.chunks_exact(F::Length::USIZE);
-        let remainder = iter.remainder();
-        iter.for_each(|data| self.process_block(data));
-        if !remainder.is_empty() {
-            self.process_unpadded_block(remainder);
-        }
-
-        assert_eq!(x1.len(), L::USIZE);
-
-        let h2 = self.r[0] * self.h0 + self.r[1] * self.h1;
-        let h3 = self.r[2] * self.h0 + self.r[3] * self.h1;
-
-        let mut ret = GenericArray::default();
-        ret[..F::Length::USIZE].copy_from_slice(&h2.as_bytes());
-        ret[F::Length::USIZE..].copy_from_slice(&h3.as_bytes()[0..B::USIZE]);
-        ret.iter_mut()
-            .zip(x1.iter())
-            .for_each(|(x1, x2)| *x1 ^= *x2);
-        ret
-    }
-}
-*/
-
-fn process_block<T: BigGaloisField>(
-    mut h0: T,
-    mut h1: GF64,
-    data: &[u8],
-    s: &T,
-    t: GF64,
-) -> (T, GF64) {
-    h0 = h0 * s + T::from(data);
-    data.chunks_exact(<GF64 as Field>::Length::USIZE)
-        .for_each(|data| {
-            h1 = h1 * t + GF64::from(data);
-        });
-    (h0, h1)
-}
-
-fn process_unpadded_block<T: BigGaloisField>(
-    h0: T,
-    h1: GF64,
-    data: &[u8],
-    s: &T,
-    t: GF64,
-) -> (T, GF64) {
-    let mut buf = GenericArray::<u8, T::Length>::default();
-    buf[..data.len()].copy_from_slice(data);
-    process_block(h0, h1, &buf, s, t)
-}
-
-pub fn volehash<O>(
-    sd: &GenericArray<u8, O::CHALL1>,
-    x0: &[u8],
-    x1: &[u8],
-) -> GenericArray<u8, O::LAMBDAPLUS2>
-where
-    O: PARAMOWF,
-{
-    let r: [_; 4] = array::from_fn(|i| {
-        O::Field::from(
-            &sd[i * <O::Field as Field>::Length::USIZE
-                ..(i + 1) * <O::Field as Field>::Length::USIZE],
-        )
-    });
-    let s = O::Field::from(
-        &sd[4 * <O::Field as Field>::Length::USIZE..5 * <O::Field as Field>::Length::USIZE],
-    );
-    let t = GF64::from(
-        &sd[5 * <O::Field as Field>::Length::USIZE
-            ..5 * <O::Field as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
-    );
-
-    let mut h0 = O::Field::ZERO;
-    let mut h1 = GF64::ZERO;
-
-    let iter = x0.chunks_exact(<O::Field as Field>::Length::USIZE);
-    let remainder = iter.remainder();
-    iter.for_each(|data| (h0, h1) = process_block(h0, h1, data, &s, t));
-    if !remainder.is_empty() {
-        (h0, h1) = process_unpadded_block(h0, h1, remainder, &s, t);
-    }
-
-    let h2 = r[0] * h0 + r[1] * h1;
-    let h3 = r[2] * h0 + r[3] * h1;
-
-    let mut ret = GenericArray::default();
-    ret[..<O::Field as Field>::Length::USIZE].copy_from_slice(&h2.as_bytes());
-    ret[<O::Field as Field>::Length::USIZE..].copy_from_slice(&h3.as_bytes()[0..B::USIZE]);
-    ret.iter_mut()
-        .zip(x1.iter())
-        .for_each(|(x1, x2)| *x1 ^= *x2);
-    ret
 }
 
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Init part
@@ -176,6 +209,7 @@ where
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Update and Finalize part
 pub trait ZKHasherProcess<F>
 where
+    Self: Clone,
     F: BigGaloisField,
 {
     fn update(&mut self, v: &F);
@@ -343,7 +377,9 @@ mod test {
         for data in database {
             let sd = GenericArray::from_slice(&data.sd);
             let h = *GenericArray::from_slice(&data.h);
-            let res = volehash::<PARAMOWF128>(sd, &data.x0, &data.x1);
+
+            let hasher = VoleHasher::<GF128>::new_vole_hasher(sd);
+            let res = hasher.process_split(&data.x0, GenericArray::from_slice(&data.x1));
             assert_eq!(h, res);
         }
     }
@@ -356,7 +392,9 @@ mod test {
         for data in database {
             let sd = GenericArray::from_slice(&data.sd);
             let h = *GenericArray::from_slice(&data.h);
-            let res = volehash::<PARAMOWF192>(sd, &data.x0, &data.x1);
+
+            let hasher = VoleHasher::<GF192>::new_vole_hasher(sd);
+            let res = hasher.process_split(&data.x0, GenericArray::from_slice(&data.x1));
             assert_eq!(h, res);
         }
     }
@@ -369,7 +407,9 @@ mod test {
         for data in database {
             let sd = GenericArray::from_slice(&data.sd);
             let h = *GenericArray::from_slice(&data.h);
-            let res = volehash::<PARAMOWF256>(sd, &data.x0, &data.x1);
+
+            let hasher = VoleHasher::<GF256>::new_vole_hasher(sd);
+            let res = hasher.process_split(&data.x0, GenericArray::from_slice(&data.x1));
             assert_eq!(h, res);
         }
     }
