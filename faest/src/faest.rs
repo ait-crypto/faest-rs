@@ -347,9 +347,9 @@ where
         &mut chall1,
     );
 
-    let base_vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
+    let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
 
-    let u_t = base_vole_hasher.clone().process(&u);
+    let u_t = vole_hasher.process(&u);
     let gv_t: GenericArray<
         GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>,
         O::LAMBDALBYTES,
@@ -357,7 +357,7 @@ where
         .iter()
         .map(|v| {
             v.iter()
-                .map(|v| base_vole_hasher.clone().process(v))
+                .map(|v| vole_hasher.process(v))
                 .collect()
         })
         .collect();
@@ -489,7 +489,7 @@ where
         .concat(),
         &mut chall1,
     );
-    let base_vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
+    let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let mut gq: GenericArray<Vec<GenericArray<u8, <P as PARAM>::LH>>, P::TAU> =
         GenericArray::default();
     let mut gd_t: GenericArray<
@@ -551,7 +551,7 @@ where
         .iter()
         .map(|q| {
             q.iter()
-                .map(|q| base_vole_hasher.clone().process(&q))
+                .map(|q| vole_hasher.process(&q))
                 .collect()
         })
         .collect();

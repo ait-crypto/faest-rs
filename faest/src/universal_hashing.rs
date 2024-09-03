@@ -31,12 +31,12 @@ where
     OutputLength: ArrayLength,
 {
     fn process_split(
-        self,
+        &self,
         x0: &[u8],
         x1: &GenericArray<u8, OutputLength>,
     ) -> GenericArray<u8, OutputLength>;
 
-    fn process(self, x: &[u8]) -> GenericArray<u8, OutputLength> {
+    fn process(&self, x: &[u8]) -> GenericArray<u8, OutputLength> {
         debug_assert!(x.len() > OutputLength::USIZE);
 
         let x0 = &x[..x.len() - OutputLength::USIZE];
@@ -52,8 +52,6 @@ pub struct VoleHasher<F>
 where
     F: BigGaloisField,
 {
-    h0: F,
-    h1: GF64,
     r: [F; 4],
     s: F,
     t: GF64,
@@ -78,13 +76,7 @@ impl VoleHasherInit<GF128> for VoleHasher<GF128> {
                 ..5 * <GF128 as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
         );
 
-        Self {
-            h0: GF128::ZERO,
-            h1: GF64::ZERO,
-            r,
-            s,
-            t,
-        }
+        Self { r, s, t }
     }
 }
 
@@ -107,13 +99,7 @@ impl VoleHasherInit<GF192> for VoleHasher<GF192> {
                 ..5 * <GF192 as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
         );
 
-        Self {
-            h0: GF192::ZERO,
-            h1: GF64::ZERO,
-            r,
-            s,
-            t,
-        }
+        Self { r, s, t }
     }
 }
 
@@ -136,13 +122,7 @@ impl VoleHasherInit<GF256> for VoleHasher<GF256> {
                 ..5 * <GF256 as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
         );
 
-        Self {
-            h0: GF256::ZERO,
-            h1: GF64::ZERO,
-            r,
-            s,
-            t,
-        }
+        Self { r, s, t }
     }
 }
 
@@ -152,19 +132,22 @@ where
     Self: VoleHasherInit<F>,
 {
     fn process_split(
-        mut self,
+        &self,
         x0: &[u8],
         x1: &GenericArray<u8, <Self as VoleHasherInit<F>>::OutputLength>,
     ) -> GenericArray<u8, <Self as VoleHasherInit<F>>::OutputLength> {
+        let mut h0 = F::ZERO;
+        let mut h1 = GF64::ZERO;
+
         let iter = x0.chunks_exact(<F as Field>::Length::USIZE);
         let remainder = iter.remainder();
-        iter.for_each(|data| self.process_block(data));
+        iter.for_each(|data| self.process_block(&mut h0, &mut h1, data));
         if !remainder.is_empty() {
-            self.process_unpadded_block(remainder);
+            self.process_unpadded_block(&mut h0, &mut h1, remainder);
         }
 
-        let h2 = self.r[0] * self.h0 + self.r[1] * self.h1;
-        let h3 = self.r[2] * self.h0 + self.r[3] * self.h1;
+        let h2 = self.r[0] * h0 + self.r[1] * h1;
+        let h3 = self.r[2] * h0 + self.r[3] * h1;
 
         let mut ret = GenericArray::default();
         ret[..<F as Field>::Length::USIZE].copy_from_slice(&h2.as_bytes());
@@ -180,18 +163,18 @@ impl<F> VoleHasher<F>
 where
     F: BigGaloisField,
 {
-    fn process_block(&mut self, data: &[u8]) {
-        self.h0 = self.h0 * self.s + F::from(data);
+    fn process_block(&self, h0: &mut F, h1: &mut GF64, data: &[u8]) {
+        *h0 = *h0 * self.s + F::from(data);
         data.chunks_exact(<GF64 as Field>::Length::USIZE)
             .for_each(|data| {
-                self.h1 = self.h1 * self.t + GF64::from(data);
+                *h1 = *h1 * self.t + GF64::from(data);
             });
     }
 
-    fn process_unpadded_block(&mut self, data: &[u8]) {
+    fn process_unpadded_block(&self, h0: &mut F, h1: &mut GF64, data: &[u8]) {
         let mut buf = GenericArray::<u8, F::Length>::default();
         buf[..data.len()].copy_from_slice(data);
-        self.process_block(&buf);
+        self.process_block(h0, h1, &buf);
     }
 }
 
