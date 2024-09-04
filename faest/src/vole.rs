@@ -162,7 +162,7 @@ pub fn volereconstruct<T, R, P>(
         ),
         P::TAU,
     >,
-    iv: u128,
+    iv: [u8; 16],
 ) -> (
     GenericArray<u8, R::PRODLAMBDA2>,
     GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>,
@@ -193,14 +193,14 @@ where
         for j in 0..delta_p.len() {
             delta[i] += (delta_p[j] as u32) << j;
         }
-        (com[i], s[i]) = vc::reconstruct::<T, R>(&pdecom[i], delta_p.to_vec(), iv);
+        (com[i], s[i]) = vc::reconstruct::<T, R>(&pdecom[i], delta_p.to_vec(), &iv);
         hasher.update(&com[i]);
         for j in 0..(1_u16 << (k)) as usize {
             sd[i].push(Some(s[i][j ^ delta[i] as usize].clone()));
         }
         sd[i][0] = None;
 
-        (_, q[i]) = convert_to_vole::<R, P::LH>(&sd[i], iv);
+        (_, q[i]) = convert_to_vole::<R, P::LH>(&sd[i], &iv);
     }
     let mut hcom: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
     hasher.finish().read(&mut hcom);

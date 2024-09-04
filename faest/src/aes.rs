@@ -205,7 +205,7 @@ fn round_with_save_has0(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
 #[allow(clippy::ptr_arg)]
-pub fn aes_key_exp_fwd<O>(x: &GenericArray<T, O::LKE>) -> Box<GenericArray<O::Field, O::PRODRUN128>>
+pub fn aes_key_exp_fwd<O>(x: &GenericArray<O::Field, O::LKE>) -> Box<GenericArray<O::Field, O::PRODRUN128>>
 where
     O: PARAMOWF,
 {

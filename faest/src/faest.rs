@@ -422,7 +422,7 @@ where
                 ),
                 P::TAU,
             >>(),
-        &iv[..16].try_into().unwrap(),
+        iv.into_array(),
     );
     let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
     let mut h2_hasher = R::h2_init();
