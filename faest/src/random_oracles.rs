@@ -962,25 +962,28 @@ mod test {
                 ],
             ),
         ];
-        for data in database {
-            let lambda = data.0;
-
-            let output = &data.2;
+        for (lambda, input, output) in database {
             if lambda == 128 {
-                let input: GenericArray<u8, U32> = *GenericArray::from_slice(&data.1);
-                let mut res = GenericArray::default();
-                RandomOracleShake128::h0(input, &mut res);
-                assert_eq!(res[..], output[..]);
+                let mut hasher = RandomOracleShake128::h0_init();
+                hasher.update(&input);
+                let mut reader = hasher.finish();
+                let mut res = vec![0; output.len()];
+                reader.read(&mut res);
+                assert_eq!(res, output);
             } else if lambda == 192 {
-                let input: GenericArray<u8, U40> = *GenericArray::from_slice(&data.1);
-                let mut res = GenericArray::default();
-                RandomOracleShake192::h0(input, &mut res);
-                assert_eq!(res[..], output[..]);
+                let mut hasher = RandomOracleShake192::h0_init();
+                hasher.update(&input);
+                let mut reader = hasher.finish();
+                let mut res = vec![0; output.len()];
+                reader.read(&mut res);
+                assert_eq!(res, output);
             } else {
-                let input: GenericArray<u8, U48> = *GenericArray::from_slice(&data.1);
-                let mut res = GenericArray::default();
-                RandomOracleShake256::h0(input, &mut res);
-                assert_eq!(res[..], output[..]);
+                let mut hasher = RandomOracleShake256::h0_init();
+                hasher.update(&input);
+                let mut reader = hasher.finish();
+                let mut res = vec![0; output.len()];
+                reader.read(&mut res);
+                assert_eq!(res, output);
             }
         }
     }
@@ -3240,22 +3243,28 @@ mod test {
                 ],
             ),
         ];
-        for data in database {
-            let lambda = data.0;
-            let input = data.1;
-            let output = data.2;
+        for (lambda, input, output) in database {
             if lambda == 128 {
-                let mut res = GenericArray::default();
-                RandomOracleShake128::h1(&input, &mut res);
-                assert_eq!(res[..], output[..]);
+                let mut hasher = RandomOracleShake128::h1_init();
+                hasher.update(&input);
+                let mut reader = hasher.finish();
+                let mut res = vec![0; output.len()];
+                reader.read(&mut res);
+                assert_eq!(res, output);
             } else if lambda == 192 {
-                let mut res = GenericArray::default();
-                RandomOracleShake192::h1(&input, &mut res);
-                assert_eq!(res[..], output[..]);
+                let mut hasher = RandomOracleShake192::h1_init();
+                hasher.update(&input);
+                let mut reader = hasher.finish();
+                let mut res = vec![0; output.len()];
+                reader.read(&mut res);
+                assert_eq!(res, output);
             } else {
-                let mut res = GenericArray::default();
-                RandomOracleShake256::h1(&input, &mut res);
-                assert_eq!(res[..], output[..]);
+                let mut hasher = RandomOracleShake256::h1_init();
+                hasher.update(&input);
+                let mut reader = hasher.finish();
+                let mut res = vec![0; output.len()];
+                reader.read(&mut res);
+                assert_eq!(res, output);
             }
         }
     }
