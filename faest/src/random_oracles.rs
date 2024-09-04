@@ -15,10 +15,18 @@ type Aes256Ctr128BE = ctr::Ctr128BE<aes::Aes256>;
 
 pub type IV = [u8; 16];
 
-/// Interfacoe for the PRG
-pub trait PseudoRandomGenerator: Sized {
+/// Reader interface for hashers and random oracles
+pub trait Reader {
+    /// Read bytes from hasher/random oracle
+    fn read(&mut self, dst: &mut [u8]);
+}
+
+/// Interface for the PRG
+pub trait PseudoRandomGenerator: Sized + Reader {
+    /// Size of the PRG key
     type Lambda: ArrayLength;
 
+    #[deprecated]
     fn prg<LH>(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> GenericArray<u8, LH>
     where
         LH: ArrayLength,
@@ -29,8 +37,8 @@ pub trait PseudoRandomGenerator: Sized {
         buf
     }
 
+    /// Instantiate new PRG instance
     fn new_prg(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> Self;
-    fn read(&mut self, dst: &mut [u8]);
 }
 
 pub struct PRG128(Aes128Ctr128BE);
@@ -44,7 +52,9 @@ impl PseudoRandomGenerator for PRG128 {
             GenericArray_0_14::from_slice(iv.as_slice()),
         ))
     }
+}
 
+impl Reader for PRG128 {
     fn read(&mut self, dst: &mut [u8]) {
         self.0.apply_keystream(dst);
     }
@@ -61,7 +71,9 @@ impl PseudoRandomGenerator for PRG192 {
             GenericArray_0_14::from_slice(iv.as_slice()),
         ))
     }
+}
 
+impl Reader for PRG192 {
     fn read(&mut self, dst: &mut [u8]) {
         self.0.apply_keystream(dst);
     }
@@ -78,7 +90,9 @@ impl PseudoRandomGenerator for PRG256 {
             GenericArray_0_14::from_slice(iv.as_slice()),
         ))
     }
+}
 
+impl Reader for PRG256 {
     fn read(&mut self, dst: &mut [u8]) {
         self.0.apply_keystream(dst);
     }
@@ -140,37 +154,42 @@ pub trait RandomOracle {
         reader.read(dest);
     }
 
+    /// Create hasher for `H0`
     fn h0_init() -> Self::Hasher<0> {
         Self::Hasher::default()
     }
 
+    /// Create hasher for `H1`
     fn h1_init() -> Self::Hasher<1> {
         Self::Hasher::default()
     }
 
+    /// Create hasher for `H2`
     fn h2_init() -> Self::Hasher<2> {
         Self::Hasher::default()
     }
 
+    /// Create hasher for `H3`
     fn h3_init() -> Self::Hasher<3> {
         Self::Hasher::default()
     }
 }
 
-pub trait Reader {
-    fn read(&mut self, dst: &mut [u8]);
-}
-
+/// Interface for hashers associated ot the random oracles
 pub trait Hasher {
+    /// Digest reader
     type Reader: Reader;
 
+    /// Hash additional bytes
     fn update(&mut self, data: &[u8]);
 
+    /// Finish hashing
     fn finish(self) -> Self::Reader;
 }
 
 pub struct RandomOracleShake128 {}
 
+/// Hasher based on `SHAKE128`
 #[derive(Debug, Default)]
 pub struct Hasher128<const SEP: u8> {
     hasher: Shake128,
@@ -232,6 +251,7 @@ impl<const SEP: u8> Hasher for Hasher256<SEP> {
 
 pub struct RandomOracleShake256 {}
 
+/// Hasher based on SHAKE256
 #[derive(Default)]
 pub struct Hasher256<const SEP: u8> {
     hasher: Shake256,
@@ -256,7 +276,7 @@ impl RandomOracle for RandomOracleShake256 {
 
 #[cfg(test)]
 mod test {
-    use generic_array::{typenum::U240, GenericArray};
+    use generic_array::GenericArray;
 
     use super::*;
 
@@ -3307,7 +3327,7 @@ mod test {
 
     #[test]
     fn test_prg128() {
-        let key = GenericArray::from_slice(&[
+        let key = GenericArray::from_array([
             0x9d, 0x79, 0xb1, 0xa3, 0x7f, 0x31, 0x80, 0x1c, 0xd1, 0x1a, 0x67, 0x06, 0xfb, 0x40,
             0xd6, 0xbd,
         ]);
@@ -3336,13 +3356,15 @@ mod test {
             0xdd, 0xda,
         ];
 
-        let res = PRG128::prg::<U240>(key, &iv);
-        assert_eq!(res, *GenericArray::from_slice(&output))
+        let mut prg = PRG128::new_prg(&key, &iv);
+        let mut res = [0; 240];
+        prg.read(&mut res);
+        assert_eq!(res, output);
     }
 
     #[test]
     fn test_prg192() {
-        let key = GenericArray::from_slice(&[
+        let key = GenericArray::from_array([
             0x50, 0xe1, 0x65, 0xe4, 0x34, 0x24, 0x9d, 0x8b, 0x82, 0x9f, 0x41, 0x16, 0x69, 0x84,
             0x2a, 0x97, 0x99, 0x11, 0x03, 0x6c, 0xf3, 0xe8, 0x22, 0x08,
         ]);
@@ -3371,13 +3393,15 @@ mod test {
             0x5a, 0x90,
         ];
 
-        let res = PRG192::prg::<U240>(key, &iv);
-        assert_eq!(res, *GenericArray::from_slice(&output))
+        let mut prg = PRG192::new_prg(&key, &iv);
+        let mut res = [0; 240];
+        prg.read(&mut res);
+        assert_eq!(res, output);
     }
 
     #[test]
     fn test_prg256() {
-        let key = GenericArray::from_slice(&[
+        let key = GenericArray::from_array([
             0xf6, 0x48, 0x81, 0x8b, 0xa4, 0xa6, 0x65, 0x6b, 0xe0, 0xcb, 0x6e, 0x38, 0x2a, 0x5d,
             0xff, 0x72, 0xac, 0x1d, 0xda, 0x96, 0x90, 0x81, 0x37, 0x47, 0x8b, 0xd5, 0x36, 0xcf,
             0x4b, 0x77, 0x8a, 0xde,
@@ -3407,7 +3431,9 @@ mod test {
             0x62, 0x63,
         ];
 
-        let res = PRG256::prg::<U240>(key, &iv);
-        assert_eq!(res, *GenericArray::from_slice(&output))
+        let mut prg = PRG256::new_prg(&key, &iv);
+        let mut res = [0; 240];
+        prg.read(&mut res);
+        assert_eq!(res, output);
     }
 }
