@@ -106,7 +106,7 @@ where
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
-pub fn em_enc_fwd<O::Field, O>(z: &GenericArray<O::Field, O::L>, x: &GenericArray<O::Field, O::LAMBDAR1>) -> Box<GenericArray<O::Field, O::SENC>>
+pub fn em_enc_fwd<O>(z: &GenericArray<O::Field, O::L>, x: &GenericArray<O::Field, O::LAMBDAR1>) -> Box<GenericArray<O::Field, O::SENC>>
 where
     O: PARAMOWF,
 {
@@ -246,7 +246,7 @@ where
     if !mkey {
         let new_w = convert_to_bit::<O, O::L, O::LBYTES>(w);
         let new_x = convert_to_bit::<O, O::LAMBDAR1, O::LAMBDAR1BYTE>(GenericArray::from_slice(&x[..4 * nst * (r + 1)]));
-        let mut w_out : Box<GenericArray<T, O::LAMBDA>> = GenericArray::default_boxed();
+        let mut w_out : Box<GenericArray<O::Field, O::LAMBDA>> = GenericArray::default_boxed();
         let mut index = 0;
         for i in 0..lambda / 8 {
             for j in 0..8 {
@@ -257,7 +257,7 @@ where
         let v_out = GenericArray::from_slice(&v[..lambda]);
         let s = em_enc_fwd::<O>(&new_w, &new_x);
         let vs = em_enc_fwd::<O>(v, &GenericArray::default());
-        let s_b = em_enc_bkwd::<P, O>(&new_x, &new_w, &w_out, false, false, O::Field::default_boxed());
+        let s_b = em_enc_bkwd::<P, O>(&new_x, &new_w, &w_out, false, false, O::Field::default());
         let v_s_b = em_enc_bkwd::<P, O>(
             &GenericArray::default_boxed(),
             v,
@@ -266,7 +266,7 @@ where
             true,
             O::Field::default(),
         );
-        let (mut a0, mut a1) : (Box<GenericArray<T, O::C>>, Box<GenericArray<T, O::C>>) = (GenericArray::default_boxed(), GenericArray::default_boxed());
+        let (mut a0, mut a1) : (Box<GenericArray<O::Field, O::C>>, Box<GenericArray<O::Field, O::C>>) = (GenericArray::default_boxed(), GenericArray::default_boxed());
         for j in 0..senc {
             a0[j] = v_s_b[j] * vs[j];
             a1[j] = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + O::Field::ONE + a0[j];
@@ -274,7 +274,7 @@ where
         (a0, a1)
     } else {
         let new_output = &convert_to_bit::<O, O::LAMBDA, O::LAMBDABYTES>(output);
-        let mut new_x : Box<GenericArray<T, O::LAMBDAR1>> = GenericArray::default_boxed();
+        let mut new_x : Box<GenericArray<O::Field, O::LAMBDAR1>> = GenericArray::default_boxed();
         let mut index = 0;
         for byte in x.iter().take(4 * nst * (r + 1)) {
             for j in 0..8 {

@@ -1,9 +1,11 @@
+use std::iter::zip;
+
 use cipher::Unsigned;
 
 use generic_array::{ArrayLength, GenericArray};
 
 use crate::parameter::PARAM;
-use crate::random_oracles::{Hasher, IV};
+use crate::random_oracles::{Hasher, Reader, IV};
 use crate::vc;
 use crate::{fields::BigGaloisField, random_oracles::RandomOracle, vc::commit};
 
@@ -26,6 +28,7 @@ where
     for (i, _) in sd.iter().enumerate().skip(1).take(n) {
         r[0][i] = R::prg::<LH>(sd[i].as_ref().unwrap().clone(), iv);
     }
+    
     let mut v: Vec<GenericArray<u8, LH>> = vec![GenericArray::default(); d];
     for j in 0..d {
         for i in 0..n / (1_usize << (j + 1)) {
@@ -40,23 +43,21 @@ where
             r[j + 1][i] = (*GenericArray::from_slice(
                 &r[j][2 * i]
                     .iter()
-                    .zip(r[j][2 * i + 1].iter())
+                    .zip(r[j][(2 * i) + 1].iter())
                     .map(|(&x1, x2)| x1 ^ x2)
                     .collect::<GenericArray<u8, LH>>(),
             ))
             .clone();
         }
     }
-    for j in 0..d {
-        for _i in 0..n / (1_usize << (d - j - 1)) {}
-    }
+    
     let u = (*GenericArray::from_slice(&r[d][0].clone())).clone();
     (u, v)
 }
 
 //constant time checking the value of i : if i is not correct, then the output will be an empty vec
 //K = k0 if i < tau0 else k1
-pub fn chaldec<P>(chal: &GenericArray<u8, P::LAMBDA>, i: u16) -> Vec<u8>
+pub fn chaldec<P>(chal: &GenericArray<u8, P::LAMBDABYTES>, i: u16) -> Vec<u8>
 where
     P: PARAM,
 {
@@ -106,6 +107,7 @@ where
     T: BigGaloisField + std::default::Default,
     R: RandomOracle,
 {
+    
     let tau = <P::TAU as Unsigned>::to_usize();
     let k0 = <P::K0 as Unsigned>::to_u16();
     let k1 = <P::K1 as Unsigned>::to_u16();
@@ -145,14 +147,14 @@ where
             .collect();
     }
     let mut hcom: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
-    hasher.finish();
+    hasher.finish().read(&mut hcom);
     (hcom, decom, c, u[0].clone(), v)
 }
 
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::type_complexity)]
 pub fn volereconstruct<T, R, P>(
-    chal: &GenericArray<u8, P::LAMBDA>,
+    chal: &GenericArray<u8, P::LAMBDABYTES>,
     pdecom: &GenericArray<
         (
             Vec<GenericArray<u8, R::LAMBDA>>,
@@ -170,6 +172,7 @@ where
     R: RandomOracle,
     P: PARAM,
 {
+    println!("{:?}", iv);
     let tau = <P::TAU as Unsigned>::to_usize();
     let k0 = <P::K0 as Unsigned>::to_u16();
     let k1 = <P::K1 as Unsigned>::to_u16();
@@ -185,7 +188,7 @@ where
     for i in 0..tau {
         let b: u16 = (i < t0.into()).into();
         let k = b * k0 + (1 - b) * k1;
-        let delta_p: Vec<u8> = chaldec::<P>(&chal, i.try_into().unwrap());
+        let delta_p: Vec<u8> = chaldec::<P>(chal, i.try_into().unwrap());
         #[allow(clippy::needless_range_loop)]
         for j in 0..delta_p.len() {
             delta[i] += (delta_p[j] as u32) << j;
@@ -200,6 +203,6 @@ where
         (_, q[i]) = convert_to_vole::<R, P::LH>(&sd[i], iv);
     }
     let mut hcom: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
-    hasher.finish();
+    hasher.finish().read(&mut hcom);
     (hcom, q)
 }

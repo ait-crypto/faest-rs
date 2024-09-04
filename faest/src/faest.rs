@@ -64,7 +64,7 @@ pub trait Variant {
 pub struct AesCypher {}
 
 impl Variant for AesCypher {
-    fn witness<P, O, T>(k: &GenericArray<u8, O::LAMBDABYTES>, pk: &GenericArray<u8, O::PK>) -> Box<GenericArray<u8, O::LBYTES>>
+    fn witness<P, O>(k: &GenericArray<u8, O::LAMBDABYTES>, pk: &GenericArray<u8, O::PK>) -> Box<GenericArray<u8, O::LBYTES>>
     where
         P: PARAM,
         O: PARAMOWF,
@@ -435,11 +435,11 @@ where
 
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let mut gq: Box<GenericArray<Vec<GenericArray<u8, <P as PARAM>::LH>>, P::TAU>> =
-        GenericArray::default();
+        GenericArray::default_boxed();
     let mut gd_t: Box<GenericArray<
         GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>,
         O::LAMBDALBYTES,
-    >> = GenericArray::default();
+    >> = GenericArray::default_boxed();
     gq[0] = gq_p[0].clone();
     let delta0 = chaldec::<P>(&chall3, 0);
     gd_t[0] = delta0

@@ -605,8 +605,8 @@ fn em_prove_test() {
             );
             assert_eq!(
                 (
-                    *GenericArray::from_slice(&data.at),
-                    *GenericArray::from_slice(&data.bt)
+                    Box::new(*GenericArray::from_slice(&data.at)),
+                    Box::new(*GenericArray::from_slice(&data.bt))
                 ),
                 res
             );
@@ -627,8 +627,8 @@ fn em_prove_test() {
             );
             assert_eq!(
                 (
-                    *GenericArray::from_slice(&data.at),
-                    *GenericArray::from_slice(&data.bt)
+                    Box::new(*GenericArray::from_slice(&data.at)),
+                    Box::new(*GenericArray::from_slice(&data.bt))
                 ),
                 res
             );
@@ -648,8 +648,8 @@ fn em_prove_test() {
             );
             assert_eq!(
                 (
-                    *GenericArray::from_slice(&data.at),
-                    *GenericArray::from_slice(&data.bt)
+                    Box::new(*GenericArray::from_slice(&data.at)),
+                    Box::new(*GenericArray::from_slice(&data.bt))
                 ),
                 res
             );

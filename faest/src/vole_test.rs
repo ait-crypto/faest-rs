@@ -47,7 +47,7 @@ fn convert_to_vole_test() {
                 .sd
                 .iter()
                 .cloned()
-                .map(|x| Some(GenericArray::default()))
+                .map(|x| Some(*GenericArray::from_slice(&x)))
                 .collect::<Vec<Option<GenericArray<u8, U16>>>>();
             if data.sd0[0] == 1 {
                 opt_sd[0] = None;
