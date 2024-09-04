@@ -21,10 +21,10 @@ where
     let mut r: Vec<Vec<GenericArray<u8, LH>>> = vec![vec![GenericArray::default(); n]; d + 1];
     match &sd[0] {
         None => (),
-        Some(sd0) => r[0][0] = R::prg::<LH>(sd0.clone(), iv),
+        Some(sd0) => r[0][0] = R::prg::<LH>(&sd0, iv),
     }
     for (i, _) in sd.iter().enumerate().skip(1).take(n) {
-        r[0][i] = R::prg::<LH>(sd[i].as_ref().unwrap().clone(), iv);
+        r[0][i] = R::prg::<LH>(sd[i].as_ref().unwrap(), iv);
     }
     let mut v: Vec<GenericArray<u8, LH>> = vec![GenericArray::default(); d];
     for j in 0..d {
@@ -110,7 +110,7 @@ where
     let k0 = <P::K0 as Unsigned>::to_u16();
     let k1 = <P::K1 as Unsigned>::to_u16();
     let _t1 = <P::TAU1 as Unsigned>::to_u16();
-    let tau_res = R::prg::<P::PRODLAMBDATAU>(r.clone(), iv);
+    let tau_res = R::prg::<P::PRODLAMBDATAU>(r, iv);
     let mut r: GenericArray<T, P::TAU> = GenericArray::default();
     let mut com: GenericArray<GenericArray<u8, R::PRODLAMBDA2>, P::TAU> = GenericArray::default();
     let mut decom: GenericArray<
@@ -153,9 +153,18 @@ where
 #[allow(clippy::type_complexity)]
 pub fn volereconstruct<T, R, P>(
     chal: &GenericArray<u8, P::LAMBDABYTES>,
-    pdecom: &GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, GenericArray<u8, R::PRODLAMBDA2>), P::TAU>,
+    pdecom: &GenericArray<
+        (
+            Vec<GenericArray<u8, R::LAMBDA>>,
+            GenericArray<u8, R::PRODLAMBDA2>,
+        ),
+        P::TAU,
+    >,
     iv: u128,
-) -> (GenericArray<u8, R::PRODLAMBDA2>, GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>)
+) -> (
+    GenericArray<u8, R::PRODLAMBDA2>,
+    GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>,
+)
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
     R: RandomOracle,
