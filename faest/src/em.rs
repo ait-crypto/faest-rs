@@ -106,11 +106,11 @@ where
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///One of the first path to optimize the code could be to do the distinction
-pub fn em_enc_fwd<T, O>(z: &GenericArray<T, O::L>, x: &GenericArray<T, O::LAMBDAR1>) -> Box<GenericArray<T, O::SENC>>
+pub fn em_enc_fwd<O>(z: &GenericArray<O::Field, O::L>, x: &GenericArray<O::Field, O::LAMBDAR1>) -> Box<GenericArray<O::Field, O::SENC>>
 where
     O: PARAMOWF,
 {
-    let mut res : Box<GenericArray<T, O::SENC>> = GenericArray::default_boxed();
+    let mut res : Box<GenericArray<O::Field, O::SENC>> = GenericArray::default_boxed();
     let mut index = 0;
     let nst = <O::NST as Unsigned>::to_usize();
     //Step 2-3
@@ -173,13 +173,13 @@ pub fn em_enc_bkwd<P, O>(
     z_out: &GenericArray<O::Field, O::LAMBDA>,
     mkey: bool,
     mtag: bool,
-    delta: T,
-) -> Box<GenericArray<T, O::SENC>>
+    delta: O::Field,
+) -> Box<GenericArray<O::Field, O::SENC>>
 where
     P: PARAM,
     O: PARAMOWF,
 {
-    let mut res : Box<GenericArray<T, O::SENC>> = GenericArray::default_boxed();
+    let mut res : Box<GenericArray<O::Field, O::SENC>> = GenericArray::default_boxed();
     let mut index = 0;
     let r = <O::R as Unsigned>::to_usize();
     let nst = <O::NST as Unsigned>::to_usize();
@@ -233,8 +233,8 @@ pub fn em_enc_cstrnts<P, O>(
     v: &GenericArray<O::Field, O::L>,
     q: &GenericArray<O::Field, O::L>,
     mkey: bool,
-    delta: T,
-) -> (Box<GenericArray<T, O::C>>, Box<GenericArray<T, O::C>>)
+    delta: O::Field,
+) -> (Box<GenericArray<O::Field, O::C>>, Box<GenericArray<O::Field, O::C>>)
 where
     P: PARAM,
     O: PARAMOWF,
@@ -244,9 +244,9 @@ where
     let nst = <O::NST as Unsigned>::to_usize();
     let r = <O::R as Unsigned>::to_usize();
     if !mkey {
-        let new_w = convert_to_bit::<T, O, O::L, O::LBYTES>(w);
-        let new_x = convert_to_bit::<T, O, O::LAMBDAR1, O::LAMBDAR1BYTE>(GenericArray::from_slice(&x[..4 * nst * (r + 1)]));
-        let mut w_out : Box<GenericArray<T, O::LAMBDA>> = GenericArray::default_boxed();
+        let new_w = convert_to_bit::<O, O::L, O::LBYTES>(w);
+        let new_x = convert_to_bit::<O, O::LAMBDAR1, O::LAMBDAR1BYTE>(GenericArray::from_slice(&x[..4 * nst * (r + 1)]));
+        let mut w_out : Box<GenericArray<O::Field, O::LAMBDA>> = GenericArray::default_boxed();
         let mut index = 0;
         for i in 0..lambda / 8 {
             for j in 0..8 {
@@ -255,10 +255,10 @@ where
             }
         }
         let v_out = GenericArray::from_slice(&v[..lambda]);
-        let s = em_enc_fwd::<T, O>(&new_w, &new_x);
-        let vs = em_enc_fwd::<T, O>(v, &GenericArray::default_boxed());
-        let s_b = em_enc_bkwd::<T, P, O>(&new_x, &new_w, &w_out, false, false, T::default());
-        let v_s_b = em_enc_bkwd::<T, P, O>(
+        let s = em_enc_fwd::<O>(&new_w, &new_x);
+        let vs = em_enc_fwd::<O>(v, &GenericArray::default());
+        let s_b = em_enc_bkwd::<P, O>(&new_x, &new_w, &w_out, false, false, O::Field::default());
+        let v_s_b = em_enc_bkwd::<P, O>(
             &GenericArray::default_boxed(),
             v,
             v_out,
@@ -266,15 +266,15 @@ where
             true,
             O::Field::default(),
         );
-        let (mut a0, mut a1) : (Box<GenericArray<T, O::C>>, Box<GenericArray<T, O::C>>) = (GenericArray::default_boxed(), GenericArray::default_boxed());
+        let (mut a0, mut a1) : (Box<GenericArray<O::Field, O::C>>, Box<GenericArray<O::Field, O::C>>) = (GenericArray::default_boxed(), GenericArray::default_boxed());
         for j in 0..senc {
             a0[j] = v_s_b[j] * vs[j];
             a1[j] = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + O::Field::ONE + a0[j];
         }
         (a0, a1)
     } else {
-        let new_output = &convert_to_bit::<T, O, O::LAMBDA, O::LAMBDABYTES>(output);
-        let mut new_x : Box<GenericArray<T, O::LAMBDAR1>> = GenericArray::default_boxed();
+        let new_output = &convert_to_bit::<O, O::LAMBDA, O::LAMBDABYTES>(output);
+        let mut new_x : Box<GenericArray<O::Field, O::LAMBDAR1>> = GenericArray::default_boxed();
         let mut index = 0;
         for byte in x.iter().take(4 * nst * (r + 1)) {
             for j in 0..8 {
@@ -282,8 +282,8 @@ where
                 index += 1;
             }
         }
-        let mut new_x : Box<GenericArray<T, O::LAMBDAR1>> = GenericArray::default_boxed();
-        let mut q_out : Box<GenericArray<T, O::LAMBDA>> = GenericArray::default_boxed();
+        let mut new_x : Box<GenericArray<O::Field, O::LAMBDAR1>> = GenericArray::default_boxed();
+        let mut q_out : Box<GenericArray<O::Field, O::LAMBDA>> = GenericArray::default_boxed();
         for i in 0..lambda {
             q_out[i] = O::Field::ONE * (&[new_output[i]])[0] * delta + q[i];
         }
@@ -345,17 +345,19 @@ where
         false,
         O::Field::default(),
     );
-    let u_s: T = T::to_field(&u[l / 8..])[0];
-    let mut v_s = new_v[l];
-    let alpha = T::new(2, 0);
-    let mut cur_alpha = alpha;
-    for i in 1..lambda {
-    v_s += new_v[l + i] * cur_alpha;
-        cur_alpha *= alpha;
-    }
-    let a_t = zkhash::<T, O>(chall, &a1, u_s);
-    let b_t = zkhash::<T, O>(chall, &a0, v_s);
-    (Box::new(a_t), Box::new(b_t))
+    let u_s = O::Field::to_field(&u[l / 8..])[0];
+    let v_s = O::Field::sum_poly(&new_v[l..l + lambda]);
+
+    let mut a_t_hasher = O::ZKHasher::new_zk_hasher(chall);
+    let mut b_t_hasher = O::ZKHasher::new_zk_hasher(chall);
+
+    a1.into_iter().for_each(|value| a_t_hasher.update(&value));
+    a0.into_iter().for_each(|value| b_t_hasher.update(&value));
+
+    let a_t = a_t_hasher.finalize(&u_s);
+    let b_t = b_t_hasher.finalize(&v_s);
+
+    (Box::new(a_t.as_bytes()), Box::new(b_t.as_bytes()))
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
