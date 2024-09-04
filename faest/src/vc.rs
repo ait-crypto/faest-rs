@@ -34,7 +34,7 @@ where
     .clone();
 
     for i in 0..n - 1 {
-        let new_ks = &R::prg::<R::PRODLAMBDA2>(k[i as usize].clone(), iv);
+        let new_ks = &R::prg::<R::PRODLAMBDA2>(&k[i as usize], iv);
         (k[((2 * i) + 1) as usize], k[((2 * i) + 2) as usize]) = (
             (*GenericArray::from_slice(&new_ks[..length])).clone(),
             (*GenericArray::from_slice(&new_ks[length..])).clone(),
@@ -121,7 +121,7 @@ where
         for j in 0..1 << (i - 1) {
             if j != a {
                 let rank = (1 << (i - 1)) - 1 + j;
-                let new_ks = R::prg::<R::PRODLAMBDA2>(k[rank as usize].clone().unwrap(), iv);
+                let new_ks = R::prg::<R::PRODLAMBDA2>(k[rank as usize].as_ref().unwrap(), iv);
                 (k[(rank * 2 + 1) as usize], k[(rank * 2 + 2) as usize]) = (
                     Some((*GenericArray::from_slice(&new_ks[..length])).clone()),
                     Some((*GenericArray::from_slice(&new_ks[length..])).clone()),

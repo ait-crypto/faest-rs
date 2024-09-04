@@ -1,11 +1,13 @@
 use aes::cipher::{KeyIvInit, StreamCipher};
-use generic_array::{ArrayLength, GenericArray};
+use generic_array::{
+    typenum::{U16, U24, U32, U40, U48, U64, U72, U96},
+    ArrayLength, GenericArray,
+};
 use generic_array_0_14::GenericArray as GenericArray_0_14;
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128, Shake128Reader, Shake256, Shake256Reader,
 };
-use typenum::{U16, U24, U32, U40, U48, U64, U72, U96};
 
 type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
 type Aes192Ctr128BE = ctr::Ctr128BE<aes::Aes192>;
@@ -13,18 +15,100 @@ type Aes256Ctr128BE = ctr::Ctr128BE<aes::Aes256>;
 
 pub type IV = [u8; 16];
 
+/// Interfacoe for the PRG
+pub trait PseudoRandomGenerator: Sized {
+    type Lambda: ArrayLength;
+
+    fn prg<LH>(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> GenericArray<u8, LH>
+    where
+        LH: ArrayLength,
+    {
+        let mut buf = GenericArray::default();
+        let mut prg = Self::new_prg(k, iv);
+        prg.read(&mut buf);
+        buf
+    }
+
+    fn new_prg(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> Self;
+    fn read(&mut self, dst: &mut [u8]);
+}
+
+pub struct PRG128(Aes128Ctr128BE);
+
+impl PseudoRandomGenerator for PRG128 {
+    type Lambda = U16;
+
+    fn new_prg(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> Self {
+        Self(Aes128Ctr128BE::new(
+            GenericArray_0_14::from_slice(k.as_slice()),
+            GenericArray_0_14::from_slice(iv.as_slice()),
+        ))
+    }
+
+    fn read(&mut self, dst: &mut [u8]) {
+        self.0.apply_keystream(dst);
+    }
+}
+
+pub struct PRG192(Aes192Ctr128BE);
+
+impl PseudoRandomGenerator for PRG192 {
+    type Lambda = U24;
+
+    fn new_prg(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> Self {
+        Self(Aes192Ctr128BE::new(
+            GenericArray_0_14::from_slice(k.as_slice()),
+            GenericArray_0_14::from_slice(iv.as_slice()),
+        ))
+    }
+
+    fn read(&mut self, dst: &mut [u8]) {
+        self.0.apply_keystream(dst);
+    }
+}
+
+pub struct PRG256(Aes256Ctr128BE);
+
+impl PseudoRandomGenerator for PRG256 {
+    type Lambda = U32;
+
+    fn new_prg(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> Self {
+        Self(Aes256Ctr128BE::new(
+            GenericArray_0_14::from_slice(k.as_slice()),
+            GenericArray_0_14::from_slice(iv.as_slice()),
+        ))
+    }
+
+    fn read(&mut self, dst: &mut [u8]) {
+        self.0.apply_keystream(dst);
+    }
+}
+
 pub trait RandomOracle {
     type Hasher<const SEP: u8>: Hasher + Default;
+    // FIXME: get rid of PRG;
+    type PRG: PseudoRandomGenerator<Lambda = Self::LAMBDA>;
+    #[deprecated]
     type LAMBDA: ArrayLength;
+    #[deprecated]
     type LAMBDA16: ArrayLength;
+    #[deprecated]
     type PRODLAMBDA3: ArrayLength;
+    #[deprecated]
     type PRODLAMBDA2: ArrayLength;
 
-    fn prg<LH>(k: GenericArray<u8, Self::LAMBDA>, iv: &IV) -> GenericArray<u8, LH>
+    #[deprecated = "Use PRG instead"]
+    fn prg<LH>(k: &GenericArray<u8, Self::LAMBDA>, iv: &IV) -> GenericArray<u8, LH>
     where
-        LH: ArrayLength;
+        LH: ArrayLength,
+    {
+        let mut buf = GenericArray::default();
+        let mut prg = Self::PRG::new_prg(k, iv);
+        prg.read(&mut buf);
+        buf
+    }
 
-    // FIXME: return dest instead
+    #[deprecated = "Use h0_init instead"]
     fn h0(data: GenericArray<u8, Self::LAMBDA16>, dest: &mut GenericArray<u8, Self::PRODLAMBDA3>) {
         let mut hasher = Self::h0_init();
         hasher.update(&data);
@@ -32,7 +116,7 @@ pub trait RandomOracle {
         reader.read(dest);
     }
 
-    // FIXME: return dest instead
+    #[deprecated = "Use h1_init instead"]
     fn h1(data: &[u8], dest: &mut GenericArray<u8, Self::PRODLAMBDA2>) {
         let mut hasher = Self::h1_init();
         hasher.update(data);
@@ -40,6 +124,7 @@ pub trait RandomOracle {
         reader.read(dest);
     }
 
+    #[deprecated = "Use h2_init instead"]
     fn h2(data: &[u8], dest: &mut [u8]) {
         let mut hasher = Self::h2_init();
         hasher.update(data);
@@ -47,7 +132,7 @@ pub trait RandomOracle {
         reader.read(dest);
     }
 
-    // FIXME: return dest instead
+    #[deprecated = "Use h3_init instead"]
     fn h3(data: &[u8], dest: &mut GenericArray<u8, Self::LAMBDA16>) {
         let mut hasher = Self::h3_init();
         hasher.update(data);
@@ -101,26 +186,10 @@ impl Reader for Hasher128Reader {
 
 impl RandomOracle for RandomOracleShake128 {
     type Hasher<const SEP: u8> = Hasher128<SEP>;
-
-    fn prg<LH>(k: generic_array::GenericArray<u8, Self::LAMBDA>, iv: &IV) -> GenericArray<u8, LH>
-    where
-        LH: ArrayLength,
-    {
-        let mut buf = GenericArray::default();
-        let mut cipher = Aes128Ctr128BE::new(
-            GenericArray_0_14::from_slice(&k),
-            GenericArray_0_14::from_slice(iv.as_slice()),
-        );
-        cipher.apply_keystream(&mut buf);
-        buf
-    }
-
+    type PRG = PRG128;
     type LAMBDA = U16;
-
     type LAMBDA16 = U32;
-
     type PRODLAMBDA3 = U48;
-
     type PRODLAMBDA2 = U32;
 }
 
@@ -141,26 +210,10 @@ pub struct RandomOracleShake192 {}
 
 impl RandomOracle for RandomOracleShake192 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
-
-    fn prg<LH>(k: generic_array::GenericArray<u8, Self::LAMBDA>, iv: &IV) -> GenericArray<u8, LH>
-    where
-        LH: ArrayLength,
-    {
-        let mut buf = GenericArray::default();
-        let mut cipher = Aes192Ctr128BE::new(
-            GenericArray_0_14::from_slice(&k),
-            GenericArray_0_14::from_slice(iv.as_slice()),
-        );
-        cipher.apply_keystream(&mut buf);
-        buf
-    }
-
+    type PRG = PRG192;
     type LAMBDA = U24;
-
     type LAMBDA16 = U40;
-
     type PRODLAMBDA3 = U72;
-
     type PRODLAMBDA2 = U48;
 }
 
@@ -194,33 +247,16 @@ impl Reader for Hasher256Reader {
 
 impl RandomOracle for RandomOracleShake256 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
-
-    fn prg<LH>(k: generic_array::GenericArray<u8, Self::LAMBDA>, iv: &IV) -> GenericArray<u8, LH>
-    where
-        LH: ArrayLength,
-    {
-        let mut buf = GenericArray::default();
-        let mut cipher = Aes256Ctr128BE::new(
-            GenericArray_0_14::from_slice(&k),
-            GenericArray_0_14::from_slice(iv.as_slice()),
-        );
-        cipher.apply_keystream(&mut buf);
-        buf
-    }
-
+    type PRG = PRG256;
     type LAMBDA = U32;
-
     type LAMBDA16 = U48;
-
     type PRODLAMBDA3 = U96;
-
     type PRODLAMBDA2 = U64;
 }
 
 #[cfg(test)]
 mod test {
-    use generic_array::GenericArray;
-    use typenum::{U240, U32, U40, U48};
+    use generic_array::{typenum::U240, GenericArray};
 
     use super::*;
 
@@ -3300,7 +3336,7 @@ mod test {
             0xdd, 0xda,
         ];
 
-        let res = RandomOracleShake128::prg::<U240>(*key, &iv);
+        let res = PRG128::prg::<U240>(key, &iv);
         assert_eq!(res, *GenericArray::from_slice(&output))
     }
 
@@ -3335,7 +3371,7 @@ mod test {
             0x5a, 0x90,
         ];
 
-        let res = RandomOracleShake192::prg::<U240>(*key, &iv);
+        let res = PRG192::prg::<U240>(key, &iv);
         assert_eq!(res, *GenericArray::from_slice(&output))
     }
 
@@ -3371,7 +3407,7 @@ mod test {
             0x62, 0x63,
         ];
 
-        let res = RandomOracleShake256::prg::<U240>(*key, &iv);
+        let res = PRG256::prg::<U240>(key, &iv);
         assert_eq!(res, *GenericArray::from_slice(&output))
     }
 }
