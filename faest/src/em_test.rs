@@ -34,23 +34,14 @@ fn em_extended_witness_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let res = em_extendedwitness::<PARAM128S, PARAMOWF128EM>(
-                GenericArray::from_slice(&data.key),
-                GenericArray::from_slice(&data.input),
-            );
-            assert_eq!(res.0, *GenericArray::from_slice(&data.w));
+            let res = em_extendedwitness::<PARAM128S, PARAMOWF128EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&data.input));
+            assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         } else if data.lambda == 192 {
-            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(
-                GenericArray::from_slice(&data.key),
-                GenericArray::from_slice(&data.input),
-            );
-            assert_eq!(res.0, *GenericArray::from_slice(&data.w));
+            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&data.input));
+            assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         } else {
-            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(
-                GenericArray::from_slice(&data.key),
-                GenericArray::from_slice(&data.input),
-            );
-            assert_eq!(res.0, *GenericArray::from_slice(&data.w));
+            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&data.input));
+            assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         }
     }
 }
@@ -113,14 +104,11 @@ fn em_enc_fwd_test() {
             );
             assert_eq!(
                 res,
-                *GenericArray::from_slice(
-                    &data
-                        .res
-                        .iter()
-                        .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
-                        .collect::<Vec<GF128>>()
-                )
-            )
+                Box::new(*GenericArray::from_slice(&data.res
+                    .iter()
+                    .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
+                    .collect::<Vec<GF128>>())
+            ))
         } else if data.lambda == 192 {
             let (input_x, input_z): (Vec<GF192>, Vec<GF192>) = if data.m == 1 {
                 (
@@ -159,14 +147,11 @@ fn em_enc_fwd_test() {
             );
             assert_eq!(
                 res,
-                *GenericArray::from_slice(
-                    &data
-                        .res
-                        .iter()
-                        .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
-                        .collect::<Vec<GF192>>()
-                )
-            )
+                Box::new(*GenericArray::from_slice(&data.res
+                    .iter()
+                    .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
+                    .collect::<Vec<GF192>>())
+            ))
         } else {
             let (input_x, input_z): (Vec<GF256>, Vec<GF256>) = if data.m == 1 {
                 (
@@ -215,17 +200,14 @@ fn em_enc_fwd_test() {
             );
             assert_eq!(
                 res,
-                *GenericArray::from_slice(
-                    &data
-                        .res
-                        .iter()
-                        .map(|z| GF256::new(
-                            z[0] as u128 + ((z[1] as u128) << 64),
-                            z[2] as u128 + ((z[3] as u128) << 64)
-                        ))
-                        .collect::<Vec<GF256>>()
-                )
-            )
+                Box::new(*GenericArray::from_slice(&data.res
+                    .iter()
+                    .map(|z| GF256::new(
+                        z[0] as u128 + ((z[1] as u128) << 64),
+                        z[2] as u128 + ((z[3] as u128) << 64)
+                    ))
+                    .collect::<Vec<GF256>>())
+            ))
         }
     }
 }
@@ -312,13 +294,10 @@ fn em_enc_bkwd_test() {
             );
             assert_eq!(
                 res,
-                *GenericArray::from_slice(
-                    &data
-                        .res
-                        .iter()
-                        .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
-                        .collect::<Vec<GF128>>()
-                )
+                Box::new(*GenericArray::from_slice(&data.res
+                    .iter()
+                    .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
+                    .collect::<Vec<GF128>>()))
             )
         } else if data.lambda == 192 {
             let (x_in, z_in, z_out_in) = if data.m == 1 {
@@ -374,13 +353,10 @@ fn em_enc_bkwd_test() {
             );
             assert_eq!(
                 res,
-                *GenericArray::from_slice(
-                    &data
-                        .res
-                        .iter()
-                        .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
-                        .collect::<Vec<GF192>>()
-                )
+                Box::new(*GenericArray::from_slice(&data.res
+                    .iter()
+                    .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
+                    .collect::<Vec<GF192>>()))
             )
         } else {
             let (x_in, z_in, z_out_in) = if data.m == 1 {
@@ -451,17 +427,14 @@ fn em_enc_bkwd_test() {
             );
             assert_eq!(
                 res,
-                *GenericArray::from_slice(
-                    &data
-                        .res
-                        .iter()
-                        .map(|z| GF256::new(
-                            z[0] as u128 + ((z[1] as u128) << 64),
-                            z[2] as u128 + ((z[3] as u128) << 64)
-                        ))
-                        .collect::<Vec<GF256>>()
-                )
-            )
+                Box::new(*GenericArray::from_slice(&data.res
+                    .iter()
+                    .map(|z| GF256::new(
+                        z[0] as u128 + ((z[1] as u128) << 64),
+                        z[2] as u128 + ((z[3] as u128) << 64)
+                    ))
+                    .collect::<Vec<GF256>>()
+            )))
         }
     }
 }

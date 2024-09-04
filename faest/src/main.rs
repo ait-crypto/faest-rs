@@ -5,7 +5,6 @@ use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
 mod fields;
 
 fn main() {
-
     //let _ = bench_sign::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(generate_sign_input_aes::<AesCypher, PARAM128S, PARAMOWF128>());
     //let res = bench_verify_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(generate_verify_input_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>());
 }
