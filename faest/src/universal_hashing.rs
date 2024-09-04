@@ -151,7 +151,8 @@ where
 
         let mut ret = GenericArray::default();
         ret[..<F as Field>::Length::USIZE].copy_from_slice(&h2.as_bytes());
-        ret[<F as Field>::Length::USIZE..B::USIZE].copy_from_slice(&h3.as_bytes()[0..B::USIZE]);
+        ret[<F as Field>::Length::USIZE..<F as Field>::Length::USIZE + B::USIZE]
+            .copy_from_slice(&h3.as_bytes()[0..B::USIZE]);
         ret.iter_mut()
             .zip(x1.iter())
             .for_each(|(x1, x2)| *x1 ^= *x2);
