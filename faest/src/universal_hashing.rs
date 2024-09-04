@@ -346,8 +346,7 @@ mod test {
     #[derive(Debug, Deserialize)]
     struct VoleHashDatabaseEntry {
         sd: Vec<u8>,
-        x0: Vec<u8>,
-        x1: Vec<u8>,
+        xs: Vec<u8>,
         h: Vec<u8>,
     }
 
@@ -361,7 +360,7 @@ mod test {
             let h = *GenericArray::from_slice(&data.h);
 
             let hasher = VoleHasher::<GF128>::new_vole_hasher(sd);
-            let res = hasher.process_split(&data.x0, GenericArray::from_slice(&data.x1));
+            let res = hasher.process(&data.xs);
             assert_eq!(h, res);
         }
     }
@@ -376,7 +375,7 @@ mod test {
             let h = *GenericArray::from_slice(&data.h);
 
             let hasher = VoleHasher::<GF192>::new_vole_hasher(sd);
-            let res = hasher.process_split(&data.x0, GenericArray::from_slice(&data.x1));
+            let res = hasher.process(&data.xs);
             assert_eq!(h, res);
         }
     }
@@ -391,7 +390,7 @@ mod test {
             let h = *GenericArray::from_slice(&data.h);
 
             let hasher = VoleHasher::<GF256>::new_vole_hasher(sd);
-            let res = hasher.process_split(&data.x0, GenericArray::from_slice(&data.x1));
+            let res = hasher.process(&data.xs);
             assert_eq!(h, res);
         }
     }
