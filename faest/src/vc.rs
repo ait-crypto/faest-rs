@@ -5,9 +5,9 @@ use crate::random_oracles::{RandomOracle, IV};
 
 #[allow(clippy::type_complexity)]
 pub fn commit<T, R>(
-    r: T,
+    r: T, // why is this T?
     iv: &IV,
-    n: u32,
+    n: usize,
 ) -> (
     GenericArray<u8, R::PRODLAMBDA2>,
     (
@@ -17,21 +17,14 @@ pub fn commit<T, R>(
     Vec<Option<GenericArray<u8, R::LAMBDA>>>,
 )
 where
-    T: BigGaloisField,
+    T: BigGaloisField<Length = R::LAMBDA>,
     R: RandomOracle,
 {
     let length = T::LENGTH / 8;
     let mut k: Vec<GenericArray<u8, R::LAMBDA>> =
         vec![GenericArray::default(); 2 * (n as usize) - 1];
     //step 2..3
-    k[0] = (*GenericArray::from_slice(
-        &[
-            &r.get_value().0.to_le_bytes(),
-            &r.get_value().1.to_le_bytes()[..length - 16_usize],
-        ]
-        .concat(),
-    ))
-    .clone();
+    k[0] = r.as_bytes();
 
     for i in 0..n - 1 {
         let new_ks = &R::prg::<R::PRODLAMBDA2>(&k[i as usize], iv);
