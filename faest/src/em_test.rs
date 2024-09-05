@@ -37,10 +37,10 @@ fn em_extended_witness_test() {
             let res = em_extendedwitness::<PARAM128S, PARAMOWF128EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&data.input));
             assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         } else if data.lambda == 192 {
-            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&data.input));
+            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&[data.input, vec![0u8; 16]].concat()));
             assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         } else {
-            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&data.input));
+            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&[data.input, vec![0u8; 32]].concat()));
             assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         }
     }
