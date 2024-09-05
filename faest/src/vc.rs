@@ -1,7 +1,7 @@
 use generic_array::{typenum::Unsigned, GenericArray};
 
 use crate::fields::BigGaloisField;
-use crate::random_oracles::{RandomOracle, IV};
+use crate::random_oracles::{Hasher, PseudoRandomGenerator, RandomOracle, Reader, IV};
 
 #[allow(clippy::type_complexity)]
 pub fn commit<T, R>(
@@ -20,38 +20,34 @@ where
     T: BigGaloisField<Length = R::LAMBDA>,
     R: RandomOracle,
 {
-    let length = T::LENGTH / 8;
-    let mut k: Vec<GenericArray<u8, R::LAMBDA>> =
-        vec![GenericArray::default(); 2 * (n as usize) - 1];
+    let mut k: Vec<GenericArray<u8, R::LAMBDA>> = vec![GenericArray::default(); 2 * n - 1];
     //step 2..3
     k[0] = r.as_bytes();
 
     for i in 0..n - 1 {
-        let new_ks = &R::prg::<R::PRODLAMBDA2>(&k[i as usize], iv);
-        (k[((2 * i) + 1) as usize], k[((2 * i) + 2) as usize]) = (
-            (*GenericArray::from_slice(&new_ks[..length])).clone(),
-            (*GenericArray::from_slice(&new_ks[length..])).clone(),
-        );
+        let mut prg = R::PRG::new_prg(&k[i], iv);
+        prg.read(&mut k[2 * i + 1]);
+        prg.read(&mut k[2 * i + 2]);
     }
     //step 4..5
-    let mut sd: Vec<Option<GenericArray<u8, R::LAMBDA>>> =
-        vec![Some(GenericArray::default()); n as usize];
-    let mut com: Vec<GenericArray<u8, R::PRODLAMBDA2>> = vec![GenericArray::default(); n as usize];
-    let mut pre_h = Vec::new();
-    for j in 0..n as usize {
-        let seed = (*GenericArray::from_slice(
-            &[k[(n - 1) as usize + j].clone().to_vec(), iv.to_vec()].concat(),
-        ))
-        .clone();
-        let mut hash: GenericArray<u8, R::PRODLAMBDA3> = GenericArray::default();
-        R::h0(seed, &mut hash);
-        sd[j] = Some((*GenericArray::from_slice(&hash[..length])).clone());
-        com[j] = (*GenericArray::from_slice(&hash[length..])).clone();
-        pre_h.append(&mut com[j].to_vec());
+    let mut h1_hasher = R::h1_init();
+    let mut sd = vec![None; n];
+    let mut com = vec![GenericArray::default(); n];
+    for j in 0..n {
+        let mut h0_hasher = R::h0_init();
+        h0_hasher.update(&k[n - 1 + j]);
+        h0_hasher.update(iv);
+        let mut reader = h0_hasher.finish();
+        let mut sd_j = GenericArray::default();
+        reader.read(&mut sd_j);
+        sd[j] = Some(sd_j);
+        reader.read(&mut com[j]);
+        h1_hasher.update(&com[j]);
     }
     //step 6
-    let mut h: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
-    R::h1(&pre_h, &mut h);
+    let mut h = GenericArray::default();
+    let mut reader = h1_hasher.finish();
+    reader.read(&mut h);
     (h, (k, com), sd)
 }
 
