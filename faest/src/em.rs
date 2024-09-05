@@ -239,6 +239,7 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
+    
     let lambda = <P::LAMBDA as Unsigned>::to_usize();
     let senc = <O::SENC as Unsigned>::to_usize();
     let nst = <O::NST as Unsigned>::to_usize();
@@ -282,14 +283,15 @@ where
                 index += 1;
             }
         }
-        let mut new_x : Box<GenericArray<O::Field, O::LAMBDAR1>> = GenericArray::default_boxed();
         let mut q_out : Box<GenericArray<O::Field, O::LAMBDA>> = GenericArray::default_boxed();
         for i in 0..lambda {
             q_out[i] = O::Field::ONE * (&[new_output[i]])[0] * delta + q[i];
         }
+        println!("{:?}", new_x);
         let qs = em_enc_fwd::<O>(q, &new_x);
         let qs_b = em_enc_bkwd::<P, O>(&new_x, q, &q_out, true, false, delta);
         let immut = delta * delta;
+        
         let b = zip(qs, qs_b).map(|(q, qb)| (q * qb) + immut).collect();
         (b, GenericArray::default_boxed())
     }
