@@ -324,7 +324,6 @@ where
     let new_v: GenericArray<_, O::LAMBDAL> =
         (*GenericArray::from_slice(&O::Field::to_field(&temp_v))).clone();
     let x = rijndael_key_schedule(&pk[..lambda / 8], nst, nk, r, 4 * (((r + 1) * nst) / nk));
-    println!("{:?}", &new_w);
     let (a0, a1) = em_enc_cstrnts::<P, O>(
         GenericArray::from_slice(&pk[lambda / 8..]),
         &x.0.chunks(8)
@@ -426,11 +425,11 @@ where
                     .flat_map(|x| u32::to_le_bytes(*x))
                     .take(lambda / 8)
                     .collect::<Vec<u8>>()
-            })
+            }).take((lambda as usize/8)  *(r as usize +1))
             .collect::<GenericArray<u8, _>>(),
         &GenericArray::default_boxed(),
         &GenericArray::default_boxed(),
-        GenericArray::from_slice(&new_q),
+        GenericArray::from_slice(&new_q[..l]),
         true,
         delta,
     );
