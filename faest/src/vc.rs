@@ -64,17 +64,14 @@ where
 {
     let mut a = 0;
     let d = (usize::BITS - decom.0.len().leading_zeros() - 1) as usize;
-    let mut cop: GenericArray<GenericArray<u8, <R as RandomOracle>::LAMBDA>, D> =
-        GenericArray::default();
+    let mut cop = Vec::with_capacity(d);
     //step 4
 
     for i in 0..d {
-        cop[i] =
-            decom.0[((1_u32 << (i + 1)) + 2 * a + (1 - b[d - i - 1]) as u32 - 1) as usize].clone();
-
-        a = 2 * a + b[d - i - 1] as u32;
+        cop.push(decom.0[(1 << (i + 1)) + 2 * a + (1 - b[d - i - 1] as usize) - 1].clone());
+        a = 2 * a + b[d - i - 1] as usize;
     }
-    (cop.to_vec(), decom.1[a as usize].clone().to_vec())
+    (cop, decom.1[a].to_vec())
 }
 
 #[allow(clippy::type_complexity)]
