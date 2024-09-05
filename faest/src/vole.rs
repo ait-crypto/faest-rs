@@ -190,7 +190,7 @@ where
         for j in 0..delta_p.len() {
             delta[i] += (delta_p[j] as u32) << j;
         }
-        (com[i], s[i]) = vc::reconstruct::<T, R>(&pdecom[i], delta_p.to_vec(), iv);
+        (com[i], s[i]) = vc::reconstruct::<T, R>(&pdecom[i], &delta_p, iv);
         hasher.update(&com[i]);
         for j in 0..(1_u16 << (k)) as usize {
             sd[i].push(Some(s[i][j ^ delta[i] as usize].clone()));

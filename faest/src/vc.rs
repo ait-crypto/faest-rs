@@ -87,7 +87,7 @@ pub fn reconstruct<T, R>(
         Vec<GenericArray<u8, R::LAMBDA>>,
         GenericArray<u8, R::PRODLAMBDA2>,
     ),
-    b: Vec<u8>,
+    b: &[u8],
     iv: &IV,
 ) -> (
     GenericArray<u8, R::PRODLAMBDA2>,
@@ -166,7 +166,7 @@ where
     D: generic_array::ArrayLength,
     T: BigGaloisField,
 {
-    let (com_b, _sd) = reconstruct::<T, R>(&pdecom, b.to_vec(), iv);
+    let (com_b, _sd) = reconstruct::<T, R>(&pdecom, &b, iv);
     if com_b == com {
         1
     } else {
@@ -180,13 +180,16 @@ where
 mod test {
     use super::*;
 
-    use generic_array::{sequence::GenericSequence, GenericArray};
+    use generic_array::{
+        sequence::GenericSequence,
+        typenum::{U16, U31, U32, U4, U5, U63},
+        GenericArray,
+    };
     use serde::Deserialize;
-    use typenum::{U16, U31, U32, U4, U5, U63};
 
     use crate::{
         fields::{GF128, GF192, GF256},
-        random_oracles::{self, RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
+        random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
     };
 
     #[derive(Debug, Deserialize)]
@@ -229,9 +232,6 @@ mod test {
         for mut data in database {
             let lamdabytes = data.keyroot.len();
             if lamdabytes == 16 {
-                data.keyroot.append(&mut vec![0; 16]);
-                type D = U31;
-                type N = U16;
                 let res = commit::<GF128, RandomOracleShake128>(
                     GF128::from(&data.keyroot[..]),
                     &data.iv.to_be_bytes(),
@@ -263,9 +263,6 @@ mod test {
                         .collect::<Vec::<Option::<GenericArray<u8, _>>>>()
                 );
             } else if lamdabytes == 24 {
-                data.keyroot.append(&mut vec![0; 8]);
-                type D = U31;
-                type N = U16;
                 let res = commit::<GF192, RandomOracleShake192>(
                     GF192::from(&data.keyroot[..]),
                     &data.iv.to_be_bytes(),
@@ -297,8 +294,6 @@ mod test {
                         .collect::<Vec::<Option::<GenericArray<u8, _>>>>()
                 );
             } else {
-                type D = U31;
-                type N = U16;
                 let res = commit::<GF256, RandomOracleShake256>(
                     GF256::from(&data.keyroot[0..32]),
                     &data.iv.to_be_bytes(),
@@ -450,38 +445,71 @@ mod test {
         for data in database {
             let lambdabyte = data.com_j.len();
             if lambdabyte == 32 {
-                type D = U4;
-                type POWD = U31;
-                type N = U16;
                 let res = reconstruct::<GF128, RandomOracleShake128>(
-                &(data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA>>>(), *GenericArray::<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2>::from_slice(&data.com_j)),
-                data.b,
-                &data.iv,
-            );
-                assert_eq!(res.0, *GenericArray::from_slice(&data.h));
-                assert_eq!(res.1, data.sd.iter().map(|x| match x[..] { [] => GenericArray::generate(|i:usize| 0u8), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA>>>());
+                    &(
+                        data.cop
+                            .iter()
+                            .map(|x| *GenericArray::from_slice(&x))
+                            .collect(),
+                        *GenericArray::from_slice(&data.com_j),
+                    ),
+                    &data.b,
+                    &data.iv,
+                );
+                assert_eq!(res.0.as_slice(), data.h.as_slice());
+                for (r, x) in res.1.iter().zip(data.sd.iter()) {
+                    if !x.is_empty() {
+                        assert_eq!(r.as_slice(), x.as_slice());
+                    } else {
+                        assert_eq!(r, &GenericArray::default());
+                    }
+                }
             } else if lambdabyte == 48 {
                 type D = U4;
                 type POWD = U31;
                 type N = U16;
                 let res = reconstruct::<GF192, RandomOracleShake192>(
-                &(data.cop.iter().map(|x| match x[..] { [] => GenericArray::generate(|i:usize| 0u8), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA>>>(), *GenericArray::<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2>::from_slice(&data.com_j)),
-                data.b,
-                &data.iv,
-            );
-                assert_eq!(res.0, *GenericArray::from_slice(&data.h));
-                assert_eq!(res.1, data.sd.iter().map(|x| match x[..] { [] => GenericArray::generate(|i:usize| 0u8), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA>>>());
+                    &(
+                        data.cop
+                            .iter()
+                            .map(|x| *GenericArray::from_slice(&x))
+                            .collect(),
+                        *GenericArray::from_slice(&data.com_j),
+                    ),
+                    &data.b,
+                    &data.iv,
+                );
+                assert_eq!(res.0.as_slice(), data.h.as_slice());
+                for (r, x) in res.1.iter().zip(data.sd.iter()) {
+                    if !x.is_empty() {
+                        assert_eq!(r.as_slice(), x.as_slice());
+                    } else {
+                        assert_eq!(r, &GenericArray::default());
+                    }
+                }
             } else {
                 type D = U5;
                 type POWD = U63;
                 type N = U32;
                 let res = reconstruct::<GF256, RandomOracleShake256>(
-                &(data.cop.iter().map(|x| *GenericArray::from_slice(&x)).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>>(), *GenericArray::<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2>::from_slice(&data.com_j)),
-                data.b,
-                &data.iv,
-            );
-                assert_eq!(res.0, *GenericArray::from_slice(&data.h));
-                assert_eq!(res.1, data.sd.iter().map(|x| match x[..] { [] => GenericArray::generate(|i:usize| 0u8), _ => *GenericArray::from_slice(&x)}).collect::<Vec::<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>>());
+                    &(
+                        data.cop
+                            .iter()
+                            .map(|x| *GenericArray::from_slice(&x))
+                            .collect(),
+                        *GenericArray::from_slice(&data.com_j),
+                    ),
+                    &data.b,
+                    &data.iv,
+                );
+                assert_eq!(res.0.as_slice(), data.h.as_slice());
+                for (r, x) in res.1.iter().zip(data.sd.iter()) {
+                    if !x.is_empty() {
+                        assert_eq!(r.as_slice(), x.as_slice());
+                    } else {
+                        assert_eq!(r, &GenericArray::default());
+                    }
+                }
             }
         }
     }
