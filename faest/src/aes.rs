@@ -4,14 +4,10 @@ use generic_array::{GenericArray};
 use typenum::{Unsigned, U8};
 
 use crate::{
-    fields::{BigGaloisField, ByteCombine, Field, SumPoly},
-    parameter::{self, PARAM, PARAMOWF},
-    rijndael_32::{
+    aes_test::byte_to_bit, fields::{BigGaloisField, ByteCombine, Field, SumPoly}, parameter::{self, PARAM, PARAMOWF}, rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
-    },
-    universal_hashing::{zkhash, ZKHasherInit, ZKHasherProcess},
-    vole::chaldec,
+    }, universal_hashing::{zkhash, ZKHasherInit, ZKHasherProcess}, vole::chaldec
 };
 
 pub fn convert_to_bit<O, S, I>(input: &GenericArray<u8, I>) -> Box<GenericArray<O::Field, S>>
@@ -668,7 +664,7 @@ fn bit_to_byte(input: &[u8]) -> u8 {
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 pub fn aes_prove<P, O>(
-    w: &GenericArray<u8, O::L>,
+    w: &GenericArray<u8, O::LBYTES>,
     u: &GenericArray<u8, O::LAMBDALBYTES>,
     gv: Box<&GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>,
     pk: &GenericArray<u8, O::PK>,
@@ -688,7 +684,7 @@ where
     let senc = <O::SENC as Unsigned>::to_usize();
     let lambda = <P::LAMBDA as Unsigned>::to_usize();
     let pk_val = <O::PK as Unsigned>::to_usize();
-    let new_w: GenericArray<u8, O::LKE> = (*GenericArray::from_slice(&w[..lke])).clone();
+    let new_w: GenericArray<u8, O::L> = w.iter().flat_map(|x| byte_to_bit(*x)).collect();
     let mut temp_v: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
     for i in 0..(l + lambda) / 8 {
         for k in 0..8 {
@@ -710,7 +706,7 @@ where
     );
 
     let (a0, a1, k, vk) = aes_key_exp_cstrnts::<O>(
-        GenericArray::from_slice(&new_w),
+        GenericArray::from_slice(&new_w[..lke]),
         GenericArray::from_slice(&new_v[..lke]),
         false,
         &GenericArray::default_boxed(),
@@ -722,7 +718,7 @@ where
         output[..16].try_into().unwrap(),
         //building a T out of w
         GenericArray::from_slice(
-            &w[lke..(lke + lenc)]
+            &new_w[lke..(lke + lenc)]
                 .chunks(8)
                 .map(|x| bit_to_byte(x))
                 .collect::<Vec<u8>>()[..],
@@ -744,7 +740,7 @@ where
             input[16..].try_into().unwrap(),
             output[16..].try_into().unwrap(),
             GenericArray::from_slice(
-                &w[(lke + lenc)..l]
+                &new_w[(lke + lenc)..l]
                     .chunks(8)
                     .map(|x| bit_to_byte(x))
                     .collect::<Vec<u8>>()[..],

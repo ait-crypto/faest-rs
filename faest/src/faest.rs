@@ -29,7 +29,7 @@ pub trait Variant {
     ///input : witness of l bits, masking values (l+lambda in aes, lambda in em), Vole tag ((l + lambda) *lambda bits), public key, chall(3lambda + 64)
     ///Output : QuickSilver response (Lambda bytes)
     fn prove<P, O>(
-        w: &GenericArray<u8, O::L>,
+        w: &GenericArray<u8, O::LBYTES>,
         u: &GenericArray<u8, O::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         pk: &GenericArray<u8, O::PK>,
@@ -73,7 +73,7 @@ impl Variant for AesCypher {
     }
 
     fn prove<P, O>(
-        w: &GenericArray<u8, O::L>,
+        w: &GenericArray<u8, O::LBYTES>,
         u: &GenericArray<u8, O::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         pk: &GenericArray<u8, O::PK>,
@@ -177,7 +177,7 @@ impl Variant for EmCypher {
     }
 
     fn prove<P, O>(
-        w: &GenericArray<u8, O::L>,
+        w: &GenericArray<u8, O::LBYTES>,
         u: &GenericArray<u8, O::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         pk: &GenericArray<u8, O::PK>,

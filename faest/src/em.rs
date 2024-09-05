@@ -4,15 +4,10 @@ use cipher::Unsigned;
 use generic_array::GenericArray;
 
 use crate::{
-    aes::convert_to_bit,
-    fields::{BigGaloisField, ByteCombine, Field, SumPoly},
-    parameter::{PARAM, PARAMOWF},
-    rijndael_32::{
+    aes::convert_to_bit, aes_test::byte_to_bit, fields::{BigGaloisField, ByteCombine, Field, SumPoly}, parameter::{PARAM, PARAMOWF}, rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
-    },
-    universal_hashing::{ZKHasherInit, ZKHasherProcess},
-    vole::chaldec,
+    }, universal_hashing::{ZKHasherInit, ZKHasherProcess}, vole::chaldec
 };
 
 pub fn em_extendedwitness<P, O>(k: &GenericArray<u8, O::LAMBDABYTES>, pk: &GenericArray<u8, O::PK>) -> (Box<GenericArray<u8, O::LBYTES>>, bool)
@@ -287,7 +282,6 @@ where
         for i in 0..lambda {
             q_out[i] = O::Field::ONE * (&[new_output[i]])[0] * delta + q[i];
         }
-        println!("{:?}", new_x);
         let qs = em_enc_fwd::<O>(q, &new_x);
         let qs_b = em_enc_bkwd::<P, O>(&new_x, q, &q_out, true, false, delta);
         let immut = delta * delta;
@@ -299,7 +293,7 @@ where
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 pub fn em_prove<P, O>(
-    w: &GenericArray<u8, O::L>,
+    w: &GenericArray<u8, O::LBYTES>,
     u: &GenericArray<u8, O::LAMBDALBYTES>,
     gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     pk: &GenericArray<u8, O::PK>,
@@ -314,7 +308,7 @@ where
     let r = <O::R as Unsigned>::to_u8();
     let l = <O::L as Unsigned>::to_usize();
     let lambda = <P::LAMBDA as Unsigned>::to_usize();
-    let new_w  = GenericArray::from_slice(&w[..l]);
+    let new_w = w.into_iter().flat_map(|x| byte_to_bit(*x)).collect::<Vec<u8>>();
     let mut temp_v : Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
     for i in 0..(l + lambda) / 8 {
         for k in 0..8 {
@@ -330,6 +324,7 @@ where
     let new_v: GenericArray<_, O::LAMBDAL> =
         (*GenericArray::from_slice(&O::Field::to_field(&temp_v))).clone();
     let x = rijndael_key_schedule(&pk[..lambda / 8], nst, nk, r, 4 * (((r + 1) * nst) / nk));
+    println!("{:?}", &new_w);
     let (a0, a1) = em_enc_cstrnts::<P, O>(
         GenericArray::from_slice(&pk[lambda / 8..]),
         &x.0.chunks(8)
@@ -339,9 +334,9 @@ where
                     .flat_map(|x| u32::to_le_bytes(*x))
                     .take(lambda / 8)
                     .collect::<Vec<u8>>()
-            })
+            }).take((lambda as usize/8)  *(r as usize +1))
             .collect::<GenericArray<u8, _>>(),
-        new_w,
+        w,
         GenericArray::from_slice(&new_v[..l]),
         &GenericArray::default_boxed(),
         false,
@@ -358,7 +353,7 @@ where
 
     let a_t = a_t_hasher.finalize(&u_s);
     let b_t = b_t_hasher.finalize(&v_s);
-
+    
     (Box::new(a_t.as_bytes()), Box::new(b_t.as_bytes()))
 }
 

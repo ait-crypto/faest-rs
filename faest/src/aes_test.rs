@@ -1146,18 +1146,10 @@ fn aes_prove_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let mut pk = data.input.to_vec();
-            let mut bitw: Vec<u8> = vec![0; 1600];
-            for i in 0..data.w.len() {
-                for j in 0..8 {
-                    bitw[8 * i + j] = (data.w[i] >> j) & 1;
-                }
-            }
-            
+            let mut pk = data.input.to_vec();            
             pk.append(&mut data.output.to_vec());
-            
             let res: (Box<GenericArray<u8, <parameter::PARAMOWF128 as parameter::PARAMOWF>::LAMBDABYTES>>, Box<GenericArray<u8, <parameter::PARAMOWF128 as parameter::PARAMOWF>::LAMBDABYTES>>) = aes_prove::<PARAM128S, PARAMOWF128>( 
-                GenericArray::from_slice(&bitw),
+                GenericArray::from_slice(&data.w),
                 GenericArray::from_slice(&data.u),
                 Box::new(GenericArray::from_slice(&data.gv.iter().map(|x| *GenericArray::from_slice(x)).collect::<Vec<GenericArray<u8, _>>>())),
                 GenericArray::from_slice(&pk),
@@ -1178,7 +1170,7 @@ fn aes_prove_test() {
             let mut pk = data.input.to_vec();
             pk.append(&mut data.output.to_vec());
             let res: (Box<GenericArray<u8, <parameter::PARAMOWF192 as parameter::PARAMOWF>::LAMBDABYTES>>, Box<GenericArray<u8, <parameter::PARAMOWF192 as parameter::PARAMOWF>::LAMBDABYTES>>) = aes_prove::<PARAM192S, PARAMOWF192>(
-                GenericArray::from_slice(&bitw),
+                GenericArray::from_slice(&data.w),
                 GenericArray::from_slice(&data.u),
                 Box::new(GenericArray::from_slice(&data.gv.iter().map(|x| *GenericArray::from_slice(x)).collect::<Vec<GenericArray<u8, _>>>())),
                 GenericArray::from_slice(&pk),
@@ -1198,7 +1190,7 @@ fn aes_prove_test() {
             let mut pk = data.input.to_vec();
             pk.append(&mut data.output.to_vec());
             let res: (Box<GenericArray<u8, <parameter::PARAMOWF256 as parameter::PARAMOWF>::LAMBDABYTES>>, Box<GenericArray<u8, <parameter::PARAMOWF256 as parameter::PARAMOWF>::LAMBDABYTES>>)= aes_prove::<PARAM256S, PARAMOWF256>(
-                GenericArray::from_slice(&bitw),
+                GenericArray::from_slice(&data.w),
                 GenericArray::from_slice(&data.u),
                 Box::new(GenericArray::from_slice(&data.gv.iter().map(|x| *GenericArray::from_slice(x)).collect::<Vec<GenericArray<u8, _>>>())),
                 GenericArray::from_slice(&pk),

@@ -5,14 +5,11 @@ use serde::Deserialize;
 use typenum::{U1, U8};
 
 use crate::{
-    aes::convert_to_bit,
-    em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_extendedwitness, em_prove, em_verify},
-    fields::{BigGaloisField, GF128, GF192, GF256},
-    parameter::{
+    aes::convert_to_bit, aes_test::byte_to_bit, em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_extendedwitness, em_prove, em_verify}, fields::{BigGaloisField, GF128, GF192, GF256}, parameter::{
         self, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
         PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF128, PARAMOWF128EM,
         PARAMOWF192, PARAMOWF192EM, PARAMOWF256, PARAMOWF256EM,
-    },
+    }
 };
 
 #[derive(Debug, Deserialize)]
