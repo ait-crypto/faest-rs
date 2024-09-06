@@ -1,8 +1,9 @@
-use generic_array::ArrayLength;
-use generic_array::{typenum::Unsigned, GenericArray};
+use generic_array::{ArrayLength, GenericArray};
 
-use crate::fields::BigGaloisField;
-use crate::random_oracles::{Hasher, PseudoRandomGenerator, RandomOracle, Reader, IV};
+use crate::{
+    fields::BigGaloisField,
+    random_oracles::{Hasher, PseudoRandomGenerator, RandomOracle, Reader, IV},
+};
 
 #[allow(clippy::type_complexity)]
 pub fn commit<T, R>(
