@@ -77,7 +77,7 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-pub fn reconstruct<T, R>(
+pub fn reconstruct<R>(
     pdecom: &(
         Vec<GenericArray<u8, R::LAMBDA>>,
         GenericArray<u8, R::PRODLAMBDA2>,
@@ -90,7 +90,6 @@ pub fn reconstruct<T, R>(
 )
 where
     R: RandomOracle,
-    T: BigGaloisField,
 {
     let mut a = 0;
     let d = b.len();
@@ -136,7 +135,7 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-pub fn verify<T, R, D, POWD, N>(
+pub fn verify<R, D, POWD, N>(
     com: GenericArray<u8, R::PRODLAMBDA2>,
     pdecom: (
         Vec<GenericArray<u8, R::LAMBDA>>,
@@ -147,10 +146,9 @@ pub fn verify<T, R, D, POWD, N>(
 ) -> u8
 where
     R: RandomOracle,
-    D: generic_array::ArrayLength,
-    T: BigGaloisField,
+    D: ArrayLength,
 {
-    let (com_b, _sd) = reconstruct::<T, R>(&pdecom, &b, iv);
+    let (com_b, _sd) = reconstruct::<R>(&pdecom, &b, iv);
     if com_b == com {
         1
     } else {
@@ -428,7 +426,7 @@ mod test {
         for data in database {
             let lambdabyte = data.com_j.len();
             if lambdabyte == 32 {
-                let res = reconstruct::<GF128, RandomOracleShake128>(
+                let res = reconstruct::<RandomOracleShake128>(
                     &(
                         data.cop
                             .iter()
@@ -451,7 +449,7 @@ mod test {
                 type D = U4;
                 type POWD = U31;
                 type N = U16;
-                let res = reconstruct::<GF192, RandomOracleShake192>(
+                let res = reconstruct::<RandomOracleShake192>(
                     &(
                         data.cop
                             .iter()
@@ -474,7 +472,7 @@ mod test {
                 type D = U5;
                 type POWD = U63;
                 type N = U32;
-                let res = reconstruct::<GF256, RandomOracleShake256>(
+                let res = reconstruct::<RandomOracleShake256>(
                     &(
                         data.cop
                             .iter()
