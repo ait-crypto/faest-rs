@@ -165,7 +165,6 @@ mod test {
     use super::*;
 
     use generic_array::{
-        sequence::GenericSequence,
         typenum::{U16, U31, U32, U4, U5, U63},
         GenericArray,
     };
