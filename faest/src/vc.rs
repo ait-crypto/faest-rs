@@ -93,15 +93,12 @@ where
     let length = R::LAMBDA::USIZE;
     let mut a = 0;
     let d = b.len();
-    let mut k: Vec<Option<GenericArray<u8, R::LAMBDA>>> =
-        vec![Some(GenericArray::default()); (1 << (d + 1)) - 1];
-    k[0] = None;
+    let mut k: Vec<Option<GenericArray<u8, R::LAMBDA>>> = vec![None; (1 << (d + 1)) - 1];
 
     //step 4
     for i in 1..d + 1 {
         let b_d_i = b[d - i] as usize;
         k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)] = Some(pdecom.0[i - 1].clone());
-        k[(1 << (i)) - 1 + (2 * a) + b_d_i] = None;
         //step 7
         for j in 0..1 << (i - 1) {
             if j != a {
