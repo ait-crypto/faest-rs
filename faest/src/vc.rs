@@ -210,7 +210,7 @@ mod test {
     fn commit_test() {
         let database: Vec<DataCommit> = serde_json::from_str(include_str!("../DataVc.json"))
             .expect("error while reading or parsing");
-        for mut data in database {
+        for data in database {
             let lamdabytes = data.keyroot.len();
             if lamdabytes == 16 {
                 let res = commit::<GF128, RandomOracleShake128>(
@@ -430,7 +430,7 @@ mod test {
                     &(
                         data.cop
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect(),
                         *GenericArray::from_slice(&data.com_j),
                     ),
@@ -446,14 +446,11 @@ mod test {
                     }
                 }
             } else if lambdabyte == 48 {
-                type D = U4;
-                type POWD = U31;
-                type N = U16;
                 let res = reconstruct::<RandomOracleShake192>(
                     &(
                         data.cop
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect(),
                         *GenericArray::from_slice(&data.com_j),
                     ),
@@ -469,14 +466,11 @@ mod test {
                     }
                 }
             } else {
-                type D = U5;
-                type POWD = U63;
-                type N = U32;
                 let res = reconstruct::<RandomOracleShake256>(
                     &(
                         data.cop
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect(),
                         *GenericArray::from_slice(&data.com_j),
                     ),
