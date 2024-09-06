@@ -111,8 +111,7 @@ where
         a = 2 * a + b_d_i;
     }
 
-    let mut sd: Vec<GenericArray<u8, R::LAMBDA>> = vec![GenericArray::default(); 1 << d];
-    let mut com: Vec<GenericArray<u8, R::PRODLAMBDA2>> = vec![GenericArray::default(); 1 << d];
+    let mut sd = vec![GenericArray::default(); 1 << d];
     let mut h1_hasher = R::h1_init();
     //step 11
     for j in 0..(1 << d) {
@@ -121,11 +120,10 @@ where
             h0_hasher.update(&k[(1 << d) - 1 + j]);
             h0_hasher.update(iv);
             let mut reader = h0_hasher.finish();
-
             reader.read(&mut sd[j]);
-            reader.read(&mut com[j]);
-
-            h1_hasher.update(&com[j]);
+            let mut com_j = GenericArray::<u8, R::PRODLAMBDA2>::default();
+            reader.read(&mut com_j);
+            h1_hasher.update(&com_j);
         } else {
             h1_hasher.update(&pdecom.1);
         }
