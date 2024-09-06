@@ -20,7 +20,7 @@ where
     T: BigGaloisField<Length = R::LAMBDA>,
     R: RandomOracle,
 {
-    let mut k: Vec<GenericArray<u8, R::LAMBDA>> = vec![GenericArray::default(); 2 * n - 1];
+    let mut k = vec![GenericArray::default(); 2 * n - 1];
     //step 2..3
     k[0] = r.as_bytes();
 
