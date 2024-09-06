@@ -1,3 +1,4 @@
+use generic_array::ArrayLength;
 use generic_array::{typenum::Unsigned, GenericArray};
 
 use crate::fields::BigGaloisField;
@@ -60,7 +61,7 @@ pub fn open<R, DPOW /*2N - 1 */, D, N>(
 ) -> (Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>)
 where
     R: RandomOracle,
-    D: generic_array::ArrayLength,
+    D: ArrayLength,
 {
     let mut a = 0;
     let d = (usize::BITS - decom.0.len().leading_zeros() - 1) as usize;
@@ -90,7 +91,6 @@ where
     R: RandomOracle,
     T: BigGaloisField,
 {
-    let length = R::LAMBDA::USIZE;
     let mut a = 0;
     let d = b.len();
     let mut k = vec![GenericArray::default(); (1 << (d + 1)) - 1];
