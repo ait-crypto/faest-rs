@@ -92,23 +92,22 @@ where
 {
     let length = R::LAMBDA::USIZE;
     let mut a = 0;
-    let d = b.len() as u32;
+    let d = b.len();
     let mut k: Vec<Option<GenericArray<u8, R::LAMBDA>>> =
         vec![Some(GenericArray::default()); (1 << (d + 1)) - 1];
     k[0] = None;
 
     //step 4
     for i in 1..d + 1 {
-        let b_d_i = b[(d - i) as usize] as u16;
-        k[((1_u16 << (i)) - 1 + (2 * a) + (1_u16 - b_d_i)) as usize] =
-            Some(pdecom.0[(i - 1) as usize].clone());
-        k[((1_u16 << (i)) - 1 + (2 * a) + b_d_i) as usize] = None;
+        let b_d_i = b[d - i] as usize;
+        k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)] = Some(pdecom.0[i - 1].clone());
+        k[(1 << (i)) - 1 + (2 * a) + b_d_i] = None;
         //step 7
         for j in 0..1 << (i - 1) {
             if j != a {
                 let rank = (1 << (i - 1)) - 1 + j;
-                let new_ks = R::prg::<R::PRODLAMBDA2>(k[rank as usize].as_ref().unwrap(), iv);
-                (k[(rank * 2 + 1) as usize], k[(rank * 2 + 2) as usize]) = (
+                let new_ks = R::prg::<R::PRODLAMBDA2>(k[rank].as_ref().unwrap(), iv);
+                (k[rank * 2 + 1], k[rank * 2 + 2]) = (
                     Some((*GenericArray::from_slice(&new_ks[..length])).clone()),
                     Some((*GenericArray::from_slice(&new_ks[length..])).clone()),
                 );
@@ -120,21 +119,17 @@ where
     let mut com: Vec<GenericArray<u8, R::PRODLAMBDA2>> = vec![GenericArray::default(); 1 << d];
     let mut pre_h = Vec::new();
     //step 11
-    for j in 0..(1_u16 << d) {
+    for j in 0..(1 << d) {
         if j != a {
             let seed: GenericArray<u8, <R as RandomOracle>::LAMBDA16> = (*GenericArray::from_slice(
-                &[
-                    k[(1 << d) - 1 + j as usize].clone().unwrap().to_vec(),
-                    iv.to_vec(),
-                ]
-                .concat(),
+                &[k[(1 << d) - 1 + j].clone().unwrap().to_vec(), iv.to_vec()].concat(),
             ))
             .clone();
             let mut hash: GenericArray<u8, R::PRODLAMBDA3> = GenericArray::default();
             R::h0(seed, &mut hash);
-            sd[j as usize] = (*GenericArray::from_slice(&hash[..length])).clone();
-            com[j as usize] = (*GenericArray::from_slice(&hash[length..])).clone();
-            pre_h.append(&mut com[j as usize].to_vec());
+            sd[j] = (*GenericArray::from_slice(&hash[..length])).clone();
+            com[j] = (*GenericArray::from_slice(&hash[length..])).clone();
+            pre_h.append(&mut com[j].to_vec());
         } else {
             pre_h.append(&mut pdecom.1.to_vec());
         }
