@@ -172,7 +172,7 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct DataCommit {
         keyroot: Vec<u8>,
-        iv: u128, // FIXME: use IV
+        iv: IV,
         depth: u8,
         h: Vec<u8>,
         k: Vec<Vec<u8>>,
@@ -203,14 +203,15 @@ mod test {
 
     #[test]
     fn commit_test() {
-        let database: Vec<DataCommit> = serde_json::from_str(include_str!("../DataVc.json"))
-            .expect("error while reading or parsing");
+        let database: Vec<DataCommit> =
+            serde_json::from_str(include_str!("../tests/data/vc_com.json"))
+                .expect("error while reading or parsing");
         for data in database {
             let lamdabytes = data.keyroot.len();
             if lamdabytes == 16 {
                 let res = commit::<RandomOracleShake128>(
                     GenericArray::from_slice(&data.keyroot),
-                    &data.iv.to_be_bytes(),
+                    &data.iv,
                     1 << data.depth,
                 );
                 let mut sd = Vec::new();
@@ -241,7 +242,7 @@ mod test {
             } else if lamdabytes == 24 {
                 let res = commit::<RandomOracleShake192>(
                     GenericArray::from_slice(&data.keyroot),
-                    &data.iv.to_be_bytes(),
+                    &data.iv,
                     1 << data.depth,
                 );
                 let mut sd = Vec::new();
@@ -272,7 +273,7 @@ mod test {
             } else {
                 let res = commit::<RandomOracleShake256>(
                     GenericArray::from_slice(&data.keyroot),
-                    &data.iv.to_be_bytes(),
+                    &data.iv,
                     1 << data.depth,
                 );
                 let mut sd = Vec::new();
