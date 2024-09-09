@@ -1,13 +1,10 @@
 use generic_array::{ArrayLength, GenericArray};
 
-use crate::{
-    fields::BigGaloisField,
-    random_oracles::{Hasher, PseudoRandomGenerator, RandomOracle, Reader, IV},
-};
+use crate::random_oracles::{Hasher, PseudoRandomGenerator, RandomOracle, Reader, IV};
 
 #[allow(clippy::type_complexity)]
-pub fn commit<T, R>(
-    r: T, // why is this T?
+pub fn commit<R>(
+    r: &GenericArray<u8, R::LAMBDA>,
     iv: &IV,
     n: usize,
 ) -> (
@@ -19,12 +16,11 @@ pub fn commit<T, R>(
     Vec<Option<GenericArray<u8, R::LAMBDA>>>,
 )
 where
-    T: BigGaloisField<Length = R::LAMBDA>,
     R: RandomOracle,
 {
     let mut k = vec![GenericArray::default(); 2 * n - 1];
     //step 2..3
-    k[0] = r.as_bytes();
+    k[0] = r.clone();
 
     for i in 0..n - 1 {
         let mut prg = R::PRG::new_prg(&k[i], iv);
@@ -134,8 +130,9 @@ where
     (h, sd)
 }
 
+/*/
 #[allow(clippy::type_complexity)]
-pub fn verify<R, D, POWD, N>(
+fn verify<R, D, POWD, N>(
     com: GenericArray<u8, R::PRODLAMBDA2>,
     pdecom: (
         Vec<GenericArray<u8, R::LAMBDA>>,
@@ -155,6 +152,7 @@ where
         0
     }
 }
+*/
 
 //reconstruct is tested in the integration_test_vc test_commitment_and_decomitment() function.
 
@@ -168,10 +166,7 @@ mod test {
     };
     use serde::Deserialize;
 
-    use crate::{
-        fields::{GF128, GF192, GF256},
-        random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
-    };
+    use crate::random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256};
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -213,8 +208,8 @@ mod test {
         for data in database {
             let lamdabytes = data.keyroot.len();
             if lamdabytes == 16 {
-                let res = commit::<GF128, RandomOracleShake128>(
-                    GF128::from(&data.keyroot[..]),
+                let res = commit::<RandomOracleShake128>(
+                    GenericArray::from_slice(&data.keyroot),
                     &data.iv.to_be_bytes(),
                     1 << data.depth,
                 );
@@ -244,8 +239,8 @@ mod test {
                         .collect::<Vec::<Option::<GenericArray<u8, _>>>>()
                 );
             } else if lamdabytes == 24 {
-                let res = commit::<GF192, RandomOracleShake192>(
-                    GF192::from(&data.keyroot[..]),
+                let res = commit::<RandomOracleShake192>(
+                    GenericArray::from_slice(&data.keyroot),
                     &data.iv.to_be_bytes(),
                     1 << data.depth,
                 );
@@ -275,8 +270,8 @@ mod test {
                         .collect::<Vec::<Option::<GenericArray<u8, _>>>>()
                 );
             } else {
-                let res = commit::<GF256, RandomOracleShake256>(
-                    GF256::from(&data.keyroot[0..32]),
+                let res = commit::<RandomOracleShake256>(
+                    GenericArray::from_slice(&data.keyroot),
                     &data.iv.to_be_bytes(),
                     1 << data.depth,
                 );
