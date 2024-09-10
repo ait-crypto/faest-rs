@@ -158,6 +158,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use std::iter::zip;
+
     use super::*;
 
     use generic_array::{
@@ -201,6 +203,30 @@ mod test {
         sd: Vec<Vec<u8>>,
     }
 
+    fn compare_expected_with_result<Lambda: ArrayLength, Lambda2: ArrayLength>(
+        expected: &DataCommit,
+        res: (
+            GenericArray<u8, Lambda2>,
+            (
+                Vec<GenericArray<u8, Lambda>>,
+                Vec<GenericArray<u8, Lambda2>>,
+            ),
+            Vec<Option<GenericArray<u8, Lambda>>>,
+        ),
+    ) {
+        assert_eq!(res.0.as_slice(), expected.h.as_slice());
+        for (k, k_expected) in zip(&res.1 .0, &expected.k) {
+            assert_eq!(k.as_slice(), k_expected.as_slice());
+        }
+        for (com, com_expected) in zip(&res.1 .1, &expected.com) {
+            assert_eq!(com.as_slice(), com_expected.as_slice());
+        }
+        for (sd, sd_expected) in zip(&res.2, &expected.sd) {
+            let sd = sd.as_ref().unwrap();
+            assert_eq!(sd.as_slice(), sd_expected.as_slice());
+        }
+    }
+
     #[test]
     fn commit_test() {
         let database: Vec<DataCommit> =
@@ -214,101 +240,30 @@ mod test {
                     &data.iv,
                     1 << data.depth,
                 );
-                let mut sd = Vec::new();
-                for val in data.sd {
-                    sd.push(Some(val));
-                }
-                assert_eq!(res.0, *GenericArray::from_slice(&data.h));
-                assert_eq!(
-                    res.1 .0,
-                    data.k
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect::<Vec::<GenericArray<u8, _>>>()
-                );
-                assert_eq!(
-                    res.1 .1,
-                    data.com
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect::<Vec::<GenericArray<u8, _>>>()
-                );
-                assert_eq!(
-                    res.2,
-                    sd.iter()
-                        .map(|x| x.as_ref().map(|y| *GenericArray::from_slice(y)))
-                        .collect::<Vec::<Option::<GenericArray<u8, _>>>>()
-                );
+                compare_expected_with_result(&data, res);
             } else if lamdabytes == 24 {
                 let res = commit::<RandomOracleShake192>(
                     GenericArray::from_slice(&data.keyroot),
                     &data.iv,
                     1 << data.depth,
                 );
-                let mut sd = Vec::new();
-                for val in data.sd {
-                    sd.push(Some(val));
-                }
-                assert_eq!(res.0, *GenericArray::from_slice(&data.h));
-                assert_eq!(
-                    res.1 .0,
-                    data.k
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect::<Vec::<GenericArray<u8, _>>>()
-                );
-                assert_eq!(
-                    res.1 .1,
-                    data.com
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect::<Vec::<GenericArray<u8, _>>>()
-                );
-                assert_eq!(
-                    res.2,
-                    sd.iter()
-                        .map(|x| x.as_ref().map(|y| *GenericArray::from_slice(y)))
-                        .collect::<Vec::<Option::<GenericArray<u8, _>>>>()
-                );
+                compare_expected_with_result(&data, res);
             } else {
                 let res = commit::<RandomOracleShake256>(
                     GenericArray::from_slice(&data.keyroot),
                     &data.iv,
                     1 << data.depth,
                 );
-                let mut sd = Vec::new();
-                for val in data.sd {
-                    sd.push(Some(val));
-                }
-                assert_eq!(res.0, *GenericArray::from_slice(&data.h));
-                assert_eq!(
-                    res.1 .0,
-                    data.k
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect::<Vec::<GenericArray<u8, _>>>()
-                );
-                assert_eq!(
-                    res.1 .1,
-                    data.com
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect::<Vec::<GenericArray<u8, _>>>()
-                );
-                assert_eq!(
-                    res.2,
-                    sd.iter()
-                        .map(|x| x.as_ref().map(|y| *GenericArray::from_slice(y)))
-                        .collect::<Vec::<Option::<GenericArray<u8, _>>>>()
-                );
+                compare_expected_with_result(&data, res);
             }
         }
     }
 
     #[test]
     fn open_test() {
-        let database: Vec<DataOpen> = serde_json::from_str(include_str!("../Dataopen.json"))
-            .expect("error while reading or parsing");
+        let database: Vec<DataOpen> =
+            serde_json::from_str(include_str!("../tests/data/vc_open.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.k[0].len() == 16 {
                 type D = U4;
@@ -414,10 +369,24 @@ mod test {
         }
     }
 
+    fn compare_expected_with_reconstruct_result<Lambda: ArrayLength, Lambda2: ArrayLength>(
+        data: &DataReconstruct,
+        res: (GenericArray<u8, Lambda2>, Vec<GenericArray<u8, Lambda>>),
+    ) {
+        assert_eq!(res.0.as_slice(), data.h.as_slice());
+        for (r, x) in zip(res.1, &data.sd) {
+            if !x.is_empty() {
+                assert_eq!(r.as_slice(), x.as_slice());
+            } else {
+                assert_eq!(r, GenericArray::default());
+            }
+        }
+    }
+
     #[test]
     fn reconstruct_test() {
         let database: Vec<DataReconstruct> =
-            serde_json::from_str(include_str!("../DataReconstruct.json"))
+            serde_json::from_str(include_str!("../tests/data/vc_reconstruct.json"))
                 .expect("error while reading or parsing");
         for data in database {
             let lambdabyte = data.com_j.len();
@@ -433,14 +402,7 @@ mod test {
                     &data.b,
                     &data.iv,
                 );
-                assert_eq!(res.0.as_slice(), data.h.as_slice());
-                for (r, x) in res.1.iter().zip(data.sd.iter()) {
-                    if !x.is_empty() {
-                        assert_eq!(r.as_slice(), x.as_slice());
-                    } else {
-                        assert_eq!(r, &GenericArray::default());
-                    }
-                }
+                compare_expected_with_reconstruct_result(&data, res);
             } else if lambdabyte == 48 {
                 let res = reconstruct::<RandomOracleShake192>(
                     &(
@@ -453,14 +415,7 @@ mod test {
                     &data.b,
                     &data.iv,
                 );
-                assert_eq!(res.0.as_slice(), data.h.as_slice());
-                for (r, x) in res.1.iter().zip(data.sd.iter()) {
-                    if !x.is_empty() {
-                        assert_eq!(r.as_slice(), x.as_slice());
-                    } else {
-                        assert_eq!(r, &GenericArray::default());
-                    }
-                }
+                compare_expected_with_reconstruct_result(&data, res);
             } else {
                 let res = reconstruct::<RandomOracleShake256>(
                     &(
@@ -473,14 +428,7 @@ mod test {
                     &data.b,
                     &data.iv,
                 );
-                assert_eq!(res.0.as_slice(), data.h.as_slice());
-                for (r, x) in res.1.iter().zip(data.sd.iter()) {
-                    if !x.is_empty() {
-                        assert_eq!(r.as_slice(), x.as_slice());
-                    } else {
-                        assert_eq!(r, &GenericArray::default());
-                    }
-                }
+                compare_expected_with_reconstruct_result(&data, res);
             }
         }
     }
