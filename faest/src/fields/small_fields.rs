@@ -691,7 +691,13 @@ mod test {
 
         let pol_1 = GF8::from(1u8);
         let pol_0 = GF8::from(0u8);
-        let anything: u8 = rng.gen();
+        let anything = {
+            let mut r = 0;
+            while r == 0 {
+                r = rng.gen();
+            }
+            r
+        };
         let pol_anything = GF8::from(anything);
         assert_eq!(pol_anything * GF8::inv(GF8::from(anything)), pol_1);
         assert_eq!(pol_anything * GF8::inv(GF8::from(0u8)), pol_0);
