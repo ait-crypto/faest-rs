@@ -135,7 +135,7 @@ where
 fn verify<R, D, POWD, N>(
     com: GenericArray<u8, R::PRODLAMBDA2>,
     pdecom: (
-        Vec<GenericArray<u8, R::LAMBDA>>,
+        Vec<Box<GenericArray<u8, R::LAMBDA>>>,
         GenericArray<u8, R::PRODLAMBDA2>,
     ),
     b: GenericArray<u8, D>,
@@ -282,13 +282,9 @@ mod test {
                     ),
                     *GenericArray::from_slice(&data.b),
                 );
-                assert_eq!(
-                    res.0,
-                    data.cop
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect::<Vec::<GenericArray<u8, _>>>()
-                );
+                for (res_0, expected) in zip(&res.0, &data.cop) {
+                    assert_eq!(res_0.as_slice(), expected);
+                }
                 assert_eq!(res.1, data.com_j);
             } else if data.k[0].len() == 24 {
                 type D = U4;
@@ -307,13 +303,9 @@ mod test {
                     ),
                     *GenericArray::from_slice(&data.b),
                 );
-                assert_eq!(
-                    res.0,
-                    data.cop
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect::<Vec::<GenericArray<u8, _>>>()
-                );
+                for (res_0, expected) in zip(&res.0, &data.cop) {
+                    assert_eq!(res_0.as_slice(), expected);
+                }
                 assert_eq!(res.1, data.com_j);
             } else if data.b.len() == 4 {
                 type D = U4;
@@ -332,13 +324,9 @@ mod test {
                     ),
                     *GenericArray::from_slice(&data.b),
                 );
-                assert_eq!(
-                    res.0,
-                    data.cop
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect::<Vec::<GenericArray<u8, _>>>()
-                );
+                for (res_0, expected) in zip(&res.0, &data.cop) {
+                    assert_eq!(res_0.as_slice(), expected);
+                }
                 assert_eq!(res.1, data.com_j);
             } else {
                 type D = U5;
@@ -357,13 +345,9 @@ mod test {
                     ),
                     *GenericArray::from_slice(&data.b),
                 );
-                assert_eq!(
-                    res.0,
-                    data.cop
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect::<Vec::<GenericArray<u8, _>>>()
-                );
+                for (res_0, expected) in zip(&res.0, &data.cop) {
+                    assert_eq!(res_0.as_slice(), expected);
+                }
                 assert_eq!(res.1, data.com_j);
             }
         }

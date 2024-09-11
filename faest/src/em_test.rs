@@ -5,14 +5,11 @@ use serde::Deserialize;
 use typenum::{U1, U8};
 
 use crate::{
-    aes::convert_to_bit,
-    em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_extendedwitness, em_prove, em_verify},
-    fields::{BigGaloisField, GF128, GF192, GF256},
-    parameter::{
+    aes::convert_to_bit, aes::byte_to_bit, em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_extendedwitness, em_prove, em_verify}, fields::{BigGaloisField, GF128, GF192, GF256}, parameter::{
         self, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
         PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF128, PARAMOWF128EM,
         PARAMOWF192, PARAMOWF192EM, PARAMOWF256, PARAMOWF256EM,
-    },
+    }
 };
 
 #[derive(Debug, Deserialize)]
@@ -37,10 +34,10 @@ fn em_extended_witness_test() {
             let res = em_extendedwitness::<PARAM128S, PARAMOWF128EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&data.input));
             assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         } else if data.lambda == 192 {
-            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&data.input));
+            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&[data.input, vec![0u8; 16]].concat()));
             assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         } else {
-            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&data.input));
+            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&[data.input, vec![0u8; 32]].concat()));
             assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         }
     }
@@ -603,11 +600,10 @@ fn em_prove_test() {
                 GenericArray::from_slice(&[data.input, data.output].concat()),
                 GenericArray::from_slice(&data.chall),
             );
-            //assert_eq!((*GenericArray::from_slice(&data.at), *GenericArray::from_slice(&data.bt)), *res);
             assert_eq!(
                 (
-                    *GenericArray::from_slice(&data.at),
-                    *GenericArray::from_slice(&data.bt)
+                    Box::new(*GenericArray::from_slice(&data.at)),
+                    Box::new(*GenericArray::from_slice(&data.bt))
                 ),
                 res
             );
@@ -628,8 +624,8 @@ fn em_prove_test() {
             );
             assert_eq!(
                 (
-                    *GenericArray::from_slice(&data.at),
-                    *GenericArray::from_slice(&data.bt)
+                    Box::new(*GenericArray::from_slice(&data.at)),
+                    Box::new(*GenericArray::from_slice(&data.bt))
                 ),
                 res
             );
@@ -649,8 +645,8 @@ fn em_prove_test() {
             );
             assert_eq!(
                 (
-                    *GenericArray::from_slice(&data.at),
-                    *GenericArray::from_slice(&data.bt)
+                    Box::new(*GenericArray::from_slice(&data.at)),
+                    Box::new(*GenericArray::from_slice(&data.bt))
                 ),
                 res
             );

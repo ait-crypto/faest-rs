@@ -1,9 +1,11 @@
+use std::iter::zip;
+
 use cipher::Unsigned;
 
 use generic_array::{ArrayLength, GenericArray};
 
 use crate::parameter::PARAM;
-use crate::random_oracles::{Hasher, IV};
+use crate::random_oracles::{Hasher, Reader, IV};
 use crate::vc;
 use crate::{fields::BigGaloisField, random_oracles::RandomOracle, vc::commit};
 
@@ -26,6 +28,7 @@ where
     for (i, _) in sd.iter().enumerate().skip(1).take(n) {
         r[0][i] = R::prg::<LH>(sd[i].as_ref().unwrap(), iv);
     }
+
     let mut v: Vec<GenericArray<u8, LH>> = vec![GenericArray::default(); d];
     for j in 0..d {
         for i in 0..n / (1_usize << (j + 1)) {
@@ -40,23 +43,21 @@ where
             r[j + 1][i] = (*GenericArray::from_slice(
                 &r[j][2 * i]
                     .iter()
-                    .zip(r[j][2 * i + 1].iter())
+                    .zip(r[j][(2 * i) + 1].iter())
                     .map(|(&x1, x2)| x1 ^ x2)
                     .collect::<GenericArray<u8, LH>>(),
             ))
             .clone();
         }
     }
-    for j in 0..d {
-        for _i in 0..n / (1_usize << (d - j - 1)) {}
-    }
+
     let u = (*GenericArray::from_slice(&r[d][0].clone())).clone();
     (u, v)
 }
 
 //constant time checking the value of i : if i is not correct, then the output will be an empty vec
 //K = k0 if i < tau0 else k1
-pub fn chaldec<P>(chal: &GenericArray<u8, P::LAMBDA>, i: u16) -> Vec<u8>
+pub fn chaldec<P>(chal: &GenericArray<u8, P::LAMBDABYTES>, i: u16) -> Vec<u8>
 where
     P: PARAM,
 {
@@ -89,51 +90,59 @@ pub fn volecommit<P, T, R>(
 ) -> (
     GenericArray<u8, R::PRODLAMBDA2>,
     //Here decom can have two diferent length, depending on if it's a i < t0 or > 0 so we use vectors
-    GenericArray<
-        (
-            Vec<GenericArray<u8, R::LAMBDA>>,
-            Vec<GenericArray<u8, R::PRODLAMBDA2>>,
-        ),
-        P::TAU,
+    Box<
+        GenericArray<
+            (
+                Vec<GenericArray<u8, R::LAMBDA>>,
+                Vec<GenericArray<u8, R::PRODLAMBDA2>>,
+            ),
+            P::TAU,
+        >,
     >,
-    GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS>,
+    Box<GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS>>,
     GenericArray<u8, P::LH>,
-    GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>,
+    Box<GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>>,
 )
 where
     P: PARAM,
 
     T: BigGaloisField + std::default::Default,
-    R: RandomOracle,
+    R: RandomOracle<LAMBDA = T::Length>,
 {
     let tau = <P::TAU as Unsigned>::to_usize();
     let k0 = <P::K0 as Unsigned>::to_u16();
     let k1 = <P::K1 as Unsigned>::to_u16();
     let _t1 = <P::TAU1 as Unsigned>::to_u16();
     let tau_res = R::prg::<P::PRODLAMBDATAU>(r, iv);
-    let mut r: GenericArray<T, P::TAU> = GenericArray::default();
+    let mut r: GenericArray<GenericArray<u8, T::Length>, P::TAU> = GenericArray::default();
     let mut com: GenericArray<GenericArray<u8, R::PRODLAMBDA2>, P::TAU> = GenericArray::default();
-    let mut decom: GenericArray<
-        (
-            Vec<GenericArray<u8, R::LAMBDA>>,
-            Vec<GenericArray<u8, R::PRODLAMBDA2>>,
-        ),
-        P::TAU,
-    > = GenericArray::default();
+    let mut decom: Box<
+        GenericArray<
+            (
+                Vec<GenericArray<u8, R::LAMBDA>>,
+                Vec<GenericArray<u8, R::PRODLAMBDA2>>,
+            ),
+            P::TAU,
+        >,
+    > = GenericArray::default_boxed();
     let mut sd: GenericArray<Vec<Option<GenericArray<u8, R::LAMBDA>>>, P::TAU> =
         GenericArray::default();
     let mut u: GenericArray<GenericArray<u8, P::LH>, P::TAU> = GenericArray::default();
-    let mut v: GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU> = GenericArray::default();
-    let mut c: GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS> = GenericArray::default();
+    let mut v: Box<GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>> =
+        GenericArray::default_boxed();
+    let mut c: Box<GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS>> =
+        GenericArray::default_boxed();
     for i in 0..tau {
-        r[i] = T::from(&tau_res[i * (T::LENGTH / 8) as usize..(i + 1) * (T::LENGTH / 8) as usize]);
+        r[i].copy_from_slice(
+            &tau_res[i * (T::LENGTH / 8) as usize..(i + 1) * (T::LENGTH / 8) as usize],
+        );
     }
     let tau_0 = T::LENGTH % tau;
     let mut hasher = R::h1_init();
     for i in 0..tau {
         let b = 1 - (i < tau_0.try_into().unwrap()) as u16;
         let k = ((1 - b) * k0) + b * k1;
-        (com[i], decom[i], sd[i]) = commit::<T, R>(r[i], iv, 1u32 << k);
+        (com[i], decom[i], sd[i]) = commit::<R>(&r[i], &iv, 1 << k);
         hasher.update(&com[i]);
         (u[i], v[i]) = convert_to_vole::<R, P::LH>(&sd[i], iv);
     }
@@ -145,7 +154,7 @@ where
             .collect();
     }
     let mut hcom: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
-    hasher.finish();
+    hasher.finish().read(&mut hcom);
     (hcom, decom, c, u[0].clone(), v)
 }
 
@@ -160,7 +169,7 @@ pub fn volereconstruct<T, R, P>(
         ),
         P::TAU,
     >,
-    iv: u128,
+    iv: [u8; 16],
 ) -> (
     GenericArray<u8, R::PRODLAMBDA2>,
     GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>,
@@ -185,21 +194,21 @@ where
     for i in 0..tau {
         let b: u16 = (i < t0.into()).into();
         let k = b * k0 + (1 - b) * k1;
-        let delta_p: Vec<u8> = chaldec::<P>(&chal, i.try_into().unwrap());
+        let delta_p: Vec<u8> = chaldec::<P>(chal, i.try_into().unwrap());
         #[allow(clippy::needless_range_loop)]
         for j in 0..delta_p.len() {
             delta[i] += (delta_p[j] as u32) << j;
         }
-        (com[i], s[i]) = vc::reconstruct::<T, R>(&pdecom[i], &delta_p, iv);
+        (com[i], s[i]) = vc::reconstruct::<R>(&pdecom[i], &delta_p, &iv);
         hasher.update(&com[i]);
         for j in 0..(1_u16 << (k)) as usize {
             sd[i].push(Some(s[i][j ^ delta[i] as usize].clone()));
         }
         sd[i][0] = None;
 
-        (_, q[i]) = convert_to_vole::<R, P::LH>(&sd[i], iv);
+        (_, q[i]) = convert_to_vole::<R, P::LH>(&sd[i], &iv);
     }
     let mut hcom: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
-    hasher.finish();
+    hasher.finish().read(&mut hcom);
     (hcom, q)
 }

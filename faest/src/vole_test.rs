@@ -47,7 +47,7 @@ fn convert_to_vole_test() {
                 .sd
                 .iter()
                 .cloned()
-                .map(|x| Some(GenericArray::default()))
+                .map(|x| Some(*GenericArray::from_slice(&x)))
                 .collect::<Vec<Option<GenericArray<u8, U16>>>>();
             if data.sd0[0] == 1 {
                 opt_sd[0] = None;
@@ -903,7 +903,7 @@ fn volereconstruct_test() {
                 let res = volereconstruct::<GF128, RandomOracleShake128, PARAM128F>(
                     GenericArray::from_slice(&data.chal),
                     &pdecom,
-                    &data.iv,
+                    data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
@@ -944,7 +944,7 @@ fn volereconstruct_test() {
                                 >,
                             )>>(),
                     ),
-                    &data.iv,
+                    data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
@@ -966,7 +966,7 @@ fn volereconstruct_test() {
                 let res = volereconstruct::<GF192, RandomOracleShake192, PARAM192F>(
                     GenericArray::from_slice(&data.chal),
                     &pdecom,
-                    &data.iv,
+                    data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
@@ -1007,7 +1007,7 @@ fn volereconstruct_test() {
                                 >,
                             )>>(),
                     ),
-                    &data.iv,
+                    data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
@@ -1028,7 +1028,7 @@ fn volereconstruct_test() {
             let res = volereconstruct::<GF256, RandomOracleShake256, PARAM256F>(
                 GenericArray::from_slice(&data.chal),
                 &pdecom,
-                &data.iv,
+                data.iv,
             );
             assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
             for i in 0..res.1.len() {
@@ -1061,7 +1061,7 @@ fn volereconstruct_test() {
                             GenericArray<u8, <RandomOracleShake256 as RandomOracle>::PRODLAMBDA2>,
                         )>>(),
                 ),
-                &data.iv,
+                data.iv,
             );
             assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
             for i in 0..res.1.len() {
