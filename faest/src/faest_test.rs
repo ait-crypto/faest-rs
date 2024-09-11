@@ -11977,7 +11977,7 @@ fn faest_sign_test() {
 #[test]
 fn faest_aes_test_128s() {
     //128-s
-    for _i in 0..5/* 00 */ {
+    for _i in 0..500 {
         let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
             [..48]
             .try_into()
@@ -12004,7 +12004,7 @@ fn faest_aes_test_128s() {
 #[test]
 fn faest_aes_test_128f() {
     //128-f
-    for _i in 0..5/* 00 */ {
+    for _i in 0..500 {
         let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
             [..48]
             .try_into()
@@ -12032,7 +12032,7 @@ fn faest_aes_test_128f() {
 #[test]
 fn faest_aes_test_192s() {
     //192-s
-    for _i in 0..5/* 00 */ {
+    for _i in 0..500 {
         let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
             [..48]
             .try_into()
@@ -12060,7 +12060,7 @@ fn faest_aes_test_192s() {
 #[test]
 fn faest_aes_test_192f() {
     //192-f
-    for _i in 0..5/* 00 */ {
+    for _i in 0..500 {
         let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
             [..48]
             .try_into()
@@ -12087,7 +12087,7 @@ fn faest_aes_test_192f() {
 #[test]
 fn faest_aes_test_256s() {
     //256-s
-    for _i in 0..5/* 00  */{
+    for _i in 0..500 {
         let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
             [..48]
             .try_into()
@@ -12114,7 +12114,7 @@ fn faest_aes_test_256s() {
 #[test]
 fn faest_aes_test_256f() {
     //256-f
-    for _i in 0..5/* 00 */ {
+    for _i in 0..500 {
         let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
             [..48]
             .try_into()
@@ -12154,7 +12154,7 @@ fn faest_em_test_128s() {
         let sigma = faest_sign::<GF128, RandomOracleShake128, EmCypher, PARAM128SEM, PARAMOWF128EM>(
             msg,
             GenericArray::from_slice(&sk[16..]),
-            GenericArray::from_slice(&sk),
+            GenericArray::from_slice(&pk),
             GenericArray::from_slice(&rho[..16]),
         );
         let res_true =

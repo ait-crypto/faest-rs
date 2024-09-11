@@ -53,6 +53,7 @@ where
                 valid &= (*i != 0);
             }
         }
+        println!("{:?}", valid);
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, nst as u8);
@@ -67,6 +68,18 @@ where
         }
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &x.0[8 * j..8 * (j + 1)]);
+    }
+    for i in inv_bitslice(&state)[0][..].iter() {
+        valid &= (*i != 0);
+    }
+    if nst == 6 {
+        for i in inv_bitslice(&state)[1][..8].iter() {
+            valid &= (*i != 0);
+        }
+    } else if nst == 8 {
+        for i in inv_bitslice(&state)[1][..].iter() {
+            valid &= (*i != 0);
+        }
     }
     (res, valid)
 }
