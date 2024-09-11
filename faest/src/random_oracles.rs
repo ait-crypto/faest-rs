@@ -122,38 +122,6 @@ pub trait RandomOracle {
         buf
     }
 
-    #[deprecated = "Use h0_init instead"]
-    fn h0(data: GenericArray<u8, Self::LAMBDA16>, dest: &mut GenericArray<u8, Self::PRODLAMBDA3>) {
-        let mut hasher = Self::h0_init();
-        hasher.update(&data);
-        let mut reader = hasher.finish();
-        reader.read(dest);
-    }
-
-    #[deprecated = "Use h1_init instead"]
-    fn h1(data: &[u8], dest: &mut GenericArray<u8, Self::PRODLAMBDA2>) {
-        let mut hasher = Self::h1_init();
-        hasher.update(data);
-        let mut reader = hasher.finish();
-        reader.read(dest);
-    }
-
-    #[deprecated = "Use h2_init instead"]
-    fn h2(data: &[u8], dest: &mut [u8]) {
-        let mut hasher = Self::h2_init();
-        hasher.update(data);
-        let mut reader = hasher.finish();
-        reader.read(dest);
-    }
-
-    #[deprecated = "Use h3_init instead"]
-    fn h3(data: &[u8], dest: &mut GenericArray<u8, Self::LAMBDA16>) {
-        let mut hasher = Self::h3_init();
-        hasher.update(data);
-        let mut reader = hasher.finish();
-        reader.read(dest);
-    }
-
     /// Create hasher for `H0`
     fn h0_init() -> Self::Hasher<0> {
         Self::Hasher::default()
