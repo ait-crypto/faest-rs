@@ -890,12 +890,12 @@ fn volereconstruct_test() {
     for data in database {
         if data.chal.len() == 16 {
             if data.q[0].len() == 8 {
-                let mut pdecom : GenericArray<(Vec<GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA>>, GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2>), <parameter::PARAM128F as parameter::PARAM>::TAU> = GenericArray::default();
+                let mut pdecom : GenericArray<(Vec<Box<GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA>>>, GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2>), <parameter::PARAM128F as parameter::PARAM>::TAU> = GenericArray::default();
                 for i in 0..data.pdec.len() {
                     pdecom[i] = (
                         data.pdec[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| Box::new(*GenericArray::from_slice(&x)))
                             .collect(),
                         *GenericArray::from_slice(&data.com[i]),
                     );
@@ -927,16 +927,16 @@ fn volereconstruct_test() {
                             .iter()
                             .map(|x| {
                                 (
-                                    x.0.iter().map(|y| *GenericArray::from_slice(y)).collect(),
+                                    x.0.iter().map(|y| Box::new(*GenericArray::from_slice(y))).collect(),
                                     *GenericArray::from_slice(&x.1),
                                 )
                             })
                             .collect::<Vec<(
                                 Vec<
-                                    GenericArray<
+                                    Box<GenericArray<
                                         u8,
                                         <RandomOracleShake128 as RandomOracle>::LAMBDA,
-                                    >,
+                                    >>
                                 >,
                                 GenericArray<
                                     u8,
@@ -953,12 +953,12 @@ fn volereconstruct_test() {
             }
         } else if data.chal.len() == 24 {
             if data.q[0].len() == 8 {
-                let mut pdecom : GenericArray<(Vec<GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA>>, GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2>), <parameter::PARAM192F as parameter::PARAM>::TAU> = GenericArray::default();
+                let mut pdecom : GenericArray<(Vec<Box<GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA>>>, GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2>), <parameter::PARAM192F as parameter::PARAM>::TAU> = GenericArray::default();
                 for i in 0..data.pdec.len() {
                     pdecom[i] = (
                         data.pdec[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| Box::new(*GenericArray::from_slice(&x)))
                             .collect(),
                         *GenericArray::from_slice(&data.com[i]),
                     );
@@ -990,17 +990,17 @@ fn volereconstruct_test() {
                             .iter()
                             .map(|x| {
                                 (
-                                    x.0.iter().map(|y| *GenericArray::from_slice(y)).collect(),
+                                    x.0.iter().map(|y| Box::new(*GenericArray::from_slice(y))).collect(),
                                     *GenericArray::from_slice(&x.1),
                                 )
                             })
                             .collect::<Vec<(
                                 Vec<
-                                    GenericArray<
+                                    Box<GenericArray<
                                         u8,
                                         <RandomOracleShake192 as RandomOracle>::LAMBDA,
                                     >,
-                                >,
+                                >>,
                                 GenericArray<
                                     u8,
                                     <RandomOracleShake192 as RandomOracle>::PRODLAMBDA2,
@@ -1015,12 +1015,12 @@ fn volereconstruct_test() {
                 }
             }
         } else if data.q[0].len() == 8 {
-            let mut pdecom : GenericArray<(Vec<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>, GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2>), <parameter::PARAM256F as parameter::PARAM>::TAU> = GenericArray::default();
+            let mut pdecom : GenericArray<(Vec<Box<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>>, GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2>), <parameter::PARAM256F as parameter::PARAM>::TAU> = GenericArray::default();
             for i in 0..data.pdec.len() {
                 pdecom[i] = (
                     data.pdec[i]
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| Box::new(*GenericArray::from_slice(&x)))
                         .collect(),
                     *GenericArray::from_slice(&data.com[i]),
                 );
@@ -1052,12 +1052,12 @@ fn volereconstruct_test() {
                         .iter()
                         .map(|x| {
                             (
-                                x.0.iter().map(|y| *GenericArray::from_slice(y)).collect(),
+                                x.0.iter().map(|y| Box::new(*GenericArray::from_slice(y))).collect(),
                                 *GenericArray::from_slice(&x.1),
                             )
                         })
                         .collect::<Vec<(
-                            Vec<GenericArray<u8, <RandomOracleShake256 as RandomOracle>::LAMBDA>>,
+                            Vec<Box<GenericArray<u8, <RandomOracleShake256 as RandomOracle>::LAMBDA>>>,
                             GenericArray<u8, <RandomOracleShake256 as RandomOracle>::PRODLAMBDA2>,
                         )>>(),
                 ),

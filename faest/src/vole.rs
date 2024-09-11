@@ -90,16 +90,16 @@ pub fn volecommit<P, T, R>(
 ) -> (
     GenericArray<u8, R::PRODLAMBDA2>,
     //Here decom can have two diferent length, depending on if it's a i < t0 or > 0 so we use vectors
-    GenericArray<
+    Box<GenericArray<
         (
             Vec<GenericArray<u8, R::LAMBDA>>,
             Vec<GenericArray<u8, R::PRODLAMBDA2>>,
         ),
         P::TAU,
-    >,
-    GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS>,
+    >>,
+    Box<GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS>>,
     GenericArray<u8, P::LH>,
-    GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>,
+    Box<GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>>,
 )
 where
     P: PARAM,
@@ -115,18 +115,18 @@ where
     let tau_res = R::prg::<P::PRODLAMBDATAU>(r, iv);
     let mut r: GenericArray<T, P::TAU> = GenericArray::default();
     let mut com: GenericArray<GenericArray<u8, R::PRODLAMBDA2>, P::TAU> = GenericArray::default();
-    let mut decom: GenericArray<
+    let mut decom: Box<GenericArray<
         (
             Vec<GenericArray<u8, R::LAMBDA>>,
             Vec<GenericArray<u8, R::PRODLAMBDA2>>,
         ),
         P::TAU,
-    > = GenericArray::default();
+    >> = GenericArray::default_boxed();
     let mut sd: GenericArray<Vec<Option<GenericArray<u8, R::LAMBDA>>>, P::TAU> =
         GenericArray::default();
     let mut u: GenericArray<GenericArray<u8, P::LH>, P::TAU> = GenericArray::default();
-    let mut v: GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU> = GenericArray::default();
-    let mut c: GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS> = GenericArray::default();
+    let mut v: Box<GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>> = GenericArray::default_boxed();
+    let mut c: Box<GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS>> = GenericArray::default_boxed();
     for i in 0..tau {
         r[i] = T::from(&tau_res[i * (T::LENGTH / 8) as usize..(i + 1) * (T::LENGTH / 8) as usize]);
     }
@@ -157,7 +157,7 @@ pub fn volereconstruct<T, R, P>(
     chal: &GenericArray<u8, P::LAMBDABYTES>,
     pdecom: &GenericArray<
         (
-            Vec<GenericArray<u8, R::LAMBDA>>,
+            Vec<Box<GenericArray<u8, R::LAMBDA>>>,
             GenericArray<u8, R::PRODLAMBDA2>,
         ),
         P::TAU,
@@ -172,14 +172,13 @@ where
     R: RandomOracle,
     P: PARAM,
 {
-    println!("{:?}", iv);
     let tau = <P::TAU as Unsigned>::to_usize();
     let k0 = <P::K0 as Unsigned>::to_u16();
     let k1 = <P::K1 as Unsigned>::to_u16();
     let _t1 = <P::TAU1 as Unsigned>::to_u16();
     let t0 = <P::TAU0 as Unsigned>::to_u16();
     let mut com: GenericArray<GenericArray<u8, R::PRODLAMBDA2>, P::TAU> = GenericArray::default();
-    let mut s: GenericArray<Vec<GenericArray<u8, R::LAMBDA>>, P::TAU> = GenericArray::default();
+    let mut s: GenericArray<Vec<Box<GenericArray<u8, R::LAMBDA>>>, P::TAU> = GenericArray::default();
     let mut sd: GenericArray<Vec<Option<GenericArray<u8, R::LAMBDA>>>, P::TAU> =
         GenericArray::default();
     let mut delta: GenericArray<u32, P::TAU> = GenericArray::default();
@@ -196,7 +195,7 @@ where
         (com[i], s[i]) = vc::reconstruct::<T, R>(&pdecom[i], delta_p.to_vec(), &iv);
         hasher.update(&com[i]);
         for j in 0..(1_u16 << (k)) as usize {
-            sd[i].push(Some(s[i][j ^ delta[i] as usize].clone()));
+            sd[i].push(Some(*s[i][j ^ delta[i] as usize].clone()));
         }
         sd[i][0] = None;
 

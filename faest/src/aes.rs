@@ -4,11 +4,19 @@ use generic_array::{GenericArray};
 use typenum::{Unsigned, U8};
 
 use crate::{
-    aes_test::byte_to_bit, fields::{BigGaloisField, ByteCombine, Field, SumPoly}, parameter::{self, PARAM, PARAMOWF}, rijndael_32::{
+    fields::{BigGaloisField, ByteCombine, Field, SumPoly}, parameter::{self, PARAM, PARAMOWF}, rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     }, universal_hashing::{zkhash, ZKHasherInit, ZKHasherProcess}, vole::chaldec
 };
+
+pub fn byte_to_bit(input : u8) -> Vec<u8> {
+    let mut res = vec![0; 8];
+    for i in 0..8 {
+        res[i] = (input >> i) & 1;
+    }
+    res
+}
 
 pub fn convert_to_bit<O, S, I>(input: &GenericArray<u8, I>) -> Box<GenericArray<O::Field, S>>
 where
@@ -49,10 +57,12 @@ where
     //step 3
     let (temp_kb, temp_val) =
         rijndael_key_schedule(key, bc, nk as u8, r, <O::SKE as Unsigned>::to_u8()); //modify rijndael_key_schedule
-    let (kb, _temp_val): (GenericArray<u32, O::KBLENGTH>, bool) = (
+    //println!("temp_val = {:?}", temp_val);
+    let (kb, mut valid): (GenericArray<u32, O::KBLENGTH>, bool) = (
         (*GenericArray::from_slice(&temp_kb[..kblen])).clone(),
         temp_val & valid,
     );
+    //println!("temp_val et valid = {:?}", valid);
     //step 4
     for i in convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4]
         .to_vec()
@@ -109,7 +119,9 @@ where
             &mut index,
             &mut valid,
         );
+        
     }
+    //println!("output = {:?}", valid);
     (w, valid)
 }
 
@@ -161,8 +173,9 @@ fn round_with_save<O>(
     rijndael_add_round_key(&mut state, &kb[..8]);
     for j in 1..r as usize {
         for i in inv_bitslice(&state)[0][..].to_vec() {
-            *valid &= i != 0
+            *valid &= (i != 0)
         }
+        //println!("round with save = {:?}", valid);
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, 4);
@@ -178,6 +191,10 @@ fn round_with_save<O>(
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
     }
+    for i in inv_bitslice(&state)[0][..].to_vec() {
+        *valid &= (i != 0)
+    }
+    //println!("round with save = {:?}", valid);
 }
 
 /* #[allow(clippy::too_many_arguments)]
@@ -790,6 +807,7 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
+    
     let lambda = O::Field::LENGTH as usize;
     let k0 = <P::K0 as Unsigned>::to_usize();
     let k1 = <P::K1 as Unsigned>::to_usize();
@@ -872,6 +890,7 @@ where
         GenericArray::from_slice(&qk[..]),
         delta,
     );
+    
     b2[..senc].into_iter().for_each(|value| zk_hasher.update(&value));
     if lambda > 128 {
         let b3 = aes_enc_cstrnts::<O>(
@@ -886,7 +905,8 @@ where
             GenericArray::from_slice(&qk[..]),
             delta,
         );
-        b3.into_iter().for_each(|value| zk_hasher.update(&value));
+        b3[..senc].into_iter().for_each(|value| zk_hasher.update(&value));
+        
     }
 
     let q_s = O::Field::sum_poly(&new_q[l..l + lambda]);

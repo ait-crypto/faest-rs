@@ -1,4 +1,4 @@
-use crate::aes::{aes_enc_bkwd, aes_enc_cstrnts, aes_prove, aes_verify};
+use crate::aes::{aes_enc_bkwd, aes_enc_cstrnts, aes_prove, aes_verify, byte_to_bit};
 use crate::aes::{
     aes_enc_fwd, aes_extendedwitness, aes_key_exp_bwd, aes_key_exp_cstrnts, aes_key_exp_fwd,
     convert_to_bit,
@@ -368,13 +368,6 @@ struct AesKeyExpCstrnts {
     res2: Vec<[u128; 4]>,
 }
 
-pub fn byte_to_bit(input : u8) -> Vec<u8> {
-    let mut res = vec![0; 8];
-    for i in 0..8 {
-        res[i] = (input >> i) & 1;
-    }
-    res
-}
 #[test]
 fn aes_key_exp_cstrnts_test() {
     let file = File::open("AesKeyExpCstrnts.json").unwrap();

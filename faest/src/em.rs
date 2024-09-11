@@ -4,7 +4,7 @@ use cipher::Unsigned;
 use generic_array::GenericArray;
 
 use crate::{
-    aes::convert_to_bit, aes_test::byte_to_bit, fields::{BigGaloisField, ByteCombine, Field, SumPoly}, parameter::{PARAM, PARAMOWF}, rijndael_32::{
+    aes::{convert_to_bit, byte_to_bit}, fields::{BigGaloisField, ByteCombine, Field, SumPoly}, parameter::{PARAM, PARAMOWF}, rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     }, universal_hashing::{ZKHasherInit, ZKHasherProcess}, vole::chaldec
@@ -15,6 +15,7 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
+    let mut valid = true;
     let lambda = <P::LAMBDA as Unsigned>::to_usize() / 8;
     let nst = <O::NST as Unsigned>::to_usize();
     let r = <O::R as Unsigned>::to_usize();
@@ -40,6 +41,18 @@ where
     );
     rijndael_add_round_key(&mut state, &x.0[..8]);
     for j in 1..r {
+        for i in inv_bitslice(&state)[0][..].iter() {
+            valid &= (*i != 0);
+        }
+        if nst == 6 {
+            for i in inv_bitslice(&state)[1][..8].iter() {
+                valid &= (*i != 0);
+            }
+        } else if nst == 8 {
+            for i in inv_bitslice(&state)[1][..].iter() {
+                valid &= (*i != 0);
+            }
+        }
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, nst as u8);
@@ -55,7 +68,7 @@ where
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &x.0[8 * j..8 * (j + 1)]);
     }
-    (res, x.1)
+    (res, valid)
 }
 
 /* pub fn em_witness_has0<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8>

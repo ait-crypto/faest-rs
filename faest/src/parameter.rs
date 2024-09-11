@@ -392,7 +392,7 @@ impl PARAMOWF for PARAMOWF128EM {
 
     type QUOTSENC4 = Quot<Self::SENC, U4>;
 
-    type QUOTPK2 = Quot<Self::PK, U2>;
+    type QUOTPK2 = Self::LAMBDABYTES;
 
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
@@ -475,7 +475,7 @@ impl PARAMOWF for PARAMOWF192EM {
 
     type QUOTSENC4 = Quot<Self::SENC, U4>;
 
-    type QUOTPK2 = Quot<Self::PK, U2>;
+    type QUOTPK2 = Self::LAMBDABYTES;
 
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
@@ -559,7 +559,7 @@ impl PARAMOWF for PARAMOWF256EM {
 
     type QUOTSENC4 = Quot<Self::SENC, U4>;
 
-    type QUOTPK2 = Quot<Self::PK, U2>;
+    type QUOTPK2 = Self::LAMBDABYTES;
 
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
@@ -855,7 +855,7 @@ impl PARAM for PARAM256F {
 pub struct PARAM128SEM;
 
 impl PARAM for PARAM128SEM {
-    type L = <U1024 as Add<U266>>::Output;
+    type L = <U1024 as Add<U256>>::Output;
 
     type LBYTES = U160;
 
@@ -898,7 +898,7 @@ impl PARAM for PARAM128SEM {
 pub struct PARAM128FEM;
 
 impl PARAM for PARAM128FEM {
-    type L = <U1024 as Add<U266>>::Output;
+    type L = <U1024 as Add<U256>>::Output;
 
     type LBYTES = U160;
 
@@ -1028,7 +1028,7 @@ impl PARAM for PARAM192FEM {
 pub struct PARAM256SEM;
 
 impl PARAM for PARAM256SEM {
-    type L = <U4096 as Add<U512>>::Output;
+    type L = Diff<U4096, U512>;
 
     type LBYTES = U448;
 
@@ -1072,7 +1072,7 @@ impl PARAM for PARAM256SEM {
 pub struct PARAM256FEM;
 
 impl PARAM for PARAM256FEM {
-    type L = <U4096 as Add<U512>>::Output;
+    type L = Diff<U4096, U512>;
 
     type LBYTES = U448;
 

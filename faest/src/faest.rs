@@ -110,21 +110,26 @@ impl Variant for AesCypher {
         O: PARAMOWF,
     {
         let nk = <O::NK as Unsigned>::to_u8();
+        let lambda = <O::LAMBDABYTES as Unsigned>::to_usize();
         let r = <O::R as Unsigned>::to_u8();
         let beta = <P::BETA as Unsigned>::to_u8();
         let pk_len = <O::PK as Unsigned>::to_usize() / 2;
         'boucle: loop {
             let mut rho : Box<GenericArray<u8, O::LAMBDABYTES>> = GenericArray::default_boxed();
             let mut sk: Box<GenericArray<u8, O::SK>> = GenericArray::default_boxed();
-            let test: bool;
             rng.fill_bytes(&mut sk);
-            test = aes_extendedwitness::<P, O>(
-                GenericArray::from_slice(&sk[pk_len..]),
-                GenericArray::from_slice(&sk[..pk_len]),
+            
+            let test = aes_extendedwitness::<P, O>(
+                GenericArray::from_slice(&sk[pk_len..pk_len+lambda]),
+                GenericArray::from_slice(&sk),
             )
             .1;
-            if test == false {
+        println!("{:?}", sk);
+            //println!("test = {:?}", test);
+            if !test {
+                //println!("yolo !!");
                 continue 'boucle;
+               
             }
             let mut cypher: cipher::array::Array<
                 aes::cipher::generic_array::GenericArray<u8, _>,
@@ -220,9 +225,10 @@ impl Variant for EmCypher {
             rng.fill_bytes(&mut sk);
             let test = em_extendedwitness::<P, O>(
                 GenericArray::from_slice(&sk[lambda..]),
-                GenericArray::from_slice(&sk[..lambda]),
+                GenericArray::from_slice(&sk),
             )
             .1;
+            println!("{:?}", sk);
             if test == false {
                 continue 'boucle;
             }
@@ -235,8 +241,8 @@ impl Variant for EmCypher {
                 nk,
                 r,
             );
-
-            let y: GenericArray<u8, O::LAMBDA> = cypher
+            //println!("{:?}, {:?}", sk.len(), cypher[0].len());
+            let y: GenericArray<u8, O::LAMBDABYTES> = cypher
                 .into_iter()
                 .flatten()
                 .take(lambda)
@@ -264,15 +270,15 @@ pub fn faest_sign<T, R, C, P, O>(
     msg: &[u8],
     sk: &GenericArray<u8, O::LAMBDABYTES>,
     pk: &GenericArray<u8, O::PK>,
-    rho: &GenericArray<u8, O::LAMBDA>,
+    rho: &GenericArray<u8, O::LAMBDABYTES>,
 ) -> (
     Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>,
     GenericArray<u8, O::LAMBDAPLUS2>,
     GenericArray<u8, O::LBYTES>,
     GenericArray<u8, O::LAMBDABYTES>,
-    Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>>,
+    Box<GenericArray<(Vec<Box<GenericArray<u8, R::LAMBDA>>>, Vec<u8>), P::TAU>>,
     GenericArray<u8, P::LAMBDABYTES>,
-    GenericArray<u8, U16>,
+    [u8; 16],
 )
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
@@ -292,9 +298,9 @@ where
     R::h1(&[pk, msg].concat(), &mut mu);
     let mut riv : Box<GenericArray<u8, R::LAMBDA16>> = GenericArray::default_boxed();
     R::h3(&[sk.to_vec(), mu.to_vec(), rho.to_vec()].concat(), &mut riv);
-    let (r, iv) = (
+    let (r , iv) : (&GenericArray<u8, R::LAMBDA>, [u8; 16]) = (
         GenericArray::from_slice(&riv[..lambda]),
-        GenericArray::from_slice(&riv[lambda..]),
+        riv[lambda..].try_into().unwrap(),
     );
     let (hcom, decom, c, mut u, gv) = volecommit::<P, T, R>(r, &iv[..16].try_into().unwrap());
     let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
@@ -309,16 +315,13 @@ where
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
 
     let u_t = vole_hasher.process(&u);
-    let gv_t: GenericArray<
-        GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>,
-        O::LAMBDALBYTES,
-    > = gv
+    let gv_t: Vec<u8> = gv
         .iter()
-        .map(|v| v.iter().map(|v| vole_hasher.process(v)).collect())
-        .collect();
+        .flat_map(|v| v.iter().flat_map(|v| vole_hasher.process(v)).collect::<Vec<u8>>())
+        .collect::<Vec<u8>>();
     let mut hv : Box<GenericArray<u8, R::PRODLAMBDA2>> = GenericArray::default_boxed();
     R::h1(
-        &gv_t.into_iter().flatten().flatten().collect::<Vec<u8>>()[..],
+        &gv_t[..],
         &mut hv,
     );
     let w = C::witness::<P, O>(sk, pk);
@@ -331,14 +334,7 @@ where
     let mut chall2 : Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
     R::h2(&[chall1.to_vec(), u_t.to_vec(), hv.to_vec(), d.to_vec()].concat(), &mut chall2);
     let new_u = GenericArray::from_slice(&u[..l + lambda]);
-    let new_gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = &gv
-        .iter()
-        .map(|x| {
-            x.iter()
-                .flat_map(|y| y.clone().into_iter().take(l + lambda).collect::<Vec<u8>>())
-                .collect::<GenericArray<u8, _>>()
-        })
-        .collect::<GenericArray<GenericArray<u8, _>, _>>();
+    let new_gv: &Box<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>> = &Box::new(gv.iter().flat_map(|x| {x.iter().map(|y| y.clone().into_iter().take(l + lambda).collect::<GenericArray<u8, O::LAMBDALBYTES>>()).collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()}).collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>());
 
     let (a_t, b_t) = C::prove::<P, O>(
         GenericArray::from_slice(&w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>()),
@@ -349,7 +345,7 @@ where
     );
     let mut chall3 : Box<GenericArray<u8, P::LAMBDABYTES>> = GenericArray::default_boxed();
     R::h2(&[chall2.to_vec(), a_t.to_vec(), b_t.to_vec()].concat(), &mut chall3);
-    let mut pdecom : Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>> = GenericArray::default_boxed();
+    let mut pdecom : Box<GenericArray<(Vec<Box<GenericArray<u8, R::LAMBDA>>>, Vec<u8>), P::TAU>> = GenericArray::default_boxed();
     for i in 0..tau {
         if i < t0 {
             let s = chaldec::<P>(&chall3, i as u16);
@@ -372,8 +368,10 @@ where
         *a_t,
         pdecom,
         (*GenericArray::from_slice(&chall3)).clone(),
-        *iv,
+        iv,
     )
+
+   /* (Box::default(), GenericArray::default(),  GenericArray::default(), GenericArray::default(), Box::default(), GenericArray::default(), GenericArray::default()) */
 }
 
 #[allow(unused_assignments)]
@@ -386,9 +384,9 @@ pub fn faest_verify<T, R, C, P, O>(
         GenericArray<u8, O::LAMBDAPLUS2>,
         GenericArray<u8, O::LBYTES>,
         GenericArray<u8, O::LAMBDABYTES>,
-        Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>>,
+        Box<GenericArray<(Vec<Box<GenericArray<u8, R::LAMBDA>>>, Vec<u8>), P::TAU>>,
         GenericArray<u8, P::LAMBDABYTES>,
-        GenericArray<u8, U16>,
+        [u8;16],
     ),
 ) -> bool
 where
@@ -417,13 +415,14 @@ where
             .map(|(x, y)| (x, (*GenericArray::from_slice(&y)).clone()))
             .collect::<GenericArray<
                 (
-                    Vec<GenericArray<u8, R::LAMBDA>>,
+                    Vec<Box<GenericArray<u8, R::LAMBDA>>>,
                     GenericArray<u8, R::PRODLAMBDA2>,
                 ),
                 P::TAU,
             >>(),
-        iv.into_array(),
+        iv
     );
+    
     let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
     let mut h2_hasher = R::h2_init();
     h2_hasher.update(&mu);
@@ -437,7 +436,7 @@ where
     let mut gq: Box<GenericArray<Vec<GenericArray<u8, <P as PARAM>::LH>>, P::TAU>> =
         GenericArray::default_boxed();
     let mut gd_t: Box<GenericArray<
-        GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>,
+        Vec<GenericArray<u8, O::LAMBDAPLUS2>>,
         O::LAMBDALBYTES,
     >> = GenericArray::default_boxed();
     gq[0] = gq_p[0].clone();
@@ -456,7 +455,7 @@ where
         /* ok */
         let delta = chaldec::<P>(&chall3, i as u16);
         gd_t[i] =
-            GenericArray::from_slice(&(delta
+           delta
                 .iter()
                 .map(|d| {
                     if *d == 1 {
@@ -465,7 +464,7 @@ where
                         GenericArray::default()
                     }
                 })
-                .collect::<GenericArray<_,  <O as PARAMOWF>::LAMBDAPLUS2>>())[..]).clone()
+                .collect::<Vec<_>>()
         ;
         let dtemp: Vec<GenericArray<u8, O::LHATBYTES>> = delta
             .into_iter()
@@ -490,22 +489,18 @@ where
             .collect();
         gq[i] = temp;
     }
-    let gq_t: GenericArray<
-        GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>,
-        O::LAMBDALBYTES,
-    > = gq
+    let gq_t:
+        GenericArray<Box<GenericArray<u8, O::LAMBDAPLUS2>>, O::LAMBDA> = gq
         .iter()
-        .map(|q| q.iter().map(|q| vole_hasher.process(&q)).collect())
+        .flat_map(|q| q.iter().map(|q| Box::new(vole_hasher.process(&q))).collect::<Vec<Box<GenericArray<u8, O::LAMBDAPLUS2>>>>())
         .collect();
     let mut hv : Box<GenericArray<u8, R::PRODLAMBDA2>> = GenericArray::default_boxed();
     R::h1(
         &zip(
-            gq_t.into_iter()
-                .flatten()
-                .collect::<GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDALBYTESLAMBDA>>(),
+            gq_t,
             gd_t.into_iter()
                 .flatten()
-                .collect::<GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDALBYTESLAMBDA>>(),
+                .collect::<Box<GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>>>(),
         )
         .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d).collect::<Vec<u8>>())
         .collect::<Vec<u8>>(),
@@ -524,7 +519,7 @@ where
                             .take(l + lambda)
                             .collect::<GenericArray<u8, _>>()
                     })
-                    .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>()
+                    .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
             })
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
         &a_t,
@@ -544,9 +539,9 @@ pub fn sigma_to_signature<P, O, R>(
     GenericArray<u8, O::LAMBDAPLUS2>,
     GenericArray<u8, O::LBYTES>,
     GenericArray<u8, O::LAMBDABYTES>,
-    Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>>,
+    Box<GenericArray<(Vec<Box<GenericArray<u8, R::LAMBDA>>>, Vec<u8>), P::TAU>>,
     GenericArray<u8, P::LAMBDABYTES>,
-    GenericArray<u8, U16>,
+    [u8;16],
     ),
 ) -> GenericArray<u8, P::SIG> where 
 O:PARAMOWF,
@@ -564,7 +559,7 @@ R:RandomOracle{
             .collect::<Vec<u8>>(),
     );
     signature.append(&mut (*sigma.5).to_vec());
-    signature.append(&mut (*sigma.6).to_vec());
+    signature.append(&mut (sigma.6).to_vec());
 
     return (*GenericArray::from_slice(&signature)).clone();
 }
@@ -577,9 +572,9 @@ pub fn signature_to_sigma<P, O, R>(
     GenericArray<u8, O::LAMBDAPLUS2>,
     GenericArray<u8, O::LBYTES>,
     GenericArray<u8, O::LAMBDABYTES>,
-    Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>>,
+    Box<GenericArray<(Vec<Box<GenericArray<u8, R::LAMBDA>>>, Vec<u8>), P::TAU>>,
     GenericArray<u8, P::LAMBDABYTES>,
-    GenericArray<u8, U16>,
+    [u8;16],
 )
 where
     P: PARAM,
@@ -596,39 +591,26 @@ where
     let tau1 = <P::TAU1 as Unsigned>::to_usize();
     let l_b = l + 2 * lambda + 2;
     let mut c : Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>> = GenericArray::default_boxed();
+    
     for i in c.iter_mut().take(tau - 1) {
-        let indice = 0;
+        let mut indice = 0;
         for j in &signature[index..index + l_b] {
             i[indice] = *j;
+            indice += 1;
         }
         index += l_b;
     }
+    
     let u_tilde = (*GenericArray::from_slice(&signature[index..index + lambda + 2])).clone();
     index += lambda + 2;
     let d = (*GenericArray::from_slice(&signature[index..index + l])).clone();
     index += l;
     let a_tilde = (*GenericArray::from_slice(&signature[index..index + lambda])).clone();
     index += lambda;
-    let mut pdecom: Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>> = GenericArray::default_boxed();/* [
-        vec![
-            (
-                vec![Vec::with_capacity(lambda); k0],
-                Vec::with_capacity(lambda + 16)
-            );
-            tau0
-        ],
-        vec![
-            (
-                vec![Vec::with_capacity(lambda); k1],
-                Vec::with_capacity(lambda + 16)
-            );
-            tau1
-        ],
-    ]
-    .concat(); */
+    let mut pdecom: Box<GenericArray<(Vec<Box<GenericArray<u8, R::LAMBDA>>>, Vec<u8>), P::TAU>> = GenericArray::default_boxed();
     for i in pdecom.iter_mut().take(tau0) {
         for j in 0..k0 {
-            i.0[j] = (*GenericArray::from_slice(&signature[index..index + lambda])).clone();
+            i.0.push(Box::new(GenericArray::from_slice(&signature[index..index + lambda]).clone()));
             index += lambda;
         }
         i.1 = signature[index..index + 2 * lambda].to_vec();
@@ -636,8 +618,7 @@ where
     }
     for i in 0..tau1 {
         for j in 0..k1 {
-            pdecom[tau0 + i].0[j] =
-                (*GenericArray::from_slice(&signature[index..index + lambda])).clone();
+            pdecom[tau0 + i].0.push(Box::new(GenericArray::from_slice(&signature[index..index + lambda]).clone()));
             index += lambda;
         }
         pdecom[tau0 + i]
@@ -647,6 +628,6 @@ where
     }
     let chall3 = (*GenericArray::from_slice(&signature[index..index + lambda])).clone();
     index += lambda;
-    let iv: GenericArray<u8, U16> = *GenericArray::from_slice(&signature[index..]);
+    let iv =  signature[index..].try_into().unwrap();
     (c, u_tilde, d, a_tilde, pdecom, chall3, iv)
 }
