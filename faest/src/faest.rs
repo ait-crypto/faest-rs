@@ -3,7 +3,7 @@ use crate::{
     em::{em_extendedwitness, em_prove, em_verify},
     fields::BigGaloisField,
     parameter::{PARAM, PARAMOWF},
-    random_oracles::{Hasher, RandomOracle, Reader},
+    random_oracles::{Hasher, RandomOracle, Reader, IV},
     rijndael_32::{rijndael_encrypt, rijndael_key_schedule},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
     vc::open,
@@ -330,15 +330,26 @@ where
     let t0 = <P::TAU0 as Unsigned>::to_usize();
     let _k0 = <P::K0 as Unsigned>::to_u16();
     let _k1 = <P::K1 as Unsigned>::to_u16();
+
+    let mut h1_hasher = R::h1_init();
+    h1_hasher.update(&pk);
+    h1_hasher.update(&msg);
+    // why is this Boxed?
     let mut mu: Box<GenericArray<u8, R::PRODLAMBDA2>> = GenericArray::default_boxed();
-    R::h1(&[pk, msg].concat(), &mut mu);
-    let mut riv: Box<GenericArray<u8, R::LAMBDA16>> = GenericArray::default_boxed();
-    R::h3(&[sk.to_vec(), mu.to_vec(), rho.to_vec()].concat(), &mut riv);
-    let (r, iv): (&GenericArray<u8, R::LAMBDA>, [u8; 16]) = (
-        GenericArray::from_slice(&riv[..lambda]),
-        riv[lambda..].try_into().unwrap(),
-    );
-    let (hcom, decom, c, mut u, gv) = volecommit::<P, T, R>(r, &iv[..16].try_into().unwrap());
+    h1_hasher.finish().read(&mut mu);
+
+    let mut h3_hasher = R::h3_init();
+    h3_hasher.update(&sk);
+    h3_hasher.update(&mu);
+    h3_hasher.update(&rho);
+
+    let mut r = GenericArray::<u8, R::LAMBDA>::default();
+    let mut iv = IV::default();
+    let mut h3_reader = h3_hasher.finish();
+    h3_reader.read(&mut r);
+    h3_reader.read(&mut iv);
+
+    let (hcom, decom, c, mut u, gv) = volecommit::<P, T, R>(&r, &iv);
     let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
     let mut h2_hasher = R::h2_init();
     h2_hasher.update(&mu);
@@ -549,8 +560,12 @@ where
                 .collect::<Vec<Box<GenericArray<u8, O::LAMBDAPLUS2>>>>()
         })
         .collect();
+
+    // why is this a box?
     let mut hv: Box<GenericArray<u8, R::PRODLAMBDA2>> = GenericArray::default_boxed();
-    R::h1(
+    let mut h1_hasher = R::h1_init();
+    // FIXME!
+    h1_hasher.update(
         &zip(
             gq_t,
             gd_t.into_iter()
@@ -559,13 +574,17 @@ where
         )
         .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d).collect::<Vec<u8>>())
         .collect::<Vec<u8>>(),
-        &mut hv,
     );
+    h1_hasher.finish().read(&mut hv);
+
     let mut chall2: Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
-    R::h2(
-        &[chall1.to_vec(), u_t.to_vec(), hv.to_vec(), d.to_vec()].concat(),
-        &mut chall2,
-    );
+    let mut h2_hasher = R::h2_init();
+    h2_hasher.update(&chall1);
+    h2_hasher.update(&u_t);
+    h2_hasher.update(&hv);
+    h2_hasher.update(&d);
+    h2_hasher.finish().read(&mut chall2);
+
     let b_t = C::verify::<P, O>(
         &d,
         &gq.iter()
@@ -585,12 +604,14 @@ where
         &chall3,
         &pk,
     );
-    let mut chall3_p: Box<GenericArray<u8, P::LAMBDABYTES>> = GenericArray::default_boxed();
-    R::h2(
-        &[chall2.to_vec(), a_t.to_vec(), b_t.to_vec()].concat(),
-        &mut chall3_p,
-    );
-    chall3 == *chall3_p
+
+    let mut h2_hasher = R::h2_init();
+    h2_hasher.update(&chall2);
+    h2_hasher.update(&a_t);
+    h2_hasher.update(&b_t);
+    let mut chall3_p: GenericArray<u8, P::LAMBDABYTES> = GenericArray::default();
+    h2_hasher.finish().read(&mut chall3_p);
+    chall3 == chall3_p
 }
 
 #[allow(clippy::type_complexity)]
