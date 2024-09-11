@@ -101,7 +101,6 @@ pub fn volecommit<P, T, R>(
 )
 where
     P: PARAM,
-
     T: BigGaloisField,
     R: RandomOracle<LAMBDA = T::Length>,
 {
@@ -129,9 +128,7 @@ where
     let mut c: Box<GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS>> =
         GenericArray::default_boxed();
     for i in 0..tau {
-        r[i].copy_from_slice(
-            &tau_res[i * (T::LENGTH / 8) as usize..(i + 1) * (T::LENGTH / 8) as usize],
-        );
+        r[i].copy_from_slice(&tau_res[i * (T::LENGTH / 8)..(i + 1) * (T::LENGTH / 8)]);
     }
     let tau_0 = T::LENGTH % tau;
     let mut hasher = R::h1_init();
