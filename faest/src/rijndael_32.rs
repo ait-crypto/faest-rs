@@ -33,7 +33,6 @@ pub(crate) fn rijndael_key_schedule(
     r: u8,
     ske: u8,
 ) -> (Vec<u32>, bool) {
-    //println!("key : {:?}, nst : {:?}, nk : {:?}, r : {:?}, ske : {:?}", key, nst, nk, r, ske);
     let mut valid = true;
     let mut rkeys = vec![0u32; (((nst.div_ceil(nk)) * 8 * (r + 1)) + 8).into()];
     let mut sd_part = [0u8; 16];
@@ -44,7 +43,6 @@ pub(crate) fn rijndael_key_schedule(
 
     let mut rk_off = 0;
     let mut count = 0;
-    //println!("{:?}", rkeys);
     for i in 0..ske / 4 {
         if nk == 8 {
             if count < ske / 4 {
@@ -55,7 +53,6 @@ pub(crate) fn rijndael_key_schedule(
             }
         } else if nk == 6 {
             for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][4..8].iter() {
-                //print!("{:?}, ", i);
                 valid &= (0 != *i);
             }
         } else {

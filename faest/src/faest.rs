@@ -62,7 +62,7 @@ pub trait Variant {
         rng: impl RngCore,
     ) -> (
         GenericArray<u8, O::PK>,
-        Box<GenericArray<u8, O::SK>>,
+        Box<GenericArray<u8, O::PK>>,
         Box<GenericArray<u8, O::LAMBDABYTES>>,
     )
     where
@@ -123,7 +123,7 @@ impl Variant for AesCypher {
         mut rng: impl RngCore,
     ) -> (
         GenericArray<u8, O::PK>,
-        Box<GenericArray<u8, O::SK>>,
+        Box<GenericArray<u8, O::PK>>,
         Box<GenericArray<u8, O::LAMBDABYTES>>,
     )
     where
@@ -137,7 +137,7 @@ impl Variant for AesCypher {
         let pk_len = <O::PK as Unsigned>::to_usize() / 2;
         'boucle: loop {
             let mut rho: Box<GenericArray<u8, O::LAMBDABYTES>> = GenericArray::default_boxed();
-            let mut sk: Box<GenericArray<u8, O::SK>> = GenericArray::default_boxed();
+            let mut sk: Box<GenericArray<u8, O::PK>> = GenericArray::default_boxed();
             rng.fill_bytes(&mut sk);
 
             let test = aes_extendedwitness::<P, O>(
@@ -145,10 +145,7 @@ impl Variant for AesCypher {
                 GenericArray::from_slice(&sk),
             )
             .1;
-            println!("{:?}", sk);
-            //println!("test = {:?}", test);
             if !test {
-                //println!("yolo !!");
                 continue 'boucle;
             }
             let mut cypher: cipher::array::Array<
@@ -244,7 +241,7 @@ impl Variant for EmCypher {
         mut rng: impl RngCore,
     ) -> (
         GenericArray<u8, O::PK>,
-        Box<GenericArray<u8, O::SK>>,
+        Box<GenericArray<u8, O::PK>>,
         Box<GenericArray<u8, O::LAMBDABYTES>>,
     )
     where
@@ -257,14 +254,13 @@ impl Variant for EmCypher {
         let nst = <O::NST as Unsigned>::to_u8();
         'boucle: loop {
             let mut rho: Box<GenericArray<u8, O::LAMBDABYTES>> = GenericArray::default_boxed();
-            let mut sk: Box<GenericArray<u8, O::SK>> = GenericArray::default_boxed();
+            let mut sk: Box<GenericArray<u8, O::PK>> = GenericArray::default_boxed();
             rng.fill_bytes(&mut sk);
             let test = em_extendedwitness::<P, O>(
                 GenericArray::from_slice(&sk[lambda..]),
                 GenericArray::from_slice(&sk),
             )
             .1;
-            println!("{:?}", sk);
             if test == false {
                 continue 'boucle;
             }
@@ -277,7 +273,6 @@ impl Variant for EmCypher {
                 nk,
                 r,
             );
-            //println!("{:?}, {:?}", sk.len(), cypher[0].len());
             let y: GenericArray<u8, O::LAMBDABYTES> = cypher
                 .into_iter()
                 .flatten()

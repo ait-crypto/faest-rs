@@ -13,8 +13,17 @@ use ::faest::{
 use cipher::Unsigned;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use faest::faest;
+use generic_array::GenericArray;
 use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
 use rand::random;
+
+type Signature<O : PARAMOWF, P : PARAM, R: RandomOracle> = (Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>,
+GenericArray<u8, O::LAMBDAPLUS2>,
+GenericArray<u8, O::LBYTES>,
+GenericArray<u8, O::LAMBDABYTES>,
+Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>>,
+GenericArray<u8, P::LAMBDABYTES>,
+[u8; 16]);
 
 fn generate_rng() -> NistPqcAes256CtrRng {
     let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()[..48]
@@ -23,7 +32,7 @@ fn generate_rng() -> NistPqcAes256CtrRng {
     NistPqcAes256CtrRng::from(seed)
 }
 
-fn generate_sign_input_aes<C, P, O>() -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>)
+fn generate_sign_input_aes<C, P, O>() -> (Vec<u8>, GenericArray<u8, O::LAMBDABYTES>, GenericArray<u8, O::PK>, GenericArray<u8, O::LAMBDABYTES>)
 where
     P: PARAM,
     O: PARAMOWF,
@@ -35,13 +44,13 @@ where
     let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
     (
         msg.to_vec(),
-        sk[<O::BETA as Unsigned>::to_usize() * 16..].to_vec(),
-        pk,
-        rho[..<P::LAMBDA as Unsigned>::to_usize() / 8].to_vec(),
+        (*GenericArray::from_slice(&sk[<O::PK as Unsigned>::to_usize()/2..<O::LAMBDABYTES as Unsigned>::to_usize()+ (<O::PK as Unsigned>::to_usize()/2)])).clone(),
+        (*GenericArray::from_slice(&pk[..<O::PK as Unsigned>::to_usize()])).clone(),
+        (*GenericArray::from_slice(&rho[..<O::LAMBDABYTES as Unsigned>::to_usize()])).clone(),
     )
 }
 
-fn generate_sign_input_em<C, P, O>() -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>)
+fn generate_sign_input_em<C, P, O>() -> (Vec<u8>, GenericArray<u8, O::LAMBDABYTES>, GenericArray<u8, O::PK>, GenericArray<u8, O::LAMBDABYTES>)
 where
     P: PARAM,
     O: PARAMOWF,
@@ -53,49 +62,33 @@ where
     let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
     (
         msg.to_vec(),
-        sk[<P::LAMBDA as Unsigned>::to_usize() / 8..].to_vec(),
-        pk,
-        rho[..<P::LAMBDA as Unsigned>::to_usize() / 8].to_vec(),
+        (*GenericArray::from_slice(&sk[<P::LAMBDA as Unsigned>::to_usize() / 8..])).clone(),
+        (*GenericArray::from_slice(&pk)).clone(),
+        (*GenericArray::from_slice(&rho[..<P::LAMBDA as Unsigned>::to_usize() / 8])).clone(),
     )
 }
 
 fn bench_sign<T, R, C, P, O>(
-    input: (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>),
-) -> (
-    Vec<Vec<u8>>,
-    Vec<u8>,
-    Vec<u8>,
-    Vec<u8>,
-    Vec<(Vec<Vec<u8>>, Vec<u8>)>,
-    Vec<u8>,
-    [u8; 16],
-)
+    input: (Vec<u8>, GenericArray<u8, O::LAMBDABYTES>, GenericArray<u8, O::PK>, GenericArray<u8, O::LAMBDABYTES>),
+) -> Signature<O, P, R>
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
     C: Variant,
-    R: RandomOracle,
+    R: RandomOracle<LAMBDA = T::Length>,
     P: PARAM,
     O: PARAMOWF,
 {
-    faest_sign::<T, R, C, P, O>(&input.0, &input.1, &input.2, input.3)
+    faest_sign::<T, R, C, P, O>(&input.0, &input.1, &input.2, &input.3)
 }
 
 fn generate_verify_input_aes<T, R, C, P, O>() -> (
     Vec<u8>,
-    Vec<u8>,
-    (
-        Vec<Vec<u8>>,
-        Vec<u8>,
-        Vec<u8>,
-        Vec<u8>,
-        Vec<(Vec<Vec<u8>>, Vec<u8>)>,
-        Vec<u8>,
-        [u8; 16],
-    ),
+    GenericArray<u8, O::PK>,
+    Signature<O, P, R>
 )
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
-    R: RandomOracle,
+    R: RandomOracle<LAMBDA = T::Length>,
     C: Variant,
     P: PARAM,
     O: PARAMOWF,
@@ -107,29 +100,21 @@ where
     let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
     let sign = faest_sign::<T, R, C, P, O>(
         msg,
-        &sk[<O::BETA as Unsigned>::to_usize() * 16..],
-        &pk,
-        rho[..<P::LAMBDA as Unsigned>::to_usize() / 8].to_vec(),
+        GenericArray::from_slice(&sk[<O::PK as Unsigned>::to_usize() - <O::LAMBDABYTES as Unsigned>::to_usize()..]),
+        GenericArray::from_slice(&pk),
+        GenericArray::from_slice(&rho[..<O::LAMBDABYTES as Unsigned>::to_usize()]),
     );
-    (msg.to_vec(), pk, sign)
+    (msg.to_vec(), *pk, sign)
 }
 
 fn generate_verify_input_em<T, R, C, P, O>() -> (
     Vec<u8>,
-    Vec<u8>,
-    (
-        Vec<Vec<u8>>,
-        Vec<u8>,
-        Vec<u8>,
-        Vec<u8>,
-        Vec<(Vec<Vec<u8>>, Vec<u8>)>,
-        Vec<u8>,
-        [u8; 16],
-    ),
+    GenericArray<u8, O::PK>,
+    Signature<O, P, R>
 )
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
-    R: RandomOracle,
+    R: RandomOracle<LAMBDA = T::Length>,
     C: Variant,
     P: PARAM,
     O: PARAMOWF,
@@ -141,26 +126,18 @@ where
     let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
     let sign = faest_sign::<T, R, C, P, O>(
         msg,
-        &sk[<P::LAMBDA as Unsigned>::to_usize() / 8..],
-        &pk,
-        rho[..<P::LAMBDA as Unsigned>::to_usize() / 8].to_vec(),
+        GenericArray::from_slice(&sk[<P::LAMBDA as Unsigned>::to_usize() / 8..]),
+        GenericArray::from_slice(&pk),
+        GenericArray::from_slice(&rho[..<P::LAMBDA as Unsigned>::to_usize() / 8]),
     );
-    (msg.to_vec(), pk, sign)
+    (msg.to_vec(), (*GenericArray::from_slice(&pk)).clone(), sign)
 }
 
-fn becnh_verify_aes<T, R, C, P, O>(
+fn bench_verify_aes<T, R, C, P, O>(
     input: (
         Vec<u8>,
-        Vec<u8>,
-        (
-            Vec<Vec<u8>>,
-            Vec<u8>,
-            Vec<u8>,
-            Vec<u8>,
-            Vec<(Vec<Vec<u8>>, Vec<u8>)>,
-            Vec<u8>,
-            [u8; 16],
-        ),
+        GenericArray<u8, O::PK>,
+        Signature<O, P, R>,
     ),
 ) where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
@@ -171,27 +148,16 @@ fn becnh_verify_aes<T, R, C, P, O>(
 {
     faest_verify::<T, R, C, P, O>(
         &input.0,
-        (
-            &input.1[..2 * <O::BETA as Unsigned>::to_usize()],
-            &input.1[2 * <O::BETA as Unsigned>::to_usize()..],
-        ),
+        input.1,
         input.2,
     );
 }
 
-fn becnh_verify_em<T, R, C, P, O>(
+fn bench_verify_em<T, R, C, P, O>(
     input: (
         Vec<u8>,
-        Vec<u8>,
-        (
-            Vec<Vec<u8>>,
-            Vec<u8>,
-            Vec<u8>,
-            Vec<u8>,
-            Vec<(Vec<Vec<u8>>, Vec<u8>)>,
-            Vec<u8>,
-            [u8; 16],
-        ),
+        GenericArray<u8, O::PK>,
+        Signature<O, P, R>,
     ),
 ) where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
@@ -202,10 +168,7 @@ fn becnh_verify_em<T, R, C, P, O>(
 {
     faest_verify::<T, R, C, P, O>(
         &input.0,
-        (
-            &input.1[..<P::LAMBDA as Unsigned>::to_usize() / 8],
-            &input.1[<P::LAMBDA as Unsigned>::to_usize() / 8..],
-        ),
+        input.1,
         input.2,
     );
 }
@@ -333,7 +296,7 @@ pub fn faest_benchmark(c: &mut Criterion) {
     });
     c.bench_function("Verify aes 128s", |b| {
         b.iter(|| {
-            becnh_verify_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(
+            bench_verify_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128S, PARAMOWF128>(
                 generate_verify_input_aes::<
                     GF128,
                     RandomOracleShake128,
@@ -346,7 +309,7 @@ pub fn faest_benchmark(c: &mut Criterion) {
     });
     c.bench_function("Verify aes 128f", |b| {
         b.iter(|| {
-            becnh_verify_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128F, PARAMOWF128>(
+            bench_verify_aes::<GF128, RandomOracleShake128, AesCypher, PARAM128F, PARAMOWF128>(
                 generate_verify_input_aes::<
                     GF128,
                     RandomOracleShake128,
@@ -359,7 +322,7 @@ pub fn faest_benchmark(c: &mut Criterion) {
     });
     c.bench_function("Verify aes 192s", |b| {
         b.iter(|| {
-            becnh_verify_aes::<GF192, RandomOracleShake192, AesCypher, PARAM192S, PARAMOWF192>(
+            bench_verify_aes::<GF192, RandomOracleShake192, AesCypher, PARAM192S, PARAMOWF192>(
                 generate_verify_input_aes::<
                     GF192,
                     RandomOracleShake192,
@@ -372,7 +335,7 @@ pub fn faest_benchmark(c: &mut Criterion) {
     });
     c.bench_function("Verify aes 192f", |b| {
         b.iter(|| {
-            becnh_verify_aes::<GF192, RandomOracleShake192, AesCypher, PARAM192F, PARAMOWF192>(
+            bench_verify_aes::<GF192, RandomOracleShake192, AesCypher, PARAM192F, PARAMOWF192>(
                 generate_verify_input_aes::<
                     GF192,
                     RandomOracleShake192,
@@ -385,7 +348,7 @@ pub fn faest_benchmark(c: &mut Criterion) {
     });
     c.bench_function("Verify aes 256s", |b| {
         b.iter(|| {
-            becnh_verify_aes::<GF256, RandomOracleShake256, AesCypher, PARAM256S, PARAMOWF256>(
+            bench_verify_aes::<GF256, RandomOracleShake256, AesCypher, PARAM256S, PARAMOWF256>(
                 generate_verify_input_aes::<
                     GF256,
                     RandomOracleShake256,
@@ -398,7 +361,7 @@ pub fn faest_benchmark(c: &mut Criterion) {
     });
     c.bench_function("Verify aes 256f", |b| {
         b.iter(|| {
-            becnh_verify_aes::<GF256, RandomOracleShake256, AesCypher, PARAM256F, PARAMOWF256>(
+            bench_verify_aes::<GF256, RandomOracleShake256, AesCypher, PARAM256F, PARAMOWF256>(
                 generate_verify_input_aes::<
                     GF256,
                     RandomOracleShake256,
@@ -411,7 +374,7 @@ pub fn faest_benchmark(c: &mut Criterion) {
     });
     c.bench_function("Verify em 128s", |b| {
         b.iter(|| {
-            becnh_verify_em::<GF128, RandomOracleShake128, EmCypher, PARAM128SEM, PARAMOWF128EM>(
+            bench_verify_em::<GF128, RandomOracleShake128, EmCypher, PARAM128SEM, PARAMOWF128EM>(
                 generate_verify_input_em::<
                     GF128,
                     RandomOracleShake128,
@@ -424,7 +387,7 @@ pub fn faest_benchmark(c: &mut Criterion) {
     });
     c.bench_function("Verify em 128f", |b| {
         b.iter(|| {
-            becnh_verify_em::<GF128, RandomOracleShake128, EmCypher, PARAM128FEM, PARAMOWF128EM>(
+            bench_verify_em::<GF128, RandomOracleShake128, EmCypher, PARAM128FEM, PARAMOWF128EM>(
                 generate_verify_input_em::<
                     GF128,
                     RandomOracleShake128,
@@ -437,7 +400,7 @@ pub fn faest_benchmark(c: &mut Criterion) {
     });
     c.bench_function("Verify em 192s", |b| {
         b.iter(|| {
-            becnh_verify_em::<GF192, RandomOracleShake192, EmCypher, PARAM192SEM, PARAMOWF192EM>(
+            bench_verify_em::<GF192, RandomOracleShake192, EmCypher, PARAM192SEM, PARAMOWF192EM>(
                 generate_verify_input_em::<
                     GF192,
                     RandomOracleShake192,
@@ -450,7 +413,7 @@ pub fn faest_benchmark(c: &mut Criterion) {
     });
     c.bench_function("Verify em 192f", |b| {
         b.iter(|| {
-            becnh_verify_em::<GF192, RandomOracleShake192, EmCypher, PARAM192FEM, PARAMOWF192EM>(
+            bench_verify_em::<GF192, RandomOracleShake192, EmCypher, PARAM192FEM, PARAMOWF192EM>(
                 generate_verify_input_em::<
                     GF192,
                     RandomOracleShake192,
@@ -463,7 +426,7 @@ pub fn faest_benchmark(c: &mut Criterion) {
     });
     c.bench_function("Verify em 256s", |b| {
         b.iter(|| {
-            becnh_verify_em::<GF256, RandomOracleShake256, EmCypher, PARAM256SEM, PARAMOWF256EM>(
+            bench_verify_em::<GF256, RandomOracleShake256, EmCypher, PARAM256SEM, PARAMOWF256EM>(
                 generate_verify_input_em::<
                     GF256,
                     RandomOracleShake256,
@@ -476,7 +439,7 @@ pub fn faest_benchmark(c: &mut Criterion) {
     });
     c.bench_function("Verify em 256f", |b| {
         b.iter(|| {
-            becnh_verify_em::<GF256, RandomOracleShake256, EmCypher, PARAM256FEM, PARAMOWF256EM>(
+            bench_verify_em::<GF256, RandomOracleShake256, EmCypher, PARAM256FEM, PARAMOWF256EM>(
                 generate_verify_input_em::<
                     GF256,
                     RandomOracleShake256,

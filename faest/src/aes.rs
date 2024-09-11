@@ -56,13 +56,11 @@ where
     let mut index = 0;
     //step 3
     let (temp_kb, temp_val) =
-        rijndael_key_schedule(key, bc, nk as u8, r, <O::SKE as Unsigned>::to_u8()); //modify rijndael_key_schedule
-                                                                                    //println!("temp_val = {:?}", temp_val);
+        rijndael_key_schedule(key, bc, nk as u8, r, <O::SKE as Unsigned>::to_u8()); 
     let (kb, mut valid): (GenericArray<u32, O::KBLENGTH>, bool) = (
         (*GenericArray::from_slice(&temp_kb[..kblen])).clone(),
         temp_val & valid,
     );
-    //println!("temp_val et valid = {:?}", valid);
     //step 4
     for i in convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4]
         .to_vec()
@@ -120,7 +118,6 @@ where
             &mut valid,
         );
     }
-    //println!("output = {:?}", valid);
     (w, valid)
 }
 
@@ -174,7 +171,6 @@ fn round_with_save<O>(
         for i in inv_bitslice(&state)[0][..].to_vec() {
             *valid &= (i != 0)
         }
-        //println!("round with save = {:?}", valid);
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, 4);
@@ -193,7 +189,6 @@ fn round_with_save<O>(
     for i in inv_bitslice(&state)[0][..].to_vec() {
         *valid &= (i != 0)
     }
-    //println!("round with save = {:?}", valid);
 }
 
 /* #[allow(clippy::too_many_arguments)]
