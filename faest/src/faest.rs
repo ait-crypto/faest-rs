@@ -372,19 +372,20 @@ where
     h1_hasher.finish().read(&mut hv);
 
     let w = C::witness::<P, O>(sk, pk);
-    // FIXME
-    let d = &zip(
-        w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
-        &mut u[..l],
-    )
-    .map(|(w, u)| w ^ *u)
-    .collect::<GenericArray<u8, O::LBYTES>>()[..];
+    let d = GenericArray::from_iter(
+        zip(
+            // FIXME: remove collect
+            w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
+            &u[..l],
+        )
+        .map(|(w, u)| w ^ *u),
+    );
 
     let mut h2_hasher = R::h2_init();
     h2_hasher.update(&chall1);
     h2_hasher.update(&u_t);
     h2_hasher.update(&hv);
-    h2_hasher.update(d);
+    h2_hasher.update(&d);
     // why is this boxed?
     let mut chall2: Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
     h2_hasher.finish().read(&mut chall2);
@@ -445,7 +446,7 @@ where
                 .collect::<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>(),
         ),
         u_t,
-        (*GenericArray::from_slice(&d)).clone(),
+        d,
         *a_t,
         pdecom,
         (*GenericArray::from_slice(&chall3)).clone(),
