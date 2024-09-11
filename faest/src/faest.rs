@@ -406,11 +406,15 @@ where
         pk,
         &chall2,
     );
+
+    let mut h2_hasher = R::h2_init();
+    h2_hasher.update(&chall2);
+    h2_hasher.update(&a_t);
+    h2_hasher.update(&b_t);
+    // why is this boxed?
     let mut chall3: Box<GenericArray<u8, P::LAMBDABYTES>> = GenericArray::default_boxed();
-    R::h2(
-        &[chall2.to_vec(), a_t.to_vec(), b_t.to_vec()].concat(),
-        &mut chall3,
-    );
+    h2_hasher.finish().read(&mut chall3);
+
     let mut pdecom: Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>> =
         GenericArray::default_boxed();
     for i in 0..tau {
