@@ -354,24 +354,23 @@ where
     let mut h2_hasher = R::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
-    c.iter().for_each(|buf| h2_hasher.update(&buf));
+    c.iter().for_each(|buf| h2_hasher.update(buf));
     h2_hasher.update(&iv);
     let mut reader = h2_hasher.finish();
     reader.read(&mut chall1);
 
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
-
     let u_t = vole_hasher.process(&u);
-    let gv_t: Vec<u8> = gv
-        .iter()
-        .flat_map(|v| {
-            v.iter()
-                .flat_map(|v| vole_hasher.process(v))
-                .collect::<Vec<u8>>()
-        })
-        .collect::<Vec<u8>>();
+
+    let mut h1_hasher = R::h1_init();
+    for v in gv.iter() {
+        v.iter()
+            .for_each(|v| h1_hasher.update(&vole_hasher.process(v)));
+    }
+    // why is this boxed?
     let mut hv: Box<GenericArray<u8, R::PRODLAMBDA2>> = GenericArray::default_boxed();
-    R::h1(&gv_t[..], &mut hv);
+    h1_hasher.finish().read(&mut hv);
+
     let w = C::witness::<P, O>(sk, pk);
     let d = &zip(
         w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
