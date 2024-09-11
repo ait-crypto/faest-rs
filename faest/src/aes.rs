@@ -1,5 +1,5 @@
 
-use std::{default, iter::zip};
+use std::iter::zip;
 use generic_array::{GenericArray};
 use typenum::{Unsigned, U8};
 
@@ -7,7 +7,7 @@ use crate::{
     fields::{BigGaloisField, ByteCombine, Field, SumPoly}, parameter::{self, PARAM, PARAMOWF}, rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
-    }, universal_hashing::{zkhash, ZKHasherInit, ZKHasherProcess}, vole::chaldec
+    }, universal_hashing::{ZKHasherInit, ZKHasherProcess}, vole::chaldec
 };
 
 pub fn byte_to_bit(input : u8) -> Vec<u8> {
