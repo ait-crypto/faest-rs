@@ -1,8 +1,4 @@
-use std::iter::zip;
-
-use cipher::Unsigned;
-
-use generic_array::{ArrayLength, GenericArray};
+use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
 use crate::parameter::PARAM;
 use crate::random_oracles::{Hasher, Reader, IV};
