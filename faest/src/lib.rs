@@ -1,4 +1,5 @@
-//#![warn(clippy::pedantic)]
+#![warn(clippy::pedantic)]
+
 // #![warn(missing_docs)]
 
 pub mod fields;

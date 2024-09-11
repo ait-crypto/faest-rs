@@ -12,7 +12,7 @@ use crate::{
     random_oracles::{
         self, RandomOracle, RandomOracleShake128, RandomOracleShake192, RandomOracleShake256,
     },
-    vole::{chaldec, convert_to_vole, volecommit, volereconstruct},
+    vole::{chaldec, to_vole_convert, volecommit, volereconstruct},
 };
 
 #[derive(Debug, Deserialize)]
@@ -50,7 +50,7 @@ fn convert_to_vole_test() {
                 opt_sd[0] = None;
             }
             type LH = U234;
-            let res = convert_to_vole::<RandomOracleShake128, LH>(&opt_sd, &data.iv);
+            let res = to_vole_convert::<RandomOracleShake128, LH>(&opt_sd, &data.iv);
             assert_eq!(res.0, *GenericArray::from_slice(&data.u));
             assert_eq!(
                 res.1,
@@ -70,7 +70,7 @@ fn convert_to_vole_test() {
                 opt_sd[0] = None;
             }
             type LH = U458;
-            let res = convert_to_vole::<RandomOracleShake192, LH>(&opt_sd, &data.iv);
+            let res = to_vole_convert::<RandomOracleShake192, LH>(&opt_sd, &data.iv);
             assert_eq!(res.0, *GenericArray::from_slice(&data.u));
             assert_eq!(
                 res.1,
@@ -90,7 +90,7 @@ fn convert_to_vole_test() {
                 opt_sd[0] = None;
             }
             type LH = U566;
-            let res = convert_to_vole::<RandomOracleShake256, LH>(&opt_sd, &data.iv);
+            let res = to_vole_convert::<RandomOracleShake256, LH>(&opt_sd, &data.iv);
             assert_eq!(res.0, *GenericArray::from_slice(&data.u));
             assert_eq!(
                 res.1,
