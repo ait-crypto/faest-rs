@@ -6,7 +6,7 @@ use generic_array::GenericArray;
 use crate::{
     aes::{byte_to_bit, convert_to_bit},
     fields::{BigGaloisField, ByteCombine, Field, SumPoly},
-    parameter::{PARAM, PARAMOWF},
+    parameter::{BaseParameters, PARAM, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
@@ -395,8 +395,10 @@ where
     let u_s = O::Field::to_field(&u[l / 8..])[0];
     let v_s = O::Field::sum_poly(&new_v[l..l + lambda]);
 
-    let mut a_t_hasher = O::ZKHasher::new_zk_hasher(chall);
-    let mut b_t_hasher = O::ZKHasher::new_zk_hasher(chall);
+    let mut a_t_hasher =
+        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
+    let mut b_t_hasher =
+        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
 
     a1.into_iter().for_each(|value| a_t_hasher.update(&value));
     a0.into_iter().for_each(|value| b_t_hasher.update(&value));
@@ -486,7 +488,8 @@ where
         delta,
     );
 
-    let mut zk_hasher = O::ZKHasher::new_zk_hasher(chall2);
+    let mut zk_hasher =
+        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
     b.into_iter().for_each(|value| zk_hasher.update(&value));
 
     let q_s = O::Field::sum_poly(&new_q[l..l + lambda]);

@@ -89,14 +89,19 @@ impl BaseParameters for BaseParams256 {
 
 pub trait PARAMOWF {
     type BaseParams: BaseParameters<
+        Lambda = Self::LAMBDA,
+        LambdaBytes = Self::LAMBDABYTES,
         Field = Self::Field,
         ZKHasher = Self::ZKHasher,
         VoleHasher = Self::VoleHasher,
     >;
 
     /// The field that is of size `2^λ` which is defined as [Self::LAMBDA]
+    // #[deprecated]
     type Field: BigGaloisField + Field<Length = Self::LAMBDABYTES> + std::fmt::Debug;
+    #[deprecated]
     type ZKHasher: ZKHasherInit<Self::Field, SDLength = Self::CHALL>;
+    #[deprecated]
     type VoleHasher: VoleHasherInit<
         Self::Field,
         SDLength = Self::CHALL1,
