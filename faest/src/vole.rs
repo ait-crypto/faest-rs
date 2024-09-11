@@ -130,7 +130,7 @@ where
     for i in 0..tau {
         prg.read(&mut r[i]);
     }
-    let tau_0 = R::LAMBDA::USIZE % tau;
+    let tau_0 = (R::LAMBDA::USIZE * 8) % tau;
     let mut hasher = R::h1_init();
     for i in 0..tau {
         let b = 1 - (i < tau_0.try_into().unwrap()) as u16;
