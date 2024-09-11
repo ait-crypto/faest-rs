@@ -56,7 +56,7 @@ where
     let mut index = 0;
     //step 3
     let (temp_kb, temp_val) =
-        rijndael_key_schedule(key, bc, nk as u8, r, <O::SKE as Unsigned>::to_u8()); 
+        rijndael_key_schedule(key, bc, nk as u8, r, <O::SKE as Unsigned>::to_u8());
     let (kb, mut valid): (GenericArray<u32, O::KBLENGTH>, bool) = (
         (*GenericArray::from_slice(&temp_kb[..kblen])).clone(),
         temp_val & valid,

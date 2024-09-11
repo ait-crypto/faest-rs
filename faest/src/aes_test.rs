@@ -18,9 +18,12 @@ use std::default;
 use std::fs::File;
 use typenum::{U176, U208, U240, U8};
 
-type ZkHash256 = Box<GenericArray<u8, <parameter::PARAMOWF256 as parameter::PARAMOWF>::LAMBDABYTES>>;
-type ZkHash192 = Box<GenericArray<u8, <parameter::PARAMOWF192 as parameter::PARAMOWF>::LAMBDABYTES>>;
-type ZkHash128 = Box<GenericArray<u8, <parameter::PARAMOWF128 as parameter::PARAMOWF>::LAMBDABYTES>>;
+type ZkHash256 =
+    Box<GenericArray<u8, <parameter::PARAMOWF256 as parameter::PARAMOWF>::LAMBDABYTES>>;
+type ZkHash192 =
+    Box<GenericArray<u8, <parameter::PARAMOWF192 as parameter::PARAMOWF>::LAMBDABYTES>>;
+type ZkHash128 =
+    Box<GenericArray<u8, <parameter::PARAMOWF128 as parameter::PARAMOWF>::LAMBDABYTES>>;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1192,7 +1195,7 @@ fn aes_prove_test() {
         if data.lambda == 128 {
             let mut pk = data.input.to_vec();
             pk.append(&mut data.output.to_vec());
-            let res: (ZkHash128, ZkHash128) = aes_prove::<PARAM128S, PARAMOWF128>( 
+            let res: (ZkHash128, ZkHash128) = aes_prove::<PARAM128S, PARAMOWF128>(
                 GenericArray::from_slice(&data.w),
                 GenericArray::from_slice(&data.u),
                 Box::new(GenericArray::from_slice(
@@ -1245,7 +1248,7 @@ fn aes_prove_test() {
 
             let mut pk = data.input.to_vec();
             pk.append(&mut data.output.to_vec());
-            let res: (ZkHash256, ZkHash256)= aes_prove::<PARAM256S, PARAMOWF256>(
+            let res: (ZkHash256, ZkHash256) = aes_prove::<PARAM256S, PARAMOWF256>(
                 GenericArray::from_slice(&data.w),
                 GenericArray::from_slice(&data.u),
                 Box::new(GenericArray::from_slice(

@@ -12,7 +12,7 @@ use crate::{
 
 #[allow(clippy::type_complexity)]
 ///# Panics
-/// 
+///
 ///If sdi is an None Option
 pub fn to_vole_convert<R, LH>(
     sd: &[Option<GenericArray<u8, R::LAMBDA>>],
@@ -155,8 +155,8 @@ where
 
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::type_complexity)]
-///# Panics 
-/// 
+///# Panics
+///
 /// if i is too big for being a u16
 pub fn volereconstruct<R, P>(
     chal: &GenericArray<u8, P::LAMBDABYTES>,
