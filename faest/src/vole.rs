@@ -6,14 +6,16 @@ use crate::parameter::PARAM;
 use crate::random_oracles::{Hasher, Reader, IV};
 use crate::vc;
 use crate::{
-    fields::BigGaloisField,
     random_oracles::{PseudoRandomGenerator, RandomOracle},
     vc::commit,
 };
 
 #[allow(clippy::type_complexity)]
-pub fn convert_to_vole<R, LH>(
-    sd: &Vec<Option<GenericArray<u8, R::LAMBDA>>>,
+///# Panics
+/// 
+///If sdi is an None Option
+pub fn to_vole_convert<R, LH>(
+    sd: &[Option<GenericArray<u8, R::LAMBDA>>],
     iv: &IV,
 ) -> (GenericArray<u8, LH>, Vec<GenericArray<u8, LH>>)
 where
@@ -35,11 +37,11 @@ where
 
     // FIXME
     let mut v: Vec<GenericArray<u8, LH>> = vec![GenericArray::default(); d];
-    for j in 0..d {
+    for (j, item) in v.iter_mut().enumerate().take(d) {
         let j_offset = (j % 2) * n;
         let j1_offset = ((j + 1) % 2) * n;
         for i in 0..n / (1 << (j + 1)) {
-            zip(v[j].as_mut_slice().iter_mut(), &r[j_offset + 2 * i + 1])
+            zip((*item).as_mut_slice().iter_mut(), &r[j_offset + 2 * i + 1])
                 .for_each(|(vj, rj)| *vj ^= rj);
             for k in 0..LH::USIZE {
                 r[j1_offset + i][k] = r[j_offset + 2 * i][k] ^ r[j_offset + 2 * i + 1][k];
@@ -72,13 +74,13 @@ where
     }
     let mut res: Vec<u8> = vec![0u8; if i < t0 { k0.into() } else { k1.into() }];
     res[0] = (chal[(lo / 8) as usize] >> (lo % 8)) & 1;
-    for j in 1..hi - lo + 1 {
+    for j in 1..=(hi - lo) {
         res[j as usize] = (chal[((lo + j) / 8) as usize] >> ((lo + j) % 8)) & 1;
     }
     res
 }
 
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::many_single_char_names)]
 pub fn volecommit<P, R>(
     r: &GenericArray<u8, <R as RandomOracle>::LAMBDA>,
     iv: &IV,
@@ -133,11 +135,11 @@ where
     let tau_0 = R::LAMBDA::USIZE % tau;
     let mut hasher = R::h1_init();
     for i in 0..tau {
-        let b = 1 - (i < tau_0.try_into().unwrap()) as u16;
+        let b = 1 - u16::from(i < tau_0);
         let k = ((1 - b) * k0) + b * k1;
         (com[i], decom[i], sd[i]) = commit::<R>(&r[i], &iv, 1 << k);
         hasher.update(&com[i]);
-        (u[i], v[i]) = convert_to_vole::<R, P::LH>(&sd[i], iv);
+        (u[i], v[i]) = to_vole_convert::<R, P::LH>(&sd[i], iv);
     }
     for i in 1..tau {
         c[i - 1] = u[0]
@@ -153,6 +155,9 @@ where
 
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::type_complexity)]
+///# Panics 
+/// 
+/// if i is too big for being a u16
 pub fn volereconstruct<R, P>(
     chal: &GenericArray<u8, P::LAMBDABYTES>,
     pdecom: &GenericArray<
@@ -189,7 +194,7 @@ where
         let delta_p: Vec<u8> = chaldec::<P>(chal, i.try_into().unwrap());
         #[allow(clippy::needless_range_loop)]
         for j in 0..delta_p.len() {
-            delta[i] += (delta_p[j] as u32) << j;
+            delta[i] += u32::from(delta_p[j]) << j;
         }
         (com[i], s[i]) = vc::reconstruct::<R>(&pdecom[i], &delta_p, &iv);
         hasher.update(&com[i]);
@@ -198,7 +203,7 @@ where
         }
         sd[i][0] = None;
 
-        (_, q[i]) = convert_to_vole::<R, P::LH>(&sd[i], &iv);
+        (_, q[i]) = to_vole_convert::<R, P::LH>(&sd[i], &iv);
     }
     let mut hcom: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
     hasher.finish().read(&mut hcom);
