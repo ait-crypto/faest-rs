@@ -102,7 +102,7 @@ pub fn volecommit<P, T, R>(
 where
     P: PARAM,
 
-    T: BigGaloisField + std::default::Default,
+    T: BigGaloisField,
     R: RandomOracle<LAMBDA = T::Length>,
 {
     let tau = <P::TAU as Unsigned>::to_usize();
