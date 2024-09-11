@@ -372,17 +372,23 @@ where
     h1_hasher.finish().read(&mut hv);
 
     let w = C::witness::<P, O>(sk, pk);
+    // FIXME
     let d = &zip(
         w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
         &mut u[..l],
     )
     .map(|(w, u)| w ^ *u)
     .collect::<GenericArray<u8, O::LBYTES>>()[..];
+
+    let mut h2_hasher = R::h2_init();
+    h2_hasher.update(&chall1);
+    h2_hasher.update(&u_t);
+    h2_hasher.update(&hv);
+    h2_hasher.update(d);
+    // why is this boxed?
     let mut chall2: Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
-    R::h2(
-        &[chall1.to_vec(), u_t.to_vec(), hv.to_vec(), d.to_vec()].concat(),
-        &mut chall2,
-    );
+    h2_hasher.finish().read(&mut chall2);
+
     let new_u = GenericArray::from_slice(&u[..l + lambda]);
     let new_gv: &Box<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>> = &Box::new(
         gv.iter()
@@ -481,8 +487,13 @@ where
     let _t1 = <P::TAU1 as Unsigned>::to_u16();
     let (c, u_t, d, a_t, pdecom, chall3, iv) = sigma;
 
+    let mut h1_hasher = R::h1_init();
+    h1_hasher.update(&pk);
+    h1_hasher.update(&msg);
+    // why is this boxed?
     let mut mu: Box<GenericArray<u8, R::PRODLAMBDA2>> = GenericArray::default_boxed();
-    R::h1(&[pk.to_vec(), msg.to_vec()].concat(), &mut mu);
+    h1_hasher.finish().read(&mut mu);
+
     let (hcom, gq_p) = volereconstruct::<T, R, P>(
         &chall3,
         &GenericArray::from_iter(
