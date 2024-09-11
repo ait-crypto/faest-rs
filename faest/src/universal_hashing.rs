@@ -309,23 +309,6 @@ where
     }
 }
 
-#[deprecated = "Use O::ZKHasher instead"]
-pub fn zkhash<F>(
-    sd: &GenericArray<u8, <ZKHasher<F> as ZKHasherInit<F>>::SDLength>,
-    x0: &[F],
-    x1: &F,
-) -> GenericArray<u8, F::Length>
-where
-    F: BigGaloisField,
-    ZKHasher<F>: ZKHasherInit<F>,
-{
-    let mut hasher = ZKHasher::<F>::new_zk_hasher(sd);
-    for x in x0 {
-        hasher.update(x);
-    }
-    hasher.finalize(x1).as_bytes()
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
