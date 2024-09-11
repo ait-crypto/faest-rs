@@ -98,8 +98,6 @@ where
     let (sk, pk, rho) = C::keygen_with_rng::<P, O>(rng);
     let length: u8 = random();
     let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
-    println!("{:?}", sk.len());
-    println!("{:?}", pk.len());
     let sign = faest_sign::<T, R, C, P, O>(
         msg,
         GenericArray::from_slice(&sk[<O::PK as Unsigned>::to_usize() - <O::LAMBDABYTES as Unsigned>::to_usize()..]),
