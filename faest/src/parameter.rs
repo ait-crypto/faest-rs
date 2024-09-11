@@ -13,13 +13,95 @@ use generic_array::{
 
 use crate::{
     fields::{BigGaloisField, Field, GF128, GF192, GF256},
-    universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit},
+    random_oracles::{
+        RandomOracle, RandomOracleShake128, RandomOracleShake192, RandomOracleShake256,
+    },
+    universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
 };
 
-pub trait PARAMOWF {
+/// Base parameters per security level
+pub trait BaseParameters {
     /// The field that is of size `2^λ` which is defined as [Self::LAMBDA]
+    type Field: BigGaloisField<Length = Self::LambdaBytes> + std::fmt::Debug;
+    /// Hasher implementation of `ZKHash`
+    type ZKHasher: ZKHasherInit<Self::Field, SDLength = Self::Chall>;
+    /// Hasher implementation of `VOLEHash`
+    type VoleHasher: VoleHasherInit<
+        Self::Field,
+        SDLength = Self::Chall1,
+        OutputLength = Sum<Self::LambdaBytes, B>,
+    >;
+    /// Associated random oracle
+    type RandomOracle: RandomOracle<LAMBDA = Self::LambdaBytes>;
+
+    /// Size of the field [Self::Field] in bits
+    type Lambda: ArrayLength;
+    /// Size of the field [Self::Field] in bytes
+    type LambdaBytes: ArrayLength + Add<B>;
+    type Chall: ArrayLength;
+    type Chall1: ArrayLength;
+}
+
+pub struct BaseParams128;
+
+impl BaseParameters for BaseParams128 {
+    type Field = GF128;
+    type ZKHasher = ZKHasher<Self::Field>;
+    type VoleHasher = VoleHasher<Self::Field>;
+    type RandomOracle = RandomOracleShake128;
+
+    type Lambda = U128;
+    type LambdaBytes = U16;
+
+    type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
+    type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
+}
+
+pub struct BaseParams192;
+
+impl BaseParameters for BaseParams192 {
+    type Field = GF192;
+    type ZKHasher = ZKHasher<Self::Field>;
+    type VoleHasher = VoleHasher<Self::Field>;
+    type RandomOracle = RandomOracleShake192;
+
+    type Lambda = U192;
+    type LambdaBytes = U24;
+
+    type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
+    type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
+}
+
+pub struct BaseParams256;
+
+impl BaseParameters for BaseParams256 {
+    type Field = GF256;
+    type ZKHasher = ZKHasher<Self::Field>;
+    type VoleHasher = VoleHasher<Self::Field>;
+    type RandomOracle = RandomOracleShake256;
+
+    type Lambda = U256;
+    type LambdaBytes = U32;
+
+    type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
+    type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
+}
+
+pub trait PARAMOWF {
+    type BaseParams: BaseParameters<
+        Lambda = Self::LAMBDA,
+        LambdaBytes = Self::LAMBDABYTES,
+        Field = Self::Field,
+        ZKHasher = Self::ZKHasher,
+        VoleHasher = Self::VoleHasher,
+    >;
+
+    /// The field that is of size `2^λ` which is defined as [Self::LAMBDA]
+    // #[deprecated]
     type Field: BigGaloisField + Field<Length = Self::LAMBDABYTES> + std::fmt::Debug;
+    #[deprecated]
     type ZKHasher: ZKHasherInit<Self::Field, SDLength = Self::CHALL>;
+    #[deprecated]
     type VoleHasher: VoleHasherInit<
         Self::Field,
         SDLength = Self::CHALL1,
@@ -68,6 +150,8 @@ pub trait PARAMOWF {
 pub struct PARAMOWF128;
 
 impl PARAMOWF for PARAMOWF128 {
+    type BaseParams = BaseParams128;
+
     type Field = GF128;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
@@ -152,6 +236,8 @@ impl PARAMOWF for PARAMOWF128 {
 pub struct PARAMOWF192;
 
 impl PARAMOWF for PARAMOWF192 {
+    type BaseParams = BaseParams192;
+
     type Field = GF192;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
@@ -236,6 +322,8 @@ impl PARAMOWF for PARAMOWF192 {
 pub struct PARAMOWF256;
 
 impl PARAMOWF for PARAMOWF256 {
+    type BaseParams = BaseParams256;
+
     type Field = GF256;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
@@ -320,6 +408,8 @@ impl PARAMOWF for PARAMOWF256 {
 pub struct PARAMOWF128EM;
 
 impl PARAMOWF for PARAMOWF128EM {
+    type BaseParams = BaseParams128;
+
     type Field = GF128;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
@@ -403,6 +493,8 @@ impl PARAMOWF for PARAMOWF128EM {
 pub struct PARAMOWF192EM;
 
 impl PARAMOWF for PARAMOWF192EM {
+    type BaseParams = BaseParams192;
+
     type Field = GF192;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
@@ -487,6 +579,8 @@ impl PARAMOWF for PARAMOWF192EM {
 pub struct PARAMOWF256EM;
 
 impl PARAMOWF for PARAMOWF256EM {
+    type BaseParams = BaseParams256;
+
     type Field = GF256;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;

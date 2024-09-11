@@ -1,19 +1,19 @@
+use std::iter::zip;
+
 use crate::{
     aes::{aes_extendedwitness, aes_prove, aes_verify},
     em::{em_extendedwitness, em_prove, em_verify},
     fields::BigGaloisField,
-    parameter::{PARAM, PARAMOWF},
+    parameter::{BaseParameters, PARAM, PARAMOWF},
     random_oracles::{Hasher, RandomOracle, Reader, IV},
     rijndael_32::{rijndael_encrypt, rijndael_key_schedule},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
     vc::open,
     vole::{chaldec, volecommit, volereconstruct},
 };
-use cipher::Unsigned;
-use generic_array::GenericArray;
+
+use generic_array::{typenum::Unsigned, GenericArray};
 use nist_pqc_seeded_rng::RngCore;
-use std::iter::zip;
-use typenum::U16;
 
 pub trait Variant {
     ///input : key (len lambda, snd part of sk); public key
@@ -290,6 +290,8 @@ impl Variant for EmCypher {
     }
 }
 
+type RO<O> = <<O as PARAMOWF>::BaseParams as BaseParameters>::RandomOracle;
+
 ///input : Message (an array of bytes), sk : secret key, pk : public key, rho : lambda bits
 ///output : correction string (tau - 1 * (l_hat bits)), Hash of VOLE sceet (LAMBDA + 16 bits), Commitment to the witness (l bits)
 /// Quicksilver proof (Lambda), Partial decommitment (Tau * (t0 * k0*lambda + t1 * k1*lambda  +  2Lambda) bits),
@@ -297,7 +299,7 @@ impl Variant for EmCypher {
 #[allow(clippy::needless_range_loop)]
 #[allow(clippy::type_complexity)]
 #[allow(clippy::unnecessary_to_owned)]
-pub fn faest_sign<T, R, C, P, O>(
+pub fn faest_sign<C, P, O>(
     msg: &[u8],
     sk: &GenericArray<u8, O::LAMBDABYTES>,
     pk: &GenericArray<u8, O::PK>,
@@ -307,14 +309,12 @@ pub fn faest_sign<T, R, C, P, O>(
     GenericArray<u8, O::LAMBDAPLUS2>,
     GenericArray<u8, O::LBYTES>,
     GenericArray<u8, O::LAMBDABYTES>,
-    Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>>,
+    Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>>,
     GenericArray<u8, P::LAMBDABYTES>,
     [u8; 16],
 )
 where
-    T: BigGaloisField + std::default::Default + std::fmt::Debug,
     C: Variant,
-    R: RandomOracle<LAMBDA = T::Length>,
     P: PARAM,
     O: PARAMOWF,
 {
@@ -326,27 +326,28 @@ where
     let _k0 = <P::K0 as Unsigned>::to_u16();
     let _k1 = <P::K1 as Unsigned>::to_u16();
 
-    let mut h1_hasher = R::h1_init();
+    let mut h1_hasher = RO::<O>::h1_init();
     h1_hasher.update(&pk);
     h1_hasher.update(&msg);
     // why is this Boxed?
-    let mut mu: Box<GenericArray<u8, R::PRODLAMBDA2>> = GenericArray::default_boxed();
+    let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
+        GenericArray::default_boxed();
     h1_hasher.finish().read(&mut mu);
 
-    let mut h3_hasher = R::h3_init();
+    let mut h3_hasher = RO::<O>::h3_init();
     h3_hasher.update(&sk);
     h3_hasher.update(&mu);
     h3_hasher.update(&rho);
 
-    let mut r = GenericArray::<u8, R::LAMBDA>::default();
+    let mut r = GenericArray::<u8, O::LAMBDABYTES>::default();
     let mut iv = IV::default();
     let mut h3_reader = h3_hasher.finish();
     h3_reader.read(&mut r);
     h3_reader.read(&mut iv);
 
-    let (hcom, decom, c, mut u, gv) = volecommit::<P, R>(&r, &iv);
+    let (hcom, decom, c, mut u, gv) = volecommit::<P, RO<O>>(&r, &iv);
     let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
-    let mut h2_hasher = R::h2_init();
+    let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
     c.iter().for_each(|buf| h2_hasher.update(buf));
@@ -357,13 +358,14 @@ where
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let u_t = vole_hasher.process(&u);
 
-    let mut h1_hasher = R::h1_init();
+    let mut h1_hasher = RO::<O>::h1_init();
     for v in gv.iter() {
         v.iter()
             .for_each(|v| h1_hasher.update(&vole_hasher.process(v)));
     }
     // why is this boxed?
-    let mut hv: Box<GenericArray<u8, R::PRODLAMBDA2>> = GenericArray::default_boxed();
+    let mut hv: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
+        GenericArray::default_boxed();
     h1_hasher.finish().read(&mut hv);
 
     let w = C::witness::<P, O>(sk, pk);
@@ -376,7 +378,7 @@ where
         .map(|(w, u)| w ^ *u),
     );
 
-    let mut h2_hasher = R::h2_init();
+    let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall1);
     h2_hasher.update(&u_t);
     h2_hasher.update(&hv);
@@ -409,7 +411,7 @@ where
         &chall2,
     );
 
-    let mut h2_hasher = R::h2_init();
+    let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall2);
     h2_hasher.update(&a_t);
     h2_hasher.update(&b_t);
@@ -417,18 +419,18 @@ where
     let mut chall3: Box<GenericArray<u8, P::LAMBDABYTES>> = GenericArray::default_boxed();
     h2_hasher.finish().read(&mut chall3);
 
-    let mut pdecom: Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>> =
+    let mut pdecom: Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>> =
         GenericArray::default_boxed();
     for i in 0..tau {
         if i < t0 {
             let s = chaldec::<P>(&chall3, i as u16);
-            pdecom[i] = open::<R, P::POWK0, P::K0, P::N0>(
+            pdecom[i] = open::<RO<O>, P::POWK0, P::K0, P::N0>(
                 &decom[i],
                 (*GenericArray::from_slice(&s)).clone(),
             );
         } else {
             let s = chaldec::<P>(&chall3, i as u16);
-            pdecom[i] = open::<R, P::POWK1, P::K1, P::N1>(
+            pdecom[i] = open::<RO<O>, P::POWK1, P::K1, P::N1>(
                 &decom[i],
                 (*GenericArray::from_slice(&s)).clone(),
             );
@@ -453,7 +455,7 @@ where
 
 #[allow(unused_assignments)]
 #[allow(clippy::type_complexity)]
-pub fn faest_verify<T, R, C, P, O>(
+pub fn faest_verify<C, P, O>(
     msg: &[u8],
     pk: GenericArray<u8, O::PK>,
     sigma: (
@@ -461,14 +463,12 @@ pub fn faest_verify<T, R, C, P, O>(
         GenericArray<u8, O::LAMBDAPLUS2>,
         GenericArray<u8, O::LBYTES>,
         GenericArray<u8, O::LAMBDABYTES>,
-        Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>>,
+        Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>>,
         GenericArray<u8, P::LAMBDABYTES>,
         [u8; 16],
     ),
 ) -> bool
 where
-    T: BigGaloisField + std::default::Default + std::fmt::Debug,
-    R: RandomOracle,
     C: Variant,
     P: PARAM,
     O: PARAMOWF,
@@ -483,14 +483,15 @@ where
     let _t1 = <P::TAU1 as Unsigned>::to_u16();
     let (c, u_t, d, a_t, pdecom, chall3, iv) = sigma;
 
-    let mut h1_hasher = R::h1_init();
+    let mut h1_hasher = RO::<O>::h1_init();
     h1_hasher.update(&pk);
     h1_hasher.update(&msg);
     // why is this boxed?
-    let mut mu: Box<GenericArray<u8, R::PRODLAMBDA2>> = GenericArray::default_boxed();
+    let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
+        GenericArray::default_boxed();
     h1_hasher.finish().read(&mut mu);
 
-    let (hcom, gq_p) = volereconstruct::<R, P>(
+    let (hcom, gq_p) = volereconstruct::<RO<O>, P>(
         &chall3,
         &GenericArray::from_iter(
             (*pdecom)
@@ -501,7 +502,7 @@ where
     );
 
     let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
-    let mut h2_hasher = R::h2_init();
+    let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
     c.iter().for_each(|buf| h2_hasher.update(&buf));
@@ -566,14 +567,15 @@ where
         .iter()
         .flat_map(|q| {
             q.iter()
-                .map(|q| Box::new(vole_hasher.process(&q)))
+                .map(|q| Box::new(vole_hasher.process(q)))
                 .collect::<Vec<Box<GenericArray<u8, O::LAMBDAPLUS2>>>>()
         })
         .collect();
 
     // why is this a box?
-    let mut hv: Box<GenericArray<u8, R::PRODLAMBDA2>> = GenericArray::default_boxed();
-    let mut h1_hasher = R::h1_init();
+    let mut hv: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
+        GenericArray::default_boxed();
+    let mut h1_hasher = RO::<O>::h1_init();
     // FIXME!
     h1_hasher.update(
         &zip(
@@ -588,7 +590,7 @@ where
     h1_hasher.finish().read(&mut hv);
 
     let mut chall2: Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
-    let mut h2_hasher = R::h2_init();
+    let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall1);
     h2_hasher.update(&u_t);
     h2_hasher.update(&hv);
@@ -615,7 +617,7 @@ where
         &pk,
     );
 
-    let mut h2_hasher = R::h2_init();
+    let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall2);
     h2_hasher.update(&a_t);
     h2_hasher.update(&b_t);
@@ -625,13 +627,13 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-pub fn sigma_to_signature<P, O, R>(
+pub fn sigma_to_signature<P, O>(
     sigma: (
         Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>,
         GenericArray<u8, O::LAMBDAPLUS2>,
         GenericArray<u8, O::LBYTES>,
         GenericArray<u8, O::LAMBDABYTES>,
-        Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>>,
+        Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>>,
         GenericArray<u8, P::LAMBDABYTES>,
         [u8; 16],
     ),
@@ -639,7 +641,6 @@ pub fn sigma_to_signature<P, O, R>(
 where
     O: PARAMOWF,
     P: PARAM,
-    R: RandomOracle,
 {
     let mut signature = sigma
         .0
@@ -663,21 +664,20 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-pub fn signature_to_sigma<P, O, R>(
+pub fn signature_to_sigma<P, O>(
     signature: &[u8],
 ) -> (
     Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>,
     GenericArray<u8, O::LAMBDAPLUS2>,
     GenericArray<u8, O::LBYTES>,
     GenericArray<u8, O::LAMBDABYTES>,
-    Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>>,
+    Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>>,
     GenericArray<u8, P::LAMBDABYTES>,
     [u8; 16],
 )
 where
     P: PARAM,
     O: PARAMOWF,
-    R: RandomOracle,
 {
     let mut index = 0;
     let tau = <P::TAU as Unsigned>::to_usize();
@@ -706,7 +706,7 @@ where
     index += l;
     let a_tilde = (*GenericArray::from_slice(&signature[index..index + lambda])).clone();
     index += lambda;
-    let mut pdecom: Box<GenericArray<(Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>), P::TAU>> =
+    let mut pdecom: Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>> =
         GenericArray::default_boxed();
     for i in pdecom.iter_mut().take(tau0) {
         for j in 0..k0 {
