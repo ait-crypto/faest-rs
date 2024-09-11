@@ -900,7 +900,7 @@ fn volereconstruct_test() {
                         *GenericArray::from_slice(&data.com[i]),
                     );
                 }
-                let res = volereconstruct::<GF128, RandomOracleShake128, PARAM128F>(
+                let res = volereconstruct::<RandomOracleShake128, PARAM128F>(
                     GenericArray::from_slice(&data.chal),
                     &pdecom,
                     data.iv,
@@ -920,7 +920,7 @@ fn volereconstruct_test() {
                         *GenericArray::from_slice(&data.com[i]),
                     );
                 }
-                let res = volereconstruct::<GF128, RandomOracleShake128, PARAM128S>(
+                let res = volereconstruct::<RandomOracleShake128, PARAM128S>(
                     GenericArray::from_slice(&data.chal),
                     GenericArray::from_slice(
                         &pdecom
@@ -963,7 +963,7 @@ fn volereconstruct_test() {
                         *GenericArray::from_slice(&data.com[i]),
                     );
                 }
-                let res = volereconstruct::<GF192, RandomOracleShake192, PARAM192F>(
+                let res = volereconstruct::<RandomOracleShake192, PARAM192F>(
                     GenericArray::from_slice(&data.chal),
                     &pdecom,
                     data.iv,
@@ -983,7 +983,7 @@ fn volereconstruct_test() {
                         *GenericArray::from_slice(&data.com[i]),
                     );
                 }
-                let res = volereconstruct::<GF192, RandomOracleShake192, PARAM192S>(
+                let res = volereconstruct::<RandomOracleShake192, PARAM192S>(
                     GenericArray::from_slice(&data.chal),
                     GenericArray::from_slice(
                         &pdecom
@@ -1025,7 +1025,7 @@ fn volereconstruct_test() {
                     *GenericArray::from_slice(&data.com[i]),
                 );
             }
-            let res = volereconstruct::<GF256, RandomOracleShake256, PARAM256F>(
+            let res = volereconstruct::<RandomOracleShake256, PARAM256F>(
                 GenericArray::from_slice(&data.chal),
                 &pdecom,
                 data.iv,
@@ -1045,7 +1045,7 @@ fn volereconstruct_test() {
                     *GenericArray::from_slice(&data.com[i]),
                 );
             }
-            let res = volereconstruct::<GF256, RandomOracleShake256, PARAM256S>(
+            let res = volereconstruct::<RandomOracleShake256, PARAM256S>(
                 GenericArray::from_slice(&data.chal),
                 GenericArray::from_slice(
                     &pdecom

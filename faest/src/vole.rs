@@ -153,7 +153,7 @@ where
 
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::type_complexity)]
-pub fn volereconstruct<T, R, P>(
+pub fn volereconstruct<R, P>(
     chal: &GenericArray<u8, P::LAMBDABYTES>,
     pdecom: &GenericArray<
         (
@@ -168,7 +168,6 @@ pub fn volereconstruct<T, R, P>(
     GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>,
 )
 where
-    T: BigGaloisField + std::default::Default + std::fmt::Debug,
     R: RandomOracle,
     P: PARAM,
 {

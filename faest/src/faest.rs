@@ -495,7 +495,7 @@ where
     let mut mu: Box<GenericArray<u8, R::PRODLAMBDA2>> = GenericArray::default_boxed();
     h1_hasher.finish().read(&mut mu);
 
-    let (hcom, gq_p) = volereconstruct::<T, R, P>(
+    let (hcom, gq_p) = volereconstruct::<R, P>(
         &chall3,
         &GenericArray::from_iter(
             (*pdecom)
