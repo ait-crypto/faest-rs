@@ -570,25 +570,25 @@ impl PARAMOWF for PARAMOWF256EM {
 
 pub trait PARAM {
     //type Field: BigGaloisField;
-    type L : ArrayLength;
-    type LBYTES : ArrayLength;
-    type TAU : ArrayLength;
-    type TAUMINUS :ArrayLength;
-    type K0 : ArrayLength;
-    type N0 : ArrayLength;
-    type POWK0 : ArrayLength;
-    type K1 : ArrayLength;
-    type N1 : ArrayLength;
-    type POWK1 : ArrayLength;
-    type TAU0 : ArrayLength;
-    type TAU1 : ArrayLength;
-    type B : ArrayLength;
-    type BETA : ArrayLength;
-    type LAMBDA : ArrayLength;
-    type LAMBDABYTES : ArrayLength;
-    type PRODLAMBDATAU : ArrayLength;
-    type LH :ArrayLength;
-    type SIG :ArrayLength;
+    type L: ArrayLength;
+    type LBYTES: ArrayLength;
+    type TAU: ArrayLength;
+    type TAUMINUS: ArrayLength;
+    type K0: ArrayLength;
+    type N0: ArrayLength;
+    type POWK0: ArrayLength;
+    type K1: ArrayLength;
+    type N1: ArrayLength;
+    type POWK1: ArrayLength;
+    type TAU0: ArrayLength;
+    type TAU1: ArrayLength;
+    type B: ArrayLength;
+    type BETA: ArrayLength;
+    type LAMBDA: ArrayLength;
+    type LAMBDABYTES: ArrayLength;
+    type PRODLAMBDATAU: ArrayLength;
+    type LH: ArrayLength;
+    type SIG: ArrayLength;
 }
 
 pub struct PARAM128S;
@@ -629,11 +629,9 @@ impl PARAM for PARAM128S {
     type LH = U234;
 
     type SIG = Sum<U142, Sum<U256, Sum<U512, U4096>>>;
-    
+
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-    
-    
-} 
+}
 
 pub struct PARAM128F;
 
@@ -675,8 +673,7 @@ impl PARAM for PARAM128F {
     type SIG = Sum<U192, Sum<U2048, U4096>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
-} 
+}
 
 pub struct PARAM192S;
 
@@ -718,9 +715,7 @@ impl PARAM for PARAM192S {
     type SIG = Sum<U200, Sum<U256, Sum<U8192, U4096>>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
-    
-} 
+}
 
 pub struct PARAM192F;
 
@@ -762,8 +757,7 @@ impl PARAM for PARAM192F {
     type SIG = Sum<U152, Sum<U256, U16384>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
- 
-} 
+}
 
 pub struct PARAM256S;
 
@@ -805,8 +799,7 @@ impl PARAM for PARAM256S {
     type SIG = Sum<U596, Sum<U1024, Sum<U4096, U16384>>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-    
-} 
+}
 
 pub struct PARAM256F;
 
@@ -848,9 +841,7 @@ impl PARAM for PARAM256F {
     type SIG = Sum<U752, Sum<U1024, Sum<U2048, Sum<U8192, U16384>>>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
- 
-} 
-
+}
 
 pub struct PARAM128SEM;
 
@@ -892,8 +883,7 @@ impl PARAM for PARAM128SEM {
     type SIG = Sum<U470, U4096>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
-} 
+}
 
 pub struct PARAM128FEM;
 
@@ -933,10 +923,9 @@ impl PARAM for PARAM128FEM {
     type LH = U194;
 
     type SIG = Sum<U576, Sum<U1024, U4096>>;
-    
+
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-    
-} 
+}
 
 pub struct PARAM192SEM;
 
@@ -978,9 +967,7 @@ impl PARAM for PARAM192SEM {
     type SIG = Sum<U584, Sum<U2048, U8192>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
-    
-} 
+}
 
 pub struct PARAM192FEM;
 
@@ -1022,8 +1009,7 @@ impl PARAM for PARAM192FEM {
     type SIG = Sum<U600, Sum<U1024, Sum<U4096, U8192>>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
-} 
+}
 
 pub struct PARAM256SEM;
 
@@ -1065,9 +1051,7 @@ impl PARAM for PARAM256SEM {
     type SIG = Sum<U476, Sum<U4096, U16384>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
-   
-} 
+}
 
 pub struct PARAM256FEM;
 
@@ -1109,9 +1093,4 @@ impl PARAM for PARAM256FEM {
     type SIG = Sum<U112, Sum<U2048, Sum<U8192, U16384>>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
-} 
-
-
-
-
+}

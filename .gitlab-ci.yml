@@ -4,17 +4,11 @@ stages:
   - build
   - test
 
-test:
-  stage: build
-  script:
-    - cd $CI_PROJECT_DIR/faest
-    - cargo build
-
 build-all-features:
   stage: build
   script:
     - cd $CI_PROJECT_DIR/faest
-    - cargo build --all-features
+    - cargo build --release --all-features
 
 clippy:
   stage: test
@@ -32,10 +26,10 @@ test:
   stage: test
   script:
     - cd $CI_PROJECT_DIR/faest
-    - cargo test
+    - cargo test --release
 
 test-all-features:
   stage: test
   script:
     - cd $CI_PROJECT_DIR/faest
-    - cargo test --all-features
+    - cargo test --release --all-features

@@ -93,7 +93,7 @@ pub(crate) fn rijndael_key_schedule(
         }
 
         xor_columns(&mut rkeys, rk_off, 8, idx_ror, nk);
-        if nk == 8 && count < ske/4 {
+        if nk == 8 && count < ske / 4 {
             for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..].iter() {
                 valid &= (0 != *i);
             }

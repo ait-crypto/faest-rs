@@ -1,13 +1,15 @@
 use std::iter::zip;
 
-use cipher::Unsigned;
-
-use generic_array::{ArrayLength, GenericArray};
+use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
 use crate::parameter::PARAM;
 use crate::random_oracles::{Hasher, Reader, IV};
 use crate::vc;
-use crate::{fields::BigGaloisField, random_oracles::RandomOracle, vc::commit};
+use crate::{
+    fields::BigGaloisField,
+    random_oracles::{PseudoRandomGenerator, RandomOracle},
+    vc::commit,
+};
 
 #[allow(clippy::type_complexity)]
 pub fn convert_to_vole<R, LH>(
@@ -18,41 +20,34 @@ where
     R: RandomOracle,
     LH: ArrayLength,
 {
+    // this parameters are known upfront!
     let n = sd.len();
     let d = (128 - (n as u128).leading_zeros() - 1) as usize;
-    let mut r: Vec<Vec<GenericArray<u8, LH>>> = vec![vec![GenericArray::default(); n]; d + 1];
-    match &sd[0] {
-        None => (),
-        Some(sd0) => r[0][0] = R::prg::<LH>(&sd0, iv),
+    let mut r = vec![GenericArray::<u8, LH>::default(); n * 2];
+    if let Some(ref sd0) = sd[0] {
+        let mut prg = R::PRG::new_prg(sd0, iv);
+        prg.read(&mut r[0]);
     }
-    for (i, _) in sd.iter().enumerate().skip(1).take(n) {
-        r[0][i] = R::prg::<LH>(sd[i].as_ref().unwrap(), iv);
+    for (i, sdi) in sd.iter().enumerate().skip(1).take(n) {
+        let mut prg = R::PRG::new_prg(sdi.as_ref().unwrap(), iv);
+        prg.read(&mut r[i]);
     }
 
+    // FIXME
     let mut v: Vec<GenericArray<u8, LH>> = vec![GenericArray::default(); d];
     for j in 0..d {
-        for i in 0..n / (1_usize << (j + 1)) {
-            v[j] = (*GenericArray::from_slice(
-                &v[j]
-                    .iter()
-                    .zip(r[j][2 * i + 1].iter())
-                    .map(|(&x1, &x2)| x1 ^ x2)
-                    .collect::<GenericArray<u8, LH>>(),
-            ))
-            .clone();
-            r[j + 1][i] = (*GenericArray::from_slice(
-                &r[j][2 * i]
-                    .iter()
-                    .zip(r[j][(2 * i) + 1].iter())
-                    .map(|(&x1, x2)| x1 ^ x2)
-                    .collect::<GenericArray<u8, LH>>(),
-            ))
-            .clone();
+        let j_offset = (j % 2) * n;
+        let j1_offset = ((j + 1) % 2) * n;
+        for i in 0..n / (1 << (j + 1)) {
+            zip(v[j].as_mut_slice().iter_mut(), &r[j_offset + 2 * i + 1])
+                .for_each(|(vj, rj)| *vj ^= rj);
+            for k in 0..LH::USIZE {
+                r[j1_offset + i][k] = r[j_offset + 2 * i][k] ^ r[j_offset + 2 * i + 1][k];
+            }
         }
     }
 
-    let u = (*GenericArray::from_slice(&r[d][0].clone())).clone();
-    (u, v)
+    (r[(d % 2) * n].clone(), v)
 }
 
 //constant time checking the value of i : if i is not correct, then the output will be an empty vec
@@ -84,7 +79,7 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-pub fn volecommit<P, T, R>(
+pub fn volecommit<P, R>(
     r: &GenericArray<u8, <R as RandomOracle>::LAMBDA>,
     iv: &IV,
 ) -> (
@@ -105,16 +100,16 @@ pub fn volecommit<P, T, R>(
 )
 where
     P: PARAM,
-
-    T: BigGaloisField + std::default::Default,
-    R: RandomOracle<LAMBDA = T::Length>,
+    R: RandomOracle,
 {
     let tau = <P::TAU as Unsigned>::to_usize();
     let k0 = <P::K0 as Unsigned>::to_u16();
     let k1 = <P::K1 as Unsigned>::to_u16();
     let _t1 = <P::TAU1 as Unsigned>::to_u16();
-    let tau_res = R::prg::<P::PRODLAMBDATAU>(r, iv);
-    let mut r: GenericArray<GenericArray<u8, T::Length>, P::TAU> = GenericArray::default();
+
+    let mut prg = R::PRG::new_prg(r, iv);
+
+    let mut r: GenericArray<GenericArray<u8, R::LAMBDA>, P::TAU> = GenericArray::default();
     let mut com: GenericArray<GenericArray<u8, R::PRODLAMBDA2>, P::TAU> = GenericArray::default();
     let mut decom: Box<
         GenericArray<
@@ -133,11 +128,9 @@ where
     let mut c: Box<GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS>> =
         GenericArray::default_boxed();
     for i in 0..tau {
-        r[i].copy_from_slice(
-            &tau_res[i * (T::LENGTH / 8) as usize..(i + 1) * (T::LENGTH / 8) as usize],
-        );
+        prg.read(&mut r[i]);
     }
-    let tau_0 = T::LENGTH % tau;
+    let tau_0 = R::LAMBDA::USIZE % tau;
     let mut hasher = R::h1_init();
     for i in 0..tau {
         let b = 1 - (i < tau_0.try_into().unwrap()) as u16;
@@ -160,7 +153,7 @@ where
 
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::type_complexity)]
-pub fn volereconstruct<T, R, P>(
+pub fn volereconstruct<R, P>(
     chal: &GenericArray<u8, P::LAMBDABYTES>,
     pdecom: &GenericArray<
         (
@@ -175,7 +168,6 @@ pub fn volereconstruct<T, R, P>(
     GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>,
 )
 where
-    T: BigGaloisField + std::default::Default + std::fmt::Debug,
     R: RandomOracle,
     P: PARAM,
 {

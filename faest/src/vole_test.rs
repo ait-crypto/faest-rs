@@ -1,13 +1,10 @@
 use std::fs::File;
 
-use cipher::Unsigned;
 use generic_array::{sequence::GenericSequence, GenericArray};
 use serde::Deserialize;
-use serde_json::from_slice;
 use typenum::{U16, U234, U24, U32, U458, U566};
 
 use crate::{
-    fields::{GF128, GF192, GF256},
     parameter::{
         self, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
         PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM,
@@ -195,7 +192,7 @@ fn volecommit_test() {
         if data.lambdabytes[0] == 16 {
             if data.u.len() == 234 {
                 if data.k0[0] == 12 {
-                    let res = volecommit::<PARAM128S, GF128, RandomOracleShake128>(
+                    let res = volecommit::<PARAM128S, RandomOracleShake128>(
                         &GenericArray::from_slice(&data.r),
                         &data.iv,
                     );
@@ -250,7 +247,7 @@ fn volecommit_test() {
                             .collect()
                     );
                 } else {
-                    let res = volecommit::<PARAM128F, GF128, RandomOracleShake128>(
+                    let res = volecommit::<PARAM128F, RandomOracleShake128>(
                         &GenericArray::from_slice(&data.r),
                         &data.iv,
                     );
@@ -306,7 +303,7 @@ fn volecommit_test() {
                     );
                 }
             } else if data.k0[0] == 12 {
-                let res = volecommit::<PARAM128SEM, GF128, RandomOracleShake128>(
+                let res = volecommit::<PARAM128SEM, RandomOracleShake128>(
                     &GenericArray::from_slice(&data.r),
                     &data.iv,
                 );
@@ -361,7 +358,7 @@ fn volecommit_test() {
                         .collect()
                 );
             } else {
-                let res = volecommit::<PARAM128FEM, GF128, RandomOracleShake128>(
+                let res = volecommit::<PARAM128FEM, RandomOracleShake128>(
                     &GenericArray::from_slice(&data.r),
                     &data.iv,
                 );
@@ -419,7 +416,7 @@ fn volecommit_test() {
         } else if data.lambdabytes[0] == 24 {
             if data.u.len() == 458 {
                 if data.k0[0] == 12 {
-                    let res = volecommit::<PARAM192S, GF192, RandomOracleShake192>(
+                    let res = volecommit::<PARAM192S, RandomOracleShake192>(
                         &GenericArray::from_slice(&data.r),
                         &data.iv,
                     );
@@ -474,7 +471,7 @@ fn volecommit_test() {
                             .collect()
                     );
                 } else {
-                    let res = volecommit::<PARAM192F, GF192, RandomOracleShake192>(
+                    let res = volecommit::<PARAM192F, RandomOracleShake192>(
                         &GenericArray::from_slice(&data.r),
                         &data.iv,
                     );
@@ -530,7 +527,7 @@ fn volecommit_test() {
                     );
                 }
             } else if data.k0[0] == 12 {
-                let res = volecommit::<PARAM192SEM, GF192, RandomOracleShake192>(
+                let res = volecommit::<PARAM192SEM, RandomOracleShake192>(
                     &GenericArray::from_slice(&data.r),
                     &data.iv,
                 );
@@ -585,7 +582,7 @@ fn volecommit_test() {
                         .collect()
                 );
             } else {
-                let res = volecommit::<PARAM192FEM, GF192, RandomOracleShake192>(
+                let res = volecommit::<PARAM192FEM, RandomOracleShake192>(
                     &GenericArray::from_slice(&data.r),
                     &data.iv,
                 );
@@ -642,7 +639,7 @@ fn volecommit_test() {
             }
         } else if data.u.len() == 566 {
             if data.k0[0] == 12 {
-                let res = volecommit::<PARAM256S, GF256, RandomOracleShake256>(
+                let res = volecommit::<PARAM256S, RandomOracleShake256>(
                     &GenericArray::from_slice(&data.r),
                     &data.iv,
                 );
@@ -697,7 +694,7 @@ fn volecommit_test() {
                         .collect()
                 );
             } else {
-                let res = volecommit::<PARAM256F, GF256, RandomOracleShake256>(
+                let res = volecommit::<PARAM256F, RandomOracleShake256>(
                     &GenericArray::from_slice(&data.r),
                     &data.iv,
                 );
@@ -753,7 +750,7 @@ fn volecommit_test() {
                 );
             }
         } else if data.k0[0] == 12 {
-            let res = volecommit::<PARAM256SEM, GF256, RandomOracleShake256>(
+            let res = volecommit::<PARAM256SEM, RandomOracleShake256>(
                 &GenericArray::from_slice(&data.r),
                 &data.iv,
             );
@@ -808,7 +805,7 @@ fn volecommit_test() {
                     .collect()
             );
         } else {
-            let res = volecommit::<PARAM256FEM, GF256, RandomOracleShake256>(
+            let res = volecommit::<PARAM256FEM, RandomOracleShake256>(
                 &GenericArray::from_slice(&data.r),
                 &data.iv,
             );
@@ -900,7 +897,7 @@ fn volereconstruct_test() {
                         *GenericArray::from_slice(&data.com[i]),
                     );
                 }
-                let res = volereconstruct::<GF128, RandomOracleShake128, PARAM128F>(
+                let res = volereconstruct::<RandomOracleShake128, PARAM128F>(
                     GenericArray::from_slice(&data.chal),
                     &pdecom,
                     data.iv,
@@ -920,7 +917,7 @@ fn volereconstruct_test() {
                         *GenericArray::from_slice(&data.com[i]),
                     );
                 }
-                let res = volereconstruct::<GF128, RandomOracleShake128, PARAM128S>(
+                let res = volereconstruct::<RandomOracleShake128, PARAM128S>(
                     GenericArray::from_slice(&data.chal),
                     GenericArray::from_slice(
                         &pdecom
@@ -963,7 +960,7 @@ fn volereconstruct_test() {
                         *GenericArray::from_slice(&data.com[i]),
                     );
                 }
-                let res = volereconstruct::<GF192, RandomOracleShake192, PARAM192F>(
+                let res = volereconstruct::<RandomOracleShake192, PARAM192F>(
                     GenericArray::from_slice(&data.chal),
                     &pdecom,
                     data.iv,
@@ -983,7 +980,7 @@ fn volereconstruct_test() {
                         *GenericArray::from_slice(&data.com[i]),
                     );
                 }
-                let res = volereconstruct::<GF192, RandomOracleShake192, PARAM192S>(
+                let res = volereconstruct::<RandomOracleShake192, PARAM192S>(
                     GenericArray::from_slice(&data.chal),
                     GenericArray::from_slice(
                         &pdecom
@@ -1025,7 +1022,7 @@ fn volereconstruct_test() {
                     *GenericArray::from_slice(&data.com[i]),
                 );
             }
-            let res = volereconstruct::<GF256, RandomOracleShake256, PARAM256F>(
+            let res = volereconstruct::<RandomOracleShake256, PARAM256F>(
                 GenericArray::from_slice(&data.chal),
                 &pdecom,
                 data.iv,
@@ -1045,7 +1042,7 @@ fn volereconstruct_test() {
                     *GenericArray::from_slice(&data.com[i]),
                 );
             }
-            let res = volereconstruct::<GF256, RandomOracleShake256, PARAM256S>(
+            let res = volereconstruct::<RandomOracleShake256, PARAM256S>(
                 GenericArray::from_slice(&data.chal),
                 GenericArray::from_slice(
                     &pdecom
