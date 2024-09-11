@@ -26,17 +26,6 @@ pub trait PseudoRandomGenerator: Sized + Reader {
     /// Size of the PRG key
     type Lambda: ArrayLength;
 
-    #[deprecated]
-    fn prg<LH>(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> GenericArray<u8, LH>
-    where
-        LH: ArrayLength,
-    {
-        let mut buf = GenericArray::default();
-        let mut prg = Self::new_prg(k, iv);
-        prg.read(&mut buf);
-        buf
-    }
-
     /// Instantiate new PRG instance
     fn new_prg(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> Self;
 }
@@ -111,17 +100,6 @@ pub trait RandomOracle {
     #[deprecated]
     type PRODLAMBDA2: ArrayLength;
 
-    #[deprecated = "Use PRG instead"]
-    fn prg<LH>(k: &GenericArray<u8, Self::LAMBDA>, iv: &IV) -> GenericArray<u8, LH>
-    where
-        LH: ArrayLength,
-    {
-        let mut buf = GenericArray::default();
-        let mut prg = Self::PRG::new_prg(k, iv);
-        prg.read(&mut buf);
-        buf
-    }
-
     /// Create hasher for `H0`
     fn h0_init() -> Self::Hasher<0> {
         Self::Hasher::default()
@@ -150,6 +128,28 @@ pub trait Hasher {
 
     /// Hash additional bytes
     fn update(&mut self, data: &[u8]);
+
+    /// Hash additional bytes obtained from an iterator
+    fn update_from_iterator<I>(&mut self, it: I)
+    where
+        I: Iterator<Item = u8>,
+    {
+        const BUFFER_LEN: usize = 64;
+
+        let mut idx = 0;
+        let mut buffer = [0u8; BUFFER_LEN];
+        for v in it {
+            buffer[idx % BUFFER_LEN] = v;
+            idx += 1;
+            if idx % BUFFER_LEN == 0 {
+                self.update(&buffer);
+            }
+        }
+
+        if idx % BUFFER_LEN != 0 {
+            self.update(&buffer[..idx % BUFFER_LEN]);
+        }
+    }
 
     /// Finish hashing
     fn finish(self) -> Self::Reader;

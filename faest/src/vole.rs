@@ -3,7 +3,11 @@ use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use crate::parameter::PARAM;
 use crate::random_oracles::{Hasher, Reader, IV};
 use crate::vc;
-use crate::{fields::BigGaloisField, random_oracles::RandomOracle, vc::commit};
+use crate::{
+    fields::BigGaloisField,
+    random_oracles::{PseudoRandomGenerator, RandomOracle},
+    vc::commit,
+};
 
 #[allow(clippy::type_complexity)]
 pub fn convert_to_vole<R, LH>(
@@ -17,14 +21,16 @@ where
     let n = sd.len();
     let d = (128 - (n as u128).leading_zeros() - 1) as usize;
     let mut r: Vec<Vec<GenericArray<u8, LH>>> = vec![vec![GenericArray::default(); n]; d + 1];
-    match &sd[0] {
-        None => (),
-        Some(sd0) => r[0][0] = R::prg::<LH>(&sd0, iv),
+    if let Some(ref sd0) = sd[0] {
+        let mut prg = R::PRG::new_prg(sd0, iv);
+        prg.read(&mut r[0][0]);
     }
-    for (i, _) in sd.iter().enumerate().skip(1).take(n) {
-        r[0][i] = R::prg::<LH>(sd[i].as_ref().unwrap(), iv);
+    for (i, sdi) in sd.iter().enumerate().skip(1).take(n) {
+        let mut prg = R::PRG::new_prg(sdi.as_ref().unwrap(), iv);
+        prg.read(&mut r[0][i]);
     }
 
+    // FIXME
     let mut v: Vec<GenericArray<u8, LH>> = vec![GenericArray::default(); d];
     for j in 0..d {
         for i in 0..n / (1_usize << (j + 1)) {
@@ -108,7 +114,9 @@ where
     let k0 = <P::K0 as Unsigned>::to_u16();
     let k1 = <P::K1 as Unsigned>::to_u16();
     let _t1 = <P::TAU1 as Unsigned>::to_u16();
-    let tau_res = R::prg::<P::PRODLAMBDATAU>(r, iv);
+
+    let mut prg = R::PRG::new_prg(r, iv);
+
     let mut r: GenericArray<GenericArray<u8, T::Length>, P::TAU> = GenericArray::default();
     let mut com: GenericArray<GenericArray<u8, R::PRODLAMBDA2>, P::TAU> = GenericArray::default();
     let mut decom: Box<
@@ -128,7 +136,7 @@ where
     let mut c: Box<GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS>> =
         GenericArray::default_boxed();
     for i in 0..tau {
-        r[i].copy_from_slice(&tau_res[i * (T::LENGTH / 8)..(i + 1) * (T::LENGTH / 8)]);
+        prg.read(&mut r[i]);
     }
     let tau_0 = T::LENGTH % tau;
     let mut hasher = R::h1_init();
