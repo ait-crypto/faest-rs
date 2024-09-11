@@ -1,3 +1,5 @@
+use std::iter::zip;
+
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
 use crate::parameter::PARAM;
@@ -18,43 +20,34 @@ where
     R: RandomOracle,
     LH: ArrayLength,
 {
+    // this parameters are known upfront!
     let n = sd.len();
     let d = (128 - (n as u128).leading_zeros() - 1) as usize;
-    let mut r: Vec<Vec<GenericArray<u8, LH>>> = vec![vec![GenericArray::default(); n]; d + 1];
+    let mut r = vec![GenericArray::<u8, LH>::default(); n * 2];
     if let Some(ref sd0) = sd[0] {
         let mut prg = R::PRG::new_prg(sd0, iv);
-        prg.read(&mut r[0][0]);
+        prg.read(&mut r[0]);
     }
     for (i, sdi) in sd.iter().enumerate().skip(1).take(n) {
         let mut prg = R::PRG::new_prg(sdi.as_ref().unwrap(), iv);
-        prg.read(&mut r[0][i]);
+        prg.read(&mut r[i]);
     }
 
     // FIXME
     let mut v: Vec<GenericArray<u8, LH>> = vec![GenericArray::default(); d];
     for j in 0..d {
-        for i in 0..n / (1_usize << (j + 1)) {
-            v[j] = (*GenericArray::from_slice(
-                &v[j]
-                    .iter()
-                    .zip(r[j][2 * i + 1].iter())
-                    .map(|(&x1, &x2)| x1 ^ x2)
-                    .collect::<GenericArray<u8, LH>>(),
-            ))
-            .clone();
-            r[j + 1][i] = (*GenericArray::from_slice(
-                &r[j][2 * i]
-                    .iter()
-                    .zip(r[j][(2 * i) + 1].iter())
-                    .map(|(&x1, x2)| x1 ^ x2)
-                    .collect::<GenericArray<u8, LH>>(),
-            ))
-            .clone();
+        let j_offset = (j % 2) * n;
+        let j1_offset = ((j + 1) % 2) * n;
+        for i in 0..n / (1 << (j + 1)) {
+            zip(v[j].as_mut_slice().iter_mut(), &r[j_offset + 2 * i + 1])
+                .for_each(|(vj, rj)| *vj ^= rj);
+            for k in 0..LH::USIZE {
+                r[j1_offset + i][k] = r[j_offset + 2 * i][k] ^ r[j_offset + 2 * i + 1][k];
+            }
         }
     }
 
-    let u = (*GenericArray::from_slice(&r[d][0].clone())).clone();
-    (u, v)
+    (r[(d % 2) * n].clone(), v)
 }
 
 //constant time checking the value of i : if i is not correct, then the output will be an empty vec
