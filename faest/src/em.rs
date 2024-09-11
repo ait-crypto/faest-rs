@@ -53,7 +53,6 @@ where
                 valid &= (*i != 0);
             }
         }
-        println!("{:?}", valid);
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, nst as u8);
