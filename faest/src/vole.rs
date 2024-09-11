@@ -79,7 +79,7 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-pub fn volecommit<P, T, R>(
+pub fn volecommit<P, R>(
     r: &GenericArray<u8, <R as RandomOracle>::LAMBDA>,
     iv: &IV,
 ) -> (
@@ -100,8 +100,7 @@ pub fn volecommit<P, T, R>(
 )
 where
     P: PARAM,
-    T: BigGaloisField,
-    R: RandomOracle<LAMBDA = T::Length>,
+    R: RandomOracle,
 {
     let tau = <P::TAU as Unsigned>::to_usize();
     let k0 = <P::K0 as Unsigned>::to_u16();
@@ -110,7 +109,7 @@ where
 
     let mut prg = R::PRG::new_prg(r, iv);
 
-    let mut r: GenericArray<GenericArray<u8, T::Length>, P::TAU> = GenericArray::default();
+    let mut r: GenericArray<GenericArray<u8, R::LAMBDA>, P::TAU> = GenericArray::default();
     let mut com: GenericArray<GenericArray<u8, R::PRODLAMBDA2>, P::TAU> = GenericArray::default();
     let mut decom: Box<
         GenericArray<
@@ -131,7 +130,7 @@ where
     for i in 0..tau {
         prg.read(&mut r[i]);
     }
-    let tau_0 = T::LENGTH % tau;
+    let tau_0 = R::LAMBDA::USIZE % tau;
     let mut hasher = R::h1_init();
     for i in 0..tau {
         let b = 1 - (i < tau_0.try_into().unwrap()) as u16;

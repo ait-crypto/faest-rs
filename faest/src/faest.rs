@@ -349,7 +349,7 @@ where
     h3_reader.read(&mut r);
     h3_reader.read(&mut iv);
 
-    let (hcom, decom, c, mut u, gv) = volecommit::<P, T, R>(&r, &iv);
+    let (hcom, decom, c, mut u, gv) = volecommit::<P, R>(&r, &iv);
     let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
     let mut h2_hasher = R::h2_init();
     h2_hasher.update(&mu);
