@@ -5,11 +5,15 @@ use serde::Deserialize;
 use typenum::{U1, U8};
 
 use crate::{
-    aes::convert_to_bit, aes::byte_to_bit, em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_extendedwitness, em_prove, em_verify}, fields::{BigGaloisField, GF128, GF192, GF256}, parameter::{
+    aes::byte_to_bit,
+    aes::convert_to_bit,
+    em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_extendedwitness, em_prove, em_verify},
+    fields::{BigGaloisField, GF128, GF192, GF256},
+    parameter::{
         self, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
         PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF128, PARAMOWF128EM,
         PARAMOWF192, PARAMOWF192EM, PARAMOWF256, PARAMOWF256EM,
-    }
+    },
 };
 
 #[derive(Debug, Deserialize)]
@@ -31,13 +35,22 @@ fn em_extended_witness_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let res = em_extendedwitness::<PARAM128S, PARAMOWF128EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&data.input));
+            let res = em_extendedwitness::<PARAM128S, PARAMOWF128EM>(
+                GenericArray::from_slice(&data.key),
+                GenericArray::from_slice(&data.input),
+            );
             assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         } else if data.lambda == 192 {
-            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&[data.input, vec![0u8; 16]].concat()));
+            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(
+                GenericArray::from_slice(&data.key),
+                GenericArray::from_slice(&[data.input, vec![0u8; 16]].concat()),
+            );
             assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         } else {
-            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(GenericArray::from_slice(&data.key), GenericArray::from_slice(&[data.input, vec![0u8; 32]].concat()));
+            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(
+                GenericArray::from_slice(&data.key),
+                GenericArray::from_slice(&[data.input, vec![0u8; 32]].concat()),
+            );
             assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         }
     }
@@ -101,11 +114,14 @@ fn em_enc_fwd_test() {
             );
             assert_eq!(
                 res,
-                Box::new(*GenericArray::from_slice(&data.res
-                    .iter()
-                    .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
-                    .collect::<Vec<GF128>>())
-            ))
+                Box::new(*GenericArray::from_slice(
+                    &data
+                        .res
+                        .iter()
+                        .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
+                        .collect::<Vec<GF128>>()
+                ))
+            )
         } else if data.lambda == 192 {
             let (input_x, input_z): (Vec<GF192>, Vec<GF192>) = if data.m == 1 {
                 (
@@ -144,11 +160,14 @@ fn em_enc_fwd_test() {
             );
             assert_eq!(
                 res,
-                Box::new(*GenericArray::from_slice(&data.res
-                    .iter()
-                    .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
-                    .collect::<Vec<GF192>>())
-            ))
+                Box::new(*GenericArray::from_slice(
+                    &data
+                        .res
+                        .iter()
+                        .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
+                        .collect::<Vec<GF192>>()
+                ))
+            )
         } else {
             let (input_x, input_z): (Vec<GF256>, Vec<GF256>) = if data.m == 1 {
                 (
@@ -197,14 +216,17 @@ fn em_enc_fwd_test() {
             );
             assert_eq!(
                 res,
-                Box::new(*GenericArray::from_slice(&data.res
-                    .iter()
-                    .map(|z| GF256::new(
-                        z[0] as u128 + ((z[1] as u128) << 64),
-                        z[2] as u128 + ((z[3] as u128) << 64)
-                    ))
-                    .collect::<Vec<GF256>>())
-            ))
+                Box::new(*GenericArray::from_slice(
+                    &data
+                        .res
+                        .iter()
+                        .map(|z| GF256::new(
+                            z[0] as u128 + ((z[1] as u128) << 64),
+                            z[2] as u128 + ((z[3] as u128) << 64)
+                        ))
+                        .collect::<Vec<GF256>>()
+                ))
+            )
         }
     }
 }
@@ -291,10 +313,13 @@ fn em_enc_bkwd_test() {
             );
             assert_eq!(
                 res,
-                Box::new(*GenericArray::from_slice(&data.res
-                    .iter()
-                    .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
-                    .collect::<Vec<GF128>>()))
+                Box::new(*GenericArray::from_slice(
+                    &data
+                        .res
+                        .iter()
+                        .map(|z| GF128::new(z[0] as u128 + ((z[1] as u128) << 64), 0))
+                        .collect::<Vec<GF128>>()
+                ))
             )
         } else if data.lambda == 192 {
             let (x_in, z_in, z_out_in) = if data.m == 1 {
@@ -350,10 +375,13 @@ fn em_enc_bkwd_test() {
             );
             assert_eq!(
                 res,
-                Box::new(*GenericArray::from_slice(&data.res
-                    .iter()
-                    .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
-                    .collect::<Vec<GF192>>()))
+                Box::new(*GenericArray::from_slice(
+                    &data
+                        .res
+                        .iter()
+                        .map(|z| GF192::new(z[0] as u128 + ((z[1] as u128) << 64), z[2] as u128))
+                        .collect::<Vec<GF192>>()
+                ))
             )
         } else {
             let (x_in, z_in, z_out_in) = if data.m == 1 {
@@ -424,14 +452,17 @@ fn em_enc_bkwd_test() {
             );
             assert_eq!(
                 res,
-                Box::new(*GenericArray::from_slice(&data.res
-                    .iter()
-                    .map(|z| GF256::new(
-                        z[0] as u128 + ((z[1] as u128) << 64),
-                        z[2] as u128 + ((z[3] as u128) << 64)
-                    ))
-                    .collect::<Vec<GF256>>()
-            )))
+                Box::new(*GenericArray::from_slice(
+                    &data
+                        .res
+                        .iter()
+                        .map(|z| GF256::new(
+                            z[0] as u128 + ((z[1] as u128) << 64),
+                            z[2] as u128 + ((z[3] as u128) << 64)
+                        ))
+                        .collect::<Vec<GF256>>()
+                ))
+            )
         }
     }
 }

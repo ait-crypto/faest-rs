@@ -12141,7 +12141,9 @@ fn faest_aes_test_256f() {
 #[test]
 fn faest_em_test_128s() {
     //128-s
-    for _i in 0..5/* 00 */ {
+    for _i in 0..5
+    /* 00 */
+    {
         let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
             [..48]
             .try_into()
@@ -12170,7 +12172,9 @@ fn faest_em_test_128s() {
 #[test]
 fn faest_em_test_128f() {
     //128-f
-    for _i in 0..5/* 00  */{
+    for _i in 0..5
+    /* 00  */
+    {
         let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
             [..48]
             .try_into()
@@ -12198,7 +12202,9 @@ fn faest_em_test_128f() {
 #[test]
 fn faest_em_test_192s() {
     //192-s
-    for _i in 0..5/* 00 */ {
+    for _i in 0..5
+    /* 00 */
+    {
         let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
             [..48]
             .try_into()
@@ -12226,7 +12232,9 @@ fn faest_em_test_192s() {
 #[test]
 fn faest_em_test_192f() {
     //192-f
-    for _i in 0..5/* 00 */ {
+    for _i in 0..5
+    /* 00 */
+    {
         let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
             [..48]
             .try_into()
@@ -12254,7 +12262,9 @@ fn faest_em_test_192f() {
 #[test]
 fn faest_em_test_256s() {
     //256-s
-    for _i in 0..5/* 00  */{
+    for _i in 0..5
+    /* 00  */
+    {
         let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
             [..48]
             .try_into()
@@ -12283,7 +12293,9 @@ fn faest_em_test_256s() {
 #[test]
 fn faest_em_test_256f() {
     //256-f
-    for _i in 0..5/* 00  */{
+    for _i in 0..5
+    /* 00  */
+    {
         let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
             [..48]
             .try_into()
@@ -12564,7 +12576,7 @@ fn test_nyst_faest_256f_aes() {
         let keypair = AesCypher::keygen_with_rng::<PARAM256F, PARAMOWF256>(rng);
         println!("pk = {:?}, keypair = {:?}", &pk, keypair.0);
         assert!(*GenericArray::from_slice(&pk) == keypair.0);
-        
+
         assert_eq!(
             sig,
             [
@@ -12599,7 +12611,7 @@ fn test_nyst_faest_128s_em() {
         let msg = data.message;
         let sig = data.sm;
         let keypair = EmCypher::keygen_with_rng::<PARAM128SEM, PARAMOWF128EM>(rng);
-        
+
         assert!(*GenericArray::from_slice(&pk) == keypair.0);
         assert_eq!(
             sig,
@@ -12695,7 +12707,7 @@ fn test_nyst_faest192f_em_() {
     let mut i = 0;
     let datas = read_kats(include_str!("../PQCsignKAT_faest_em_192f.rsp"));
     for data in datas {
-        i+=1;
+        i += 1;
         println!("I = {:?}", i);
         let seed: [u8; 48] = data.seed.try_into().unwrap();
         let rng = NistPqcAes256CtrRng::from(seed);
