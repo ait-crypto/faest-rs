@@ -5,14 +5,13 @@ use serde::Deserialize;
 use typenum::{U1, U8};
 
 use crate::{
-    aes::byte_to_bit,
     aes::convert_to_bit,
     em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_extendedwitness, em_prove, em_verify},
     fields::{BigGaloisField, GF128, GF192, GF256},
     parameter::{
-        self, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
-        PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF128, PARAMOWF128EM,
-        PARAMOWF192, PARAMOWF192EM, PARAMOWF256, PARAMOWF256EM,
+        PARAM128FEM, PARAM128SEM, PARAM192FEM, PARAM192S, PARAM192SEM,
+        PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF128, PARAMOWF128EM, PARAMOWF192EM,
+        PARAMOWF256, PARAMOWF256EM,
     },
 };
 
@@ -35,7 +34,7 @@ fn em_extended_witness_test() {
         serde_json::from_reader(file).expect("error while reading or parsing");
     for data in database {
         if data.lambda == 128 {
-            let res = em_extendedwitness::<PARAM128S, PARAMOWF128EM>(
+            let res = em_extendedwitness::<PARAM128SEM, PARAMOWF128EM>(
                 GenericArray::from_slice(&data.key),
                 GenericArray::from_slice(&data.input),
             );
@@ -128,7 +127,7 @@ fn em_enc_fwd_test() {
                     data.x
                         .iter()
                         .flat_map(|x| {
-                            convert_to_bit::<PARAMOWF192, U8, U1>(GenericArray::from_slice(
+                            convert_to_bit::<PARAMOWF192EM, U8, U1>(GenericArray::from_slice(
                                 &x[0].to_le_bytes()[..1],
                             ))
                         })
@@ -136,7 +135,7 @@ fn em_enc_fwd_test() {
                     data.z
                         .iter()
                         .flat_map(|z| {
-                            convert_to_bit::<PARAMOWF192, U8, U1>(GenericArray::from_slice(
+                            convert_to_bit::<PARAMOWF192EM, U8, U1>(GenericArray::from_slice(
                                 &z[0].to_le_bytes()[..1],
                             ))
                         })
@@ -303,7 +302,7 @@ fn em_enc_bkwd_test() {
                         .collect::<Vec<GF128>>(),
                 )
             };
-            let res = em_enc_bkwd::<PARAM128S, PARAMOWF128EM>(
+            let res = em_enc_bkwd::<PARAM128SEM, PARAMOWF128EM>(
                 GenericArray::from_slice(&x_in),
                 GenericArray::from_slice(&z_in),
                 GenericArray::from_slice(&z_out_in),
@@ -327,7 +326,7 @@ fn em_enc_bkwd_test() {
                     data.x
                         .iter()
                         .flat_map(|x| {
-                            convert_to_bit::<PARAMOWF192, U8, U1>(GenericArray::from_slice(
+                            convert_to_bit::<PARAMOWF192EM, U8, U1>(GenericArray::from_slice(
                                 &x[0].to_le_bytes()[..1],
                             ))
                         })
@@ -335,7 +334,7 @@ fn em_enc_bkwd_test() {
                     data.z
                         .iter()
                         .flat_map(|z| {
-                            convert_to_bit::<PARAMOWF192, U8, U1>(GenericArray::from_slice(
+                            convert_to_bit::<PARAMOWF192EM, U8, U1>(GenericArray::from_slice(
                                 &z[0].to_le_bytes()[..1],
                             ))
                         })
@@ -343,7 +342,7 @@ fn em_enc_bkwd_test() {
                     data.zout
                         .iter()
                         .flat_map(|z| {
-                            convert_to_bit::<PARAMOWF192, U8, U1>(GenericArray::from_slice(
+                            convert_to_bit::<PARAMOWF192EM, U8, U1>(GenericArray::from_slice(
                                 &z[0].to_le_bytes()[..1],
                             ))
                         })

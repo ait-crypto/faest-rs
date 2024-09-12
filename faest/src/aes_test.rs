@@ -3,18 +3,16 @@ use crate::aes::{
     aes_enc_fwd, aes_extendedwitness, aes_key_exp_bwd, aes_key_exp_cstrnts, aes_key_exp_fwd,
     convert_to_bit,
 };
-use crate::fields::{self, BigGaloisField, GF128, GF192, GF256};
+use crate::fields::{BigGaloisField, GF128, GF192, GF256};
 
 use crate::parameter::{
     self, PARAM128S, PARAM192S, PARAM256S, PARAMOWF128, PARAMOWF192, PARAMOWF256,
 };
-use cipher::Unsigned;
 use generic_array::GenericArray;
 #[cfg(test)]
 use serde::Deserialize;
 #[allow(unused_imports)]
 use std::convert;
-use std::default;
 use std::fs::File;
 use typenum::{U176, U208, U240, U8};
 

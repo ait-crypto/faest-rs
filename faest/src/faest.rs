@@ -3,7 +3,6 @@ use std::iter::zip;
 use crate::{
     aes::{aes_extendedwitness, aes_prove, aes_verify},
     em::{em_extendedwitness, em_prove, em_verify},
-    fields::BigGaloisField,
     parameter::{BaseParameters, PARAM, PARAMOWF},
     random_oracles::{Hasher, RandomOracle, Reader, IV},
     rijndael_32::{rijndael_encrypt, rijndael_key_schedule},

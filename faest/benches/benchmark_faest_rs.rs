@@ -99,7 +99,7 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    faest_sign::<T, R, C, P, O>(&input.0, &input.1, &input.2, &input.3)
+    faest_sign::<C, P, O>(&input.0, &input.1, &input.2, &input.3)
 }
 
 fn generate_verify_input_aes<T, R, C, P, O>(
@@ -116,7 +116,7 @@ where
     let (sk, pk, rho) = C::keygen_with_rng::<P, O>(rng);
     let length: u8 = random();
     let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
-    let sign = faest_sign::<T, R, C, P, O>(
+    let sign = faest_sign::<C, P, O>(
         msg,
         GenericArray::from_slice(
             &sk[<O::PK as Unsigned>::to_usize() - <O::LAMBDABYTES as Unsigned>::to_usize()..],
@@ -127,7 +127,7 @@ where
     (msg.to_vec(), *pk, sign)
 }
 
-fn generate_verify_input_em<T, R, C, P, O>(
+fn generate_verify_input_em<C, P, O>(
 ) -> (Vec<u8>, GenericArray<u8, O::PK>, Signature<O, P, R>)
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
@@ -141,7 +141,7 @@ where
     let (sk, pk, rho) = C::keygen_with_rng::<P, O>(rng);
     let length: u8 = random();
     let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
-    let sign = faest_sign::<T, R, C, P, O>(
+    let sign = faest_sign::<C, P, O>(
         msg,
         GenericArray::from_slice(&sk[<P::LAMBDA as Unsigned>::to_usize() / 8..]),
         GenericArray::from_slice(&pk),
@@ -150,7 +150,7 @@ where
     (msg.to_vec(), (*GenericArray::from_slice(&pk)).clone(), sign)
 }
 
-fn bench_verify_aes<T, R, C, P, O>(input: (Vec<u8>, GenericArray<u8, O::PK>, Signature<O, P, R>))
+fn bench_verify_aes<C, P, O>(input: (Vec<u8>, GenericArray<u8, O::PK>, Signature<O, P, R>))
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
     C: Variant,
@@ -158,10 +158,10 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    faest_verify::<T, R, C, P, O>(&input.0, input.1, input.2);
+    faest_verify::<C, P, O>(&input.0, input.1, input.2);
 }
 
-fn bench_verify_em<T, R, C, P, O>(input: (Vec<u8>, GenericArray<u8, O::PK>, Signature<O, P, R>))
+fn bench_verify_em<C, P, O>(input: (Vec<u8>, GenericArray<u8, O::PK>, Signature<O, P, R>))
 where
     T: BigGaloisField + std::default::Default + std::fmt::Debug,
     C: Variant,
@@ -169,7 +169,7 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    faest_verify::<T, R, C, P, O>(&input.0, input.1, input.2);
+    faest_verify::<C, P, O>(&input.0, input.1, input.2);
 }
 
 pub fn faest_benchmark(c: &mut Criterion) {

@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use generic_array::{sequence::GenericSequence, GenericArray};
+use generic_array::GenericArray;
 use serde::Deserialize;
 use typenum::{U16, U234, U24, U32, U458, U566};
 
