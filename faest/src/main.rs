@@ -1,5 +1,4 @@
 //use faest::{faest::{faest_sign, faest_verify, AesCypher, Variant}, fields::{BigGaloisField, GF128}, parameter::{PARAM, PARAM128S, PARAMOWF, PARAMOWF128}, random_oracles::{RandomOracle, RandomOracleShake128}};
-use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
 // use rand::random;
 
 mod fields;

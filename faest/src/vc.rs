@@ -203,16 +203,18 @@ mod test {
         sd: Vec<Vec<u8>>,
     }
 
+type Result<Lambda, Lambda2> = (
+    GenericArray<u8, Lambda2>,
+    (
+        Vec<GenericArray<u8, Lambda>>,
+        Vec<GenericArray<u8, Lambda2>>,
+    ),
+    Vec<Option<GenericArray<u8, Lambda>>>,
+);
+
     fn compare_expected_with_result<Lambda: ArrayLength, Lambda2: ArrayLength>(
         expected: &DataCommit,
-        res: (
-            GenericArray<u8, Lambda2>,
-            (
-                Vec<GenericArray<u8, Lambda>>,
-                Vec<GenericArray<u8, Lambda2>>,
-            ),
-            Vec<Option<GenericArray<u8, Lambda>>>,
-        ),
+        res: Result<Lambda, Lambda2>
     ) {
         assert_eq!(res.0.as_slice(), expected.h.as_slice());
         for (k, k_expected) in zip(&res.1 .0, &expected.k) {
@@ -267,9 +269,9 @@ mod test {
         for data in database {
             if data.k[0].len() == 16 {
                 type D = U4;
-                type DPOW = U31;
+                type Dpow = U31;
                 type N = U16;
-                let res = open::<RandomOracleShake128, DPOW, D, N>(
+                let res = open::<RandomOracleShake128, Dpow, D, N>(
                     &(
                         data.k
                             .iter()
@@ -288,9 +290,9 @@ mod test {
                 assert_eq!(res.1, data.com_j);
             } else if data.k[0].len() == 24 {
                 type D = U4;
-                type DPOW = U31;
+                type Dpow = U31;
                 type N = U16;
-                let res = open::<RandomOracleShake192, DPOW, D, N>(
+                let res = open::<RandomOracleShake192, Dpow, D, N>(
                     &(
                         data.k
                             .iter()
@@ -309,9 +311,9 @@ mod test {
                 assert_eq!(res.1, data.com_j);
             } else if data.b.len() == 4 {
                 type D = U4;
-                type DPOW = U31;
+                type Dpow = U31;
                 type N = U16;
-                let res = open::<RandomOracleShake256, DPOW, D, N>(
+                let res = open::<RandomOracleShake256, Dpow, D, N>(
                     &(
                         data.k
                             .iter()
@@ -330,9 +332,9 @@ mod test {
                 assert_eq!(res.1, data.com_j);
             } else {
                 type D = U5;
-                type DPOW = U63;
+                type Dpow = U63;
                 type N = U32;
-                let res = open::<RandomOracleShake256, DPOW, D, N>(
+                let res = open::<RandomOracleShake256, Dpow, D, N>(
                     &(
                         data.k
                             .iter()

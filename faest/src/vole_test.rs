@@ -15,15 +15,15 @@ use crate::{
     vole::{chaldec, to_vole_convert, volecommit, volereconstruct},
 };
 
+type Pdecom<LAMBDA, PRODLAMBDA2, TAU> = GenericArray<(Vec<GenericArray<u8, LAMBDA>>, GenericArray<u8, PRODLAMBDA2>), TAU>;
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DataConvertToVole {
     sd: Vec<Vec<u8>>,
 
     iv: [u8; 16],
-
-    lh: [usize; 1],
-
+    
     lambdabytes: [u8; 1],
 
     sd0: [u8; 1],
@@ -56,16 +56,11 @@ fn convert_to_vole_test() {
                 res.1,
                 data.v
                     .iter()
-                    .map(|x| *GenericArray::from_slice(&x))
+                    .map(|x| *GenericArray::from_slice(x))
                     .collect::<Vec<GenericArray<u8, LH>>>()
             );
         } else if data.lambdabytes[0] == 24 {
-            let mut opt_sd: Vec<Option<GenericArray<u8, U24>>> = data
-                .sd
-                .iter()
-                .cloned()
-                .map(|x| Some(GenericArray::default()))
-                .collect::<Vec<Option<GenericArray<u8, U24>>>>();
+            let mut opt_sd: Vec<Option<GenericArray<u8, U24>>> = Vec::default();
             if data.sd0[0] == 1 {
                 opt_sd[0] = None;
             }
@@ -76,16 +71,11 @@ fn convert_to_vole_test() {
                 res.1,
                 data.v
                     .iter()
-                    .map(|x| *GenericArray::from_slice(&x))
+                    .map(|x| *GenericArray::from_slice(x))
                     .collect::<Vec<GenericArray<u8, LH>>>()
             );
         } else {
-            let mut opt_sd: Vec<Option<GenericArray<u8, U32>>> = data
-                .sd
-                .iter()
-                .cloned()
-                .map(|x| Some(GenericArray::default()))
-                .collect::<Vec<Option<GenericArray<u8, U32>>>>();
+            let mut opt_sd: Vec<Option<GenericArray<u8, U32>>> = Vec::default();
             if data.sd0[0] == 1 {
                 opt_sd[0] = None;
             }
@@ -96,7 +86,7 @@ fn convert_to_vole_test() {
                 res.1,
                 data.v
                     .iter()
-                    .map(|x| *GenericArray::from_slice(&x))
+                    .map(|x| *GenericArray::from_slice(x))
                     .collect::<Vec<GenericArray<u8, LH>>>()
             );
         }
@@ -109,9 +99,6 @@ struct DataChalDec {
     chal: Vec<u8>,
     i: [u16; 1],
     k0: [u16; 1],
-    t0: [u16; 1],
-    k1: [u16; 1],
-    t1: [u16; 1],
     res: Vec<u8>,
 }
 
@@ -160,15 +147,9 @@ struct DataVoleCommit {
 
     iv: [u8; 16],
 
-    lh: [usize; 1],
-
     lambdabytes: [u16; 1],
 
-    tau: [usize; 1],
-
     k0: [u8; 1],
-
-    k1: [u8; 1],
 
     hcom: Vec<u8>,
 
@@ -193,7 +174,7 @@ fn volecommit_test() {
             if data.u.len() == 234 {
                 if data.k0[0] == 12 {
                     let res = volecommit::<PARAM128S, RandomOracleShake128>(
-                        &GenericArray::from_slice(&data.r),
+                        GenericArray::from_slice(&data.r),
                         &data.iv,
                     );
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
@@ -203,12 +184,12 @@ fn volecommit_test() {
                             (
                                 data.k[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone(),
                                 data.com[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone()
                             )
@@ -220,12 +201,12 @@ fn volecommit_test() {
                             (
                                 data.k[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone(),
                                 data.com[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone()
                             )
@@ -235,7 +216,7 @@ fn volecommit_test() {
                         res.2,
                         data.c
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect()
                     );
                     assert_eq!(res.3, *GenericArray::from_slice(&data.u));
@@ -243,12 +224,12 @@ fn volecommit_test() {
                         res.4,
                         data.v
                             .iter()
-                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(&y)).collect())
+                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
                             .collect()
                     );
                 } else {
                     let res = volecommit::<PARAM128F, RandomOracleShake128>(
-                        &GenericArray::from_slice(&data.r),
+                        GenericArray::from_slice(&data.r),
                         &data.iv,
                     );
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
@@ -258,12 +239,12 @@ fn volecommit_test() {
                             (
                                 data.k[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone(),
                                 data.com[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone()
                             )
@@ -275,12 +256,12 @@ fn volecommit_test() {
                             (
                                 data.k[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone(),
                                 data.com[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone()
                             )
@@ -290,7 +271,7 @@ fn volecommit_test() {
                         res.2,
                         data.c
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect()
                     );
                     assert_eq!(res.3, *GenericArray::from_slice(&data.u));
@@ -298,13 +279,13 @@ fn volecommit_test() {
                         res.4,
                         data.v
                             .iter()
-                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(&y)).collect())
+                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
                             .collect()
                     );
                 }
             } else if data.k0[0] == 12 {
                 let res = volecommit::<PARAM128SEM, RandomOracleShake128>(
-                    &GenericArray::from_slice(&data.r),
+                    GenericArray::from_slice(&data.r),
                     &data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
@@ -314,12 +295,12 @@ fn volecommit_test() {
                         (
                             data.k[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone(),
                             data.com[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone()
                         )
@@ -331,12 +312,12 @@ fn volecommit_test() {
                         (
                             data.k[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone(),
                             data.com[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone()
                         )
@@ -346,7 +327,7 @@ fn volecommit_test() {
                     res.2,
                     data.c
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect()
                 );
                 assert_eq!(res.3, *GenericArray::from_slice(&data.u));
@@ -354,12 +335,12 @@ fn volecommit_test() {
                     res.4,
                     data.v
                         .iter()
-                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(&y)).collect())
+                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
                         .collect()
                 );
             } else {
                 let res = volecommit::<PARAM128FEM, RandomOracleShake128>(
-                    &GenericArray::from_slice(&data.r),
+                    GenericArray::from_slice(&data.r),
                     &data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
@@ -369,12 +350,12 @@ fn volecommit_test() {
                         (
                             data.k[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone(),
                             data.com[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone()
                         )
@@ -386,12 +367,12 @@ fn volecommit_test() {
                         (
                             data.k[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone(),
                             data.com[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone()
                         )
@@ -401,7 +382,7 @@ fn volecommit_test() {
                     res.2,
                     data.c
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect()
                 );
                 assert_eq!(res.3, *GenericArray::from_slice(&data.u));
@@ -409,7 +390,7 @@ fn volecommit_test() {
                     res.4,
                     data.v
                         .iter()
-                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(&y)).collect())
+                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
                         .collect()
                 );
             }
@@ -417,7 +398,7 @@ fn volecommit_test() {
             if data.u.len() == 458 {
                 if data.k0[0] == 12 {
                     let res = volecommit::<PARAM192S, RandomOracleShake192>(
-                        &GenericArray::from_slice(&data.r),
+                        GenericArray::from_slice(&data.r),
                         &data.iv,
                     );
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
@@ -427,12 +408,12 @@ fn volecommit_test() {
                             (
                                 data.k[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone(),
                                 data.com[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone()
                             )
@@ -444,12 +425,12 @@ fn volecommit_test() {
                             (
                                 data.k[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone(),
                                 data.com[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone()
                             )
@@ -459,7 +440,7 @@ fn volecommit_test() {
                         res.2,
                         data.c
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect()
                     );
                     assert_eq!(res.3, *GenericArray::from_slice(&data.u));
@@ -467,12 +448,12 @@ fn volecommit_test() {
                         res.4,
                         data.v
                             .iter()
-                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(&y)).collect())
+                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
                             .collect()
                     );
                 } else {
                     let res = volecommit::<PARAM192F, RandomOracleShake192>(
-                        &GenericArray::from_slice(&data.r),
+                        GenericArray::from_slice(&data.r),
                         &data.iv,
                     );
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
@@ -482,12 +463,12 @@ fn volecommit_test() {
                             (
                                 data.k[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone(),
                                 data.com[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone()
                             )
@@ -499,12 +480,12 @@ fn volecommit_test() {
                             (
                                 data.k[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone(),
                                 data.com[i]
                                     .iter()
-                                    .map(|x| *GenericArray::from_slice(&x))
+                                    .map(|x| *GenericArray::from_slice(x))
                                     .collect::<Vec<GenericArray<u8, _>>>()
                                     .clone()
                             )
@@ -514,7 +495,7 @@ fn volecommit_test() {
                         res.2,
                         data.c
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect()
                     );
                     assert_eq!(res.3, *GenericArray::from_slice(&data.u));
@@ -522,13 +503,13 @@ fn volecommit_test() {
                         res.4,
                         data.v
                             .iter()
-                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(&y)).collect())
+                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
                             .collect()
                     );
                 }
             } else if data.k0[0] == 12 {
                 let res = volecommit::<PARAM192SEM, RandomOracleShake192>(
-                    &GenericArray::from_slice(&data.r),
+                    GenericArray::from_slice(&data.r),
                     &data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
@@ -538,12 +519,12 @@ fn volecommit_test() {
                         (
                             data.k[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone(),
                             data.com[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone()
                         )
@@ -555,12 +536,12 @@ fn volecommit_test() {
                         (
                             data.k[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone(),
                             data.com[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone()
                         )
@@ -570,7 +551,7 @@ fn volecommit_test() {
                     res.2,
                     data.c
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect()
                 );
                 assert_eq!(res.3, *GenericArray::from_slice(&data.u));
@@ -578,12 +559,12 @@ fn volecommit_test() {
                     res.4,
                     data.v
                         .iter()
-                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(&y)).collect())
+                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
                         .collect()
                 );
             } else {
                 let res = volecommit::<PARAM192FEM, RandomOracleShake192>(
-                    &GenericArray::from_slice(&data.r),
+                    GenericArray::from_slice(&data.r),
                     &data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
@@ -593,12 +574,12 @@ fn volecommit_test() {
                         (
                             data.k[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone(),
                             data.com[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone()
                         )
@@ -610,12 +591,12 @@ fn volecommit_test() {
                         (
                             data.k[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone(),
                             data.com[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone()
                         )
@@ -625,7 +606,7 @@ fn volecommit_test() {
                     res.2,
                     data.c
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect()
                 );
                 assert_eq!(res.3, *GenericArray::from_slice(&data.u));
@@ -633,14 +614,14 @@ fn volecommit_test() {
                     res.4,
                     data.v
                         .iter()
-                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(&y)).collect())
+                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
                         .collect()
                 );
             }
         } else if data.u.len() == 566 {
             if data.k0[0] == 12 {
                 let res = volecommit::<PARAM256S, RandomOracleShake256>(
-                    &GenericArray::from_slice(&data.r),
+                    GenericArray::from_slice(&data.r),
                     &data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
@@ -650,12 +631,12 @@ fn volecommit_test() {
                         (
                             data.k[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone(),
                             data.com[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone()
                         )
@@ -667,12 +648,12 @@ fn volecommit_test() {
                         (
                             data.k[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone(),
                             data.com[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone()
                         )
@@ -682,7 +663,7 @@ fn volecommit_test() {
                     res.2,
                     data.c
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect()
                 );
                 assert_eq!(res.3, *GenericArray::from_slice(&data.u));
@@ -690,12 +671,12 @@ fn volecommit_test() {
                     res.4,
                     data.v
                         .iter()
-                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(&y)).collect())
+                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
                         .collect()
                 );
             } else {
                 let res = volecommit::<PARAM256F, RandomOracleShake256>(
-                    &GenericArray::from_slice(&data.r),
+                    GenericArray::from_slice(&data.r),
                     &data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
@@ -705,12 +686,12 @@ fn volecommit_test() {
                         (
                             data.k[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone(),
                             data.com[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone()
                         )
@@ -722,12 +703,12 @@ fn volecommit_test() {
                         (
                             data.k[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone(),
                             data.com[i]
                                 .iter()
-                                .map(|x| *GenericArray::from_slice(&x))
+                                .map(|x| *GenericArray::from_slice(x))
                                 .collect::<Vec<GenericArray<u8, _>>>()
                                 .clone()
                         )
@@ -737,7 +718,7 @@ fn volecommit_test() {
                     res.2,
                     data.c
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect()
                 );
                 assert_eq!(res.3, *GenericArray::from_slice(&data.u));
@@ -745,13 +726,13 @@ fn volecommit_test() {
                     res.4,
                     data.v
                         .iter()
-                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(&y)).collect())
+                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
                         .collect()
                 );
             }
         } else if data.k0[0] == 12 {
             let res = volecommit::<PARAM256SEM, RandomOracleShake256>(
-                &GenericArray::from_slice(&data.r),
+                GenericArray::from_slice(&data.r),
                 &data.iv,
             );
             assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
@@ -761,12 +742,12 @@ fn volecommit_test() {
                     (
                         data.k[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>()
                             .clone(),
                         data.com[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>()
                             .clone()
                     )
@@ -778,12 +759,12 @@ fn volecommit_test() {
                     (
                         data.k[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>()
                             .clone(),
                         data.com[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>()
                             .clone()
                     )
@@ -793,7 +774,7 @@ fn volecommit_test() {
                 res.2,
                 data.c
                     .iter()
-                    .map(|x| *GenericArray::from_slice(&x))
+                    .map(|x| *GenericArray::from_slice(x))
                     .collect()
             );
             assert_eq!(res.3, *GenericArray::from_slice(&data.u));
@@ -801,12 +782,12 @@ fn volecommit_test() {
                 res.4,
                 data.v
                     .iter()
-                    .map(|x| x.iter().map(|y| *GenericArray::from_slice(&y)).collect())
+                    .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
                     .collect()
             );
         } else {
             let res = volecommit::<PARAM256FEM, RandomOracleShake256>(
-                &GenericArray::from_slice(&data.r),
+                GenericArray::from_slice(&data.r),
                 &data.iv,
             );
             assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
@@ -816,12 +797,12 @@ fn volecommit_test() {
                     (
                         data.k[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>()
                             .clone(),
                         data.com[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>()
                             .clone()
                     )
@@ -833,12 +814,12 @@ fn volecommit_test() {
                     (
                         data.k[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>()
                             .clone(),
                         data.com[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>()
                             .clone()
                     )
@@ -848,7 +829,7 @@ fn volecommit_test() {
                 res.2,
                 data.c
                     .iter()
-                    .map(|x| *GenericArray::from_slice(&x))
+                    .map(|x| *GenericArray::from_slice(x))
                     .collect()
             );
             assert_eq!(res.3, *GenericArray::from_slice(&data.u));
@@ -856,7 +837,7 @@ fn volecommit_test() {
                 res.4,
                 data.v
                     .iter()
-                    .map(|x| x.iter().map(|y| *GenericArray::from_slice(&y)).collect())
+                    .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
                     .collect()
             );
         }
@@ -887,12 +868,12 @@ fn volereconstruct_test() {
     for data in database {
         if data.chal.len() == 16 {
             if data.q[0].len() == 8 {
-                let mut pdecom : GenericArray<(Vec<GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA>>, GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2>), <parameter::PARAM128F as parameter::PARAM>::TAU> = GenericArray::default();
+                let mut pdecom : Pdecom<<random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2, <parameter::PARAM128F as parameter::PARAM>::TAU> = GenericArray::default();
                 for i in 0..data.pdec.len() {
                     pdecom[i] = (
                         data.pdec[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect(),
                         *GenericArray::from_slice(&data.com[i]),
                     );
@@ -907,12 +888,12 @@ fn volereconstruct_test() {
                     assert_eq!(res.1[i].len(), data.q[i].len());
                 }
             } else {
-                let mut pdecom : GenericArray<(Vec<GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA>>, GenericArray<u8, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2>), <parameter::PARAM128S as parameter::PARAM>::TAU> = GenericArray::default();
+                let mut pdecom : Pdecom<<random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2, <parameter::PARAM128S as parameter::PARAM>::TAU> = GenericArray::default();
                 for i in 0..data.pdec.len() {
                     pdecom[i] = (
                         data.pdec[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect(),
                         *GenericArray::from_slice(&data.com[i]),
                     );
@@ -950,12 +931,12 @@ fn volereconstruct_test() {
             }
         } else if data.chal.len() == 24 {
             if data.q[0].len() == 8 {
-                let mut pdecom : GenericArray<(Vec<GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA>>, GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2>), <parameter::PARAM192F as parameter::PARAM>::TAU> = GenericArray::default();
+                let mut pdecom : Pdecom<<random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2, <parameter::PARAM192F as parameter::PARAM>::TAU> = GenericArray::default();
                 for i in 0..data.pdec.len() {
                     pdecom[i] = (
                         data.pdec[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect(),
                         *GenericArray::from_slice(&data.com[i]),
                     );
@@ -970,12 +951,12 @@ fn volereconstruct_test() {
                     assert_eq!(res.1[i].len(), data.q[i].len());
                 }
             } else {
-                let mut pdecom : GenericArray<(Vec<GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA>>, GenericArray<u8, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2>), <parameter::PARAM192S as parameter::PARAM>::TAU> = GenericArray::default();
+                let mut pdecom : Pdecom<<random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2, <parameter::PARAM192S as parameter::PARAM>::TAU> = GenericArray::default();
                 for i in 0..data.pdec.len() {
                     pdecom[i] = (
                         data.pdec[i]
                             .iter()
-                            .map(|x| *GenericArray::from_slice(&x))
+                            .map(|x| *GenericArray::from_slice(x))
                             .collect(),
                         *GenericArray::from_slice(&data.com[i]),
                     );
@@ -1012,12 +993,12 @@ fn volereconstruct_test() {
                 }
             }
         } else if data.q[0].len() == 8 {
-            let mut pdecom : GenericArray<(Vec<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>, GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2>), <parameter::PARAM256F as parameter::PARAM>::TAU> = GenericArray::default();
+            let mut pdecom : Pdecom<<random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2, <parameter::PARAM256F as parameter::PARAM>::TAU> = GenericArray::default();
             for i in 0..data.pdec.len() {
                 pdecom[i] = (
                     data.pdec[i]
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect(),
                     *GenericArray::from_slice(&data.com[i]),
                 );
@@ -1032,12 +1013,12 @@ fn volereconstruct_test() {
                 assert_eq!(res.1[i].len(), data.q[i].len());
             }
         } else {
-            let mut pdecom : GenericArray<(Vec<GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA>>, GenericArray<u8, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2>), <parameter::PARAM256S as parameter::PARAM>::TAU> = GenericArray::default();
+            let mut pdecom : Pdecom<<random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2, <parameter::PARAM256S as parameter::PARAM>::TAU> = GenericArray::default();
             for i in 0..data.pdec.len() {
                 pdecom[i] = (
                     data.pdec[i]
                         .iter()
-                        .map(|x| *GenericArray::from_slice(&x))
+                        .map(|x| *GenericArray::from_slice(x))
                         .collect(),
                     *GenericArray::from_slice(&data.com[i]),
                 );

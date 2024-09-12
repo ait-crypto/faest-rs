@@ -9,9 +9,8 @@ use crate::{
     em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_extendedwitness, em_prove, em_verify},
     fields::{BigGaloisField, GF128, GF192, GF256},
     parameter::{
-        PARAM128FEM, PARAM128SEM, PARAM192FEM, PARAM192S, PARAM192SEM,
-        PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF128, PARAMOWF128EM, PARAMOWF192EM,
-        PARAMOWF256, PARAMOWF256EM,
+        PARAM128FEM, PARAM128SEM, PARAM192FEM, PARAM192SEM, PARAM256FEM, PARAM256SEM, PARAMOWF128,
+        PARAMOWF128EM, PARAMOWF192EM, PARAMOWF256EM,
     },
 };
 
@@ -40,13 +39,13 @@ fn em_extended_witness_test() {
             );
             assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         } else if data.lambda == 192 {
-            let res = em_extendedwitness::<PARAM192S, PARAMOWF192EM>(
+            let res = em_extendedwitness::<PARAM192SEM, PARAMOWF192EM>(
                 GenericArray::from_slice(&data.key),
                 GenericArray::from_slice(&[data.input, vec![0u8; 16]].concat()),
             );
             assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
         } else {
-            let res = em_extendedwitness::<PARAM256S, PARAMOWF256EM>(
+            let res = em_extendedwitness::<PARAM256SEM, PARAMOWF256EM>(
                 GenericArray::from_slice(&data.key),
                 GenericArray::from_slice(&[data.input, vec![0u8; 32]].concat()),
             );
@@ -173,7 +172,7 @@ fn em_enc_fwd_test() {
                     data.x
                         .iter()
                         .flat_map(|x| {
-                            convert_to_bit::<PARAMOWF256, U8, U1>(GenericArray::from_slice(
+                            convert_to_bit::<PARAMOWF256EM, U8, U1>(GenericArray::from_slice(
                                 &x[0].to_le_bytes()[..1],
                             ))
                         })
@@ -181,7 +180,7 @@ fn em_enc_fwd_test() {
                     data.z
                         .iter()
                         .flat_map(|z| {
-                            convert_to_bit::<PARAMOWF256, U8, U1>(GenericArray::from_slice(
+                            convert_to_bit::<PARAMOWF256EM, U8, U1>(GenericArray::from_slice(
                                 &z[0].to_le_bytes()[..1],
                             ))
                         })
@@ -364,7 +363,7 @@ fn em_enc_bkwd_test() {
                         .collect(),
                 )
             };
-            let res = em_enc_bkwd::<PARAM192S, PARAMOWF192EM>(
+            let res = em_enc_bkwd::<PARAM192SEM, PARAMOWF192EM>(
                 GenericArray::from_slice(&x_in),
                 GenericArray::from_slice(&z_in),
                 GenericArray::from_slice(&z_out_in),
@@ -388,7 +387,7 @@ fn em_enc_bkwd_test() {
                     data.x
                         .iter()
                         .flat_map(|x| {
-                            convert_to_bit::<PARAMOWF256, U8, U1>(GenericArray::from_slice(
+                            convert_to_bit::<PARAMOWF256EM, U8, U1>(GenericArray::from_slice(
                                 &x[0].to_le_bytes()[..1],
                             ))
                         })
@@ -396,7 +395,7 @@ fn em_enc_bkwd_test() {
                     data.z
                         .iter()
                         .flat_map(|z| {
-                            convert_to_bit::<PARAMOWF256, U8, U1>(GenericArray::from_slice(
+                            convert_to_bit::<PARAMOWF256EM, U8, U1>(GenericArray::from_slice(
                                 &z[0].to_le_bytes()[..1],
                             ))
                         })
@@ -404,7 +403,7 @@ fn em_enc_bkwd_test() {
                     data.zout
                         .iter()
                         .flat_map(|z| {
-                            convert_to_bit::<PARAMOWF256, U8, U1>(GenericArray::from_slice(
+                            convert_to_bit::<PARAMOWF256EM, U8, U1>(GenericArray::from_slice(
                                 &z[0].to_le_bytes()[..1],
                             ))
                         })
@@ -441,7 +440,7 @@ fn em_enc_bkwd_test() {
                         .collect(),
                 )
             };
-            let res = em_enc_bkwd::<PARAM256S, PARAMOWF256EM>(
+            let res = em_enc_bkwd::<PARAM256SEM, PARAMOWF256EM>(
                 GenericArray::from_slice(&x_in),
                 GenericArray::from_slice(&z_in),
                 GenericArray::from_slice(&z_out_in),

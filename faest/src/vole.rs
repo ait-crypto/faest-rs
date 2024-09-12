@@ -137,7 +137,7 @@ where
     for i in 0..tau {
         let b = 1 - u16::from(i < tau_0);
         let k = ((1 - b) * k0) + b * k1;
-        (com[i], decom[i], sd[i]) = commit::<R>(&r[i], &iv, 1 << k);
+        (com[i], decom[i], sd[i]) = commit::<R>(&r[i], iv, 1 << k);
         hasher.update(&com[i]);
         (u[i], v[i]) = to_vole_convert::<R, P::LH>(&sd[i], iv);
     }
