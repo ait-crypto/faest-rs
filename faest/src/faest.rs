@@ -11,6 +11,16 @@ use crate::{
     vole::{chaldec, volecommit, volereconstruct},
 };
 
+type QSProof<O> = (
+    Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
+    Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
+);
+type Key<O> = (
+    GenericArray<u8, <O as PARAMOWF>::PK>,
+    Box<GenericArray<u8, <O as PARAMOWF>::PK>>,
+    Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
+);
+
 use generic_array::{typenum::Unsigned, GenericArray};
 use nist_pqc_seeded_rng::RngCore;
 
@@ -33,10 +43,7 @@ pub trait Variant {
         gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         pk: &GenericArray<u8, O::PK>,
         chall: &GenericArray<u8, O::CHALL>,
-    ) -> (
-        Box<GenericArray<u8, O::LAMBDABYTES>>,
-        Box<GenericArray<u8, O::LAMBDABYTES>>,
-    )
+    ) -> QSProof<O>
     where
         P: PARAM,
         O: PARAMOWF;
@@ -57,13 +64,7 @@ pub trait Variant {
 
     ///input : a random number generator
     /// output = pk : input, output; sk : input, key; rho (len = Lambda bytes)
-    fn keygen_with_rng<P, O>(
-        rng: impl RngCore,
-    ) -> (
-        GenericArray<u8, O::PK>,
-        Box<GenericArray<u8, O::PK>>,
-        Box<GenericArray<u8, O::LAMBDABYTES>>,
-    )
+    fn keygen_with_rng<P, O>(rng: impl RngCore) -> Key<O>
     where
         P: PARAM,
         O: PARAMOWF;
@@ -260,7 +261,7 @@ impl Variant for EmCypher {
                 GenericArray::from_slice(&sk),
             )
             .1;
-            if test == false {
+            if !test {
                 continue 'boucle;
             }
 
@@ -292,8 +293,11 @@ impl Variant for EmCypher {
 type RO<O> = <<O as PARAMOWF>::BaseParams as BaseParameters>::RandomOracle;
 
 ///input : Message (an array of bytes), sk : secret key, pk : public key, rho : lambda bits
+///
 ///output : correction string (tau - 1 * (l_hat bits)), Hash of VOLE sceet (LAMBDA + 16 bits), Commitment to the witness (l bits)
+///
 /// Quicksilver proof (Lambda), Partial decommitment (Tau * (t0 * k0*lambda + t1 * k1*lambda  +  2Lambda) bits),
+///
 ///last challenge (lambda bits), initialisation vector
 #[allow(clippy::needless_range_loop)]
 #[allow(clippy::type_complexity)]
@@ -326,17 +330,17 @@ where
     let _k1 = <P::K1 as Unsigned>::to_u16();
 
     let mut h1_hasher = RO::<O>::h1_init();
-    h1_hasher.update(&pk);
-    h1_hasher.update(&msg);
+    h1_hasher.update(pk);
+    h1_hasher.update(msg);
     // why is this Boxed?
     let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
         GenericArray::default_boxed();
     h1_hasher.finish().read(&mut mu);
 
     let mut h3_hasher = RO::<O>::h3_init();
-    h3_hasher.update(&sk);
+    h3_hasher.update(sk);
     h3_hasher.update(&mu);
-    h3_hasher.update(&rho);
+    h3_hasher.update(rho);
 
     let mut r = GenericArray::<u8, O::LAMBDABYTES>::default();
     let mut iv = IV::default();
@@ -344,7 +348,7 @@ where
     h3_reader.read(&mut r);
     h3_reader.read(&mut iv);
 
-    let (hcom, decom, c, mut u, gv) = volecommit::<P, RO<O>>(&r, &iv);
+    let (hcom, decom, c, u, gv) = volecommit::<P, RO<O>>(&r, &iv);
     let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&mu);
@@ -484,7 +488,7 @@ where
 
     let mut h1_hasher = RO::<O>::h1_init();
     h1_hasher.update(&pk);
-    h1_hasher.update(&msg);
+    h1_hasher.update(msg);
     // why is this boxed?
     let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
         GenericArray::default_boxed();
@@ -504,7 +508,7 @@ where
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
-    c.iter().for_each(|buf| h2_hasher.update(&buf));
+    c.iter().for_each(|buf| h2_hasher.update(buf));
     h2_hasher.update(&iv);
     let mut reader = h2_hasher.finish();
     reader.read(&mut chall1);
@@ -691,10 +695,8 @@ where
         GenericArray::default_boxed();
 
     for i in c.iter_mut().take(tau - 1) {
-        let mut indice = 0;
-        for j in &signature[index..index + l_b] {
+        for (indice, j) in signature[index..index + l_b].iter().enumerate() {
             i[indice] = *j;
-            indice += 1;
         }
         index += l_b;
     }
@@ -708,7 +710,7 @@ where
     let mut pdecom: Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>> =
         GenericArray::default_boxed();
     for i in pdecom.iter_mut().take(tau0) {
-        for j in 0..k0 {
+        for _j in 0..k0 {
             i.0.push(GenericArray::from_slice(&signature[index..index + lambda]).clone());
             index += lambda;
         }
@@ -716,7 +718,7 @@ where
         index += 2 * lambda;
     }
     for i in 0..tau1 {
-        for j in 0..k1 {
+        for _j in 0..k1 {
             pdecom[tau0 + i]
                 .0
                 .push(GenericArray::from_slice(&signature[index..index + lambda]).clone());
