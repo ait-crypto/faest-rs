@@ -47,17 +47,17 @@ pub(crate) fn rijndael_key_schedule(
         if nk == 8 {
             if count < ske / 4 {
                 for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][12..].iter() {
-                    valid &= (0 != *i);
+                    valid &= 0 != *i;
                 }
                 count += 1
             }
         } else if nk == 6 {
             for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][4..8].iter() {
-                valid &= (0 != *i);
+                valid &= 0 != *i;
             }
         } else {
             for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..].iter() {
-                valid &= (0 != *i);
+                valid &= 0 != *i;
             }
         }
         memshift32(&mut rkeys, rk_off);
@@ -95,7 +95,7 @@ pub(crate) fn rijndael_key_schedule(
         xor_columns(&mut rkeys, rk_off, 8, idx_ror, nk);
         if nk == 8 && count < ske / 4 {
             for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..].iter() {
-                valid &= (0 != *i);
+                valid &= 0 != *i;
             }
             count += 1
         }
@@ -885,7 +885,6 @@ fn delta_swap_2(a: &mut u32, b: &mut u32, shift: u32, mask: u32) {
 ///
 ///
 /// /// Applies ShiftRows once on an AES state (or key).
-#[cfg(any(not(aes_compact), feature = "hazmat"))]
 #[inline]
 pub fn rijndael_shift_rows_1(state: &mut [u32], bc: u8) {
     debug_assert_eq!(state.len(), 8);
@@ -1369,7 +1368,7 @@ mod test {
                     padded_text[..text.len()].copy_from_slice(&text[..]);
                     let r = max(kc, bc) + 6;
                     let mut state_text = State::default();
-                    let (rkeys, valid) =
+                    let (rkeys, _) =
                         rijndael_key_schedule(&key, bc, kc, r, 4 * (((r + 1) * bc) / kc));
                     let crypted = rijndael_encrypt(&rkeys, &padded_text, bc, bc, r);
                     let res = rijndael_decrypt(&rkeys, &crypted, bc, r);
