@@ -2,6 +2,11 @@ use generic_array::{ArrayLength, GenericArray};
 
 use crate::random_oracles::{Hasher, PseudoRandomGenerator, RandomOracle, Reader, IV};
 
+type Decom<R> = (
+    Vec<GenericArray<u8, <R as RandomOracle>::LAMBDA>>,
+    Vec<GenericArray<u8, <R as RandomOracle>::PRODLAMBDA2>>,
+);
+
 #[allow(clippy::type_complexity)]
 pub fn commit<R>(
     r: &GenericArray<u8, R::LAMBDA>,
@@ -50,10 +55,7 @@ where
 }
 
 pub fn open<R, DPOW /*2N - 1 */, D, N>(
-    decom: &(
-        Vec<GenericArray<u8, R::LAMBDA>>,
-        Vec<GenericArray<u8, R::PRODLAMBDA2>>,
-    ),
+    decom: &Decom<R>,
     b: GenericArray<u8, D>,
 ) -> (Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>)
 where
@@ -203,18 +205,18 @@ mod test {
         sd: Vec<Vec<u8>>,
     }
 
-type Result<Lambda, Lambda2> = (
-    GenericArray<u8, Lambda2>,
-    (
-        Vec<GenericArray<u8, Lambda>>,
-        Vec<GenericArray<u8, Lambda2>>,
-    ),
-    Vec<Option<GenericArray<u8, Lambda>>>,
-);
+    type Result<Lambda, Lambda2> = (
+        GenericArray<u8, Lambda2>,
+        (
+            Vec<GenericArray<u8, Lambda>>,
+            Vec<GenericArray<u8, Lambda2>>,
+        ),
+        Vec<Option<GenericArray<u8, Lambda>>>,
+    );
 
     fn compare_expected_with_result<Lambda: ArrayLength, Lambda2: ArrayLength>(
         expected: &DataCommit,
-        res: Result<Lambda, Lambda2>
+        res: Result<Lambda, Lambda2>,
     ) {
         assert_eq!(res.0.as_slice(), expected.h.as_slice());
         for (k, k_expected) in zip(&res.1 .0, &expected.k) {

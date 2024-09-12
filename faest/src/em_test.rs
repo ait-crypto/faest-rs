@@ -501,8 +501,8 @@ fn em_enc_cstrnts_test() {
                 GenericArray::from_slice(&data.out),
                 GenericArray::from_slice(&data.x),
                 GenericArray::from_slice(&data.w),
-                GenericArray::from_slice(&vq),
-                GenericArray::from_slice(&vq),
+                GenericArray::from_slice(vq),
+                GenericArray::from_slice(vq),
                 data.mkey != 0,
                 GF128::to_field(&data.delta)[0],
             );
@@ -530,8 +530,8 @@ fn em_enc_cstrnts_test() {
                 GenericArray::from_slice(&data.out),
                 GenericArray::from_slice(&data.x),
                 GenericArray::from_slice(&data.w),
-                GenericArray::from_slice(&vq),
-                GenericArray::from_slice(&vq),
+                GenericArray::from_slice(vq),
+                GenericArray::from_slice(vq),
                 data.mkey != 0,
                 GF192::to_field(&data.delta)[0],
             );
@@ -564,8 +564,8 @@ fn em_enc_cstrnts_test() {
                 GenericArray::from_slice(&data.out),
                 GenericArray::from_slice(&data.x),
                 GenericArray::from_slice(&data.w),
-                GenericArray::from_slice(&vq),
-                GenericArray::from_slice(&vq),
+                GenericArray::from_slice(vq),
+                GenericArray::from_slice(vq),
                 data.mkey != 0,
                 GF256::to_field(&data.delta)[0],
             );
@@ -618,7 +618,7 @@ fn em_prove_test() {
         if data.lambda == 128 {
             let res = em_prove::<PARAM128SEM, PARAMOWF128EM>(
                 GenericArray::from_slice(&data.w),
-                &GenericArray::from_slice(&[[0u8; 160].to_vec(), data.u].concat()),
+                GenericArray::from_slice(&[[0u8; 160].to_vec(), data.u].concat()),
                 GenericArray::from_slice(
                     &data
                         .gv
@@ -640,7 +640,7 @@ fn em_prove_test() {
         } else if data.lambda == 192 {
             let res = em_prove::<PARAM192SEM, PARAMOWF192EM>(
                 GenericArray::from_slice(&data.w),
-                &GenericArray::from_slice(&[[0u8; 288].to_vec(), data.u].concat()),
+                GenericArray::from_slice(&[[0u8; 288].to_vec(), data.u].concat()),
                 GenericArray::from_slice(
                     &data
                         .gv
@@ -717,7 +717,7 @@ fn em_verify_test() {
             let res = if data.tau == 11 {
                 em_verify::<PARAM128SEM, PARAMOWF128EM>(
                     GenericArray::from_slice(&data.d),
-                    &mut GenericArray::from_slice(
+                    GenericArray::from_slice(
                         &data
                             .gq
                             .iter()
@@ -732,7 +732,7 @@ fn em_verify_test() {
             } else {
                 em_verify::<PARAM128FEM, PARAMOWF128EM>(
                     GenericArray::from_slice(&data.d),
-                    &mut GenericArray::from_slice(
+                    GenericArray::from_slice(
                         &data
                             .gq
                             .iter()
@@ -750,7 +750,7 @@ fn em_verify_test() {
             let res = if data.tau == 16 {
                 em_verify::<PARAM192SEM, PARAMOWF192EM>(
                     GenericArray::from_slice(&data.d),
-                    &mut GenericArray::from_slice(
+                    GenericArray::from_slice(
                         &data
                             .gq
                             .iter()
@@ -765,7 +765,7 @@ fn em_verify_test() {
             } else {
                 em_verify::<PARAM192FEM, PARAMOWF192EM>(
                     GenericArray::from_slice(&data.d),
-                    &mut GenericArray::from_slice(
+                    GenericArray::from_slice(
                         &data
                             .gq
                             .iter()
@@ -783,7 +783,7 @@ fn em_verify_test() {
             let res = if data.tau == 22 {
                 em_verify::<PARAM256SEM, PARAMOWF256EM>(
                     GenericArray::from_slice(&data.d),
-                    &mut GenericArray::from_slice(
+                    GenericArray::from_slice(
                         &data
                             .gq
                             .iter()
@@ -798,7 +798,7 @@ fn em_verify_test() {
             } else {
                 em_verify::<PARAM256FEM, PARAMOWF256EM>(
                     GenericArray::from_slice(&data.d),
-                    &mut GenericArray::from_slice(
+                    GenericArray::from_slice(
                         &data
                             .gq
                             .iter()

@@ -585,7 +585,7 @@ fn aes_key_exp_cstrnts_test() {
                 .iter()
                 .map(|w| GF256::new(w[0] + ((w[1]) << 64), w[2] + ((w[3]) << 64)))
                 .collect();
-            let mut res = aes_key_exp_cstrnts::<PARAMOWF256>(
+            let res = aes_key_exp_cstrnts::<PARAMOWF256>(
                 GenericArray::from_slice(
                     &(data
                         .w

@@ -15,7 +15,8 @@ use crate::{
     vole::{chaldec, to_vole_convert, volecommit, volereconstruct},
 };
 
-type Pdecom<LAMBDA, PRODLAMBDA2, TAU> = GenericArray<(Vec<GenericArray<u8, LAMBDA>>, GenericArray<u8, PRODLAMBDA2>), TAU>;
+type Pdecom<LAMBDA, PRODLAMBDA2, TAU> =
+    GenericArray<(Vec<GenericArray<u8, LAMBDA>>, GenericArray<u8, PRODLAMBDA2>), TAU>;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +24,7 @@ struct DataConvertToVole {
     sd: Vec<Vec<u8>>,
 
     iv: [u8; 16],
-    
+
     lambdabytes: [u8; 1],
 
     sd0: [u8; 1],
@@ -993,7 +994,11 @@ fn volereconstruct_test() {
                 }
             }
         } else if data.q[0].len() == 8 {
-            let mut pdecom : Pdecom<<random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2, <parameter::PARAM256F as parameter::PARAM>::TAU> = GenericArray::default();
+            let mut pdecom: Pdecom<
+                <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA,
+                <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2,
+                <parameter::PARAM256F as parameter::PARAM>::TAU,
+            > = GenericArray::default();
             for i in 0..data.pdec.len() {
                 pdecom[i] = (
                     data.pdec[i]
@@ -1013,7 +1018,11 @@ fn volereconstruct_test() {
                 assert_eq!(res.1[i].len(), data.q[i].len());
             }
         } else {
-            let mut pdecom : Pdecom<<random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA, <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2, <parameter::PARAM256S as parameter::PARAM>::TAU> = GenericArray::default();
+            let mut pdecom: Pdecom<
+                <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA,
+                <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2,
+                <parameter::PARAM256S as parameter::PARAM>::TAU,
+            > = GenericArray::default();
             for i in 0..data.pdec.len() {
                 pdecom[i] = (
                     data.pdec[i]

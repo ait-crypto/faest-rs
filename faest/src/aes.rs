@@ -169,7 +169,7 @@ fn round_with_save<O>(
     rijndael_add_round_key(&mut state, &kb[..8]);
     for j in 1..r as usize {
         for i in inv_bitslice(&state)[0][..].to_vec() {
-            *valid &= (i != 0)
+            *valid &= i != 0
         }
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
@@ -187,7 +187,7 @@ fn round_with_save<O>(
         rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
     }
     for i in inv_bitslice(&state)[0][..].to_vec() {
-        *valid &= (i != 0)
+        *valid &= i != 0
     }
 }
 
@@ -378,8 +378,6 @@ where
             Box<GenericArray<O::Field, O::SKE>>,
             Box<GenericArray<O::Field, O::SKE>>,
         ) = (GenericArray::default_boxed(), GenericArray::default_boxed());
-
-        let bits_w = &convert_to_bit::<O, O::PRODRUN128, O::LKE>(w)[..lke];
         let k = aes_key_exp_fwd::<O>(GenericArray::from_slice(
             &w.iter()
                 .map(|x| match x {

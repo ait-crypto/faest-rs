@@ -4,7 +4,7 @@ use cipher::Unsigned;
 use generic_array::GenericArray;
 
 use crate::{
-    aes::{byte_to_bit, convert_to_bit},
+    aes::convert_to_bit,
     fields::{BigGaloisField, ByteCombine, Field, SumPoly},
     parameter::{BaseParameters, PARAM, PARAMOWF},
     rijndael_32::{
@@ -14,6 +14,16 @@ use crate::{
     universal_hashing::{ZKHasherInit, ZKHasherProcess},
     vole::chaldec,
 };
+
+type Reveal<O> = (
+    Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>,
+    Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>,
+);
+
+type EMProof<O> = (
+    Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
+    Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
+);
 
 pub fn em_extendedwitness<P, O>(
     k: &GenericArray<u8, O::LAMBDABYTES>,
@@ -37,7 +47,7 @@ where
         r as u8,
         (4 * (((r + 1) * nst) / kc as usize)) as u8,
     );
-    for i in k.to_vec() {
+    for i in k.iter().copied() {
         res[index] = i;
         index += 1;
     }
@@ -50,15 +60,15 @@ where
     rijndael_add_round_key(&mut state, &x.0[..8]);
     for j in 1..r {
         for i in inv_bitslice(&state)[0][..].iter() {
-            valid &= (*i != 0);
+            valid &= *i != 0;
         }
         if nst == 6 {
             for i in inv_bitslice(&state)[1][..8].iter() {
-                valid &= (*i != 0);
+                valid &= *i != 0;
             }
         } else if nst == 8 {
             for i in inv_bitslice(&state)[1][..].iter() {
-                valid &= (*i != 0);
+                valid &= *i != 0;
             }
         }
         sub_bytes(&mut state);
@@ -77,15 +87,15 @@ where
         rijndael_add_round_key(&mut state, &x.0[8 * j..8 * (j + 1)]);
     }
     for i in inv_bitslice(&state)[0][..].iter() {
-        valid &= (*i != 0);
+        valid &= *i != 0;
     }
     if nst == 6 {
         for i in inv_bitslice(&state)[1][..8].iter() {
-            valid &= (*i != 0);
+            valid &= *i != 0;
         }
     } else if nst == 8 {
         for i in inv_bitslice(&state)[1][..].iter() {
-            valid &= (*i != 0);
+            valid &= *i != 0;
         }
     }
     (res, valid)
@@ -132,7 +142,9 @@ where
     res
 } */
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
+/// 
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
+/// 
 ///One of the first path to optimize the code could be to do the distinction
 pub fn em_enc_fwd<O>(
     z: &GenericArray<O::Field, O::L>,
@@ -195,7 +207,9 @@ where
 }
 
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
+/// 
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
+/// 
 ///One of the first path to optimize the code could be to do the distinction
 #[allow(clippy::too_many_arguments)]
 pub fn em_enc_bkwd<P, O>(
@@ -265,10 +279,7 @@ pub fn em_enc_cstrnts<P, O>(
     q: &GenericArray<O::Field, O::L>,
     mkey: bool,
     delta: O::Field,
-) -> (
-    Box<GenericArray<O::Field, O::C>>,
-    Box<GenericArray<O::Field, O::C>>,
-)
+) -> Reveal<O>
 where
     P: PARAM,
     O: PARAMOWF,
@@ -302,10 +313,7 @@ where
             true,
             O::Field::default(),
         );
-        let (mut a0, mut a1): (
-            Box<GenericArray<O::Field, O::C>>,
-            Box<GenericArray<O::Field, O::C>>,
-        ) = (GenericArray::default_boxed(), GenericArray::default_boxed());
+        let (mut a0, mut a1): Reveal<O> = (GenericArray::default_boxed(), GenericArray::default_boxed());
         for j in 0..senc {
             a0[j] = v_s_b[j] * vs[j];
             a1[j] = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + O::Field::ONE + a0[j];
@@ -341,10 +349,7 @@ pub fn em_prove<P, O>(
     gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     pk: &GenericArray<u8, O::PK>,
     chall: &GenericArray<u8, O::CHALL>,
-) -> (
-    Box<GenericArray<u8, O::LAMBDABYTES>>,
-    Box<GenericArray<u8, O::LAMBDABYTES>>,
-)
+) -> EMProof<O>
 where
     P: PARAM,
     O: PARAMOWF,
@@ -354,10 +359,6 @@ where
     let r = <O::R as Unsigned>::to_u8();
     let l = <O::L as Unsigned>::to_usize();
     let lambda = <P::LAMBDA as Unsigned>::to_usize();
-    let new_w = w
-        .into_iter()
-        .flat_map(|x| byte_to_bit(*x))
-        .collect::<Vec<u8>>();
     let mut temp_v: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
     for i in 0..(l + lambda) / 8 {
         for k in 0..8 {
@@ -383,7 +384,7 @@ where
                     .take(lambda / 8)
                     .collect::<Vec<u8>>()
             })
-            .take((lambda as usize / 8) * (r as usize + 1))
+            .take((lambda / 8) * (r as usize + 1))
             .collect::<GenericArray<u8, _>>(),
         w,
         GenericArray::from_slice(&new_v[..l]),
@@ -478,7 +479,7 @@ where
                     .take(lambda / 8)
                     .collect::<Vec<u8>>()
             })
-            .take((lambda as usize / 8) * (r as usize + 1))
+            .take((lambda / 8) * (r as usize + 1))
             .collect::<GenericArray<u8, _>>(),
         &GenericArray::default_boxed(),
         &GenericArray::default_boxed(),
