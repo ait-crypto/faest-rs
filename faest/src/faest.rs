@@ -98,7 +98,7 @@ impl Variant for AesCypher {
         P: PARAM,
         O: PARAMOWF,
     {
-        aes_prove::<P, O>(w, u, Box::new(gv), pk, chall)
+        aes_prove::<P, O>(w, u, gv, pk, chall)
     }
 
     fn verify<P, O>(

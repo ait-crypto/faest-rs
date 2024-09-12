@@ -68,10 +68,6 @@ fn aes_extended_witness_test() {
 struct AesKeyExpFwd {
     lambda: u16,
 
-    r: u8,
-
-    nwd: u8,
-
     x: Vec<[u128; 4]>,
 
     out: Vec<[u128; 4]>,
@@ -187,8 +183,6 @@ struct AesKeyExpBwd {
     mtag: u8,
 
     mkey: u8,
-
-    ske: u16,
 
     delta: [u128; 4],
 
@@ -436,9 +430,9 @@ fn aes_key_exp_cstrnts_test() {
                         .flat_map(|x| byte_to_bit(*x))
                         .collect::<Vec<u8>>())[..448],
                 ),
-                GenericArray::from_slice(&fields_v),
+                GenericArray::from_slice(fields_v),
                 mkey,
-                GenericArray::from_slice(&fields_q),
+                GenericArray::from_slice(fields_q),
                 delta,
             );
             if res.1 == GenericArray::default_boxed() {
@@ -512,7 +506,7 @@ fn aes_key_exp_cstrnts_test() {
                 .iter()
                 .map(|w| GF192::new(w[0] + ((w[1]) << 64), w[2]))
                 .collect();
-            let mut res = aes_key_exp_cstrnts::<PARAMOWF192>(
+            let res = aes_key_exp_cstrnts::<PARAMOWF192>(
                 GenericArray::from_slice(
                     &(data
                         .w
@@ -520,9 +514,9 @@ fn aes_key_exp_cstrnts_test() {
                         .flat_map(|x| byte_to_bit(*x))
                         .collect::<Vec<u8>>())[..448],
                 ),
-                GenericArray::from_slice(&fields_v),
+                GenericArray::from_slice(fields_v),
                 mkey,
-                GenericArray::from_slice(&fields_q),
+                GenericArray::from_slice(fields_q),
                 delta,
             );
             #[allow(clippy::needless_range_loop)]
@@ -593,9 +587,9 @@ fn aes_key_exp_cstrnts_test() {
                         .flat_map(|x| byte_to_bit(*x))
                         .collect::<Vec<u8>>())[..672],
                 ),
-                GenericArray::from_slice(&fields_v),
+                GenericArray::from_slice(fields_v),
                 mkey,
-                GenericArray::from_slice(&fields_q),
+                GenericArray::from_slice(fields_q),
                 delta,
             );
             #[allow(clippy::needless_range_loop)]
@@ -1043,7 +1037,7 @@ fn aes_enc_cstrnts_test() {
                 GenericArray::from_slice(&vqk),
                 delta,
             );
-            if mkey == false {
+            if !mkey {
                 for i in 0..senc {
                     assert_eq!(res[i], ab[i].0);
                     assert_eq!(res[senc + i], ab[i].1);
@@ -1196,13 +1190,13 @@ fn aes_prove_test() {
             let res: (ZkHash128, ZkHash128) = aes_prove::<PARAM128S, PARAMOWF128>(
                 GenericArray::from_slice(&data.w),
                 GenericArray::from_slice(&data.u),
-                Box::new(GenericArray::from_slice(
+                GenericArray::from_slice(
                     &data
                         .gv
                         .iter()
                         .map(|x| *GenericArray::from_slice(x))
                         .collect::<Vec<GenericArray<u8, _>>>(),
-                )),
+                ),
                 GenericArray::from_slice(&pk),
                 GenericArray::from_slice(&data.chall),
             );
@@ -1210,33 +1204,30 @@ fn aes_prove_test() {
             assert_eq!((res).0, Box::new(*GenericArray::from_slice(&data.at)));
             assert_eq!((res).1, Box::new(*GenericArray::from_slice(&data.bt)));
         } else if data.lambda == 192 {
-            let mut pk = data.input.to_vec();
             let mut bitw: Vec<u8> = vec![0; 3264];
             for i in 0..data.w.len() {
                 for j in 0..8 {
                     bitw[8 * i + j] = (data.w[i] >> j) & 1;
                 }
             }
-
             let mut pk = data.input.to_vec();
             pk.append(&mut data.output.to_vec());
             let res: (ZkHash192, ZkHash192) = aes_prove::<PARAM192S, PARAMOWF192>(
                 GenericArray::from_slice(&data.w),
                 GenericArray::from_slice(&data.u),
-                Box::new(GenericArray::from_slice(
+                GenericArray::from_slice(
                     &data
                         .gv
                         .iter()
                         .map(|x| *GenericArray::from_slice(x))
                         .collect::<Vec<GenericArray<u8, _>>>(),
-                )),
+                ),
                 GenericArray::from_slice(&pk),
                 GenericArray::from_slice(&data.chall),
             );
             assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.at)));
             assert_eq!(res.1, Box::new(*GenericArray::from_slice(&data.bt)));
         } else {
-            let mut pk = data.input.to_vec();
             let mut bitw: Vec<u8> = vec![0; 4000];
             for i in 0..data.w.len() {
                 for j in 0..8 {
@@ -1249,13 +1240,13 @@ fn aes_prove_test() {
             let res: (ZkHash256, ZkHash256) = aes_prove::<PARAM256S, PARAMOWF256>(
                 GenericArray::from_slice(&data.w),
                 GenericArray::from_slice(&data.u),
-                Box::new(GenericArray::from_slice(
+                GenericArray::from_slice(
                     &data
                         .gv
                         .iter()
                         .map(|x| *GenericArray::from_slice(x))
                         .collect::<Vec<GenericArray<u8, _>>>(),
-                )),
+                ),
                 GenericArray::from_slice(&pk),
                 GenericArray::from_slice(&data.chall),
             );
