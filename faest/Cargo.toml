@@ -9,7 +9,7 @@ aes = "0.8.4"
 cipher = "=0.5.0-pre.4"
 ctr = "0.9.2"
 hex = "0.4.3"
-nist-pqc-seeded-rng = "0.1.2"
+nist-pqc-seeded-rng = "0.2"
 sha3 = "0.10.8"
 signature = "2.2.0"
 subtle = { version = "2.6", features = ["const-generics"] }
