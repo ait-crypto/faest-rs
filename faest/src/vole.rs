@@ -16,7 +16,7 @@ use crate::{
 ///If sdi is an None Option
 pub fn to_vole_convert<R, LH>(
     sd: &[Option<GenericArray<u8, R::LAMBDA>>],
-    iv: &IV,
+    iv: &[u8],
 ) -> (GenericArray<u8, LH>, Vec<GenericArray<u8, LH>>)
 where
     R: RandomOracle,
@@ -27,11 +27,11 @@ where
     let d = (128 - (n as u128).leading_zeros() - 1) as usize;
     let mut r = vec![GenericArray::<u8, LH>::default(); n * 2];
     if let Some(ref sd0) = sd[0] {
-        let mut prg = R::PRG::new_prg(sd0, iv);
+        let mut prg = R::PRG::new_prg(sd0, iv.try_into().unwrap());
         prg.read(&mut r[0]);
     }
     for (i, sdi) in sd.iter().enumerate().skip(1).take(n) {
-        let mut prg = R::PRG::new_prg(sdi.as_ref().unwrap(), iv);
+        let mut prg = R::PRG::new_prg(sdi.as_ref().unwrap(), iv.try_into().unwrap());
         prg.read(&mut r[i]);
     }
 
@@ -160,14 +160,8 @@ where
 /// if i is too big for being a u16
 pub fn volereconstruct<R, P>(
     chal: &GenericArray<u8, P::LAMBDABYTES>,
-    pdecom: &GenericArray<
-        (
-            Vec<GenericArray<u8, R::LAMBDA>>,
-            GenericArray<u8, R::PRODLAMBDA2>,
-        ),
-        P::TAU,
-    >,
-    iv: [u8; 16],
+    pdecom: &[u8],
+    iv: &[u8],
 ) -> (
     GenericArray<u8, R::PRODLAMBDA2>,
     GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>,
@@ -176,11 +170,11 @@ where
     R: RandomOracle,
     P: PARAM,
 {
+    let lambda = <R::LAMBDA as Unsigned>::to_usize();
     let tau = <P::TAU as Unsigned>::to_usize();
-    let k0 = <P::K0 as Unsigned>::to_u16();
-    let k1 = <P::K1 as Unsigned>::to_u16();
-    let _t1 = <P::TAU1 as Unsigned>::to_u16();
-    let t0 = <P::TAU0 as Unsigned>::to_u16();
+    let k0 = <P::K0 as Unsigned>::to_usize();
+    let k1 = <P::K1 as Unsigned>::to_usize();
+    let t0 = <P::TAU0 as Unsigned>::to_usize();
     let mut com: GenericArray<GenericArray<u8, R::PRODLAMBDA2>, P::TAU> = GenericArray::default();
     let mut s: GenericArray<Vec<GenericArray<u8, R::LAMBDA>>, P::TAU> = GenericArray::default();
     let mut sd: GenericArray<Vec<Option<GenericArray<u8, R::LAMBDA>>>, P::TAU> =
@@ -189,21 +183,37 @@ where
     let mut q: GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU> = GenericArray::default();
     let mut hasher = R::h1_init();
     for i in 0..tau {
-        let b: u16 = (i < t0.into()).into();
+        let b: usize = (i < t0).into();
         let k = b * k0 + (1 - b) * k1;
+        let pad = b * (k0 * i) + (1 - b) * (k0 * t0 + (i - t0 * (1 - b)) * k1);
         let delta_p: Vec<u8> = chaldec::<P>(chal, i.try_into().unwrap());
+        let d = delta_p.len();
         #[allow(clippy::needless_range_loop)]
         for j in 0..delta_p.len() {
             delta[i] += u32::from(delta_p[j]) << j;
         }
-        (com[i], s[i]) = vc::reconstruct::<R>(&pdecom[i], &delta_p, &iv);
+        println!(
+            "{:?}",
+            &pdecom[pad * lambda + i * 2 * lambda
+                ..(b * (k0 * (i + 1)) + (1 - b) * (k0 * t0 + ((i + 1) - t0 * (1 - b)) * k1))
+                    * lambda
+                    + (i + 1) * 2 * lambda]
+        );
+        (com[i], s[i]) = vc::reconstruct::<R>(
+            &pdecom[pad * lambda + i * 2 * lambda
+                ..(b * (k0 * (i + 1)) + (1 - b) * (k0 * t0 + ((i + 1) - t0 * (1 - b)) * k1))
+                    * lambda
+                    + (i + 1) * 2 * lambda],
+            &delta_p,
+            iv,
+        );
         hasher.update(&com[i]);
         for j in 0..(1_u16 << (k)) as usize {
             sd[i].push(Some(s[i][j ^ delta[i] as usize].clone()));
         }
         sd[i][0] = None;
 
-        (_, q[i]) = to_vole_convert::<R, P::LH>(&sd[i], &iv);
+        (_, q[i]) = to_vole_convert::<R, P::LH>(&sd[i], iv);
     }
     let mut hcom: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
     hasher.finish().read(&mut hcom);

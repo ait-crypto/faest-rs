@@ -4,7 +4,7 @@ use rand::random;
 
 use crate::{
     faest::{
-        faest_sign, faest_verify, sigma_to_signature, signature_to_sigma, AesCypher, EmCypher,
+        faest_sign, faest_verify, sigma_to_signature, AesCypher, EmCypher,
         Variant,
     },
     parameter::{
@@ -814,7 +814,7 @@ fn faest_sign_test() {
     let res = faest_verify::<AesCypher, PARAM128S, PARAMOWF128>(
         &message,
         *GenericArray::from_slice(&pk),
-        signature_to_sigma::<PARAM128S, PARAMOWF128>(&sig128s),
+        &sig128s,
     );
     assert!(res);
 
@@ -829,7 +829,7 @@ fn faest_sign_test() {
     let res = faest_verify::<AesCypher, PARAM128F, PARAMOWF128>(
         &message,
         *GenericArray::from_slice(&pk),
-        signature_to_sigma::<PARAM128F, PARAMOWF128>(&sig128f),
+        &sig128f,
     );
     assert!(res);
 
@@ -2839,7 +2839,7 @@ fn faest_sign_test() {
     let res = faest_verify::<AesCypher, PARAM192S, PARAMOWF192>(
         &message,
         *GenericArray::from_slice(&pk192),
-        signature_to_sigma::<PARAM192S, PARAMOWF192>(&sign192s),
+        &sign192s,
     );
     assert!(res);
 
@@ -2854,7 +2854,7 @@ fn faest_sign_test() {
     let res = faest_verify::<AesCypher, PARAM192F, PARAMOWF192>(
         &message,
         *GenericArray::from_slice(&pk192),
-        signature_to_sigma::<PARAM192F, PARAMOWF192>(&sign192f),
+        &sign192f,
     );
     assert!(res);
 
@@ -6261,7 +6261,7 @@ fn faest_sign_test() {
     let res = faest_verify::<AesCypher, PARAM256S, PARAMOWF256>(
         &message,
         *GenericArray::from_slice(&pk256),
-        signature_to_sigma::<PARAM256S, PARAMOWF256>(&sign256s),
+        &sign256s,
     );
     assert!(res);
 
@@ -6276,7 +6276,7 @@ fn faest_sign_test() {
     let res = faest_verify::<AesCypher, PARAM256F, PARAMOWF256>(
         &message,
         *GenericArray::from_slice(&pk256),
-        signature_to_sigma::<PARAM256F, PARAMOWF256>(&sign256f),
+        &sign256f,
     );
     assert!(res);
 
@@ -7003,7 +7003,7 @@ fn faest_sign_test() {
     let res = faest_verify::<EmCypher, PARAM128SEM, PARAMOWF128EM>(
         &msg,
         *GenericArray::from_slice(&pk128em),
-        signature_to_sigma::<PARAM128SEM, PARAMOWF128EM>(&sig128sem),
+        &sig128sem,
     );
     assert!(res);
 
@@ -7018,7 +7018,7 @@ fn faest_sign_test() {
     let res = faest_verify::<EmCypher, PARAM128FEM, PARAMOWF128EM>(
         &msg,
         *GenericArray::from_slice(&pk128em),
-        signature_to_sigma::<PARAM128FEM, PARAMOWF128EM>(&sig128fem),
+        &sig128fem,
     );
     assert!(res);
 
@@ -8708,7 +8708,7 @@ fn faest_sign_test() {
     let res = faest_verify::<EmCypher, PARAM192SEM, PARAMOWF192EM>(
         &msg,
         *GenericArray::from_slice(&pk192em),
-        signature_to_sigma::<PARAM192SEM, PARAMOWF192EM>(&sign192sem),
+        &sign192sem,
     );
     assert!(res);
 
@@ -8723,7 +8723,7 @@ fn faest_sign_test() {
     let res = faest_verify::<EmCypher, PARAM192FEM, PARAMOWF192EM>(
         &msg,
         *GenericArray::from_slice(&pk192em),
-        signature_to_sigma::<PARAM192FEM, PARAMOWF192EM>(&sign192fem),
+        &sign192fem,
     );
     assert!(res);
 
@@ -11945,7 +11945,7 @@ fn faest_sign_test() {
     let res = faest_verify::<EmCypher, PARAM256SEM, PARAMOWF256EM>(
         &msg,
         *GenericArray::from_slice(&pk256em),
-        signature_to_sigma::<PARAM256SEM, PARAMOWF256EM>(&sign256sem),
+        &sign256sem,
     );
     assert!(res);
 
@@ -11960,7 +11960,7 @@ fn faest_sign_test() {
     let res = faest_verify::<EmCypher, PARAM256FEM, PARAMOWF256EM>(
         &msg,
         *GenericArray::from_slice(&pk256em),
-        signature_to_sigma::<PARAM256FEM, PARAMOWF256EM>(&sign256fem),
+        &sign256fem,
     );
     assert!(res);
 }
@@ -11986,7 +11986,7 @@ fn faest_aes_test_128s() {
         let res_true = faest_verify::<AesCypher, PARAM128S, PARAMOWF128>(
             msg,
             *GenericArray::from_slice(&pk),
-            sigma,
+            &sigma_to_signature::<PARAM128S, PARAMOWF128>(sigma),
         );
         assert!(res_true);
     }
@@ -12013,7 +12013,7 @@ fn faest_aes_test_128f() {
         let res_true = faest_verify::<AesCypher, PARAM128F, PARAMOWF128>(
             msg,
             *GenericArray::from_slice(&pk),
-            sigma,
+            &sigma_to_signature::<PARAM128F, PARAMOWF128>(sigma),
         );
 
         assert!(res_true);
@@ -12041,7 +12041,7 @@ fn faest_aes_test_192s() {
         let res_true = faest_verify::<AesCypher, PARAM192S, PARAMOWF192>(
             msg,
             *GenericArray::from_slice(&pk),
-            sigma.clone(),
+            &sigma_to_signature::<PARAM192S, PARAMOWF192>(sigma),
         );
 
         assert!(res_true);
@@ -12069,7 +12069,7 @@ fn faest_aes_test_192f() {
         let res_true = faest_verify::<AesCypher, PARAM192F, PARAMOWF192>(
             msg,
             *GenericArray::from_slice(&pk),
-            sigma.clone(),
+            &sigma_to_signature::<PARAM192F, PARAMOWF192>(sigma),
         );
         assert!(res_true);
     }
@@ -12096,7 +12096,7 @@ fn faest_aes_test_256s() {
         let res_true = faest_verify::<AesCypher, PARAM256S, PARAMOWF256>(
             msg,
             *GenericArray::from_slice(&pk),
-            sigma.clone(),
+            &sigma_to_signature::<PARAM256S, PARAMOWF256>(sigma),
         );
         assert!(res_true);
     }
@@ -12123,7 +12123,7 @@ fn faest_aes_test_256f() {
         let res_true = faest_verify::<AesCypher, PARAM256F, PARAMOWF256>(
             msg,
             *GenericArray::from_slice(&pk),
-            sigma.clone(),
+            &sigma_to_signature::<PARAM256F, PARAMOWF256>(sigma),
         );
         assert!(res_true);
     }
@@ -12152,7 +12152,7 @@ fn faest_em_test_128s() {
         let res_true = faest_verify::<EmCypher, PARAM128SEM, PARAMOWF128EM>(
             msg,
             *GenericArray::from_slice(&pk),
-            sigma.clone(),
+            &sigma_to_signature::<PARAM128SEM, PARAMOWF128EM>(sigma),
         );
         assert!(res_true);
     }
@@ -12181,7 +12181,7 @@ fn faest_em_test_128f() {
         let res_true = faest_verify::<EmCypher, PARAM128FEM, PARAMOWF128EM>(
             msg,
             *GenericArray::from_slice(&pk),
-            sigma.clone(),
+            &sigma_to_signature::<PARAM128FEM, PARAMOWF128EM>(sigma),
         );
         assert!(res_true);
     }
@@ -12210,7 +12210,7 @@ fn faest_em_test_192s() {
         let res_true = faest_verify::<EmCypher, PARAM192SEM, PARAMOWF192EM>(
             msg,
             *GenericArray::from_slice(&pk),
-            sigma.clone(),
+            &sigma_to_signature::<PARAM192SEM, PARAMOWF192EM>(sigma),
         );
         assert!(res_true);
     }
@@ -12239,7 +12239,7 @@ fn faest_em_test_192f() {
         let res_true = faest_verify::<EmCypher, PARAM192FEM, PARAMOWF192EM>(
             msg,
             *GenericArray::from_slice(&pk),
-            sigma.clone(),
+            &sigma_to_signature::<PARAM192FEM, PARAMOWF192EM>(sigma),
         );
         assert!(res_true);
     }
@@ -12269,7 +12269,7 @@ fn faest_em_test_256s() {
         let res_true = faest_verify::<EmCypher, PARAM256SEM, PARAMOWF256EM>(
             msg,
             *GenericArray::from_slice(&pk),
-            sigma.clone(),
+            &sigma_to_signature::<PARAM256SEM, PARAMOWF256EM>(sigma),
         );
         assert!(res_true);
     }
@@ -12298,7 +12298,7 @@ fn faest_em_test_256f() {
         let res_true = faest_verify::<EmCypher, PARAM256FEM, PARAMOWF256EM>(
             msg,
             *GenericArray::from_slice(&pk),
-            sigma.clone(),
+            &sigma_to_signature::<PARAM256FEM, PARAMOWF256EM>(sigma),
         );
         assert!(res_true);
     }

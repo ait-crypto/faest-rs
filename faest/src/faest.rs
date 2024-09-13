@@ -452,40 +452,24 @@ where
         (*GenericArray::from_slice(&chall3)).clone(),
         iv,
     )
-
-    /* (Box::default(), GenericArray::default(),  GenericArray::default(), GenericArray::default(), Box::default(), GenericArray::default(), GenericArray::default()) */
 }
 
 #[allow(unused_assignments)]
 #[allow(clippy::type_complexity)]
-pub fn faest_verify<C, P, O>(
-    msg: &[u8],
-    pk: GenericArray<u8, O::PK>,
-    sigma: (
-        Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>,
-        GenericArray<u8, O::LAMBDAPLUS2>,
-        GenericArray<u8, O::LBYTES>,
-        GenericArray<u8, O::LAMBDABYTES>,
-        Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>>,
-        GenericArray<u8, P::LAMBDABYTES>,
-        [u8; 16],
-    ),
-) -> bool
+pub fn faest_verify<C, P, O>(msg: &[u8], pk: GenericArray<u8, O::PK>, sigma: &[u8]) -> bool
 where
     C: Variant,
     P: PARAM,
     O: PARAMOWF,
 {
+    let lhat = <O::LHATBYTES as Unsigned>::to_usize();
+    let sig = <P::SIG as Unsigned>::to_usize();
     let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
     let l = <P::L as Unsigned>::to_usize() / 8;
-    let _b = <P::B as Unsigned>::to_usize() / 8;
     let tau = <P::TAU as Unsigned>::to_usize();
-    let _k0 = <P::K0 as Unsigned>::to_u16();
-    let _k1 = <P::K1 as Unsigned>::to_u16();
-    let _t0 = <P::TAU0 as Unsigned>::to_u16();
-    let _t1 = <P::TAU1 as Unsigned>::to_u16();
-    let (c, u_t, d, a_t, pdecom, chall3, iv) = sigma;
+    //let (c, u_t, d, a_t, pdecom, chall3, iv) = sigma;
 
+    let chall3 = GenericArray::from_slice(&sigma[sig - (16 + lambda)..sig - 16]);
     let mut h1_hasher = RO::<O>::h1_init();
     h1_hasher.update(&pk);
     h1_hasher.update(msg);
@@ -493,23 +477,24 @@ where
     let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
         GenericArray::default_boxed();
     h1_hasher.finish().read(&mut mu);
-
+    println!(
+        "{:?}",
+        &sigma[(lhat * (tau - 1)) + (2 * lambda) + l + 2..sig - (16 + lambda)]
+    );
     let (hcom, gq_p) = volereconstruct::<RO<O>, P>(
-        &chall3,
-        &GenericArray::from_iter(
-            (*pdecom)
-                .into_iter()
-                .map(|(l, r)| (l, GenericArray::from_slice(&r).clone())),
-        ),
-        iv,
+        chall3,
+        &sigma[(lhat * (tau - 1)) + (2 * lambda) + l + 2..sig - (16 + lambda)],
+        &sigma[sig - 16..],
     );
 
     let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
-    c.iter().for_each(|buf| h2_hasher.update(buf));
-    h2_hasher.update(&iv);
+    let c = &sigma[..lhat * (tau - 1)];
+
+    h2_hasher.update(c);
+    h2_hasher.update(&sigma[sig - 16..]);
     let mut reader = h2_hasher.finish();
     reader.read(&mut chall1);
 
@@ -519,12 +504,13 @@ where
     let mut gd_t: Box<GenericArray<Vec<GenericArray<u8, O::LAMBDAPLUS2>>, O::LAMBDALBYTES>> =
         GenericArray::default_boxed();
     gq[0] = gq_p[0].clone();
-    let delta0 = chaldec::<P>(&chall3, 0);
+    let delta0 = chaldec::<P>(chall3, 0);
+    let u_t = &sigma[lhat * (tau - 1)..lhat * (tau - 1) + lambda + 2];
     gd_t[0] = delta0
         .iter()
         .map(|d| {
             if *d == 1 {
-                u_t.clone()
+                (*GenericArray::from_slice(u_t)).clone()
             } else {
                 GenericArray::default()
             }
@@ -532,12 +518,12 @@ where
         .collect();
     for i in 1..tau {
         /* ok */
-        let delta = chaldec::<P>(&chall3, i as u16);
+        let delta = chaldec::<P>(chall3, i as u16);
         gd_t[i] = delta
             .iter()
             .map(|d| {
                 if *d == 1 {
-                    u_t.clone()
+                    (*GenericArray::from_slice(u_t)).clone()
                 } else {
                     GenericArray::default()
                 }
@@ -547,7 +533,7 @@ where
             .into_iter()
             .map(|d| {
                 if d == 1 {
-                    c[i - 1].clone()
+                    (*GenericArray::from_slice(&c[lhat * (i - 1)..lhat * i])).clone()
                 } else {
                     GenericArray::default()
                 }
@@ -591,17 +577,18 @@ where
         .collect::<Vec<u8>>(),
     );
     h1_hasher.finish().read(&mut hv);
-
+    let d = &sigma[lhat * (tau - 1) + lambda + 2..lhat * (tau - 1) + lambda + 2 + l];
     let mut chall2: Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall1);
-    h2_hasher.update(&u_t);
+    h2_hasher.update(u_t);
     h2_hasher.update(&hv);
-    h2_hasher.update(&d);
+    h2_hasher.update(d);
     h2_hasher.finish().read(&mut chall2);
 
+    let a_t = &sigma[lhat * (tau - 1) + lambda + 2 + l..lhat * (tau - 1) + 2 * lambda + 2 + l];
     let b_t = C::verify::<P, O>(
-        &d,
+        GenericArray::from_slice(d),
         &gq.iter()
             .flat_map(|x| {
                 x.iter()
@@ -614,19 +601,19 @@ where
                     .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
             })
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
-        &a_t,
+        GenericArray::from_slice(a_t),
         &chall2,
-        &chall3,
+        chall3,
         &pk,
     );
 
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall2);
-    h2_hasher.update(&a_t);
+    h2_hasher.update(a_t);
     h2_hasher.update(&b_t);
     let mut chall3_p: GenericArray<u8, P::LAMBDABYTES> = GenericArray::default();
     h2_hasher.finish().read(&mut chall3_p);
-    chall3 == chall3_p
+    *chall3 == chall3_p
 }
 
 #[allow(clippy::type_complexity)]

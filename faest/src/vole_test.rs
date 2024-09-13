@@ -1,3 +1,4 @@
+
 use std::fs::File;
 
 use generic_array::GenericArray;
@@ -6,17 +7,12 @@ use typenum::{U16, U234, U24, U32, U458, U566};
 
 use crate::{
     parameter::{
-        self, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
+        PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
         PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM,
     },
-    random_oracles::{
-        self, RandomOracle, RandomOracleShake128, RandomOracleShake192, RandomOracleShake256,
-    },
+    random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
     vole::{chaldec, to_vole_convert, volecommit, volereconstruct},
 };
-
-type Pdecom<LAMBDA, PRODLAMBDA2, TAU> =
-    GenericArray<(Vec<GenericArray<u8, LAMBDA>>, GenericArray<u8, PRODLAMBDA2>), TAU>;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -869,61 +865,36 @@ fn volereconstruct_test() {
     for data in database {
         if data.chal.len() == 16 {
             if data.q[0].len() == 8 {
-                let mut pdecom : Pdecom<<random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2, <parameter::PARAM128F as parameter::PARAM>::TAU> = GenericArray::default();
-                for i in 0..data.pdec.len() {
-                    pdecom[i] = (
-                        data.pdec[i]
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect(),
-                        *GenericArray::from_slice(&data.com[i]),
-                    );
-                }
+                let pdecom = &data
+                    .pdec
+                    .into_iter()
+                    .zip(&data.com)
+                    .flat_map(|(x, y)| {
+                        [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
+                    })
+                    .collect::<Vec<u8>>();
                 let res = volereconstruct::<RandomOracleShake128, PARAM128F>(
                     GenericArray::from_slice(&data.chal),
-                    &pdecom,
-                    data.iv,
+                    pdecom,
+                    &data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
                     assert_eq!(res.1[i].len(), data.q[i].len());
                 }
             } else {
-                let mut pdecom : Pdecom<<random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::LAMBDA, <random_oracles::RandomOracleShake128 as random_oracles::RandomOracle>::PRODLAMBDA2, <parameter::PARAM128S as parameter::PARAM>::TAU> = GenericArray::default();
-                for i in 0..data.pdec.len() {
-                    pdecom[i] = (
-                        data.pdec[i]
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect(),
-                        *GenericArray::from_slice(&data.com[i]),
-                    );
-                }
+                let pdecom = &data
+                    .pdec
+                    .into_iter()
+                    .zip(&data.com)
+                    .flat_map(|(x, y)| {
+                        [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
+                    })
+                    .collect::<Vec<u8>>();
                 let res = volereconstruct::<RandomOracleShake128, PARAM128S>(
                     GenericArray::from_slice(&data.chal),
-                    GenericArray::from_slice(
-                        &pdecom
-                            .iter()
-                            .map(|x| {
-                                (
-                                    x.0.iter().map(|y| *GenericArray::from_slice(y)).collect(),
-                                    *GenericArray::from_slice(&x.1),
-                                )
-                            })
-                            .collect::<Vec<(
-                                Vec<
-                                    GenericArray<
-                                        u8,
-                                        <RandomOracleShake128 as RandomOracle>::LAMBDA,
-                                    >,
-                                >,
-                                GenericArray<
-                                    u8,
-                                    <RandomOracleShake128 as RandomOracle>::PRODLAMBDA2,
-                                >,
-                            )>>(),
-                    ),
-                    data.iv,
+                    pdecom,
+                    &data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
@@ -932,61 +903,36 @@ fn volereconstruct_test() {
             }
         } else if data.chal.len() == 24 {
             if data.q[0].len() == 8 {
-                let mut pdecom : Pdecom<<random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2, <parameter::PARAM192F as parameter::PARAM>::TAU> = GenericArray::default();
-                for i in 0..data.pdec.len() {
-                    pdecom[i] = (
-                        data.pdec[i]
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect(),
-                        *GenericArray::from_slice(&data.com[i]),
-                    );
-                }
+                let pdecom = &data
+                    .pdec
+                    .into_iter()
+                    .zip(&data.com)
+                    .flat_map(|(x, y)| {
+                        [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
+                    })
+                    .collect::<Vec<u8>>();
                 let res = volereconstruct::<RandomOracleShake192, PARAM192F>(
                     GenericArray::from_slice(&data.chal),
-                    &pdecom,
-                    data.iv,
+                    pdecom,
+                    &data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
                     assert_eq!(res.1[i].len(), data.q[i].len());
                 }
             } else {
-                let mut pdecom : Pdecom<<random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::LAMBDA, <random_oracles::RandomOracleShake192 as random_oracles::RandomOracle>::PRODLAMBDA2, <parameter::PARAM192S as parameter::PARAM>::TAU> = GenericArray::default();
-                for i in 0..data.pdec.len() {
-                    pdecom[i] = (
-                        data.pdec[i]
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect(),
-                        *GenericArray::from_slice(&data.com[i]),
-                    );
-                }
+                let pdecom = &data
+                    .pdec
+                    .into_iter()
+                    .zip(&data.com)
+                    .flat_map(|(x, y)| {
+                        [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
+                    })
+                    .collect::<Vec<u8>>();
                 let res = volereconstruct::<RandomOracleShake192, PARAM192S>(
                     GenericArray::from_slice(&data.chal),
-                    GenericArray::from_slice(
-                        &pdecom
-                            .iter()
-                            .map(|x| {
-                                (
-                                    x.0.iter().map(|y| *GenericArray::from_slice(y)).collect(),
-                                    *GenericArray::from_slice(&x.1),
-                                )
-                            })
-                            .collect::<Vec<(
-                                Vec<
-                                    GenericArray<
-                                        u8,
-                                        <RandomOracleShake192 as RandomOracle>::LAMBDA,
-                                    >,
-                                >,
-                                GenericArray<
-                                    u8,
-                                    <RandomOracleShake192 as RandomOracle>::PRODLAMBDA2,
-                                >,
-                            )>>(),
-                    ),
-                    data.iv,
+                    pdecom,
+                    &data.iv,
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
@@ -994,61 +940,36 @@ fn volereconstruct_test() {
                 }
             }
         } else if data.q[0].len() == 8 {
-            let mut pdecom: Pdecom<
-                <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA,
-                <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2,
-                <parameter::PARAM256F as parameter::PARAM>::TAU,
-            > = GenericArray::default();
-            for i in 0..data.pdec.len() {
-                pdecom[i] = (
-                    data.pdec[i]
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect(),
-                    *GenericArray::from_slice(&data.com[i]),
-                );
-            }
+            let pdecom = &data
+                .pdec
+                .into_iter()
+                .zip(&data.com)
+                .flat_map(|(x, y)| {
+                    [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
+                })
+                .collect::<Vec<u8>>();
             let res = volereconstruct::<RandomOracleShake256, PARAM256F>(
                 GenericArray::from_slice(&data.chal),
-                &pdecom,
-                data.iv,
+                pdecom,
+                &data.iv,
             );
             assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
             for i in 0..res.1.len() {
                 assert_eq!(res.1[i].len(), data.q[i].len());
             }
         } else {
-            let mut pdecom: Pdecom<
-                <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::LAMBDA,
-                <random_oracles::RandomOracleShake256 as random_oracles::RandomOracle>::PRODLAMBDA2,
-                <parameter::PARAM256S as parameter::PARAM>::TAU,
-            > = GenericArray::default();
-            for i in 0..data.pdec.len() {
-                pdecom[i] = (
-                    data.pdec[i]
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect(),
-                    *GenericArray::from_slice(&data.com[i]),
-                );
-            }
+            let pdecom = &data
+                .pdec
+                .into_iter()
+                .zip(&data.com)
+                .flat_map(|(x, y)| {
+                    [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
+                })
+                .collect::<Vec<u8>>();
             let res = volereconstruct::<RandomOracleShake256, PARAM256S>(
                 GenericArray::from_slice(&data.chal),
-                GenericArray::from_slice(
-                    &pdecom
-                        .iter()
-                        .map(|x| {
-                            (
-                                x.0.iter().map(|y| *GenericArray::from_slice(y)).collect(),
-                                *GenericArray::from_slice(&x.1),
-                            )
-                        })
-                        .collect::<Vec<(
-                            Vec<GenericArray<u8, <RandomOracleShake256 as RandomOracle>::LAMBDA>>,
-                            GenericArray<u8, <RandomOracleShake256 as RandomOracle>::PRODLAMBDA2>,
-                        )>>(),
-                ),
-                data.iv,
+                pdecom,
+                &data.iv,
             );
             assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
             for i in 0..res.1.len() {

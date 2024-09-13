@@ -1,4 +1,5 @@
 use generic_array::{ArrayLength, GenericArray};
+use typenum::Unsigned;
 
 use crate::random_oracles::{Hasher, PseudoRandomGenerator, RandomOracle, Reader, IV};
 
@@ -68,7 +69,13 @@ where
     //step 4
 
     for i in 0..d {
-        cop.push(decom.0[(1 << (i + 1)) + 2 * a + (1 - b[d - i - 1] as usize) - 1].clone());
+        cop.push(
+            decom.0[(1 << (i + 1))
+                + 2 * a
+                + (1 - b[std::convert::TryInto::<usize>::try_into(d).unwrap() - i - 1] as usize)
+                - 1]
+            .clone(),
+        );
         a = 2 * a + b[d - i - 1] as usize;
     }
     (cop, decom.1[a].to_vec())
@@ -76,12 +83,9 @@ where
 
 #[allow(clippy::type_complexity)]
 pub fn reconstruct<R>(
-    pdecom: &(
-        Vec<GenericArray<u8, R::LAMBDA>>,
-        GenericArray<u8, R::PRODLAMBDA2>,
-    ),
+    pdecom: &[u8], 
     b: &[u8],
-    iv: &IV,
+    iv: &[u8],
 ) -> (
     GenericArray<u8, R::PRODLAMBDA2>,
     Vec<GenericArray<u8, R::LAMBDA>>,
@@ -89,26 +93,26 @@ pub fn reconstruct<R>(
 where
     R: RandomOracle,
 {
+    let lambda = <R::LAMBDA as Unsigned>::to_usize();
     let mut a = 0;
     let d = b.len();
     let mut k = vec![GenericArray::default(); (1 << (d + 1)) - 1];
-
     //step 4
     for i in 1..d + 1 {
         let b_d_i = b[d - i] as usize;
-        k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)] = pdecom.0[i - 1].clone();
+        k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)] =
+            (*GenericArray::from_slice(&pdecom[(i - 1) * lambda..i * lambda])).clone();
         //step 7
         for j in 0..1 << (i - 1) {
             if j != a {
                 let rank = (1 << (i - 1)) - 1 + j;
-                let mut prg = R::PRG::new_prg(&k[rank], iv);
+                let mut prg = R::PRG::new_prg(&k[rank], iv.try_into().unwrap());
                 prg.read(&mut k[rank * 2 + 1]);
                 prg.read(&mut k[rank * 2 + 2]);
             }
         }
         a = 2 * a + b_d_i;
     }
-
     let mut sd = vec![GenericArray::default(); 1 << d];
     let mut h1_hasher = R::h1_init();
     //step 11
@@ -123,7 +127,7 @@ where
             reader.read(&mut com_j);
             h1_hasher.update(&com_j);
         } else {
-            h1_hasher.update(&pdecom.1);
+            h1_hasher.update(&pdecom[pdecom.len() - 2 * lambda..]);
         }
     }
     let mut h = GenericArray::default();
@@ -131,30 +135,6 @@ where
     reader.read(&mut h);
     (h, sd)
 }
-
-/*/
-#[allow(clippy::type_complexity)]
-fn verify<R, D, POWD, N>(
-    com: GenericArray<u8, R::PRODLAMBDA2>,
-    pdecom: (
-        Vec<Box<GenericArray<u8, R::LAMBDA>>>,
-        GenericArray<u8, R::PRODLAMBDA2>,
-    ),
-    b: GenericArray<u8, D>,
-    iv: &IV,
-) -> u8
-where
-    R: RandomOracle,
-    D: ArrayLength,
-{
-    let (com_b, _sd) = reconstruct::<R>(&pdecom, &b, iv);
-    if com_b == com {
-        1
-    } else {
-        0
-    }
-}
-*/
 
 //reconstruct is tested in the integration_test_vc test_commitment_and_decomitment() function.
 
@@ -380,39 +360,33 @@ mod test {
             let lambdabyte = data.com_j.len();
             if lambdabyte == 32 {
                 let res = reconstruct::<RandomOracleShake128>(
-                    &(
-                        data.cop
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect(),
-                        *GenericArray::from_slice(&data.com_j),
-                    ),
+                    &[
+                        &data.cop.clone().into_iter().flatten().collect::<Vec<u8>>()[..],
+                        &data.com_j[..],
+                    ]
+                    .concat(),
                     &data.b,
                     &data.iv,
                 );
                 compare_expected_with_reconstruct_result(&data, res);
             } else if lambdabyte == 48 {
                 let res = reconstruct::<RandomOracleShake192>(
-                    &(
-                        data.cop
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect(),
-                        *GenericArray::from_slice(&data.com_j),
-                    ),
+                    &[
+                        &data.cop.clone().into_iter().flatten().collect::<Vec<u8>>()[..],
+                        &data.com_j[..],
+                    ]
+                    .concat(),
                     &data.b,
                     &data.iv,
                 );
                 compare_expected_with_reconstruct_result(&data, res);
             } else {
                 let res = reconstruct::<RandomOracleShake256>(
-                    &(
-                        data.cop
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect(),
-                        *GenericArray::from_slice(&data.com_j),
-                    ),
+                    &[
+                        &data.cop.clone().into_iter().flatten().collect::<Vec<u8>>()[..],
+                        &data.com_j[..],
+                    ]
+                    .concat(),
                     &data.b,
                     &data.iv,
                 );
