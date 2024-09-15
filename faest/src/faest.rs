@@ -333,8 +333,7 @@ where
     h1_hasher.update(pk);
     h1_hasher.update(msg);
     // why is this Boxed?
-    let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
-        GenericArray::default_boxed();
+    let mut mu: Box<GenericArray<u8, O::LAMBDADOUBLE>> = GenericArray::default_boxed();
     h1_hasher.finish().read(&mut mu);
 
     let mut h3_hasher = RO::<O>::h3_init();
@@ -367,8 +366,7 @@ where
             .for_each(|v| h1_hasher.update(&vole_hasher.process(v)));
     }
     // why is this boxed?
-    let mut hv: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
-        GenericArray::default_boxed();
+    let mut hv: Box<GenericArray<u8, O::LAMBDADOUBLE>> = GenericArray::default_boxed();
     h1_hasher.finish().read(&mut hv);
 
     let w = C::witness::<P, O>(sk, pk);
@@ -474,8 +472,7 @@ where
     h1_hasher.update(&pk);
     h1_hasher.update(msg);
     // why is this boxed?
-    let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
-        GenericArray::default_boxed();
+    let mut mu: Box<GenericArray<u8, O::LAMBDADOUBLE>> = GenericArray::default_boxed();
     h1_hasher.finish().read(&mut mu);
     println!(
         "{:?}",
@@ -561,9 +558,6 @@ where
         })
         .collect();
 
-    // why is this a box?
-    let mut hv: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
-        GenericArray::default_boxed();
     let mut h1_hasher = RO::<O>::h1_init();
     // FIXME!
     h1_hasher.update(
@@ -576,6 +570,8 @@ where
         .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d).collect::<Vec<u8>>())
         .collect::<Vec<u8>>(),
     );
+    // why is this a box?
+    let mut hv: Box<GenericArray<u8, O::LAMBDADOUBLE>> = GenericArray::default_boxed();
     h1_hasher.finish().read(&mut hv);
     let d = &sigma[lhat * (tau - 1) + lambda + 2..lhat * (tau - 1) + lambda + 2 + l];
     let mut chall2: Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
