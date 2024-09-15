@@ -370,12 +370,7 @@ where
 
     let w = C::witness::<P, O>(sk, pk);
     let d = GenericArray::from_iter(
-        zip(
-            // FIXME: remove collect
-            w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
-            &u[..l],
-        )
-        .map(|(w, u)| w ^ *u),
+        zip(w.iter().flat_map(|w| w.to_le_bytes()), &u[..l]).map(|(w, u)| w ^ *u),
     );
 
     let mut h2_hasher = RO::<O>::h2_init();
