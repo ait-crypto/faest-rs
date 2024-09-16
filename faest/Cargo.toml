@@ -33,6 +33,10 @@ harness = false
 [profile.dev.package."*"]
 opt-level = 3
 
+[profile.release]
+# `lto = true` should also work
+lto = 'fat'
+
 [lib]
 name = "faest"
 path = "src/lib.rs"

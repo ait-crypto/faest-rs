@@ -187,18 +187,10 @@ where
         let k = b * k0 + (1 - b) * k1;
         let pad = b * (k0 * i) + (1 - b) * (k0 * t0 + (i - t0 * (1 - b)) * k1);
         let delta_p: Vec<u8> = chaldec::<P>(chal, i.try_into().unwrap());
-        let d = delta_p.len();
         #[allow(clippy::needless_range_loop)]
         for j in 0..delta_p.len() {
             delta[i] += u32::from(delta_p[j]) << j;
         }
-        println!(
-            "{:?}",
-            &pdecom[pad * lambda + i * 2 * lambda
-                ..(b * (k0 * (i + 1)) + (1 - b) * (k0 * t0 + ((i + 1) - t0 * (1 - b)) * k1))
-                    * lambda
-                    + (i + 1) * 2 * lambda]
-        );
         (com[i], s[i]) = vc::reconstruct::<R>(
             &pdecom[pad * lambda + i * 2 * lambda
                 ..(b * (k0 * (i + 1)) + (1 - b) * (k0 * t0 + ((i + 1) - t0 * (1 - b)) * k1))
