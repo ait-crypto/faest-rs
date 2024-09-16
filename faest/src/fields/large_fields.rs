@@ -3979,7 +3979,7 @@ mod test {
             assert_eq!(first_value_rev, 0u128);
             assert_eq!(second_value_rev, 0u128);
             //anything * 1 = anything
-            let (first_value_anything, second_value_anything) =(anything.0[0], anything.0[1]);
+            let (first_value_anything, second_value_anything) = (anything.0[0], anything.0[1]);
             let pol_res_rev = anything * 1u64;
             let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
             assert_eq!(first_value_rev, first_value_anything);
@@ -4575,7 +4575,6 @@ mod test {
     }
 
     //GF256
-   
 
     #[test]
     //input : two GF256

@@ -1,4 +1,3 @@
-
 use ::faest::{
     faest::{faest_sign, faest_verify, sigma_to_signature, AesCypher, EmCypher, Variant},
     parameter::{
@@ -70,15 +69,12 @@ where
     )
 }
 
-fn bench_sign<C, P, O>(
-    input: KeyInput<O>
-) -> Signature<P>
+fn bench_sign<C, P, O>(input: KeyInput<O>) -> Signature<P>
 where
     C: Variant,
     P: PARAM,
     O: PARAMOWF,
 {
-    
     sigma_to_signature::<P, O>(faest_sign::<C, P, O>(
         &input.0, &input.1, &input.2, &input.3,
     ))
@@ -185,86 +181,110 @@ pub fn faest_benchmark(c: &mut Criterion) {
     });
     c.bench_function("Sign aes 128s", |b| {
         b.iter(|| {
-            bench_sign::<AesCypher, PARAM128S, PARAMOWF128>(
-                generate_sign_input_aes::<AesCypher, PARAM128S, PARAMOWF128>(),
-            )
+            bench_sign::<AesCypher, PARAM128S, PARAMOWF128>(generate_sign_input_aes::<
+                AesCypher,
+                PARAM128S,
+                PARAMOWF128,
+            >())
         })
     });
     c.bench_function("Sign aes 128f", |b| {
         b.iter(|| {
-            bench_sign::<AesCypher, PARAM128F, PARAMOWF128>(
-                generate_sign_input_aes::<AesCypher, PARAM128F, PARAMOWF128>(),
-            )
+            bench_sign::<AesCypher, PARAM128F, PARAMOWF128>(generate_sign_input_aes::<
+                AesCypher,
+                PARAM128F,
+                PARAMOWF128,
+            >())
         })
     });
     c.bench_function("Sign aes 192s", |b| {
         b.iter(|| {
-            bench_sign::<AesCypher, PARAM192S, PARAMOWF192>(
-                generate_sign_input_aes::<AesCypher, PARAM192S, PARAMOWF192>(),
-            )
+            bench_sign::<AesCypher, PARAM192S, PARAMOWF192>(generate_sign_input_aes::<
+                AesCypher,
+                PARAM192S,
+                PARAMOWF192,
+            >())
         })
     });
     c.bench_function("Sign aes 192f", |b| {
         b.iter(|| {
-            bench_sign::<AesCypher, PARAM192F, PARAMOWF192>(
-                generate_sign_input_aes::<AesCypher, PARAM192F, PARAMOWF192>(),
-            )
+            bench_sign::<AesCypher, PARAM192F, PARAMOWF192>(generate_sign_input_aes::<
+                AesCypher,
+                PARAM192F,
+                PARAMOWF192,
+            >())
         })
     });
     c.bench_function("Sign aes 256s", |b| {
         b.iter(|| {
-            bench_sign::<AesCypher, PARAM256S, PARAMOWF256>(
-                generate_sign_input_aes::<AesCypher, PARAM256S, PARAMOWF256>(),
-            )
+            bench_sign::<AesCypher, PARAM256S, PARAMOWF256>(generate_sign_input_aes::<
+                AesCypher,
+                PARAM256S,
+                PARAMOWF256,
+            >())
         })
     });
     c.bench_function("Sign aes 256f", |b| {
         b.iter(|| {
-            bench_sign::<AesCypher, PARAM256F, PARAMOWF256>(
-                generate_sign_input_aes::<AesCypher, PARAM256F, PARAMOWF256>(),
-            )
+            bench_sign::<AesCypher, PARAM256F, PARAMOWF256>(generate_sign_input_aes::<
+                AesCypher,
+                PARAM256F,
+                PARAMOWF256,
+            >())
         })
     });
     c.bench_function("Sign em 128s", |b| {
         b.iter(|| {
-            bench_sign::<EmCypher, PARAM128SEM, PARAMOWF128EM>(
-                generate_sign_input_em::<EmCypher, PARAM128SEM, PARAMOWF128EM>(),
-            )
+            bench_sign::<EmCypher, PARAM128SEM, PARAMOWF128EM>(generate_sign_input_em::<
+                EmCypher,
+                PARAM128SEM,
+                PARAMOWF128EM,
+            >())
         })
     });
     c.bench_function("Sign em 128f", |b| {
         b.iter(|| {
-            bench_sign::<EmCypher, PARAM128FEM, PARAMOWF128EM>(
-                generate_sign_input_em::<EmCypher, PARAM128FEM, PARAMOWF128EM>(),
-            )
+            bench_sign::<EmCypher, PARAM128FEM, PARAMOWF128EM>(generate_sign_input_em::<
+                EmCypher,
+                PARAM128FEM,
+                PARAMOWF128EM,
+            >())
         })
     });
     c.bench_function("Sign em 192s", |b| {
         b.iter(|| {
-            bench_sign::<EmCypher, PARAM192SEM, PARAMOWF192EM>(
-                generate_sign_input_em::<EmCypher, PARAM192SEM, PARAMOWF192EM>(),
-            )
+            bench_sign::<EmCypher, PARAM192SEM, PARAMOWF192EM>(generate_sign_input_em::<
+                EmCypher,
+                PARAM192SEM,
+                PARAMOWF192EM,
+            >())
         })
     });
     c.bench_function("Sign em 192f", |b| {
         b.iter(|| {
-            bench_sign::<EmCypher, PARAM192FEM, PARAMOWF192EM>(
-                generate_sign_input_em::<EmCypher, PARAM192FEM, PARAMOWF192EM>(),
-            )
+            bench_sign::<EmCypher, PARAM192FEM, PARAMOWF192EM>(generate_sign_input_em::<
+                EmCypher,
+                PARAM192FEM,
+                PARAMOWF192EM,
+            >())
         })
     });
     c.bench_function("Sign em 256s", |b| {
         b.iter(|| {
-            bench_sign::<EmCypher, PARAM256SEM, PARAMOWF256EM>(
-                generate_sign_input_em::<EmCypher, PARAM256SEM, PARAMOWF256EM>(),
-            )
+            bench_sign::<EmCypher, PARAM256SEM, PARAMOWF256EM>(generate_sign_input_em::<
+                EmCypher,
+                PARAM256SEM,
+                PARAMOWF256EM,
+            >())
         })
     });
     c.bench_function("Sign em 256f", |b| {
         b.iter(|| {
-            bench_sign::<EmCypher, PARAM256FEM, PARAMOWF256EM>(
-                generate_sign_input_em::<EmCypher, PARAM256FEM, PARAMOWF256EM>(),
-            )
+            bench_sign::<EmCypher, PARAM256FEM, PARAMOWF256EM>(generate_sign_input_em::<
+                EmCypher,
+                PARAM256FEM,
+                PARAMOWF256EM,
+            >())
         })
     });
     c.bench_function("Verify aes 128s", |b| {

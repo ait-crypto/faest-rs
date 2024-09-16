@@ -477,10 +477,6 @@ where
     let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
         GenericArray::default_boxed();
     h1_hasher.finish().read(&mut mu);
-    println!(
-        "{:?}",
-        &sigma[(lhat * (tau - 1)) + (2 * lambda) + l + 2..sig - (16 + lambda)]
-    );
     let (hcom, gq_p) = volereconstruct::<RO<O>, P>(
         chall3,
         &sigma[(lhat * (tau - 1)) + (2 * lambda) + l + 2..sig - (16 + lambda)],

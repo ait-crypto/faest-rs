@@ -1303,7 +1303,7 @@ fn aes_verify_test() {
             );
             assert_eq!(
                 GF128::new(data.res[0] as u128 + ((data.res[1] as u128) << 64), 0),
-                GF128::to_field(&out)[0]
+                GF128::to_field(&out[..])[0]
             );
         } else if data.lambda == 192 {
             let mut pk = data.input.to_vec();
@@ -1327,7 +1327,7 @@ fn aes_verify_test() {
                     data.res[0] as u128 + ((data.res[1] as u128) << 64),
                     data.res[2] as u128
                 ),
-                GF192::to_field(&out)[0]
+                GF192::to_field(&out[..])[0]
             );
         } else {
             let mut pk = data.input.to_vec();
@@ -1351,7 +1351,7 @@ fn aes_verify_test() {
                     data.res[0] as u128 + ((data.res[1] as u128) << 64),
                     data.res[2] as u128 + ((data.res[3] as u128) << 64)
                 ),
-                GF256::to_field(&out)[0]
+                GF256::to_field(&out[..])[0]
             );
         }
     }

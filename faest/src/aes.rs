@@ -13,6 +13,9 @@ use crate::{
     universal_hashing::{ZKHasherInit, ZKHasherProcess},
     vole::chaldec,
 };
+
+type IO<'a, O> = (&'a GenericArray<u8, <O as PARAMOWF>::QUOTPK2>, &'a GenericArray<u8, <O as PARAMOWF>::QUOTPK2>);
+
 type KeyCstrnts<O> = (
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::SKE>>,
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::SKE>>,
@@ -80,10 +83,8 @@ where
     //step 3
     let (temp_kb, temp_val) =
         rijndael_key_schedule(key, bc, nk as u8, r, <O::SKE as Unsigned>::to_u8());
-    let (kb, mut valid): (GenericArray<u32, O::KBLENGTH>, bool) = (
-        (*GenericArray::from_slice(&temp_kb[..kblen])).clone(),
-        temp_val,
-    );
+    let (kb, mut valid): (&GenericArray<u32, O::KBLENGTH>, bool) =
+        (GenericArray::from_slice(&temp_kb[..kblen]), temp_val);
     //step 4
     for i in convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4]
         .to_vec()
@@ -107,9 +108,8 @@ where
         ..1 + (nk / 8)
             + ((<O::SKE as Unsigned>::to_usize()) * ((2 - (nk % 4)) * 2 + (nk % 4) * 3)) / 16
     {
-        let key: GenericArray<u32, U8> = *GenericArray::from_slice(&convert_from_batchblocks(
-            inv_bitslice(&kb[8 * j..8 * (j + 1)]),
-        ));
+        let inside = &convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]));
+        let key: &GenericArray<u32, U8> = GenericArray::from_slice(inside);
         if nk == 6 {
             if j % 3 == 1 {
                 for i in key[2].to_le_bytes().iter().copied() {
@@ -134,7 +134,7 @@ where
         round_with_save::<O>(
             input[16 * b..16 * (b + 1)].try_into().unwrap(),
             [0; 16],
-            &kb,
+            kb,
             r,
             &mut w,
             &mut index,
@@ -742,8 +742,8 @@ where
             }
         }
     }
-    let new_v: GenericArray<O::Field, O::LAMBDAL> =
-        (*GenericArray::from_slice(&O::Field::to_field(&temp_v))).clone();
+    let inside = &O::Field::to_field(&temp_v);
+    let new_v: &GenericArray<O::Field, O::LAMBDAL> = GenericArray::from_slice(inside);
 
     let (input, output): Keypair<O> = (
         GenericArray::from_slice(&pk[..pk_val / 2]),
@@ -856,9 +856,9 @@ where
     let lenc = <O::LENC as Unsigned>::to_usize();
     let senc = <O::SENC as Unsigned>::to_usize();
     let pk_len = <O::PK as Unsigned>::to_usize();
-    let (input, output): (GenericArray<u8, O::QUOTPK2>, GenericArray<u8, O::QUOTPK2>) = (
-        (*GenericArray::from_slice(&pk[..pk_len / 2])).clone(),
-        (*GenericArray::from_slice(&pk[pk_len / 2..])).clone(),
+    let (input, output): IO<O> = (
+        GenericArray::from_slice(&pk[..pk_len / 2]),
+        GenericArray::from_slice(&pk[pk_len / 2..]),
     );
     let mut new_gq: GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = gq.clone();
     for i in 0..t0 {
