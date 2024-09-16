@@ -62,8 +62,6 @@ where
 
     fn new(first_value: u128, second_value: u128) -> Self;
 
-    fn get_value(&self) -> (u128, u128);
-
     fn to_bytes(&self) -> Vec<u8>;
 
     fn to_field(x: &[u8]) -> Vec<Self> {
@@ -692,10 +690,6 @@ impl BigGaloisField for BigGF<u128, 1, 128> {
         Self([first_value])
     }
 
-    fn get_value(&self) -> (u128, u128) {
-        (self.0[0], 0)
-    }
-
     fn to_bytes(&self) -> Vec<u8> {
         self.0[0].to_le_bytes().to_vec()
     }
@@ -807,10 +801,6 @@ impl BigGaloisField for BigGF<u128, 2, 192> {
 
     fn new(first_value: u128, second_value: u128) -> Self {
         Self([first_value, second_value]).clear_high_bits()
-    }
-
-    fn get_value(&self) -> (u128, u128) {
-        (self.0[0], self.0[1])
     }
 
     fn to_bytes(&self) -> Vec<u8> {
@@ -933,10 +923,6 @@ impl BigGaloisField for BigGF<u128, 2, 256> {
         Self([first_value, second_value])
     }
 
-    fn get_value(&self) -> (u128, u128) {
-        (self.0[0], self.0[1])
-    }
-
     fn to_bytes(&self) -> Vec<u8> {
         let mut res = Vec::with_capacity(Self::LENGTH / 8);
         res.extend_from_slice(&self.0[0].to_le_bytes());
@@ -986,21 +972,6 @@ mod test {
     use rand::{rngs::SmallRng, SeedableRng};
 
     //GF128
-    #[test]
-    //precondition : none
-    //Postiditon : GF128 whose get value is as expected
-    fn gf128_test_new_get_value() {
-        let polynome = GF128::new(243806996201303833512771950610419307673u128, 0);
-        let (first_value, second_value) = polynome.get_value();
-        assert_eq!(first_value, 243806996201303833512771950610419307673u128);
-        assert_eq!(second_value, 0u128);
-
-        //if given a second value not null
-        let polynome = GF128::new(243806996201303833512771950610419307673u128, 1u128);
-        let (first_value, second_value) = polynome.get_value();
-        assert_eq!(first_value, 243806996201303833512771950610419307673u128);
-        assert_eq!(second_value, 0u128);
-    }
 
     #[test]
     //input : two GF128
@@ -1013,26 +984,22 @@ mod test {
         for _i in 0..1000 {
             let anything: GF128 = rng.gen();
             let pol_res = pol_0 * anything;
-            let (first_value, second_value) = pol_res.get_value();
-            assert_eq!(first_value, 0u128);
-            assert_eq!(second_value, 0u128);
+            let first_value = pol_res;
+            assert_eq!(first_value.0[0], 0u128);
             //1 * anything = anything
-            let (first_value_anything, _second_value_anything) = anything.get_value();
+            let first_value_anything = anything;
             #[deny(clippy::op_ref)]
             let pol_res = GF128::ONE * anything;
-            let (first_value, second_value) = pol_res.get_value();
+            let first_value = pol_res;
             assert_eq!(first_value, first_value_anything);
-            assert_eq!(second_value, 0u128);
             //anything * 0 = 0
             let pol_res_rev = anything * pol_0;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
-            assert_eq!(first_value_rev, 0u128);
-            assert_eq!(second_value_rev, 0u128);
+            let first_value_rev = pol_res_rev;
+            assert_eq!(first_value_rev.0[0], 0u128);
             //anything * 1 = anything
             let pol_res_rev = anything * GF128::ONE;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let first_value_rev = pol_res_rev;
             assert_eq!(first_value_rev, first_value_anything);
-            assert_eq!(second_value_rev, 0u128);
         }
         //to test with random values we use a database we get from the test cases of the reference implementation
         let database = [
@@ -1999,9 +1966,8 @@ mod test {
             let result = GF128::new(data[2], 0);
             let res = left * right;
             let res_rev = right * left;
-            let (first_value, second_value) = res.get_value();
-            assert_eq!(first_value, result.get_value().0);
-            assert_eq!(second_value, result.get_value().1);
+            let first_value = res;
+            assert_eq!(first_value, result);
             //to test commutativity
             assert_eq!(res, res_rev);
             //to test with ref
@@ -2031,26 +1997,22 @@ mod test {
             //0 * anything = 0
             let anything: u64 = rng.gen();
             let pol_res = pol_0 * anything;
-            let (first_value, second_value) = pol_res.get_value();
-            assert_eq!(first_value, 0u128);
-            assert_eq!(second_value, 0u128);
+            let first_value = pol_res;
+            assert_eq!(first_value.0[0], 0u128);
             //1 * anything = anything
             let pol_res_1 = GF128::ONE * anything;
-            let (first_value_1, second_value_1) = pol_res_1.get_value();
-            assert_eq!(first_value_1, anything as u128);
-            assert_eq!(second_value_1, 0u128);
+            let first_value_1 = pol_res_1;
+            assert_eq!(first_value_1.0[0], anything.into());
             //anything * 0 = 0
             let anything: GF128 = rng.gen();
             let pol_res_rev = anything * 0u64;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
-            assert_eq!(first_value_rev, 0u128);
-            assert_eq!(second_value_rev, 0u128);
+            let first_value_rev = pol_res_rev;
+            assert_eq!(first_value_rev.0[0], 0u128);
             //anything * 1 = anything
-            let (first_value_anything, _second_value_anything) = anything.get_value();
+            let first_value_anything = anything;
             let pol_res_rev = anything * 1u64;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let first_value_rev = pol_res_rev;
             assert_eq!(first_value_rev, first_value_anything);
-            assert_eq!(second_value_rev, 0u128);
         }
         //to test with complex values we use the tests values of the reference implementation
         let mut left = GF128::new(0xefcdab8967452301efcdab8967452301u128, 0);
@@ -2072,9 +2034,8 @@ mod test {
         assert_eq!(left, result);
         assert_eq!(left_2, result);
 
-        let (first_value, second_value) = res.get_value();
-        assert_eq!(first_value, result.get_value().0);
-        assert_eq!(second_value, result.get_value().1);
+        let first_value = res;
+        assert_eq!(first_value, result);
     }
 
     #[test]
@@ -2087,27 +2048,23 @@ mod test {
             //anything * 0 = 0
             let anything: GF128 = rng.gen();
             let pol_res_rev = anything * 0u8;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
-            assert_eq!(first_value_rev, 0u128);
-            assert_eq!(second_value_rev, 0u128);
+            let first_value_rev = pol_res_rev;
+            assert_eq!(first_value_rev.0[0], 0u128);
             //anything * 1 = anything
-            let (first_value_anything, second_value_anything) = anything.get_value();
+            let first_value_anything = anything;
             let pol_res_rev = anything * 1u8;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let first_value_rev = pol_res_rev;
             assert_eq!(first_value_rev, first_value_anything);
-            assert_eq!(second_value_rev, 0u128);
             //anything_1 * anything_2 (odd) = anything_1
             let anything_2 = rng.gen::<u8>() | 1u8;
             let pol_res_2 = anything * anything_2;
-            let (first_value_2, second_value_2) = pol_res_2.get_value();
+            let first_value_2 = pol_res_2;
             assert_eq!(first_value_2, first_value_anything);
-            assert_eq!(second_value_2, second_value_anything);
             //anything_1 * anything_2 (even) = 0
             let anything_3 = rng.gen::<u8>() & u8::MAX << 1;
             let pol_res_3 = anything * anything_3;
-            let (first_value_3, second_value_3) = pol_res_3.get_value();
-            assert_eq!(first_value_3, 0u128);
-            assert_eq!(second_value_3, 0u128);
+            let first_value_3 = pol_res_3;
+            assert_eq!(first_value_3.0[0], 0u128);
         }
     }
 
@@ -2388,7 +2345,7 @@ mod test {
             let verif_big = BigUint::from_bytes_le(&random);
             let verif = verif_big.to_u64_digits()[0] as u128
                 + ((verif_big.to_u64_digits()[1] as u128) << 64);
-            assert_eq!(pol[0].get_value().0, verif)
+            assert_eq!(pol[0].0[0], verif)
         }
         //with many polynomes
         for _i in 0..1000 {
@@ -2399,44 +2356,12 @@ mod test {
                 + ((verif_big.to_u64_digits()[1] as u128) << 64);
             let verif_1 = verif_big.to_u64_digits()[2] as u128
                 + ((verif_big.to_u64_digits()[3] as u128) << 64);
-            assert_eq!(pol[0].get_value().0, verif_0);
-            assert_eq!(pol[1].get_value().0, verif_1);
+            assert_eq!(pol[0].0[0], verif_0);
+            assert_eq!(pol[1].0[0], verif_1);
         }
     }
 
     //GF192
-    #[test]
-    //precondition : none
-    //Postiditon : GF128 whose get value is as expected
-    //if the value given as second value is greater than u64::MAX, the resulting second value will be truncated to hold in 64 bits
-    fn gf192_test_new_get_value() {
-        //when the input are correct
-        let polynome = GF192::new(
-            313773831264450545416201890967826687364u128,
-            275646867658955913877178570363409381843u128 & u64::MAX as u128,
-        );
-        let (first_value, second_value) = polynome.get_value();
-        assert_eq!(first_value, 313773831264450545416201890967826687364u128);
-        assert_eq!(
-            second_value,
-            275646867658955913877178570363409381843u128 & u64::MAX as u128
-        );
-        //when the input is not bounded
-        let other_polynome = GF192::new(
-            313773831264450545416201890967826687364u128,
-            275646867658955913877178570363409381843u128,
-        );
-        let (other_first_value, other_second_value) = other_polynome.get_value();
-        assert_eq!(
-            other_first_value,
-            313773831264450545416201890967826687364u128
-        );
-        assert_eq!(
-            other_second_value,
-            275646867658955913877178570363409381843u128 & u64::MAX as u128
-        );
-    }
-
     #[test]
     //input : two GF192
     //output : the product of the two according to te rules of Galois Fields arithmetic
@@ -2448,23 +2373,23 @@ mod test {
         for _i in 0..1000 {
             let anything: GF192 = rng.gen();
             let pol_res = pol_0 * anything;
-            let (first_value, second_value) = pol_res.get_value();
+            let (first_value, second_value) = (pol_res.0[0], pol_res.0[1]);
             assert_eq!(first_value, 0u128);
             assert_eq!(second_value, 0u128);
             //anything * 0 = 0
             let pol_res_rev = anything * pol_0;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
             assert_eq!(first_value_rev, 0u128);
             assert_eq!(second_value_rev, 0u128);
             //1 * anything = anything
-            let (first_value_anything, second_value_anything) = anything.get_value();
+            let (first_value_anything, second_value_anything) = (anything.0[0], anything.0[1]);
             let pol_res = GF192::ONE * anything;
-            let (first_value, second_value) = pol_res.get_value();
+            let (first_value, second_value) = (pol_res.0[0], pol_res.0[1]);
             assert_eq!(first_value, first_value_anything);
             assert_eq!(second_value, second_value_anything);
             //anything * 1 = anything
             let pol_res_rev = anything * GF192::ONE;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
             assert_eq!(first_value_rev, first_value_anything);
             assert_eq!(second_value_rev, second_value_anything);
         }
@@ -4007,9 +3932,9 @@ mod test {
             let res = left * right;
             #[allow(clippy::op_ref)]
             let res_rev = right * &left;
-            let (first_value, second_value) = res.get_value();
-            assert_eq!(first_value, result.get_value().0);
-            assert_eq!(second_value, result.get_value().1);
+            let (first_value, second_value) = (res.0[0], res.0[1]);
+            assert_eq!(first_value, result.0[0]);
+            assert_eq!(second_value, result.0[1]);
             //to test commutativity
             assert_eq!(res, res_rev);
             //to test with ref
@@ -4039,24 +3964,24 @@ mod test {
             //0 * anything = 0
             let anything: u64 = rng.gen();
             let pol_res = pol_0 * anything;
-            let (first_value, second_value) = pol_res.get_value();
+            let (first_value, second_value) = (pol_res.0[0], pol_res.0[1]);
             assert_eq!(first_value, 0u128);
             assert_eq!(second_value, 0u128);
             //1 * anything = anything
             let pol_res_1 = GF192::ONE * anything;
-            let (first_value_1, second_value_1) = pol_res_1.get_value();
+            let (first_value_1, second_value_1) = (pol_res_1.0[0], pol_res_1.0[1]);
             assert_eq!(first_value_1, anything as u128);
             assert_eq!(second_value_1, 0u128);
             //anything * 0 = 0
             let anything: GF192 = rng.gen();
             let pol_res_rev = anything * 0u64;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
             assert_eq!(first_value_rev, 0u128);
             assert_eq!(second_value_rev, 0u128);
             //anything * 1 = anything
-            let (first_value_anything, second_value_anything) = anything.get_value();
+            let (first_value_anything, second_value_anything) =(anything.0[0], anything.0[1]);
             let pol_res_rev = anything * 1u64;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
             assert_eq!(first_value_rev, first_value_anything);
             assert_eq!(second_value_rev, second_value_anything);
         }
@@ -4101,25 +4026,25 @@ mod test {
             //anything * 0 = 0
             let anything: GF192 = rng.gen();
             let pol_res_rev = anything * 0u8;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
             assert_eq!(first_value_rev, 0u128);
             assert_eq!(second_value_rev, 0u128);
             //anything * 1 = anything
-            let (first_value_anything, second_value_anything) = anything.get_value();
+            let (first_value_anything, second_value_anything) = (anything.0[0], anything.0[1]);
             let pol_res_rev = anything * 1u8;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
             assert_eq!(first_value_rev, first_value_anything);
             assert_eq!(second_value_rev, second_value_anything);
             //anything_1 * anything_2 (odd) = anything_1
             let anything_2 = rng.gen::<u8>() | 1u8;
             let pol_res_2 = anything * anything_2;
-            let (first_value_2, second_value_2) = pol_res_2.get_value();
+            let (first_value_2, second_value_2) = (pol_res_2.0[0], pol_res_2.0[1]);
             assert_eq!(first_value_2, first_value_anything);
             assert_eq!(second_value_2, second_value_anything);
             //anything_1 * anything_2 (even) = 0
             let anything_3 = rng.gen::<u8>() & u8::MAX << 1;
             let pol_res_3 = anything * anything_3;
-            let (first_value_3, second_value_3) = pol_res_3.get_value();
+            let (first_value_3, second_value_3) = (pol_res_3.0[0], pol_res_3.0[1]);
             assert_eq!(first_value_3, 0u128);
             assert_eq!(second_value_3, 0u128);
         }
@@ -4139,7 +4064,7 @@ mod test {
             let pol_1 = GF192::new(random_1_1, random_1_2);
             let pol_2 = GF192::new(random_2_1, random_2_2);
             let pol_res = pol_1 + pol_2;
-            let (first_value, second_value) = pol_res.get_value();
+            let (first_value, second_value) = (pol_res.0[0], pol_res.0[1]);
             assert_eq!(first_value, random_1_1 ^ random_2_1);
             assert_eq!(second_value, random_1_2 ^ random_2_2);
         }
@@ -4626,8 +4551,8 @@ mod test {
             let verif_0_0 = verif_big.to_u64_digits()[0] as u128
                 + ((verif_big.to_u64_digits()[1] as u128) << 64);
             let verif_0_1 = verif_big.to_u64_digits()[2] as u128;
-            assert_eq!(pol[0].get_value().0, verif_0_0);
-            assert_eq!(pol[0].get_value().1, verif_0_1);
+            assert_eq!(pol[0].0[0], verif_0_0);
+            assert_eq!(pol[0].0[1], verif_0_1);
         }
         //with many polynomes
         for _i in 0..1000 {
@@ -4642,26 +4567,15 @@ mod test {
             let verif_1_0 = verif_big.to_u64_digits()[3] as u128
                 + ((verif_big.to_u64_digits()[4] as u128) << 64);
             let verif_1_1 = verif_big.to_u64_digits()[5] as u128;
-            assert_eq!(pol[0].get_value().0, verif_0_0);
-            assert_eq!(pol[0].get_value().1, verif_0_1);
-            assert_eq!(pol[1].get_value().0, verif_1_0);
-            assert_eq!(pol[1].get_value().1, verif_1_1);
+            assert_eq!(pol[0].0[0], verif_0_0);
+            assert_eq!(pol[0].0[1], verif_0_1);
+            assert_eq!(pol[1].0[0], verif_1_0);
+            assert_eq!(pol[1].0[1], verif_1_1);
         }
     }
 
     //GF256
-    #[test]
-    //precondition : none
-    //Postiditon : GF128 whose get value is as expected
-    fn gf256_test_new_get_value() {
-        let polynome = GF256::new(
-            164039018632738885083851012429149951352u128,
-            259919711421018557325306649715233556854u128,
-        );
-        let (first_value, second_value) = polynome.get_value();
-        assert_eq!(first_value, 164039018632738885083851012429149951352u128);
-        assert_eq!(second_value, 259919711421018557325306649715233556854u128);
-    }
+   
 
     #[test]
     //input : two GF256
@@ -4674,23 +4588,23 @@ mod test {
         for _i in 0..1000 {
             let anything: GF256 = rng.gen();
             let pol_res = pol_0 * anything;
-            let (first_value, second_value) = pol_res.get_value();
+            let (first_value, second_value) = (pol_res.0[0], pol_res.0[1]);
             assert_eq!(first_value, 0u128);
             assert_eq!(second_value, 0u128);
             //anything * 0 = 0
             let pol_res_rev = anything * pol_0;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
             assert_eq!(first_value_rev, 0u128);
             assert_eq!(second_value_rev, 0u128);
             //1 * anything = anything
-            let (first_value_anything, second_value_anything) = anything.get_value();
+            let (first_value_anything, second_value_anything) = (anything.0[0], anything.0[1]);
             let pol_res = GF256::ONE * anything;
-            let (first_value, second_value) = pol_res.get_value();
+            let (first_value, second_value) = (pol_res.0[0], pol_res.0[1]);
             assert_eq!(first_value, first_value_anything);
             assert_eq!(second_value, second_value_anything);
             //anything * 1 = anything
             let pol_res_rev = anything * GF256::ONE;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
             assert_eq!(first_value_rev, first_value_anything);
             assert_eq!(second_value_rev, second_value_anything);
         }
@@ -6232,9 +6146,9 @@ mod test {
             let result = GF256::new(data[4], data[5]);
             let res = left * right;
             let res_rev = right * left;
-            let (first_value, second_value) = res.get_value();
-            assert_eq!(first_value, result.get_value().0);
-            assert_eq!(second_value, result.get_value().1);
+            let (first_value, second_value) = (res.0[0], res.0[1]);
+            assert_eq!(first_value, result.0[0]);
+            assert_eq!(second_value, result.0[1]);
             //to test commutativity
             assert_eq!(res, res_rev);
             //to test with ref
@@ -6264,24 +6178,24 @@ mod test {
             //0 * anything = 0
             let anything: u64 = rng.gen();
             let pol_res = pol_0 * anything;
-            let (first_value, second_value) = pol_res.get_value();
+            let (first_value, second_value) = (pol_res.0[0], pol_res.0[1]);
             assert_eq!(first_value, 0u128);
             assert_eq!(second_value, 0u128);
             //1 * anything = anything
             let pol_res_1 = GF256::ONE * anything;
-            let (first_value_1, second_value_1) = pol_res_1.get_value();
+            let (first_value_1, second_value_1) = (pol_res_1.0[0], pol_res_1.0[1]);
             assert_eq!(first_value_1, anything as u128);
             assert_eq!(second_value_1, 0u128);
             //anything * 0 = 0
             let anything: GF256 = rng.gen();
             let pol_res_rev = anything * 0u64;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
             assert_eq!(first_value_rev, 0u128);
             assert_eq!(second_value_rev, 0u128);
             //anything * 1 = anything
-            let (first_value_anything, second_value_anything) = anything.get_value();
+            let (first_value_anything, second_value_anything) = (anything.0[0], anything.0[1]);
             let pol_res_rev = anything * 1u64;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
             assert_eq!(first_value_rev, first_value_anything);
             assert_eq!(second_value_rev, second_value_anything);
         }
@@ -6326,25 +6240,25 @@ mod test {
             //anything * 0 = 0
             let anything: GF256 = rng.gen();
             let pol_res_rev = anything * 0u8;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
             assert_eq!(first_value_rev, 0u128);
             assert_eq!(second_value_rev, 0u128);
             //anything * 1 = anything
-            let (first_value_anything, second_value_anything) = anything.get_value();
+            let (first_value_anything, second_value_anything) = (anything.0[0], anything.0[1]);
             let pol_res_rev = anything * 1u8;
-            let (first_value_rev, second_value_rev) = pol_res_rev.get_value();
+            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
             assert_eq!(first_value_rev, first_value_anything);
             assert_eq!(second_value_rev, second_value_anything);
             //anything_1 * anything_2 (odd) = anything_1
             let anything_2 = rng.gen::<u8>() | 1u8;
             let pol_res_2 = anything * anything_2;
-            let (first_value_2, second_value_2) = pol_res_2.get_value();
+            let (first_value_2, second_value_2) = (pol_res_2.0[0], pol_res_2.0[1]);
             assert_eq!(first_value_2, first_value_anything);
             assert_eq!(second_value_2, second_value_anything);
             //anything_1 * anything_2 (even) = 0
             let anything_3 = rng.gen::<u8>() & u8::MAX << 1;
             let pol_res_3 = anything * anything_3;
-            let (first_value_3, second_value_3) = pol_res_3.get_value();
+            let (first_value_3, second_value_3) = (pol_res_3.0[0], pol_res_3.0[1]);
             assert_eq!(first_value_3, 0u128);
             assert_eq!(second_value_3, 0u128);
         }
@@ -6364,7 +6278,7 @@ mod test {
             let pol_1 = GF256::new(random_1_1, random_1_2);
             let pol_2 = GF256::new(random_2_1, random_2_2);
             let pol_res = pol_1 + pol_2;
-            let (first_value, second_value) = pol_res.get_value();
+            let (first_value, second_value) = (pol_res.0[0], pol_res.0[1]);
             assert_eq!(first_value, random_1_1 ^ random_2_1);
             assert_eq!(second_value, random_1_2 ^ random_2_2);
         }
@@ -6852,8 +6766,8 @@ mod test {
                 + ((verif_big.to_u64_digits()[1] as u128) << 64);
             let verif_0_1 = verif_big.to_u64_digits()[2] as u128
                 + ((verif_big.to_u64_digits()[3] as u128) << 64);
-            assert_eq!(pol[0].get_value().0, verif_0_0);
-            assert_eq!(pol[0].get_value().1, verif_0_1);
+            assert_eq!(pol[0].0[0], verif_0_0);
+            assert_eq!(pol[0].0[1], verif_0_1);
         }
         //with many polynomes
         for _i in 0..1000 {
@@ -6870,10 +6784,10 @@ mod test {
                 + ((verif_big.to_u64_digits()[5] as u128) << 64);
             let verif_1_1 = verif_big.to_u64_digits()[6] as u128
                 + ((verif_big.to_u64_digits()[7] as u128) << 64);
-            assert_eq!(pol[0].get_value().0, verif_0_0);
-            assert_eq!(pol[0].get_value().1, verif_0_1);
-            assert_eq!(pol[1].get_value().0, verif_1_0);
-            assert_eq!(pol[1].get_value().1, verif_1_1);
+            assert_eq!(pol[0].0[0], verif_0_0);
+            assert_eq!(pol[0].0[1], verif_0_1);
+            assert_eq!(pol[1].0[0], verif_1_0);
+            assert_eq!(pol[1].0[1], verif_1_1);
         }
     }
 }

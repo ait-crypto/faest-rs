@@ -268,16 +268,6 @@ mod test {
     use super::*;
 
     //GF8
-    #[test]
-    //Precondition = None
-    //Post contidtion = GF8 whose get_value is as expected
-    fn gf8_test_from_and_get_value() {
-        let mut rng = SmallRng::from_entropy();
-
-        let x: u8 = rng.gen();
-        let polynome = GF8::from(x);
-        assert_eq!(polynome, x);
-    }
 
     #[test]
     //Should be equal to 8
@@ -763,17 +753,6 @@ mod test {
     }
 
     //GF64
-
-    #[test]
-    //Precondition = None
-    //Post contidtion = GF64 whose get_value is as expected
-    fn gf64_test_from_and_get_value() {
-        let mut rng = SmallRng::from_entropy();
-
-        let x: u64 = rng.gen();
-        let polynome = GF64::from(x);
-        assert_eq!(polynome, x);
-    }
 
     #[test]
     //Should be equal to 64
