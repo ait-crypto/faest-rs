@@ -371,8 +371,9 @@ where
             }
         }
     }
-    let new_v: GenericArray<_, O::LAMBDAL> =
-        (*GenericArray::from_slice(&O::Field::to_field(&temp_v))).clone();
+    let inside = &O::Field::to_field(&temp_v);
+    let new_v: &GenericArray<_, O::LAMBDAL> =
+        GenericArray::from_slice(inside);
     let x = rijndael_key_schedule(&pk[..lambda / 8], nst, nk, r, 4 * (((r + 1) * nst) / nk));
     let (a0, a1) = em_enc_cstrnts::<P, O>(
         GenericArray::from_slice(&pk[lambda / 8..]),
