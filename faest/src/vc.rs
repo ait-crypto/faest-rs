@@ -57,7 +57,7 @@ where
 
 pub fn open<R, DPOW /*2N - 1 */, D, N>(
     decom: &Decom<R>,
-    b: GenericArray<u8, D>,
+    b: &GenericArray<u8, D>,
 ) -> (Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>)
 where
     R: RandomOracle,
@@ -264,7 +264,7 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
-                    *GenericArray::from_slice(&data.b),
+                    GenericArray::from_slice(&data.b),
                 );
                 for (res_0, expected) in zip(&res.0, &data.cop) {
                     assert_eq!(res_0.as_slice(), expected);
@@ -285,7 +285,7 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
-                    *GenericArray::from_slice(&data.b),
+                    GenericArray::from_slice(&data.b),
                 );
                 for (res_0, expected) in zip(&res.0, &data.cop) {
                     assert_eq!(res_0.as_slice(), expected);
@@ -306,7 +306,7 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
-                    *GenericArray::from_slice(&data.b),
+                    GenericArray::from_slice(&data.b),
                 );
                 for (res_0, expected) in zip(&res.0, &data.cop) {
                     assert_eq!(res_0.as_slice(), expected);
@@ -327,7 +327,7 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
-                    *GenericArray::from_slice(&data.b),
+                    GenericArray::from_slice(&data.b),
                 );
                 for (res_0, expected) in zip(&res.0, &data.cop) {
                     assert_eq!(res_0.as_slice(), expected);

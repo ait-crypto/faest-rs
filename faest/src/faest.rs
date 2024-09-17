@@ -182,6 +182,7 @@ impl Variant for AesCypher {
             };
             rng.fill_bytes(&mut rho);
             return (
+                /*  */
                 (*GenericArray::from_slice(&[&sk[..16 * beta as usize], &y[..pk_len]].concat()))
                     .clone(),
                 sk,
@@ -282,6 +283,7 @@ impl Variant for EmCypher {
                 .collect();
             rng.fill_bytes(&mut rho);
             return (
+                /*  */
                 (*GenericArray::from_slice(&[&sk[..lambda], &y[..]].concat())).clone(),
                 sk,
                 rho,
@@ -427,29 +429,25 @@ where
     for i in 0..tau {
         if i < t0 {
             let s = chaldec::<P>(&chall3, i as u16);
-            pdecom[i] = open::<RO<O>, P::POWK0, P::K0, P::N0>(
-                &decom[i],
-                (*GenericArray::from_slice(&s)).clone(),
-            );
+            pdecom[i] =
+                open::<RO<O>, P::POWK0, P::K0, P::N0>(&decom[i], GenericArray::from_slice(&s));
         } else {
             let s = chaldec::<P>(&chall3, i as u16);
-            pdecom[i] = open::<RO<O>, P::POWK1, P::K1, P::N1>(
-                &decom[i],
-                (*GenericArray::from_slice(&s)).clone(),
-            );
+            pdecom[i] =
+                open::<RO<O>, P::POWK1, P::K1, P::N1>(&decom[i], GenericArray::from_slice(&s));
         }
     }
     (
         Box::new(
             c.iter()
-                .map(|x| (*GenericArray::from_slice(&x[..])).clone())
+                .map(|x| (/*  */*GenericArray::from_slice(&x[..])).clone())
                 .collect::<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>(),
         ),
         u_t,
         d,
         *a_t,
         pdecom,
-        (*GenericArray::from_slice(&chall3)).clone(),
+        (/*  */*GenericArray::from_slice(&chall3)).clone(),
         iv,
     )
 }
@@ -467,7 +465,6 @@ where
     let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
     let l = <P::L as Unsigned>::to_usize() / 8;
     let tau = <P::TAU as Unsigned>::to_usize();
-    //let (c, u_t, d, a_t, pdecom, chall3, iv) = sigma;
 
     let chall3 = GenericArray::from_slice(&sigma[sig - (16 + lambda)..sig - 16]);
     let mut h1_hasher = RO::<O>::h1_init();
@@ -495,9 +492,13 @@ where
     reader.read(&mut chall1);
 
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
+    let def = GenericArray::default();
+    let def2 = GenericArray::default();
+    let def3 = GenericArray::default();
+    let def4 = GenericArray::default();
     let mut gq: Box<GenericArray<Vec<GenericArray<u8, <P as PARAM>::LH>>, P::TAU>> =
         GenericArray::default_boxed();
-    let mut gd_t: Box<GenericArray<Vec<GenericArray<u8, O::LAMBDAPLUS2>>, O::LAMBDALBYTES>> =
+    let mut gd_t: Box<GenericArray<Vec<&GenericArray<u8, O::LAMBDAPLUS2>>, O::LAMBDALBYTES>> =
         GenericArray::default_boxed();
     gq[0] = gq_p[0].clone();
     let delta0 = chaldec::<P>(chall3, 0);
@@ -506,12 +507,14 @@ where
         .iter()
         .map(|d| {
             if *d == 1 {
-                (*GenericArray::from_slice(u_t)).clone()
+                GenericArray::from_slice(u_t)
             } else {
-                GenericArray::default()
+                &def
             }
         })
         .collect();
+    let mut temp: Vec<GenericArray<u8, P::LH>> = vec![def3];
+    let mut dtemp = vec![def4];
     for i in 1..tau {
         /* ok */
         let delta = chaldec::<P>(chall3, i as u16);
@@ -519,33 +522,34 @@ where
             .iter()
             .map(|d| {
                 if *d == 1 {
-                    (*GenericArray::from_slice(u_t)).clone()
+                    GenericArray::from_slice(u_t)
                 } else {
-                    GenericArray::default()
+                    &def
                 }
             })
             .collect::<Vec<_>>();
-        let dtemp: Vec<GenericArray<u8, O::LHATBYTES>> = delta
-            .into_iter()
+        dtemp = delta
+            .iter()
             .map(|d| {
-                if d == 1 {
-                    (*GenericArray::from_slice(&c[lhat * (i - 1)..lhat * i])).clone()
+                if *d == 1 {
+                    c[lhat * (i - 1)..lhat * i]
+                        .iter()
+                        .copied()
+                        .collect::<GenericArray<u8, _>>()
                 } else {
-                    GenericArray::default()
+                    def2.clone()
                 }
             })
-            .collect::<Vec<GenericArray<u8, O::LHATBYTES>>>();
-        let mut temp: Vec<GenericArray<u8, P::LH>> = vec![GenericArray::default()];
-        temp = zip(gq_p[i].clone(), dtemp)
+            .collect::<Vec<GenericArray<u8, P::LH>>>();
+        temp = gq_p[i]
+            .iter()
+            .zip(dtemp)
             .map(|(q, d)| {
-                (*GenericArray::from_slice(
-                    &zip(q, d)
-                        .map(|(q, d)| q ^ d)
-                        .collect::<GenericArray<u8, P::LH>>(),
-                ))
-                .clone()
+                zip(q, d)
+                    .map(|(q, d)| (q ^ d))
+                    .collect::<GenericArray<u8, P::LH>>()
             })
-            .collect();
+            .collect::<Vec<GenericArray<u8, <P as PARAM>::LH>>>();
         gq[i] = temp;
     }
     let gq_t: GenericArray<Box<GenericArray<u8, O::LAMBDAPLUS2>>, O::LAMBDA> = gq
@@ -567,7 +571,7 @@ where
             gq_t,
             gd_t.into_iter()
                 .flatten()
-                .collect::<Box<GenericArray<GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>>>(),
+                .collect::<Box<GenericArray<&GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>>>(),
         )
         .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d).collect::<Vec<u8>>())
         .collect::<Vec<u8>>(),
@@ -589,10 +593,10 @@ where
             .flat_map(|x| {
                 x.iter()
                     .map(|y| {
-                        y.clone()
-                            .into_iter()
-                            .take(l + lambda)
-                            .collect::<GenericArray<u8, _>>()
+                        y[..l + lambda]
+                            .iter()
+                            .copied()
+                            .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
                     })
                     .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
             })
@@ -646,7 +650,7 @@ where
     signature.append(&mut (*sigma.5).to_vec());
     signature.append(&mut (sigma.6).to_vec());
 
-    return (*GenericArray::from_slice(&signature)).clone();
+    return (/*  */*GenericArray::from_slice(&signature)).clone();
 }
 
 #[allow(clippy::type_complexity)]
@@ -654,11 +658,11 @@ pub fn signature_to_sigma<P, O>(
     signature: &[u8],
 ) -> (
     Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>,
-    GenericArray<u8, O::LAMBDAPLUS2>,
-    GenericArray<u8, O::LBYTES>,
-    GenericArray<u8, O::LAMBDABYTES>,
+    &GenericArray<u8, O::LAMBDAPLUS2>,
+    &GenericArray<u8, O::LBYTES>,
+    &GenericArray<u8, O::LAMBDABYTES>,
     Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>>,
-    GenericArray<u8, P::LAMBDABYTES>,
+    &GenericArray<u8, P::LAMBDABYTES>,
     [u8; 16],
 )
 where
@@ -684,11 +688,11 @@ where
         index += l_b;
     }
 
-    let u_tilde = (*GenericArray::from_slice(&signature[index..index + lambda + 2])).clone();
+    let u_tilde = GenericArray::from_slice(&signature[index..index + lambda + 2]);
     index += lambda + 2;
-    let d = (*GenericArray::from_slice(&signature[index..index + l])).clone();
+    let d = GenericArray::from_slice(&signature[index..index + l]);
     index += l;
-    let a_tilde = (*GenericArray::from_slice(&signature[index..index + lambda])).clone();
+    let a_tilde = GenericArray::from_slice(&signature[index..index + lambda]);
     index += lambda;
     let mut pdecom: Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>> =
         GenericArray::default_boxed();
@@ -712,7 +716,7 @@ where
             .append(&mut signature[index..index + 2 * lambda].to_vec());
         index += 2 * lambda;
     }
-    let chall3 = (*GenericArray::from_slice(&signature[index..index + lambda])).clone();
+    let chall3 = GenericArray::from_slice(&signature[index..index + lambda]);
     index += lambda;
     let iv = signature[index..].try_into().unwrap();
     (c, u_tilde, d, a_tilde, pdecom, chall3, iv)
