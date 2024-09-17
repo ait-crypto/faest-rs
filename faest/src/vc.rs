@@ -83,7 +83,7 @@ where
 
 #[allow(clippy::type_complexity)]
 pub fn reconstruct<R>(
-    pdecom: &[u8], 
+    pdecom: &[u8],
     b: &[u8],
     iv: &[u8],
 ) -> (
@@ -96,19 +96,20 @@ where
     let lambda = <R::LAMBDA as Unsigned>::to_usize();
     let mut a = 0;
     let d = b.len();
-    let mut k = vec![GenericArray::default(); (1 << (d + 1)) - 1];
+    let def = GenericArray::default();
+    let mut k = vec![def; (1 << (d + 1)) - 1];
     //step 4
     for i in 1..d + 1 {
         let b_d_i = b[d - i] as usize;
         k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)] =
-            (*GenericArray::from_slice(&pdecom[(i - 1) * lambda..i * lambda])).clone();
+            pdecom[(i - 1) * lambda..i * lambda].iter().copied().collect::<GenericArray<u8, _>>();
         //step 7
         for j in 0..1 << (i - 1) {
             if j != a {
                 let rank = (1 << (i - 1)) - 1 + j;
                 let mut prg = R::PRG::new_prg(&k[rank], iv.try_into().unwrap());
                 prg.read(&mut k[rank * 2 + 1]);
-                prg.read(&mut k[rank * 2 + 2]);
+                prg.read( &mut k[rank * 2 + 2]);
             }
         }
         a = 2 * a + b_d_i;
