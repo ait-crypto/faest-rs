@@ -335,8 +335,7 @@ where
     h1_hasher.update(pk);
     h1_hasher.update(msg);
     // why is this Boxed?
-    let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
-        GenericArray::default_boxed();
+    let mut mu: Box<GenericArray<u8, O::LAMBDADOUBLE>> = GenericArray::default_boxed();
     h1_hasher.finish().read(&mut mu);
 
     let mut h3_hasher = RO::<O>::h3_init();
@@ -357,8 +356,7 @@ where
     h2_hasher.update(&hcom);
     c.iter().for_each(|buf| h2_hasher.update(buf));
     h2_hasher.update(&iv);
-    let mut reader = h2_hasher.finish();
-    reader.read(&mut chall1);
+    h2_hasher.finish().read(&mut chall1);
 
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let u_t = vole_hasher.process(&u);
@@ -369,18 +367,12 @@ where
             .for_each(|v| h1_hasher.update(&vole_hasher.process(v)));
     }
     // why is this boxed?
-    let mut hv: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
-        GenericArray::default_boxed();
+    let mut hv: Box<GenericArray<u8, O::LAMBDADOUBLE>> = GenericArray::default_boxed();
     h1_hasher.finish().read(&mut hv);
 
     let w = C::witness::<P, O>(sk, pk);
     let d = GenericArray::from_iter(
-        zip(
-            // FIXME: remove collect
-            w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
-            &u[..l],
-        )
-        .map(|(w, u)| w ^ *u),
+        zip(w.iter().flat_map(|w| w.to_le_bytes()), &u[..l]).map(|(w, u)| w ^ *u),
     );
 
     let mut h2_hasher = RO::<O>::h2_init();
@@ -471,8 +463,7 @@ where
     h1_hasher.update(&pk);
     h1_hasher.update(msg);
     // why is this boxed?
-    let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
-        GenericArray::default_boxed();
+    let mut mu: Box<GenericArray<u8, O::LAMBDADOUBLE>> = GenericArray::default_boxed();
     h1_hasher.finish().read(&mut mu);
     let (hcom, gq_p) = volereconstruct::<RO<O>, P>(
         chall3,
@@ -480,16 +471,14 @@ where
         &sigma[sig - 16..],
     );
 
-    let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
     let c = &sigma[..lhat * (tau - 1)];
-
     h2_hasher.update(c);
     h2_hasher.update(&sigma[sig - 16..]);
-    let mut reader = h2_hasher.finish();
-    reader.read(&mut chall1);
+    let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
+    h2_hasher.finish().read(&mut chall1);
 
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let def = GenericArray::default();
@@ -561,9 +550,6 @@ where
         })
         .collect();
 
-    // why is this a box?
-    let mut hv: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
-        GenericArray::default_boxed();
     let mut h1_hasher = RO::<O>::h1_init();
     // FIXME!
     h1_hasher.update(
@@ -576,14 +562,16 @@ where
         .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d).collect::<Vec<u8>>())
         .collect::<Vec<u8>>(),
     );
+    // why is this a box?
+    let mut hv: Box<GenericArray<u8, O::LAMBDADOUBLE>> = GenericArray::default_boxed();
     h1_hasher.finish().read(&mut hv);
     let d = &sigma[lhat * (tau - 1) + lambda + 2..lhat * (tau - 1) + lambda + 2 + l];
-    let mut chall2: Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall1);
     h2_hasher.update(u_t);
     h2_hasher.update(&hv);
     h2_hasher.update(d);
+    let mut chall2: Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
     h2_hasher.finish().read(&mut chall2);
 
     let a_t = &sigma[lhat * (tau - 1) + lambda + 2 + l..lhat * (tau - 1) + 2 * lambda + 2 + l];

@@ -94,10 +94,6 @@ pub trait RandomOracle {
     #[deprecated]
     type LAMBDA: ArrayLength;
     #[deprecated]
-    type LAMBDA16: ArrayLength;
-    #[deprecated]
-    type PRODLAMBDA3: ArrayLength;
-    #[deprecated]
     type PRODLAMBDA2: ArrayLength;
 
     /// Create hasher for `H0`
@@ -175,8 +171,6 @@ impl RandomOracle for RandomOracleShake128 {
     type Hasher<const SEP: u8> = Hasher128<SEP>;
     type PRG = PRG128;
     type LAMBDA = U16;
-    type LAMBDA16 = U32;
-    type PRODLAMBDA3 = U48;
     type PRODLAMBDA2 = U32;
 }
 
@@ -199,8 +193,6 @@ impl RandomOracle for RandomOracleShake192 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
     type PRG = PRG192;
     type LAMBDA = U24;
-    type LAMBDA16 = U40;
-    type PRODLAMBDA3 = U72;
     type PRODLAMBDA2 = U48;
 }
 
@@ -237,8 +229,6 @@ impl RandomOracle for RandomOracleShake256 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
     type PRG = PRG256;
     type LAMBDA = U32;
-    type LAMBDA16 = U48;
-    type PRODLAMBDA3 = U96;
     type PRODLAMBDA2 = U64;
 }
 
