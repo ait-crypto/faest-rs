@@ -26,7 +26,7 @@ where
 {
     let mut k = vec![GenericArray::default(); 2 * n - 1];
     //step 2..3
-    k[0] = r.clone();
+    k[0] = r.iter().copied().collect();
 
     for i in 0..n - 1 {
         let mut prg = R::PRG::new_prg(&k[i], iv);
@@ -362,7 +362,7 @@ mod test {
             if lambdabyte == 32 {
                 let res = reconstruct::<RandomOracleShake128>(
                     &[
-                        &data.cop.clone().into_iter().flatten().collect::<Vec<u8>>()[..],
+                        &data.cop.iter().flatten().copied().collect::<Vec<u8>>()[..],
                         &data.com_j[..],
                     ]
                     .concat(),
@@ -373,7 +373,7 @@ mod test {
             } else if lambdabyte == 48 {
                 let res = reconstruct::<RandomOracleShake192>(
                     &[
-                        &data.cop.clone().into_iter().flatten().collect::<Vec<u8>>()[..],
+                        &data.cop.iter().flatten().copied().collect::<Vec<u8>>()[..],
                         &data.com_j[..],
                     ]
                     .concat(),

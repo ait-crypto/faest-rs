@@ -14,7 +14,10 @@ use crate::{
     vole::chaldec,
 };
 
-type IO<'a, O> = (&'a GenericArray<u8, <O as PARAMOWF>::QUOTPK2>, &'a GenericArray<u8, <O as PARAMOWF>::QUOTPK2>);
+type IO<'a, O> = (
+    &'a GenericArray<u8, <O as PARAMOWF>::QUOTPK2>,
+    &'a GenericArray<u8, <O as PARAMOWF>::QUOTPK2>,
+);
 
 type KeyCstrnts<O> = (
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::SKE>>,
@@ -799,14 +802,14 @@ where
         );
     }
     let a0_array: GenericArray<O::Field, O::C> = if lambda == 128 {
-        (GenericArray::from_slice(&[&a0[..], &a_01[..senc]].concat())).clone()
+        [&a0[..], &a_01[..senc]].concat().iter().copied().collect()
     } else {
-        (GenericArray::from_slice(&[&a0[..], &a_01[..senc], &a_01_bis[..senc]].concat())).clone()
+        [&a0[..], &a_01[..senc], &a_01_bis[..senc]].concat().iter().copied().collect()
     };
     let a1_array: GenericArray<O::Field, O::C> = if lambda == 128 {
-        (GenericArray::from_slice(&[&a1[..], &a_01[senc..]].concat())).clone()
+        [&a1[..], &a_01[senc..]].concat().iter().copied().collect()
     } else {
-        (GenericArray::from_slice(&[&a1[..], &a_01[senc..], &a_01_bis[senc..]].concat())).clone()
+        [&a1[..], &a_01[senc..], &a_01_bis[senc..]].concat().iter().copied().collect()
     };
     let u_s = O::Field::to_field(&u[l / 8..])[0];
 
@@ -825,8 +828,8 @@ where
         b_t.update(&a0_array[i]);
     }
     (
-        Box::new(GenericArray::from_slice(&(a_t.finalize(&u_s).to_bytes())[..]).clone()),
-        Box::new(GenericArray::from_slice(&(b_t.finalize(&v_s).to_bytes())[..]).clone()),
+        Box::new((a_t.finalize(&u_s).to_bytes())[..].iter().copied().collect()),
+        Box::new((b_t.finalize(&v_s).to_bytes())[..].iter().copied().collect()),
     )
 }
 

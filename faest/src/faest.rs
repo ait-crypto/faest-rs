@@ -182,9 +182,7 @@ impl Variant for AesCypher {
             };
             rng.fill_bytes(&mut rho);
             return (
-                /*  */
-                (*GenericArray::from_slice(&[&sk[..16 * beta as usize], &y[..pk_len]].concat()))
-                    .clone(),
+                [&sk[..16 * beta as usize], &y[..pk_len]].concat().iter().copied().collect(),
                 sk,
                 rho,
             );
@@ -283,8 +281,7 @@ impl Variant for EmCypher {
                 .collect();
             rng.fill_bytes(&mut rho);
             return (
-                /*  */
-                (*GenericArray::from_slice(&[&sk[..lambda], &y[..]].concat())).clone(),
+                [&sk[..lambda], &y[..]].concat().iter().copied().collect(),
                 sk,
                 rho,
             );
@@ -335,7 +332,8 @@ where
     h1_hasher.update(pk);
     h1_hasher.update(msg);
     // why is this Boxed?
-    let mut mu: Box<GenericArray<u8, O::LAMBDADOUBLE>> = GenericArray::default_boxed();
+    let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
+        GenericArray::default_boxed();
     h1_hasher.finish().read(&mut mu);
 
     let mut h3_hasher = RO::<O>::h3_init();
@@ -356,7 +354,8 @@ where
     h2_hasher.update(&hcom);
     c.iter().for_each(|buf| h2_hasher.update(buf));
     h2_hasher.update(&iv);
-    h2_hasher.finish().read(&mut chall1);
+    let mut reader = h2_hasher.finish();
+    reader.read(&mut chall1);
 
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let u_t = vole_hasher.process(&u);
@@ -367,12 +366,18 @@ where
             .for_each(|v| h1_hasher.update(&vole_hasher.process(v)));
     }
     // why is this boxed?
-    let mut hv: Box<GenericArray<u8, O::LAMBDADOUBLE>> = GenericArray::default_boxed();
+    let mut hv: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
+        GenericArray::default_boxed();
     h1_hasher.finish().read(&mut hv);
 
     let w = C::witness::<P, O>(sk, pk);
     let d = GenericArray::from_iter(
-        zip(w.iter().flat_map(|w| w.to_le_bytes()), &u[..l]).map(|(w, u)| w ^ *u),
+        zip(
+            // FIXME: remove collect
+            w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
+            &u[..l],
+        )
+        .map(|(w, u)| w ^ *u),
     );
 
     let mut h2_hasher = RO::<O>::h2_init();
@@ -389,12 +394,7 @@ where
         gv.iter()
             .flat_map(|x| {
                 x.iter()
-                    .map(|y| {
-                        y.clone()
-                            .into_iter()
-                            .take(l + lambda)
-                            .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
-                    })
+                    .map(|y| y[..l+lambda].iter().copied().collect())
                     .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
             })
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
@@ -432,14 +432,14 @@ where
     (
         Box::new(
             c.iter()
-                .map(|x| (/*  */*GenericArray::from_slice(&x[..])).clone())
+                .map(|x| x[..].iter().copied().collect::<GenericArray<u8, _>>())
                 .collect::<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>(),
         ),
         u_t,
         d,
         *a_t,
         pdecom,
-        (/*  */*GenericArray::from_slice(&chall3)).clone(),
+        chall3.iter().copied().collect(),
         iv,
     )
 }
@@ -463,7 +463,8 @@ where
     h1_hasher.update(&pk);
     h1_hasher.update(msg);
     // why is this boxed?
-    let mut mu: Box<GenericArray<u8, O::LAMBDADOUBLE>> = GenericArray::default_boxed();
+    let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
+        GenericArray::default_boxed();
     h1_hasher.finish().read(&mut mu);
     let (hcom, gq_p) = volereconstruct::<RO<O>, P>(
         chall3,
@@ -471,14 +472,16 @@ where
         &sigma[sig - 16..],
     );
 
+    let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
     let c = &sigma[..lhat * (tau - 1)];
+
     h2_hasher.update(c);
     h2_hasher.update(&sigma[sig - 16..]);
-    let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
-    h2_hasher.finish().read(&mut chall1);
+    let mut reader = h2_hasher.finish();
+    reader.read(&mut chall1);
 
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let def = GenericArray::default();
@@ -550,6 +553,9 @@ where
         })
         .collect();
 
+    // why is this a box?
+    let mut hv: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
+        GenericArray::default_boxed();
     let mut h1_hasher = RO::<O>::h1_init();
     // FIXME!
     h1_hasher.update(
@@ -562,16 +568,14 @@ where
         .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d).collect::<Vec<u8>>())
         .collect::<Vec<u8>>(),
     );
-    // why is this a box?
-    let mut hv: Box<GenericArray<u8, O::LAMBDADOUBLE>> = GenericArray::default_boxed();
     h1_hasher.finish().read(&mut hv);
     let d = &sigma[lhat * (tau - 1) + lambda + 2..lhat * (tau - 1) + lambda + 2 + l];
+    let mut chall2: Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall1);
     h2_hasher.update(u_t);
     h2_hasher.update(&hv);
     h2_hasher.update(d);
-    let mut chall2: Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
     h2_hasher.finish().read(&mut chall2);
 
     let a_t = &sigma[lhat * (tau - 1) + lambda + 2 + l..lhat * (tau - 1) + 2 * lambda + 2 + l];
@@ -638,7 +642,7 @@ where
     signature.append(&mut (*sigma.5).to_vec());
     signature.append(&mut (sigma.6).to_vec());
 
-    return (/*  */*GenericArray::from_slice(&signature)).clone();
+    return signature.iter().copied().collect();
 }
 
 #[allow(clippy::type_complexity)]
@@ -686,7 +690,7 @@ where
         GenericArray::default_boxed();
     for i in pdecom.iter_mut().take(tau0) {
         for _j in 0..k0 {
-            i.0.push(GenericArray::from_slice(&signature[index..index + lambda]).clone());
+            i.0.push(signature[index..index + lambda].iter().copied().collect());
             index += lambda;
         }
         i.1 = signature[index..index + 2 * lambda].to_vec();
