@@ -182,13 +182,8 @@ impl Variant for AesCypher {
             };
             rng.fill_bytes(&mut rho);
             let mut res = GenericArray::default();
-            res.copy_from_slice(&[&sk[..16 * beta as usize], &y[..pk_len]]
-                    .concat());
-            return (
-                res,
-                sk,
-                rho,
-            );
+            res.copy_from_slice(&[&sk[..16 * beta as usize], &y[..pk_len]].concat());
+            return (res, sk, rho);
         }
     }
 }
@@ -285,11 +280,7 @@ impl Variant for EmCypher {
             rng.fill_bytes(&mut rho);
             let mut res = GenericArray::default();
             res.copy_from_slice(&[&sk[..lambda], &y[..]].concat());
-            return (
-                res,
-                sk,
-                rho,
-            );
+            return (res, sk, rho);
         }
     }
 }
@@ -394,8 +385,7 @@ where
                             .into_iter()
                             .take(l + lambda)
                             .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
-                    }
-)
+                    })
                     .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
             })
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
@@ -534,31 +524,19 @@ where
             .collect::<Vec<GenericArray<u8, <P as PARAM>::LH>>>();
         gq[i] = temp;
     }
-    let gq_t: GenericArray<Box<GenericArray<u8, O::LAMBDAPLUS2>>, O::LAMBDA> = gq
+    let gq_t = gq
         .iter()
-        .flat_map(|q| {
-            q.iter()
-                .map(|q| Box::new(vole_hasher.process(q)))
-                .collect::<Vec<Box<GenericArray<u8, O::LAMBDAPLUS2>>>>()
-        })
-        .collect();
+        .flat_map(|q| q.iter().map(|q| vole_hasher.process(q)));
 
+    let mut h1_hasher = RO::<O>::h1_init();
+    zip(gq_t, gd_t.into_iter().flatten())
+        .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d))
+        .for_each(|v| h1_hasher.update(&[v]));
     // why is this a box?
     let mut hv: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
         GenericArray::default_boxed();
-    let mut h1_hasher = RO::<O>::h1_init();
-    // FIXME!
-    h1_hasher.update(
-        &zip(
-            gq_t,
-            gd_t.into_iter()
-                .flatten()
-                .collect::<Box<GenericArray<&GenericArray<u8, O::LAMBDAPLUS2>, O::LAMBDA>>>(),
-        )
-        .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d).collect::<Vec<u8>>())
-        .collect::<Vec<u8>>(),
-    );
     h1_hasher.finish().read(&mut hv);
+
     let d = &sigma[lhat * (tau - 1) + lambda + 2..lhat * (tau - 1) + lambda + 2 + l];
     let mut chall2: Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
     let mut h2_hasher = RO::<O>::h2_init();
