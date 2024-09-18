@@ -700,7 +700,7 @@ where
         for _j in 0..k1 {
             pdecom[tau0 + i]
                 .0
-                .push(GenericArray::from_slice(&signature[index..index + lambda]).clone());
+                .push(signature[index..index + lambda].iter().copied().collect());
             index += lambda;
         }
         pdecom[tau0 + i]

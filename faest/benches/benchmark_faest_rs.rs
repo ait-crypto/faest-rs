@@ -143,7 +143,7 @@ where
 }
 
 pub fn faest_benchmark(c: &mut Criterion) {
-    c.bench_function("Keygen aes 128s", |b| {
+    c.bench_function("Keygen aes 128s", |b| {;
         b.iter(|| faest::AesCypher::keygen_with_rng::<PARAM128S, PARAMOWF128>(generate_rng()))
     });
     c.bench_function("Keygen aes 128f", |b| {
@@ -179,220 +179,226 @@ pub fn faest_benchmark(c: &mut Criterion) {
     c.bench_function("Keygen em 256f", |b| {
         b.iter(|| faest::EmCypher::keygen_with_rng::<PARAM256FEM, PARAMOWF256EM>(generate_rng()))
     });
-    c.bench_function("Sign aes 128s", |b| {
+    c.bench_function("Sign aes 128s", |b| {let input = generate_sign_input_aes::<
+        AesCypher,
+        PARAM128S,
+        PARAMOWF128,
+    >();
         b.iter(|| {
-            bench_sign::<AesCypher, PARAM128S, PARAMOWF128>(generate_sign_input_aes::<
-                AesCypher,
-                PARAM128S,
-                PARAMOWF128,
-            >())
+            bench_sign::<AesCypher, PARAM128S, PARAMOWF128>(input.clone())
         })
     });
     c.bench_function("Sign aes 128f", |b| {
-        b.iter(|| {
-            bench_sign::<AesCypher, PARAM128F, PARAMOWF128>(generate_sign_input_aes::<
+        let input = generate_sign_input_aes::<
                 AesCypher,
                 PARAM128F,
                 PARAMOWF128,
-            >())
+            >();
+        b.iter(|| {
+            bench_sign::<AesCypher, PARAM128F, PARAMOWF128>(input.clone())
         })
     });
     c.bench_function("Sign aes 192s", |b| {
+        let input = generate_sign_input_aes::<
+        AesCypher,
+        PARAM192S,
+        PARAMOWF192,
+    >();
         b.iter(|| {
-            bench_sign::<AesCypher, PARAM192S, PARAMOWF192>(generate_sign_input_aes::<
-                AesCypher,
-                PARAM192S,
-                PARAMOWF192,
-            >())
+            bench_sign::<AesCypher, PARAM192S, PARAMOWF192>(input.clone())
         })
     });
     c.bench_function("Sign aes 192f", |b| {
-        b.iter(|| {
-            bench_sign::<AesCypher, PARAM192F, PARAMOWF192>(generate_sign_input_aes::<
+        let input = generate_sign_input_aes::<
                 AesCypher,
                 PARAM192F,
                 PARAMOWF192,
-            >())
+            >();
+        b.iter(|| {
+            bench_sign::<AesCypher, PARAM192F, PARAMOWF192>(input.clone())
         })
     });
     c.bench_function("Sign aes 256s", |b| {
-        b.iter(|| {
-            bench_sign::<AesCypher, PARAM256S, PARAMOWF256>(generate_sign_input_aes::<
+        let input = generate_sign_input_aes::<
                 AesCypher,
                 PARAM256S,
                 PARAMOWF256,
-            >())
+            >();
+        b.iter(|| {
+            bench_sign::<AesCypher, PARAM256S, PARAMOWF256>(input.clone())
         })
     });
     c.bench_function("Sign aes 256f", |b| {
-        b.iter(|| {
-            bench_sign::<AesCypher, PARAM256F, PARAMOWF256>(generate_sign_input_aes::<
+        let input = generate_sign_input_aes::<
                 AesCypher,
                 PARAM256F,
                 PARAMOWF256,
-            >())
+            >();
+        b.iter(|| {
+            bench_sign::<AesCypher, PARAM256F, PARAMOWF256>(input.clone())
         })
     });
-    c.bench_function("Sign em 128s", |b| {
+    c.bench_function("Sign em 128s", |b| {let input = generate_sign_input_em::<
+        EmCypher,
+        PARAM128SEM,
+        PARAMOWF128EM,
+    >();
         b.iter(|| {
-            bench_sign::<EmCypher, PARAM128SEM, PARAMOWF128EM>(generate_sign_input_em::<
-                EmCypher,
-                PARAM128SEM,
-                PARAMOWF128EM,
-            >())
+            bench_sign::<EmCypher, PARAM128SEM, PARAMOWF128EM>(input.clone())
         })
     });
-    c.bench_function("Sign em 128f", |b| {
+    c.bench_function("Sign em 128f", |b| {let input = generate_sign_input_em::<
+        EmCypher,
+        PARAM128FEM,
+        PARAMOWF128EM,
+    >();
         b.iter(|| {
-            bench_sign::<EmCypher, PARAM128FEM, PARAMOWF128EM>(generate_sign_input_em::<
-                EmCypher,
-                PARAM128FEM,
-                PARAMOWF128EM,
-            >())
+            bench_sign::<EmCypher, PARAM128FEM, PARAMOWF128EM>(input.clone())
         })
     });
-    c.bench_function("Sign em 192s", |b| {
-        b.iter(|| {
-            bench_sign::<EmCypher, PARAM192SEM, PARAMOWF192EM>(generate_sign_input_em::<
+    c.bench_function("Sign em 192s", |b| {let input = generate_sign_input_em::<
                 EmCypher,
                 PARAM192SEM,
                 PARAMOWF192EM,
-            >())
+            >();
+        b.iter(|| {
+            bench_sign::<EmCypher, PARAM192SEM, PARAMOWF192EM>(input.clone())
         })
     });
-    c.bench_function("Sign em 192f", |b| {
+    c.bench_function("Sign em 192f", |b| {let input = generate_sign_input_em::<
+        EmCypher,
+        PARAM192FEM,
+        PARAMOWF192EM,
+    >();
         b.iter(|| {
-            bench_sign::<EmCypher, PARAM192FEM, PARAMOWF192EM>(generate_sign_input_em::<
-                EmCypher,
-                PARAM192FEM,
-                PARAMOWF192EM,
-            >())
+            bench_sign::<EmCypher, PARAM192FEM, PARAMOWF192EM>(input.clone())
         })
     });
-    c.bench_function("Sign em 256s", |b| {
+    c.bench_function("Sign em 256s", |b| {let input = generate_sign_input_em::<
+        EmCypher,
+        PARAM256SEM,
+        PARAMOWF256EM,
+    >();
         b.iter(|| {
-            bench_sign::<EmCypher, PARAM256SEM, PARAMOWF256EM>(generate_sign_input_em::<
-                EmCypher,
-                PARAM256SEM,
-                PARAMOWF256EM,
-            >())
+            bench_sign::<EmCypher, PARAM256SEM, PARAMOWF256EM>(input.clone())
         })
     });
-    c.bench_function("Sign em 256f", |b| {
+    c.bench_function("Sign em 256f", |b| {let input = generate_sign_input_em::<
+        EmCypher,
+        PARAM256FEM,
+        PARAMOWF256EM,
+    >();
         b.iter(|| {
-            bench_sign::<EmCypher, PARAM256FEM, PARAMOWF256EM>(generate_sign_input_em::<
-                EmCypher,
-                PARAM256FEM,
-                PARAMOWF256EM,
-            >())
+            bench_sign::<EmCypher, PARAM256FEM, PARAMOWF256EM>(input.clone())
         })
     });
-    c.bench_function("Verify aes 128s", |b| {
-        b.iter(|| {
-            bench_verify_aes::<AesCypher, PARAM128S, PARAMOWF128>(generate_verify_input_aes::<
+    c.bench_function("Verify aes 128s", |b| {let input = 
+        generate_verify_input_aes::<
                 AesCypher,
                 PARAM128S,
                 PARAMOWF128,
-            >())
+            >();
+        b.iter(|| {
+            bench_verify_aes::<AesCypher, PARAM128S, PARAMOWF128>(input.clone())
         })
     });
-    c.bench_function("Verify aes 128f", |b| {
+    c.bench_function("Verify aes 128f", |b| {let input = generate_verify_input_aes::<
+        AesCypher,
+        PARAM128F,
+        PARAMOWF128,
+    >();
         b.iter(|| {
-            bench_verify_aes::<AesCypher, PARAM128F, PARAMOWF128>(generate_verify_input_aes::<
-                AesCypher,
-                PARAM128F,
-                PARAMOWF128,
-            >())
+            bench_verify_aes::<AesCypher, PARAM128F, PARAMOWF128>(input.clone())
         })
     });
-    c.bench_function("Verify aes 192s", |b| {
+    c.bench_function("Verify aes 192s", |b| {let input = generate_verify_input_aes::<
+        AesCypher,
+        PARAM192S,
+        PARAMOWF192,
+    >();
         b.iter(|| {
-            bench_verify_aes::<AesCypher, PARAM192S, PARAMOWF192>(generate_verify_input_aes::<
-                AesCypher,
-                PARAM192S,
-                PARAMOWF192,
-            >())
+            bench_verify_aes::<AesCypher, PARAM192S, PARAMOWF192>(input.clone())
         })
     });
-    c.bench_function("Verify aes 192f", |b| {
+    c.bench_function("Verify aes 192f", |b| {let input = generate_verify_input_aes::<
+        AesCypher,
+        PARAM192F,
+        PARAMOWF192,
+    >();
         b.iter(|| {
-            bench_verify_aes::<AesCypher, PARAM192F, PARAMOWF192>(generate_verify_input_aes::<
-                AesCypher,
-                PARAM192F,
-                PARAMOWF192,
-            >())
+            bench_verify_aes::<AesCypher, PARAM192F, PARAMOWF192>(input.clone())
         })
     });
-    c.bench_function("Verify aes 256s", |b| {
+    c.bench_function("Verify aes 256s", |b| {let input = generate_verify_input_aes::<
+        AesCypher,
+        PARAM256S,
+        PARAMOWF256,
+    >();
         b.iter(|| {
-            bench_verify_aes::<AesCypher, PARAM256S, PARAMOWF256>(generate_verify_input_aes::<
-                AesCypher,
-                PARAM256S,
-                PARAMOWF256,
-            >())
+            bench_verify_aes::<AesCypher, PARAM256S, PARAMOWF256>(input.clone())
         })
     });
-    c.bench_function("Verify aes 256f", |b| {
+    c.bench_function("Verify aes 256f", |b| {let input = generate_verify_input_aes::<
+        AesCypher,
+        PARAM256F,
+        PARAMOWF256,
+    >();
         b.iter(|| {
-            bench_verify_aes::<AesCypher, PARAM256F, PARAMOWF256>(generate_verify_input_aes::<
-                AesCypher,
-                PARAM256F,
-                PARAMOWF256,
-            >())
+            bench_verify_aes::<AesCypher, PARAM256F, PARAMOWF256>(input.clone())
         })
     });
-    c.bench_function("Verify em 128s", |b| {
+    c.bench_function("Verify em 128s", |b| {let input = generate_verify_input_em::<
+        EmCypher,
+        PARAM128SEM,
+        PARAMOWF128EM,
+    >();
         b.iter(|| {
-            bench_verify_em::<EmCypher, PARAM128SEM, PARAMOWF128EM>(generate_verify_input_em::<
-                EmCypher,
-                PARAM128SEM,
-                PARAMOWF128EM,
-            >())
+            bench_verify_em::<EmCypher, PARAM128SEM, PARAMOWF128EM>(input.clone())
         })
     });
-    c.bench_function("Verify em 128f", |b| {
+    c.bench_function("Verify em 128f", |b| {let input = generate_verify_input_em::<
+        EmCypher,
+        PARAM128FEM,
+        PARAMOWF128EM,
+    >();
         b.iter(|| {
-            bench_verify_em::<EmCypher, PARAM128FEM, PARAMOWF128EM>(generate_verify_input_em::<
-                EmCypher,
-                PARAM128FEM,
-                PARAMOWF128EM,
-            >())
+            bench_verify_em::<EmCypher, PARAM128FEM, PARAMOWF128EM>(input.clone())
         })
     });
-    c.bench_function("Verify em 192s", |b| {
+    c.bench_function("Verify em 192s", |b| {let input = generate_verify_input_em::<
+        EmCypher,
+        PARAM192SEM,
+        PARAMOWF192EM,
+    >();
         b.iter(|| {
-            bench_verify_em::<EmCypher, PARAM192SEM, PARAMOWF192EM>(generate_verify_input_em::<
-                EmCypher,
-                PARAM192SEM,
-                PARAMOWF192EM,
-            >())
+            bench_verify_em::<EmCypher, PARAM192SEM, PARAMOWF192EM>(input.clone())
         })
     });
-    c.bench_function("Verify em 192f", |b| {
+    c.bench_function("Verify em 192f", |b| {let input = generate_verify_input_em::<
+        EmCypher,
+        PARAM192FEM,
+        PARAMOWF192EM,
+    >();
         b.iter(|| {
-            bench_verify_em::<EmCypher, PARAM192FEM, PARAMOWF192EM>(generate_verify_input_em::<
-                EmCypher,
-                PARAM192FEM,
-                PARAMOWF192EM,
-            >())
+            bench_verify_em::<EmCypher, PARAM192FEM, PARAMOWF192EM>(input.clone())
         })
     });
-    c.bench_function("Verify em 256s", |b| {
+    c.bench_function("Verify em 256s", |b| {let input = generate_verify_input_em::<
+        EmCypher,
+        PARAM256SEM,
+        PARAMOWF256EM,
+    >();
         b.iter(|| {
-            bench_verify_em::<EmCypher, PARAM256SEM, PARAMOWF256EM>(generate_verify_input_em::<
-                EmCypher,
-                PARAM256SEM,
-                PARAMOWF256EM,
-            >())
+            bench_verify_em::<EmCypher, PARAM256SEM, PARAMOWF256EM>(input.clone())
         })
     });
-    c.bench_function("Verify em 256f", |b| {
+    c.bench_function("Verify em 256f", |b| {let input = generate_verify_input_em::<
+        EmCypher,
+        PARAM256FEM,
+        PARAMOWF256EM,
+    >();
         b.iter(|| {
-            bench_verify_em::<EmCypher, PARAM256FEM, PARAMOWF256EM>(generate_verify_input_em::<
-                EmCypher,
-                PARAM256FEM,
-                PARAMOWF256EM,
-            >())
+            bench_verify_em::<EmCypher, PARAM256FEM, PARAMOWF256EM>(input.clone())
         })
     });
 }

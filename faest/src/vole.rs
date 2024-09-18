@@ -43,9 +43,9 @@ where
         for i in 0..n / (1 << (j + 1)) {
             zip((*item).as_mut_slice().iter_mut(), &r[j_offset + 2 * i + 1])
                 .for_each(|(vj, rj)| *vj ^= rj);
-            for k in 0..LH::USIZE {
-                r[j1_offset + i][k] = r[j_offset + 2 * i][k] ^ r[j_offset + 2 * i + 1][k];
-            }
+            r[j1_offset + i] = zip(&r[j_offset + 2 * i], &r[j_offset + 2 * i + 1])
+                .map(|(x, y)| x ^ y)
+                .collect::<GenericArray<u8, LH>>();
         }
     }
 

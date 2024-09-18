@@ -33,6 +33,9 @@ harness = false
 [profile.dev.package."*"]
 opt-level = 3
 
+[profile.bench]
+debug = true
+
 [profile.release]
 # `lto = true` should also work
 lto = 'fat'

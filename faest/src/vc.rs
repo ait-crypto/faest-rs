@@ -384,7 +384,7 @@ mod test {
             } else {
                 let res = reconstruct::<RandomOracleShake256>(
                     &[
-                        &data.cop.clone().into_iter().flatten().collect::<Vec<u8>>()[..],
+                        &data.cop.iter().flatten().copied().collect::<Vec<u8>>()[..],
                         &data.com_j[..],
                     ]
                     .concat(),

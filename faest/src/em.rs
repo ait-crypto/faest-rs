@@ -142,9 +142,9 @@ where
     res
 } */
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
-/// 
+///
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
-/// 
+///
 ///One of the first path to optimize the code could be to do the distinction
 pub fn em_enc_fwd<O>(
     z: &GenericArray<O::Field, O::L>,
@@ -207,9 +207,9 @@ where
 }
 
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
-/// 
+///
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
-/// 
+///
 ///One of the first path to optimize the code could be to do the distinction
 #[allow(clippy::too_many_arguments)]
 pub fn em_enc_bkwd<P, O>(
@@ -313,7 +313,8 @@ where
             true,
             O::Field::default(),
         );
-        let (mut a0, mut a1): Reveal<O> = (GenericArray::default_boxed(), GenericArray::default_boxed());
+        let (mut a0, mut a1): Reveal<O> =
+            (GenericArray::default_boxed(), GenericArray::default_boxed());
         for j in 0..senc {
             a0[j] = v_s_b[j] * vs[j];
             a1[j] = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + O::Field::ONE + a0[j];
@@ -372,8 +373,7 @@ where
         }
     }
     let inside = &O::Field::to_field(&temp_v);
-    let new_v: &GenericArray<_, O::LAMBDAL> =
-        GenericArray::from_slice(inside);
+    let new_v: &GenericArray<_, O::LAMBDAL> = GenericArray::from_slice(inside);
     let x = rijndael_key_schedule(&pk[..lambda / 8], nst, nk, r, 4 * (((r + 1) * nst) / nk));
     let (a0, a1) = em_enc_cstrnts::<P, O>(
         GenericArray::from_slice(&pk[lambda / 8..]),
