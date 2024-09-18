@@ -451,7 +451,7 @@ where
     let (hcom, gq_p) = volereconstruct::<RO<O>, P>(
         chall3,
         &sigma[(lhat * (tau - 1)) + (2 * lambda) + l + 2..sig - (16 + lambda)],
-        &sigma[sig - 16..],
+        &sigma[sig - 16..].try_into().unwrap(),
     );
 
     let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
@@ -599,7 +599,7 @@ pub fn sigma_to_signature<P, O>(
         GenericArray<u8, O::LAMBDABYTES>,
         Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>>,
         GenericArray<u8, P::LAMBDABYTES>,
-        [u8; 16],
+        IV,
     ),
 ) -> GenericArray<u8, P::SIG>
 where

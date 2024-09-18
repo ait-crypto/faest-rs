@@ -85,7 +85,7 @@ where
 pub fn reconstruct<R>(
     pdecom: &[u8],
     b: &[u8],
-    iv: &[u8],
+    iv: &IV,
 ) -> (
     GenericArray<u8, R::PRODLAMBDA2>,
     Vec<GenericArray<u8, R::LAMBDA>>,
@@ -107,7 +107,7 @@ where
         for j in 0..1 << (i - 1) {
             if j != a {
                 let rank = (1 << (i - 1)) - 1 + j;
-                let mut prg = R::PRG::new_prg(&k[rank], iv.try_into().unwrap());
+                let mut prg = R::PRG::new_prg(&k[rank], iv);
                 prg.read(&mut k[rank * 2 + 1]);
                 prg.read( &mut k[rank * 2 + 2]);
             }

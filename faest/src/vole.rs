@@ -161,7 +161,7 @@ where
 pub fn volereconstruct<R, P>(
     chal: &GenericArray<u8, P::LAMBDABYTES>,
     pdecom: &[u8],
-    iv: &[u8],
+    iv: &IV,
 ) -> (
     GenericArray<u8, R::PRODLAMBDA2>,
     GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>,
