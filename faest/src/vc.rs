@@ -93,7 +93,7 @@ pub fn reconstruct<R>(
 where
     R: RandomOracle,
 {
-    let lambda = <R::LAMBDA as Unsigned>::to_usize();
+    let lambda = <R::LAMBDA as Unsigned>::USIZE;
     let mut a = 0;
     let d = b.len();
     let def = GenericArray::default();
@@ -101,15 +101,15 @@ where
     //step 4
     for i in 1..d + 1 {
         let b_d_i = b[d - i] as usize;
-        k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)] =
-            pdecom[(i - 1) * lambda..i * lambda].iter().copied().collect::<GenericArray<u8, _>>();
+        k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)]
+            .copy_from_slice(&pdecom[(i - 1) * lambda..i * lambda]);
         //step 7
         for j in 0..1 << (i - 1) {
             if j != a {
                 let rank = (1 << (i - 1)) - 1 + j;
                 let mut prg = R::PRG::new_prg(&k[rank], iv);
                 prg.read(&mut k[rank * 2 + 1]);
-                prg.read( &mut k[rank * 2 + 2]);
+                prg.read(&mut k[rank * 2 + 2]);
             }
         }
         a = 2 * a + b_d_i;
