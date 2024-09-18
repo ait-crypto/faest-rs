@@ -14,7 +14,8 @@ use generic_array::{
 use crate::{
     fields::{BigGaloisField, Field, GF128, GF192, GF256},
     random_oracles::{
-        RandomOracle, RandomOracleShake128, RandomOracleShake192, RandomOracleShake256,
+        PseudoRandomGenerator, RandomOracle, RandomOracleShake128, RandomOracleShake192,
+        RandomOracleShake256, PRG128, PRG192, PRG256,
     },
     universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
 };
@@ -33,6 +34,8 @@ pub trait BaseParameters {
     >;
     /// Associated random oracle
     type RandomOracle: RandomOracle<LAMBDA = Self::LambdaBytes>;
+    /// Associated PRG
+    type PRG: PseudoRandomGenerator<Lambda = Self::LambdaBytes>;
 
     /// Size of the field [Self::Field] in bits
     type Lambda: ArrayLength;
@@ -49,6 +52,7 @@ impl BaseParameters for BaseParams128 {
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
     type RandomOracle = RandomOracleShake128;
+    type PRG = PRG128;
 
     type Lambda = U128;
     type LambdaBytes = U16;
@@ -64,6 +68,7 @@ impl BaseParameters for BaseParams192 {
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
     type RandomOracle = RandomOracleShake192;
+    type PRG = PRG192;
 
     type Lambda = U192;
     type LambdaBytes = U24;
@@ -79,6 +84,7 @@ impl BaseParameters for BaseParams256 {
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
     type RandomOracle = RandomOracleShake256;
+    type PRG = PRG256;
 
     type Lambda = U256;
     type LambdaBytes = U32;
@@ -94,6 +100,8 @@ pub trait PARAMOWF {
         Field = Self::Field,
         ZKHasher = Self::ZKHasher,
         VoleHasher = Self::VoleHasher,
+        Chall = Self::CHALL,
+        Chall1 = Self::CHALL1,
     >;
 
     /// The field that is of size `2^λ` which is defined as [Self::LAMBDA]
