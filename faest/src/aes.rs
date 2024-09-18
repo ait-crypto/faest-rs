@@ -866,7 +866,7 @@ where
     );
     let mut new_gq: GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = gq.clone();
     for i in 0..t0 {
-        let sdelta = chaldec::<P>(GenericArray::from_slice(chall3), i as u16);
+        let sdelta = chaldec::<P>(GenericArray::from_slice(chall3), i);
         for j in 0..k0 {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate().take(l / 8) {
@@ -876,7 +876,7 @@ where
         }
     }
     for i in 0..t1 {
-        let sdelta = chaldec::<P>(GenericArray::from_slice(chall3), (t0 + i) as u16);
+        let sdelta = chaldec::<P>(GenericArray::from_slice(chall3), t0 + i);
         for j in 0..k1 {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate().take(l / 8) {

@@ -69,13 +69,7 @@ where
     //step 4
 
     for i in 0..d {
-        cop.push(
-            decom.0[(1 << (i + 1))
-                + 2 * a
-                + (1 - b[std::convert::TryInto::<usize>::try_into(d).unwrap() - i - 1] as usize)
-                - 1]
-            .clone(),
-        );
+        cop.push(decom.0[(1 << (i + 1)) + 2 * a + (1 - b[d - i - 1] as usize) - 1].clone());
         a = 2 * a + b[d - i - 1] as usize;
     }
     (cop, decom.1[a].to_vec())
@@ -132,8 +126,7 @@ where
         }
     }
     let mut h = GenericArray::default();
-    let mut reader = h1_hasher.finish();
-    reader.read(&mut h);
+    h1_hasher.finish().read(&mut h);
     (h, sd)
 }
 

@@ -402,12 +402,11 @@ where
 
     let mut pdecom = GenericArray::default_boxed();
     for i in 0..tau {
+        let s = chaldec::<P>(&chall3, i);
         if i < t0 {
-            let s = chaldec::<P>(&chall3, i as u16);
             pdecom[i] =
                 open::<RO<O>, P::POWK0, P::K0, P::N0>(&decom[i], GenericArray::from_slice(&s));
         } else {
-            let s = chaldec::<P>(&chall3, i as u16);
             pdecom[i] =
                 open::<RO<O>, P::POWK1, P::K1, P::N1>(&decom[i], GenericArray::from_slice(&s));
         }
@@ -492,7 +491,7 @@ where
     let mut dtemp = vec![def4];
     for i in 1..tau {
         /* ok */
-        let delta = chaldec::<P>(chall3, i as u16);
+        let delta = chaldec::<P>(chall3, i);
         gd_t[i] = delta
             .iter()
             .map(|d| {

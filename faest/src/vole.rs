@@ -53,30 +53,29 @@ where
 
 //constant time checking the value of i : if i is not correct, then the output will be an empty vec
 //K = k0 if i < tau0 else k1
-pub fn chaldec<P>(chal: &GenericArray<u8, P::LAMBDABYTES>, i: u16) -> Vec<u8>
+pub fn chaldec<P>(chal: &GenericArray<u8, P::LAMBDABYTES>, i: usize) -> Vec<u8>
 where
     P: PARAM,
 {
-    let mut lo = 1_u16;
-    let mut hi = 0_u16;
-    let t0 = <P::TAU0 as Unsigned>::to_u16();
-    let t1 = <P::TAU1 as Unsigned>::to_u16();
-    let k0 = <P::K0 as Unsigned>::to_u16();
-    let k1 = <P::K1 as Unsigned>::to_u16();
-    if i < t0 {
-        lo = i * k0;
-        hi = (i + 1) * k0 - 1;
-    } else if i < t0 + t1 {
+    let t0 = P::TAU0::USIZE;
+    let t1 = P::TAU1::USIZE;
+    let k0 = P::K0::USIZE;
+    let k1 = P::K1::USIZE;
+    let (lo, hi) = if i < t0 {
+        let lo = i * k0;
+        let hi = (i + 1) * k0 - 1;
+        (lo, hi)
+    } else {
+        debug_assert!(i < t0 + t1);
         let t = i - t0;
-        lo = t0 * k0 + t * k1;
-        hi = t0 * k0 + (t + 1) * k1 - 1;
-    }
-    let mut res: Vec<u8> = vec![0u8; if i < t0 { k0.into() } else { k1.into() }];
-    res[0] = (chal[(lo / 8) as usize] >> (lo % 8)) & 1;
-    for j in 1..=(hi - lo) {
-        res[j as usize] = (chal[((lo + j) / 8) as usize] >> ((lo + j) % 8)) & 1;
-    }
-    res
+        let lo = t0 * k0 + t * k1;
+        let hi = t0 * k0 + (t + 1) * k1 - 1;
+        (lo, hi)
+    };
+
+    (0..=(hi - lo))
+        .map(|j| (chal[((lo + j) / 8) as usize] >> ((lo + j) % 8)) & 1)
+        .collect()
 }
 
 #[allow(clippy::type_complexity, clippy::many_single_char_names)]

@@ -1,4 +1,3 @@
-
 use std::fs::File;
 
 use generic_array::GenericArray;
@@ -94,8 +93,8 @@ fn convert_to_vole_test() {
 #[serde(rename_all = "camelCase")]
 struct DataChalDec {
     chal: Vec<u8>,
-    i: [u16; 1],
-    k0: [u16; 1],
+    i: [usize; 1],
+    k0: [usize; 1],
     res: Vec<u8>,
 }
 
