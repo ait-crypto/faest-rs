@@ -331,9 +331,7 @@ where
     let mut h1_hasher = RO::<O>::h1_init();
     h1_hasher.update(pk);
     h1_hasher.update(msg);
-    // why is this Boxed?
-    let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
-        GenericArray::default_boxed();
+    let mut mu: GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2> = GenericArray::default();
     h1_hasher.finish().read(&mut mu);
 
     let mut h3_hasher = RO::<O>::h3_init();
@@ -348,14 +346,13 @@ where
     h3_reader.read(&mut iv);
 
     let (hcom, decom, c, u, gv) = volecommit::<P, RO<O>>(&r, &iv);
-    let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
     c.iter().for_each(|buf| h2_hasher.update(buf));
     h2_hasher.update(&iv);
-    let mut reader = h2_hasher.finish();
-    reader.read(&mut chall1);
+    let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
+    h2_hasher.finish().read(&mut chall1);
 
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let u_t = vole_hasher.process(&u);
