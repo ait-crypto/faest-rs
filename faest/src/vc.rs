@@ -26,7 +26,7 @@ where
 {
     let mut k = vec![GenericArray::default(); 2 * n - 1];
     //step 2..3
-    k[0] = r.iter().copied().collect();
+    k[0] = r.clone();
 
     for i in 0..n - 1 {
         let mut prg = R::PRG::new_prg(&k[i], iv);
