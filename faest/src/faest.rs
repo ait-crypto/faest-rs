@@ -368,14 +368,7 @@ where
     h1_hasher.finish().read(&mut hv);
 
     let w = C::witness::<P, O>(sk, pk);
-    let d = GenericArray::from_iter(
-        zip(
-            // FIXME: remove collect
-            w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
-            &u[..l],
-        )
-        .map(|(w, u)| w ^ *u),
-    );
+    let d = GenericArray::from_iter(zip(w.iter(), &u[..l]).map(|(w, u)| w ^ *u));
 
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall1);
@@ -391,30 +384,22 @@ where
         gv.iter()
             .flat_map(|x| {
                 x.iter()
-                    .map(|y| y[..l+lambda].iter().copied().collect())
+                    .map(|y| y[..l + lambda].iter().copied().collect())
                     .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
             })
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
     );
 
-    let (a_t, b_t) = C::prove::<P, O>(
-        GenericArray::from_slice(&w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>()),
-        new_u,
-        new_gv,
-        pk,
-        &chall2,
-    );
+    let (a_t, b_t) = C::prove::<P, O>(&w, new_u, new_gv, pk, &chall2);
 
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall2);
     h2_hasher.update(&a_t);
     h2_hasher.update(&b_t);
-    // why is this boxed?
-    let mut chall3: Box<GenericArray<u8, P::LAMBDABYTES>> = GenericArray::default_boxed();
+    let mut chall3 = GenericArray::default();
     h2_hasher.finish().read(&mut chall3);
 
-    let mut pdecom: Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>> =
-        GenericArray::default_boxed();
+    let mut pdecom = GenericArray::default_boxed();
     for i in 0..tau {
         if i < t0 {
             let s = chaldec::<P>(&chall3, i as u16);
@@ -436,7 +421,7 @@ where
         d,
         *a_t,
         pdecom,
-        chall3.iter().copied().collect(),
+        chall3,
         iv,
     )
 }
