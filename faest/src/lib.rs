@@ -4,10 +4,7 @@ mod universal_hashing;
 
 pub mod random_oracles;
 pub mod vc;
-
 pub mod vole;
-#[cfg(test)]
-mod vole_test;
 
 pub mod aes;
 #[cfg(test)]
