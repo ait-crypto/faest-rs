@@ -2,12 +2,11 @@ use std::iter::zip;
 
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
-use crate::parameter::PARAM;
-use crate::random_oracles::{Hasher, Reader, IV};
-use crate::vc;
 use crate::{
+    parameter::{TauParameters, PARAM},
+    random_oracles::{Hasher, Reader, IV},
     random_oracles::{PseudoRandomGenerator, RandomOracle},
-    vc::commit,
+    vc::{commit, reconstruct},
 };
 
 #[allow(clippy::type_complexity)]
@@ -49,33 +48,6 @@ where
         }
     }
     (r[(d % 2) * n].clone(), v)
-}
-
-//constant time checking the value of i : if i is not correct, then the output will be an empty vec
-//K = k0 if i < tau0 else k1
-pub fn chaldec<P>(chal: &GenericArray<u8, P::LAMBDABYTES>, i: usize) -> Vec<u8>
-where
-    P: PARAM,
-{
-    let t0 = P::TAU0::USIZE;
-    let t1 = P::TAU1::USIZE;
-    let k0 = P::K0::USIZE;
-    let k1 = P::K1::USIZE;
-    let (lo, hi) = if i < t0 {
-        let lo = i * k0;
-        let hi = (i + 1) * k0 - 1;
-        (lo, hi)
-    } else {
-        debug_assert!(i < t0 + t1);
-        let t = i - t0;
-        let lo = t0 * k0 + t * k1;
-        let hi = t0 * k0 + (t + 1) * k1 - 1;
-        (lo, hi)
-    };
-
-    (0..=(hi - lo))
-        .map(|j| (chal[((lo + j) / 8) as usize] >> ((lo + j) % 8)) & 1)
-        .collect()
 }
 
 #[allow(clippy::type_complexity, clippy::many_single_char_names)]
@@ -184,12 +156,12 @@ where
         let b: usize = (i < t0).into();
         let k = b * k0 + (1 - b) * k1;
         let pad = b * (k0 * i) + (1 - b) * (k0 * t0 + (i - t0 * (1 - b)) * k1);
-        let delta_p: Vec<u8> = chaldec::<P>(chal, i.try_into().unwrap());
+        let delta_p: Vec<u8> = P::Tau::decode_challenge(chal, i);
         #[allow(clippy::needless_range_loop)]
         for j in 0..delta_p.len() {
             delta[i] += u32::from(delta_p[j]) << j;
         }
-        (com[i], s[i]) = vc::reconstruct::<R>(
+        (com[i], s[i]) = reconstruct::<R>(
             &pdecom[pad * lambda + i * 2 * lambda
                 ..(b * (k0 * (i + 1)) + (1 - b) * (k0 * t0 + ((i + 1) - t0 * (1 - b)) * k1))
                     * lambda
@@ -216,9 +188,11 @@ mod test {
 
     use std::fs::File;
 
-    use generic_array::GenericArray;
+    use generic_array::{
+        typenum::{U16, U234, U24, U32, U458, U566},
+        GenericArray,
+    };
     use serde::Deserialize;
-    use typenum::{U16, U234, U24, U32, U458, U566};
 
     use crate::{
         parameter::{

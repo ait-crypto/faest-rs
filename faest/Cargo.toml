@@ -9,14 +9,14 @@ aes = "0.8.4"
 cipher = "=0.5.0-pre.4"
 ctr = "0.9.2"
 hex = "0.4.3"
+# TODO: move to dev-dependencies
 nist-pqc-seeded-rng = "0.2"
 sha3 = "0.10.8"
 signature = "2.2.0"
 subtle = { version = "2.6", features = ["const-generics"] }
-typenum = "1.17.0"
 generic-array = { version = "1", features = ["alloc"] }
 generic_array_0_14 = { version = "0.14", package = "generic-array" }
-stacker = "0.1.17"
+rand_core = { version = "0.6", default-features = false }
 
 [dev-dependencies]
 num-bigint = "0.4.4"

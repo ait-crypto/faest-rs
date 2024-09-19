@@ -1,17 +1,18 @@
-use generic_array::GenericArray;
-
 use std::iter::zip;
-use typenum::{Unsigned, U8};
+
+use generic_array::{
+    typenum::{Unsigned, U8},
+    GenericArray,
+};
 
 use crate::{
     fields::{BigGaloisField, ByteCombine, Field, SumPoly},
-    parameter::{self, PARAM, PARAMOWF},
+    parameter::{TauParameters, PARAM, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     },
     universal_hashing::{ZKHasherInit, ZKHasherProcess},
-    vole::chaldec,
 };
 
 type IO<'a, O> = (
@@ -71,7 +72,7 @@ pub fn aes_extendedwitness<P, O>(
 where
     P: PARAM,
     O: PARAMOWF,
-    <O as parameter::PARAMOWF>::KBLENGTH: generic_array::ArrayLength,
+    <O as PARAMOWF>::KBLENGTH: generic_array::ArrayLength,
 {
     let beta = <P::BETA as Unsigned>::to_usize();
     let kblen = <O::KBLENGTH as Unsigned>::to_usize();
@@ -865,7 +866,7 @@ where
     );
     let mut new_gq: GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = gq.clone();
     for i in 0..t0 {
-        let sdelta = chaldec::<P>(GenericArray::from_slice(chall3), i);
+        let sdelta = P::Tau::decode_challenge(chall3, i);
         for j in 0..k0 {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate().take(l / 8) {
@@ -875,7 +876,7 @@ where
         }
     }
     for i in 0..t1 {
-        let sdelta = chaldec::<P>(GenericArray::from_slice(chall3), t0 + i);
+        let sdelta = P::Tau::decode_challenge(chall3, t0 + i);
         for j in 0..k1 {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate().take(l / 8) {

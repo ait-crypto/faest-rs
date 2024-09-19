@@ -1,18 +1,16 @@
 use std::iter::zip;
 
-use cipher::Unsigned;
-use generic_array::GenericArray;
+use generic_array::{typenum::Unsigned, GenericArray};
 
 use crate::{
     aes::convert_to_bit,
     fields::{BigGaloisField, ByteCombine, Field, SumPoly},
-    parameter::{BaseParameters, PARAM, PARAMOWF},
+    parameter::{BaseParameters, TauParameters, PARAM, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     },
     universal_hashing::{ZKHasherInit, ZKHasherProcess},
-    vole::chaldec,
 };
 
 type Reveal<O> = (
@@ -437,7 +435,7 @@ where
 
     let mut new_gq: GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = gq.clone();
     for i in 0..t0 {
-        let sdelta = chaldec::<P>(chall3, i);
+        let sdelta = P::Tau::decode_challenge(chall3, i);
         for j in 0..k0 {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate() {
@@ -447,7 +445,7 @@ where
         }
     }
     for i in 0..t1 {
-        let sdelta = chaldec::<P>(chall3, t0 + i);
+        let sdelta = P::Tau::decode_challenge(chall3, t0 + i);
         for j in 0..k1 {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate().take(l / 8) {

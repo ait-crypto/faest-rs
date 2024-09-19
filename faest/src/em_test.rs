@@ -1,8 +1,10 @@
 use std::fs::File;
 
-use generic_array::GenericArray;
+use generic_array::{
+    typenum::{U1, U8},
+    GenericArray,
+};
 use serde::Deserialize;
-use typenum::{U1, U8};
 
 use crate::{
     aes::convert_to_bit,

@@ -3,13 +3,16 @@ use std::iter::zip;
 use crate::{
     aes::{aes_extendedwitness, aes_prove, aes_verify},
     em::{em_extendedwitness, em_prove, em_verify},
-    parameter::{BaseParameters, PARAM, PARAMOWF},
+    parameter::{BaseParameters, TauParameters, PARAM, PARAMOWF},
     random_oracles::{Hasher, RandomOracle, Reader, IV},
     rijndael_32::{rijndael_encrypt, rijndael_key_schedule},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
     vc::open,
-    vole::{chaldec, volecommit, volereconstruct},
+    vole::{volecommit, volereconstruct},
 };
+
+use generic_array::{typenum::Unsigned, GenericArray};
+use rand_core::RngCore;
 
 type QSProof<O> = (
     Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
@@ -20,9 +23,6 @@ type Key<O> = (
     Box<GenericArray<u8, <O as PARAMOWF>::PK>>,
     Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
 );
-
-use generic_array::{typenum::Unsigned, GenericArray};
-use nist_pqc_seeded_rng::RngCore;
 
 pub trait Variant {
     ///input : key (len lambda, snd part of sk); public key
@@ -402,7 +402,7 @@ where
 
     let mut pdecom = GenericArray::default_boxed();
     for i in 0..tau {
-        let s = chaldec::<P>(&chall3, i);
+        let s = P::Tau::decode_challenge(&chall3, i);
         if i < t0 {
             pdecom[i] =
                 open::<RO<O>, P::POWK0, P::K0, P::N0>(&decom[i], GenericArray::from_slice(&s));
@@ -475,7 +475,7 @@ where
     let mut gd_t: Box<GenericArray<Vec<&GenericArray<u8, O::LAMBDAPLUS2>>, O::LAMBDALBYTES>> =
         GenericArray::default_boxed();
     gq[0] = gq_p[0].clone();
-    let delta0 = chaldec::<P>(chall3, 0);
+    let delta0 = P::Tau::decode_challenge(chall3, 0);
     let u_t = &sigma[lhat * (tau - 1)..lhat * (tau - 1) + lambda + 2];
     gd_t[0] = delta0
         .iter()
@@ -491,7 +491,7 @@ where
     let mut dtemp = vec![def4];
     for i in 1..tau {
         /* ok */
-        let delta = chaldec::<P>(chall3, i);
+        let delta = P::Tau::decode_challenge(chall3, i);
         gd_t[i] = delta
             .iter()
             .map(|d| {

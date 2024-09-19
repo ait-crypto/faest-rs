@@ -8,13 +8,15 @@ use crate::fields::{BigGaloisField, GF128, GF192, GF256};
 use crate::parameter::{
     self, PARAM128S, PARAM192S, PARAM256S, PARAMOWF128, PARAMOWF192, PARAMOWF256,
 };
-use generic_array::GenericArray;
+use generic_array::{
+    typenum::{U176, U208, U240, U8},
+    GenericArray,
+};
 #[cfg(test)]
 use serde::Deserialize;
 #[allow(unused_imports)]
 use std::convert;
 use std::fs::File;
-use typenum::{U176, U208, U240, U8};
 
 type ZkHash256 =
     Box<GenericArray<u8, <parameter::PARAMOWF256 as parameter::PARAMOWF>::LAMBDABYTES>>;
