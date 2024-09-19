@@ -1,24 +1,16 @@
-pub mod fields;
-
+mod fields;
+mod random_oracles;
 mod universal_hashing;
+mod vc;
+mod vole;
 
-pub mod random_oracles;
-pub mod vc;
-pub mod vole;
-
-pub mod aes;
-#[cfg(test)]
-mod aes_test;
-
-pub mod rijndael_32;
+mod aes;
+mod em;
+mod rijndael_32;
 
 pub mod faest;
 #[cfg(test)]
 mod faest_test;
-
-pub mod em;
-#[cfg(test)]
-mod em_test;
 
 pub mod parameter;
 
