@@ -389,7 +389,6 @@ where
         gv.iter()
             .flat_map(|x| {
                 x.iter()
-<<<<<<< HEAD
                     .map(|y| {
                         y.clone()
                             .into_iter()
@@ -397,9 +396,6 @@ where
                             .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
                     }
 )
-=======
-                    .map(|y| y[..l + lambda].iter().copied().collect())
->>>>>>> 34acba12cb08d1f5cef40c1554a3c06cbb3301d8
                     .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
             })
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
@@ -436,11 +432,7 @@ where
         d,
         *a_t,
         pdecom,
-<<<<<<< HEAD
-        *chall3,
-=======
         chall3,
->>>>>>> 34acba12cb08d1f5cef40c1554a3c06cbb3301d8
         iv,
     )
 }
@@ -587,8 +579,7 @@ where
                             .into_iter()
                             .take(l + lambda)
                             .collect::<GenericArray<u8, _>>()
-                    }
-)
+                    })
                     .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
             })
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),

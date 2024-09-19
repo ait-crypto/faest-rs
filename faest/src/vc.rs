@@ -26,7 +26,7 @@ where
 {
     let mut k = vec![GenericArray::default(); 2 * n - 1];
     //step 2..3
-    k[0].copy_from_slice(&r);
+    k[0] = r.iter().copied().collect();
 
     for i in 0..n - 1 {
         let mut prg = R::PRG::new_prg(&k[i], iv);
@@ -101,12 +101,8 @@ where
     //step 4
     for i in 1..d + 1 {
         let b_d_i = b[d - i] as usize;
-<<<<<<< HEAD
-        k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)].copy_from_slice(&pdecom[(i - 1) * lambda..i * lambda]);
-=======
         k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)]
             .copy_from_slice(&pdecom[(i - 1) * lambda..i * lambda]);
->>>>>>> 34acba12cb08d1f5cef40c1554a3c06cbb3301d8
         //step 7
         for j in 0..1 << (i - 1) {
             if j != a {
@@ -372,7 +368,6 @@ mod test {
                     .concat(),
                     &data.b,
                     &data.iv,
-
                 );
                 compare_expected_with_reconstruct_result(&data, res);
             } else if lambdabyte == 48 {
