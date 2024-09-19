@@ -15,7 +15,6 @@ sha3 = "0.10.8"
 signature = "2.2.0"
 subtle = { version = "2.6", features = ["const-generics"] }
 generic-array = { version = "1", features = ["alloc"] }
-generic_array_0_14 = { version = "0.14", package = "generic-array" }
 rand_core = { version = "0.6", default-features = false }
 
 [dev-dependencies]

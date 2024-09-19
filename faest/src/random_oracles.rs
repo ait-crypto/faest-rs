@@ -1,9 +1,8 @@
-use aes::cipher::{KeyIvInit, StreamCipher};
+use aes::cipher::{generic_array::GenericArray as GenericArray_0_14, KeyIvInit, StreamCipher};
 use generic_array::{
-    typenum::{U16, U24, U32, U40, U48, U64, U72, U96},
+    typenum::{U16, U24, U32, U48, U64},
     ArrayLength, GenericArray,
 };
-use generic_array_0_14::GenericArray as GenericArray_0_14;
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128, Shake128Reader, Shake256, Shake256Reader,
