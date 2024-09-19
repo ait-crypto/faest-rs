@@ -1,5 +1,4 @@
-use generic_array::{ArrayLength, GenericArray};
-use typenum::Unsigned;
+use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
 use crate::random_oracles::{Hasher, PseudoRandomGenerator, RandomOracle, Reader, IV};
 
