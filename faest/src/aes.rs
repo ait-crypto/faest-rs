@@ -802,7 +802,7 @@ where
         );
     }
     let a0_array: GenericArray<O::Field, O::C> = if lambda == 128 {
-        (GenericArray::from_slice(&[&a0[..], &a_01[..senc]].concat())).clone() 
+        (GenericArray::from_slice(&[&a0[..], &a_01[..senc]].concat())).clone()
     } else {
         (GenericArray::from_slice(&[&a0[..], &a_01[..senc], &a_01_bis[..senc]].concat())).clone()
     };
@@ -830,7 +830,6 @@ where
     (
         Box::new(GenericArray::from_slice(&(a_t.finalize(&u_s).to_bytes())[..]).clone()),
         Box::new(GenericArray::from_slice(&(b_t.finalize(&v_s).to_bytes())[..]).clone()),
-
     )
 }
 
