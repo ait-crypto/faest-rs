@@ -1343,3 +1343,51 @@ impl PARAM for PARAM256FEM {
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use serde::Deserialize;
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct DataChalDec {
+        chal: Vec<u8>,
+        i: [usize; 1],
+        k0: [usize; 1],
+        res: Vec<u8>,
+    }
+
+    #[test]
+    fn chaldec_test() {
+        let database: Vec<DataChalDec> =
+            serde_json::from_str(include_str!("../tests/data/decode_challenge.json"))
+                .expect("error while reading or parsing");
+        for data in database {
+            if data.chal.len() == 16 {
+                if data.k0[0] == 12 {
+                    let res = Tau128Small::decode_challenge(&data.chal, data.i[0]);
+                    assert_eq!(res, data.res);
+                } else {
+                    let res = Tau128Fast::decode_challenge(&data.chal, data.i[0]);
+                    assert_eq!(res, data.res);
+                }
+            } else if data.chal.len() == 24 {
+                if data.k0[0] == 12 {
+                    let res = Tau192Small::decode_challenge(&data.chal, data.i[0]);
+                    assert_eq!(res, data.res);
+                } else {
+                    let res = Tau192Fast::decode_challenge(&data.chal, data.i[0]);
+                    assert_eq!(res, data.res);
+                }
+            } else if data.k0[0] == 12 {
+                let res = Tau256Small::decode_challenge(&data.chal, data.i[0]);
+                assert_eq!(res, data.res);
+            } else {
+                let res = Tau256Fast::decode_challenge(&data.chal, data.i[0]);
+                assert_eq!(res, data.res);
+            }
+        }
+    }
+}

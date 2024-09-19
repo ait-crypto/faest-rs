@@ -301,61 +301,6 @@ mod test {
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
-    struct DataChalDec {
-        chal: Vec<u8>,
-        i: [usize; 1],
-        k0: [usize; 1],
-        res: Vec<u8>,
-    }
-
-    #[test]
-    fn chaldec_test() {
-        let file = File::open("DataChalDec.json").unwrap();
-        let database: Vec<DataChalDec> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
-        for data in database {
-            if data.chal.len() == 16 {
-                if data.k0[0] == 12 {
-                    let res = chaldec::<PARAM128S>(
-                        GenericArray::<u8, _>::from_slice(&data.chal),
-                        data.i[0],
-                    );
-                    assert_eq!(res, data.res);
-                } else {
-                    let res = chaldec::<PARAM128F>(
-                        GenericArray::<u8, _>::from_slice(&data.chal),
-                        data.i[0],
-                    );
-                    assert_eq!(res, data.res);
-                }
-            } else if data.chal.len() == 24 {
-                if data.k0[0] == 12 {
-                    let res = chaldec::<PARAM192S>(
-                        GenericArray::<u8, _>::from_slice(&data.chal),
-                        data.i[0],
-                    );
-                    assert_eq!(res, data.res);
-                } else {
-                    let res = chaldec::<PARAM192F>(
-                        GenericArray::<u8, _>::from_slice(&data.chal),
-                        data.i[0],
-                    );
-                    assert_eq!(res, data.res);
-                }
-            } else if data.k0[0] == 12 {
-                let res =
-                    chaldec::<PARAM256S>(GenericArray::<u8, _>::from_slice(&data.chal), data.i[0]);
-                assert_eq!(res, data.res);
-            } else {
-                let res =
-                    chaldec::<PARAM256F>(GenericArray::<u8, _>::from_slice(&data.chal), data.i[0]);
-                assert_eq!(res, data.res);
-            }
-        }
-    }
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     struct DataVoleCommit {
         r: Vec<u8>,
 
