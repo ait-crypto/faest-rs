@@ -312,7 +312,8 @@ where
     let mut h1_hasher = RO::<O>::h1_init();
     h1_hasher.update(pk);
     h1_hasher.update(msg);
-    let mut mu: GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2> = GenericArray::default();
+    let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
+        GenericArray::default();
     h1_hasher.finish().read(&mut mu);
 
     let mut h3_hasher = RO::<O>::h3_init();
@@ -343,9 +344,8 @@ where
         v.iter()
             .for_each(|v| h1_hasher.update(&vole_hasher.process(v)));
     }
-    // why is this boxed?
-    let mut hv: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
-        GenericArray::default_boxed();
+    let mut hv: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
+        GenericArray::default();
     h1_hasher.finish().read(&mut hv);
 
     let w = C::witness::<P, O>(sk, pk);
@@ -429,9 +429,8 @@ where
     let mut h1_hasher = RO::<O>::h1_init();
     h1_hasher.update(&pk);
     h1_hasher.update(msg);
-    // why is this boxed?
-    let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
-        GenericArray::default_boxed();
+    let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
+        GenericArray::default();
     h1_hasher.finish().read(&mut mu);
     let (hcom, gq_p) = volereconstruct::<RO<O>, P>(
         chall3,
@@ -516,9 +515,8 @@ where
     zip(gq_t, gd_t.into_iter().flatten())
         .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d))
         .for_each(|v| h1_hasher.update(&[v]));
-    // why is this a box?
-    let mut hv: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
-        GenericArray::default_boxed();
+    let mut hv: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
+        GenericArray::default();
     h1_hasher.finish().read(&mut hv);
 
     let d = &sigma[lhat * (tau - 1) + lambda + 2..lhat * (tau - 1) + lambda + 2 + l];
@@ -593,10 +591,10 @@ where
     );
     signature.append(&mut (*sigma.5).to_vec());
     signature.append(&mut (sigma.6).to_vec());
+
     let mut res = GenericArray::default();
     res.copy_from_slice(&signature);
-
-    return res;
+    res
 }
 
 #[allow(clippy::type_complexity)]
