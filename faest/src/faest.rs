@@ -336,9 +336,7 @@ where
     let mut h1_hasher = RO::<O>::h1_init();
     h1_hasher.update(pk);
     h1_hasher.update(msg);
-    // why is this Boxed?
-    let mut mu: Box<GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2>> =
-        GenericArray::default_boxed();
+    let mut mu: GenericArray<u8, <RO<O> as RandomOracle>::PRODLAMBDA2> = GenericArray::default();
     h1_hasher.finish().read(&mut mu);
 
     let mut h3_hasher = RO::<O>::h3_init();
@@ -353,14 +351,13 @@ where
     h3_reader.read(&mut iv);
 
     let (hcom, decom, c, u, gv) = volecommit::<P, RO<O>>(&r, &iv);
-    let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
     c.iter().for_each(|buf| h2_hasher.update(buf));
     h2_hasher.update(&iv);
-    let mut reader = h2_hasher.finish();
-    reader.read(&mut chall1);
+    let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
+    h2_hasher.finish().read(&mut chall1);
 
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let u_t = vole_hasher.process(&u);
@@ -376,14 +373,7 @@ where
     h1_hasher.finish().read(&mut hv);
 
     let w = C::witness::<P, O>(sk, pk);
-    let d = GenericArray::from_iter(
-        zip(
-            // FIXME: remove collect
-            w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>(),
-            &u[..l],
-        )
-        .map(|(w, u)| w ^ *u),
-    );
+    let d = GenericArray::from_iter(zip(w.iter(), &u[..l]).map(|(w, u)| w ^ *u));
 
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall1);
@@ -399,6 +389,7 @@ where
         gv.iter()
             .flat_map(|x| {
                 x.iter()
+<<<<<<< HEAD
                     .map(|y| {
                         y.clone()
                             .into_iter()
@@ -406,29 +397,24 @@ where
                             .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
                     }
 )
+=======
+                    .map(|y| y[..l + lambda].iter().copied().collect())
+>>>>>>> 34acba12cb08d1f5cef40c1554a3c06cbb3301d8
                     .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
             })
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
     );
 
-    let (a_t, b_t) = C::prove::<P, O>(
-        GenericArray::from_slice(&w.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>()),
-        new_u,
-        new_gv,
-        pk,
-        &chall2,
-    );
+    let (a_t, b_t) = C::prove::<P, O>(&w, new_u, new_gv, pk, &chall2);
 
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall2);
     h2_hasher.update(&a_t);
     h2_hasher.update(&b_t);
-    // why is this boxed?
-    let mut chall3: Box<GenericArray<u8, P::LAMBDABYTES>> = GenericArray::default_boxed();
+    let mut chall3 = GenericArray::default();
     h2_hasher.finish().read(&mut chall3);
 
-    let mut pdecom: Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>> =
-        GenericArray::default_boxed();
+    let mut pdecom = GenericArray::default_boxed();
     for i in 0..tau {
         if i < t0 {
             let s = chaldec::<P>(&chall3, i as u16);
@@ -450,7 +436,11 @@ where
         d,
         *a_t,
         pdecom,
+<<<<<<< HEAD
         *chall3,
+=======
+        chall3,
+>>>>>>> 34acba12cb08d1f5cef40c1554a3c06cbb3301d8
         iv,
     )
 }
@@ -480,7 +470,7 @@ where
     let (hcom, gq_p) = volereconstruct::<RO<O>, P>(
         chall3,
         &sigma[(lhat * (tau - 1)) + (2 * lambda) + l + 2..sig - (16 + lambda)],
-        &sigma[sig - 16..],
+        &sigma[sig - 16..].try_into().unwrap(),
     );
 
     let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
@@ -626,7 +616,7 @@ pub fn sigma_to_signature<P, O>(
         GenericArray<u8, O::LAMBDABYTES>,
         Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>>,
         GenericArray<u8, P::LAMBDABYTES>,
-        [u8; 16],
+        IV,
     ),
 ) -> GenericArray<u8, P::SIG>
 where

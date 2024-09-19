@@ -85,7 +85,7 @@ where
 pub fn reconstruct<R>(
     pdecom: &[u8],
     b: &[u8],
-    iv: &[u8],
+    iv: &IV,
 ) -> (
     GenericArray<u8, R::PRODLAMBDA2>,
     Vec<GenericArray<u8, R::LAMBDA>>,
@@ -93,7 +93,7 @@ pub fn reconstruct<R>(
 where
     R: RandomOracle,
 {
-    let lambda = <R::LAMBDA as Unsigned>::to_usize();
+    let lambda = <R::LAMBDA as Unsigned>::USIZE;
     let mut a = 0;
     let d = b.len();
     let def = GenericArray::default();
@@ -101,12 +101,17 @@ where
     //step 4
     for i in 1..d + 1 {
         let b_d_i = b[d - i] as usize;
+<<<<<<< HEAD
         k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)].copy_from_slice(&pdecom[(i - 1) * lambda..i * lambda]);
+=======
+        k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)]
+            .copy_from_slice(&pdecom[(i - 1) * lambda..i * lambda]);
+>>>>>>> 34acba12cb08d1f5cef40c1554a3c06cbb3301d8
         //step 7
         for j in 0..1 << (i - 1) {
             if j != a {
                 let rank = (1 << (i - 1)) - 1 + j;
-                let mut prg = R::PRG::new_prg(&k[rank], iv.try_into().unwrap());
+                let mut prg = R::PRG::new_prg(&k[rank], iv);
                 prg.read(&mut k[rank * 2 + 1]);
                 prg.read(&mut k[rank * 2 + 2]);
             }
