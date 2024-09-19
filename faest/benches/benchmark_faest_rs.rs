@@ -19,7 +19,6 @@ type KeyInput<O> = (
     Vec<u8>,
     GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>,
     GenericArray<u8, <O as PARAMOWF>::PK>,
-    GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>,
 );
 
 fn generate_rng() -> NistPqcAes256CtrRng {
@@ -36,7 +35,7 @@ where
     C: Variant,
 {
     let rng = generate_rng();
-    let (sk, pk, rho) = C::keygen_with_rng::<P, O>(rng);
+    let (sk, pk) = C::keygen_with_rng::<P, O>(rng);
     let length: u8 = random();
     let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
     (
@@ -47,7 +46,6 @@ where
         ))
         .clone(),
         (*GenericArray::from_slice(&pk[..<O::PK as Unsigned>::to_usize()])).clone(),
-        (*GenericArray::from_slice(&rho[..<O::LAMBDABYTES as Unsigned>::to_usize()])).clone(),
     )
 }
 
@@ -58,14 +56,13 @@ where
     C: Variant,
 {
     let rng = generate_rng();
-    let (sk, pk, rho) = C::keygen_with_rng::<P, O>(rng);
+    let (sk, pk) = C::keygen_with_rng::<P, O>(rng);
     let length: u8 = random();
     let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
     (
         msg.to_vec(),
         (*GenericArray::from_slice(&sk[<P::LAMBDA as Unsigned>::to_usize() / 8..])).clone(),
         (*GenericArray::from_slice(&pk)).clone(),
-        (*GenericArray::from_slice(&rho[..<P::LAMBDA as Unsigned>::to_usize() / 8])).clone(),
     )
 }
 
@@ -75,9 +72,7 @@ where
     P: PARAM,
     O: PARAMOWF,
 {
-    sigma_to_signature::<P, O>(faest_sign::<C, P, O>(
-        &input.0, &input.1, &input.2, &input.3,
-    ))
+    sigma_to_signature::<P, O>(faest_sign::<C, P, O>(&input.0, &input.1, &input.2, &[]))
 }
 
 fn generate_verify_input_aes<C, P, O>() -> (Vec<u8>, GenericArray<u8, O::PK>, Signature<P>)
@@ -87,7 +82,7 @@ where
     O: PARAMOWF,
 {
     let rng = generate_rng();
-    let (sk, pk, rho) = C::keygen_with_rng::<P, O>(rng);
+    let (sk, pk) = C::keygen_with_rng::<P, O>(rng);
     let length: u8 = random();
     let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
     let sign = faest_sign::<C, P, O>(
@@ -96,7 +91,7 @@ where
             &sk[<O::PK as Unsigned>::to_usize() - <O::LAMBDABYTES as Unsigned>::to_usize()..],
         ),
         GenericArray::from_slice(&pk),
-        GenericArray::from_slice(&rho[..<O::LAMBDABYTES as Unsigned>::to_usize()]),
+        &[],
     );
     (msg.to_vec(), *pk, sigma_to_signature::<P, O>(sign))
 }
@@ -108,14 +103,14 @@ where
     O: PARAMOWF,
 {
     let rng = generate_rng();
-    let (sk, pk, rho) = C::keygen_with_rng::<P, O>(rng);
+    let (sk, pk) = C::keygen_with_rng::<P, O>(rng);
     let length: u8 = random();
     let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
     let sign = faest_sign::<C, P, O>(
         msg,
         GenericArray::from_slice(&sk[<P::LAMBDA as Unsigned>::to_usize() / 8..]),
         GenericArray::from_slice(&pk),
-        GenericArray::from_slice(&rho[..<P::LAMBDA as Unsigned>::to_usize() / 8]),
+        &[],
     );
     (
         msg.to_vec(),
