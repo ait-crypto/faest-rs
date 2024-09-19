@@ -21,7 +21,6 @@ type QSProof<O> = (
 type Key<O> = (
     GenericArray<u8, <O as PARAMOWF>::PK>,
     Box<GenericArray<u8, <O as PARAMOWF>::PK>>,
-    Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
 );
 
 pub trait Variant {
@@ -63,7 +62,7 @@ pub trait Variant {
         O: PARAMOWF;
 
     ///input : a random number generator
-    /// output = pk : input, output; sk : input, key; rho (len = Lambda bytes)
+    /// output = pk : input, output; sk : input, key
     fn keygen_with_rng<P, O>(rng: impl RngCore) -> Key<O>
     where
         P: PARAM,
@@ -119,13 +118,7 @@ impl Variant for AesCypher {
     ///Input : the parameter of the faest protocol
     /// Output : sk : inputOWF||keyOWF, pk : inputOWF||outputOWF
     #[allow(clippy::never_loop)]
-    fn keygen_with_rng<P, O>(
-        mut rng: impl RngCore,
-    ) -> (
-        GenericArray<u8, O::PK>,
-        Box<GenericArray<u8, O::PK>>,
-        Box<GenericArray<u8, O::LAMBDABYTES>>,
-    )
+    fn keygen_with_rng<P, O>(mut rng: impl RngCore) -> Key<O>
     where
         P: PARAM,
         O: PARAMOWF,
@@ -136,7 +129,6 @@ impl Variant for AesCypher {
         let beta = <P::BETA as Unsigned>::to_u8();
         let pk_len = <O::PK as Unsigned>::to_usize() / 2;
         'boucle: loop {
-            let mut rho: Box<GenericArray<u8, O::LAMBDABYTES>> = GenericArray::default_boxed();
             let mut sk: Box<GenericArray<u8, O::PK>> = GenericArray::default_boxed();
             rng.fill_bytes(&mut sk);
 
@@ -180,10 +172,10 @@ impl Variant for AesCypher {
                     index += 1;
                 }
             };
-            rng.fill_bytes(&mut rho);
             let mut res = GenericArray::default();
-            res.copy_from_slice(&[&sk[..16 * beta as usize], &y[..pk_len]].concat());
-            return (res, sk, rho);
+            res[..16 * beta as usize].copy_from_slice(&sk[..16 * beta as usize]);
+            res[16 * beta as usize..].copy_from_slice(&y[..pk_len]);
+            return (res, sk);
         }
     }
 }
@@ -234,13 +226,7 @@ impl Variant for EmCypher {
         em_verify::<P, O>(d, gq, a_t, chall2, chall3, pk)
     }
 
-    fn keygen_with_rng<P, O>(
-        mut rng: impl RngCore,
-    ) -> (
-        GenericArray<u8, O::PK>,
-        Box<GenericArray<u8, O::PK>>,
-        Box<GenericArray<u8, O::LAMBDABYTES>>,
-    )
+    fn keygen_with_rng<P, O>(mut rng: impl RngCore) -> Key<O>
     where
         P: PARAM,
         O: PARAMOWF,
@@ -250,7 +236,6 @@ impl Variant for EmCypher {
         let r = <O::R as Unsigned>::to_u8();
         let nst = <O::NST as Unsigned>::to_u8();
         'boucle: loop {
-            let mut rho: Box<GenericArray<u8, O::LAMBDABYTES>> = GenericArray::default_boxed();
             let mut sk: Box<GenericArray<u8, O::PK>> = GenericArray::default_boxed();
             rng.fill_bytes(&mut sk);
             let test = em_extendedwitness::<P, O>(
@@ -277,10 +262,10 @@ impl Variant for EmCypher {
                 .zip(&sk[lambda..])
                 .map(|(y, k)| y ^ k)
                 .collect();
-            rng.fill_bytes(&mut rho);
             let mut res = GenericArray::default();
-            res.copy_from_slice(&[&sk[..lambda], &y[..]].concat());
-            return (res, sk, rho);
+            res[..lambda].copy_from_slice(&sk[..lambda]);
+            res[lambda..].copy_from_slice(&y[..]);
+            return (res, sk);
         }
     }
 }
@@ -301,7 +286,7 @@ pub fn faest_sign<C, P, O>(
     msg: &[u8],
     sk: &GenericArray<u8, O::LAMBDABYTES>,
     pk: &GenericArray<u8, O::PK>,
-    rho: &GenericArray<u8, O::LAMBDABYTES>,
+    rho: &[u8],
 ) -> (
     Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>,
     GenericArray<u8, O::LAMBDAPLUS2>,
@@ -309,7 +294,7 @@ pub fn faest_sign<C, P, O>(
     GenericArray<u8, O::LAMBDABYTES>,
     Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>>,
     GenericArray<u8, P::LAMBDABYTES>,
-    [u8; 16],
+    IV,
 )
 where
     C: Variant,
