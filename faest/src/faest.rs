@@ -579,18 +579,15 @@ where
         .into_iter()
         .flat_map(|x| x.to_vec())
         .collect::<Vec<u8>>();
-    signature.append(&mut (*sigma.1).to_vec());
-    signature.append(&mut (*sigma.2).to_vec());
-    signature.append(&mut (*sigma.3).to_vec());
-    signature.append(
-        &mut sigma
-            .4
-            .into_iter()
-            .flat_map(|x| [x.0.into_iter().flatten().collect::<Vec<u8>>(), x.1].concat())
-            .collect::<Vec<u8>>(),
-    );
-    signature.append(&mut (*sigma.5).to_vec());
-    signature.append(&mut (sigma.6).to_vec());
+    signature.extend_from_slice(&sigma.1);
+    signature.extend_from_slice(&sigma.2);
+    signature.extend_from_slice(&sigma.3);
+    sigma.4.iter().for_each(|x| {
+        x.0.iter().for_each(|v| signature.extend_from_slice(v));
+        signature.extend_from_slice(&x.1);
+    });
+    signature.extend_from_slice(&sigma.5);
+    signature.extend_from_slice(&sigma.6);
 
     let mut res = GenericArray::default();
     res.copy_from_slice(&signature);
