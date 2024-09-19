@@ -115,18 +115,18 @@ where
         let key: &GenericArray<u32, U8> = GenericArray::from_slice(inside);
         if nk == 6 {
             if j % 3 == 1 {
-                for i in key[2].to_le_bytes().iter().copied() {
+                for i in key[2].to_le_bytes() {
                     w[index] = i;
                     index += 1;
                 }
             } else if j % 3 == 0 {
-                for i in key[0].to_le_bytes().iter().copied() {
+                for i in key[0].to_le_bytes() {
                     w[index] = i;
                     index += 1;
                 }
             }
         } else {
-            for i in key[0].to_le_bytes().iter().copied() {
+            for i in key[0].to_le_bytes() {
                 w[index] = i;
                 index += 1;
             }
@@ -194,8 +194,8 @@ fn round_with_save<O>(
     bitslice(&mut state, &input1, &input2);
     rijndael_add_round_key(&mut state, &kb[..8]);
     for j in 1..r as usize {
-        for i in inv_bitslice(&state)[0][..].iter().copied() {
-            *valid &= i != 0
+        for i in &inv_bitslice(&state)[0][..] {
+            *valid &= *i != 0
         }
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
@@ -212,8 +212,8 @@ fn round_with_save<O>(
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
     }
-    for i in inv_bitslice(&state)[0][..].iter().copied() {
-        *valid &= i != 0
+    for i in &inv_bitslice(&state)[0][..] {
+        *valid &= *i != 0
     }
 }
 
@@ -259,8 +259,8 @@ where
     let mut indice = lambda;
     for j in nk as u16..(4 * (r + 1)) as u16 {
         if (j % (nk as u16) == 0) || ((nk > 6) && (j % (nk as u16) == 4)) {
-            for i in x[indice..indice + 32].iter().copied() {
-                out[index] = i;
+            for i in &x[indice..indice + 32] {
+                out[index] = *i;
                 index += 1;
             }
             indice += 32;
@@ -348,8 +348,8 @@ where
         } else {
             O::Field::ONE
         };
-        for i in y_tilde.iter().copied() {
-            out[index as usize] = i;
+        for i in &y_tilde {
+            out[index as usize] = *i;
             index += 1;
         }
         c += 1;
@@ -802,14 +802,14 @@ where
         );
     }
     let a0_array: GenericArray<O::Field, O::C> = if lambda == 128 {
-        [&a0[..], &a_01[..senc]].concat().iter().copied().collect()
+        (GenericArray::from_slice(&[&a0[..], &a_01[..senc]].concat())).clone() 
     } else {
-        [&a0[..], &a_01[..senc], &a_01_bis[..senc]].concat().iter().copied().collect()
+        (GenericArray::from_slice(&[&a0[..], &a_01[..senc], &a_01_bis[..senc]].concat())).clone()
     };
     let a1_array: GenericArray<O::Field, O::C> = if lambda == 128 {
-        [&a1[..], &a_01[senc..]].concat().iter().copied().collect()
+        (GenericArray::from_slice(&[&a1[..], &a_01[senc..]].concat())).clone()
     } else {
-        [&a1[..], &a_01[senc..], &a_01_bis[senc..]].concat().iter().copied().collect()
+        (GenericArray::from_slice(&[&a1[..], &a_01[senc..], &a_01_bis[senc..]].concat())).clone()
     };
     let u_s = O::Field::to_field(&u[l / 8..])[0];
 
@@ -828,8 +828,9 @@ where
         b_t.update(&a0_array[i]);
     }
     (
-        Box::new((a_t.finalize(&u_s).to_bytes())[..].iter().copied().collect()),
-        Box::new((b_t.finalize(&v_s).to_bytes())[..].iter().copied().collect()),
+        Box::new(GenericArray::from_slice(&(a_t.finalize(&u_s).to_bytes())[..]).clone()),
+        Box::new(GenericArray::from_slice(&(b_t.finalize(&v_s).to_bytes())[..]).clone()),
+
     )
 }
 

@@ -47,8 +47,8 @@ where
         r as u8,
         (4 * (((r + 1) * nst) / kc as usize)) as u8,
     );
-    for i in k.iter().copied() {
-        res[index] = i;
+    for i in k.iter() {
+        res[index] = *i;
         index += 1;
     }
     let mut state = State::default();

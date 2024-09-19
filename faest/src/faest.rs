@@ -181,8 +181,11 @@ impl Variant for AesCypher {
                 }
             };
             rng.fill_bytes(&mut rho);
+            let mut res = GenericArray::default();
+            res.copy_from_slice(&[&sk[..16 * beta as usize], &y[..pk_len]]
+                    .concat());
             return (
-                [&sk[..16 * beta as usize], &y[..pk_len]].concat().iter().copied().collect(),
+                res,
                 sk,
                 rho,
             );
@@ -280,8 +283,10 @@ impl Variant for EmCypher {
                 .map(|(y, k)| y ^ k)
                 .collect();
             rng.fill_bytes(&mut rho);
+            let mut res = GenericArray::default();
+            res.copy_from_slice(&[&sk[..lambda], &y[..]].concat());
             return (
-                [&sk[..lambda], &y[..]].concat().iter().copied().collect(),
+                res,
                 sk,
                 rho,
             );
@@ -394,7 +399,13 @@ where
         gv.iter()
             .flat_map(|x| {
                 x.iter()
-                    .map(|y| y[..l+lambda].iter().copied().collect())
+                    .map(|y| {
+                        y.clone()
+                            .into_iter()
+                            .take(l + lambda)
+                            .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
+                    }
+)
                     .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
             })
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
@@ -432,14 +443,14 @@ where
     (
         Box::new(
             c.iter()
-                .map(|x| x[..].iter().copied().collect::<GenericArray<u8, _>>())
+                .map(|x| GenericArray::from_slice(&x[..]).clone())
                 .collect::<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>(),
         ),
         u_t,
         d,
         *a_t,
         pdecom,
-        chall3.iter().copied().collect(),
+        *chall3,
         iv,
     )
 }
@@ -524,10 +535,7 @@ where
             .iter()
             .map(|d| {
                 if *d == 1 {
-                    c[lhat * (i - 1)..lhat * i]
-                        .iter()
-                        .copied()
-                        .collect::<GenericArray<u8, _>>()
+                    GenericArray::from_slice(&c[lhat * (i - 1)..lhat * i]).clone()
                 } else {
                     def2.clone()
                 }
@@ -585,11 +593,12 @@ where
             .flat_map(|x| {
                 x.iter()
                     .map(|y| {
-                        y[..l + lambda]
-                            .iter()
-                            .copied()
-                            .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
-                    })
+                        y.clone()
+                            .into_iter()
+                            .take(l + lambda)
+                            .collect::<GenericArray<u8, _>>()
+                    }
+)
                     .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
             })
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
@@ -641,8 +650,10 @@ where
     );
     signature.append(&mut (*sigma.5).to_vec());
     signature.append(&mut (sigma.6).to_vec());
+    let mut res = GenericArray::default();
+    res.copy_from_slice(&signature);
 
-    return signature.iter().copied().collect();
+    return res;
 }
 
 #[allow(clippy::type_complexity)]
@@ -690,7 +701,7 @@ where
         GenericArray::default_boxed();
     for i in pdecom.iter_mut().take(tau0) {
         for _j in 0..k0 {
-            i.0.push(signature[index..index + lambda].iter().copied().collect());
+            i.0.push((GenericArray::from_slice(&signature[index..index + lambda])).clone());
             index += lambda;
         }
         i.1 = signature[index..index + 2 * lambda].to_vec();
@@ -700,7 +711,7 @@ where
         for _j in 0..k1 {
             pdecom[tau0 + i]
                 .0
-                .push(signature[index..index + lambda].iter().copied().collect());
+                .push(GenericArray::from_slice(&signature[index..index + lambda]).clone());
             index += lambda;
         }
         pdecom[tau0 + i]

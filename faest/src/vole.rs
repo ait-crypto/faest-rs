@@ -48,8 +48,7 @@ where
                 .collect::<GenericArray<u8, LH>>();
         }
     }
-
-    (r[(d % 2) * n].iter().copied().collect(), v)
+    (r[(d % 2) * n].clone(), v)
 }
 
 //constant time checking the value of i : if i is not correct, then the output will be an empty vec
@@ -150,7 +149,7 @@ where
     }
     let mut hcom: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
     hasher.finish().read(&mut hcom);
-    (hcom, decom, c, u[0].iter().copied().collect(), v)
+    (hcom, decom, c, u[0].clone(), v)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -201,7 +200,7 @@ where
         );
         hasher.update(&com[i]);
         for j in 0..(1_u16 << (k)) as usize {
-            sd[i].push(Some(s[i][j ^ delta[i] as usize].iter().copied().collect()));
+            sd[i].push(Some(s[i][j ^ delta[i] as usize].clone()));
         }
         sd[i][0] = None;
 

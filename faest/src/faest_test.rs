@@ -3,10 +3,7 @@ use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
 use rand::random;
 
 use crate::{
-    faest::{
-        faest_sign, faest_verify, sigma_to_signature, AesCypher, EmCypher,
-        Variant,
-    },
+    faest::{faest_sign, faest_verify, sigma_to_signature, AesCypher, EmCypher, Variant},
     parameter::{
         PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
         PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF128, PARAMOWF128EM,
