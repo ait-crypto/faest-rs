@@ -2,11 +2,11 @@ use std::ops::{Add, Sub};
 
 use generic_array::{
     typenum::{
-        Diff, Double, Prod, Quot, Sum, U0, U1, U10, U1024, U11, U112, U12, U128, U14, U142, U152,
-        U16, U160, U16384, U176, U192, U194, U2, U200, U2048, U22, U224, U234, U24, U256, U288, U3,
-        U32, U338, U352, U384, U4, U40, U408, U4096, U416, U448, U458, U470, U476, U48, U5, U500,
-        U511, U512, U514, U52, U544, U566, U576, U584, U596, U6, U600, U64, U640, U672, U7, U704,
-        U752, U8, U8192, U832, U96,
+        Diff, Double, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1024, U11, U112, U12, U128, U14,
+        U142, U152, U16, U160, U16384, U176, U192, U194, U2, U200, U2048, U22, U224, U234, U24,
+        U256, U288, U3, U32, U338, U352, U384, U4, U40, U408, U4096, U416, U448, U458, U470, U476,
+        U48, U5, U500, U511, U512, U514, U52, U544, U566, U576, U584, U596, U6, U600, U64, U640,
+        U672, U7, U704, U752, U8, U8192, U832, U96,
     },
     ArrayLength,
 };
@@ -41,6 +41,7 @@ pub trait BaseParameters {
     type Lambda: ArrayLength;
     /// Size of the field [Self::Field] in bytes
     type LambdaBytes: ArrayLength + Add<B>;
+    type LambdaBytesTimes2: ArrayLength;
     type Chall: ArrayLength;
     type Chall1: ArrayLength;
 }
@@ -56,6 +57,7 @@ impl BaseParameters for BaseParams128 {
 
     type Lambda = U128;
     type LambdaBytes = U16;
+    type LambdaBytesTimes2 = U32;
 
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
@@ -72,6 +74,7 @@ impl BaseParameters for BaseParams192 {
 
     type Lambda = U192;
     type LambdaBytes = U24;
+    type LambdaBytesTimes2 = U48;
 
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
@@ -88,6 +91,7 @@ impl BaseParameters for BaseParams256 {
 
     type Lambda = U256;
     type LambdaBytes = U32;
+    type LambdaBytesTimes2 = U64;
 
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
@@ -670,8 +674,115 @@ impl PARAMOWF for PARAMOWF256EM {
     type XK = Sum<U1024, U160>;
 }
 
+pub trait TauParameters {
+    type Tau: ArrayLength;
+    type TauMinus1: ArrayLength;
+    type K0: ArrayLength;
+    type K1: ArrayLength;
+    type Tau0: ArrayLength;
+    type Tau1: ArrayLength;
+
+    fn decode_challenge(chal: &[u8], i: usize) -> Vec<u8> {
+        let (lo, hi) = if i < Self::Tau0::USIZE {
+            let lo = i * Self::K0::USIZE;
+            let hi = (i + 1) * Self::K0::USIZE - 1;
+            (lo, hi)
+        } else {
+            debug_assert!(i < Self::Tau0::USIZE + Self::Tau1::USIZE);
+            let t = i - Self::Tau0::USIZE;
+            let lo = Self::Tau0::USIZE * Self::K0::USIZE + t * Self::K1::USIZE;
+            let hi = Self::Tau0::USIZE * Self::K0::USIZE + (t + 1) * Self::K1::USIZE - 1;
+            (lo, hi)
+        };
+
+        (0..=(hi - lo))
+            .map(|j| (chal[(lo + j) / 8] >> ((lo + j) % 8)) & 1)
+            .collect()
+    }
+}
+
+pub struct Tau128Small;
+
+impl TauParameters for Tau128Small {
+    type Tau = U11;
+    type TauMinus1 = Diff<Self::Tau, U1>;
+    type K0 = U12;
+    type K1 = U11;
+    type Tau0 = U7;
+    type Tau1 = U4;
+}
+
+pub struct Tau128Fast;
+
+impl TauParameters for Tau128Fast {
+    type Tau = U16;
+    type TauMinus1 = Diff<Self::Tau, U1>;
+    type K0 = U8;
+    type K1 = U8;
+    type Tau0 = U8;
+    type Tau1 = U8;
+}
+
+pub struct Tau192Small;
+
+impl TauParameters for Tau192Small {
+    type Tau = U16;
+    type TauMinus1 = Diff<Self::Tau, U1>;
+    type K0 = U12;
+    type K1 = U12;
+    type Tau0 = U8;
+    type Tau1 = U8;
+}
+
+pub struct Tau192Fast;
+
+impl TauParameters for Tau192Fast {
+    type Tau = U24;
+    type TauMinus1 = Diff<Self::Tau, U1>;
+    type K0 = U8;
+    type K1 = U8;
+    type Tau0 = U12;
+    type Tau1 = U12;
+}
+
+pub struct Tau256Small;
+
+impl TauParameters for Tau256Small {
+    type Tau = U22;
+    type TauMinus1 = Diff<Self::Tau, U1>;
+    type K0 = U12;
+    type K1 = U11;
+    type Tau0 = U14;
+    type Tau1 = U8;
+}
+
+pub struct Tau256Fast;
+
+impl TauParameters for Tau256Fast {
+    type Tau = U32;
+    type TauMinus1 = Diff<Self::Tau, U1>;
+    type K0 = U8;
+    type K1 = U8;
+    type Tau0 = U16;
+    type Tau1 = U16;
+}
+
 pub trait PARAM {
-    //type Field: BigGaloisField;
+    type OWF: PARAMOWF<
+        LAMBDA = Self::LAMBDA,
+        LAMBDABYTES = Self::LAMBDABYTES,
+        L = Self::L,
+        LBYTES = Self::LBYTES,
+    >;
+    type Tau: TauParameters<
+        Tau = Self::TAU,
+        TauMinus1 = Self::TAUMINUS,
+        K0 = Self::K0,
+        K1 = Self::K1,
+        Tau0 = Self::TAU0,
+        Tau1 = Self::TAU1,
+    >;
+
     type L: ArrayLength;
     type LBYTES: ArrayLength;
     type TAU: ArrayLength;
@@ -696,6 +807,9 @@ pub trait PARAM {
 pub struct PARAM128S;
 
 impl PARAM for PARAM128S {
+    type OWF = PARAMOWF128;
+    type Tau = Tau128Small;
+
     type L = <U1024 as Add<U576>>::Output;
 
     type LBYTES = U200;
@@ -738,6 +852,9 @@ impl PARAM for PARAM128S {
 pub struct PARAM128F;
 
 impl PARAM for PARAM128F {
+    type OWF = PARAMOWF128;
+    type Tau = Tau128Fast;
+
     type L = <U1024 as Add<U576>>::Output;
 
     type LBYTES = U200;
@@ -780,6 +897,9 @@ impl PARAM for PARAM128F {
 pub struct PARAM192S;
 
 impl PARAM for PARAM192S {
+    type OWF = PARAMOWF192;
+    type Tau = Tau192Small;
+
     type L = <U4096 as Sub<U832>>::Output;
 
     type LBYTES = U408;
@@ -822,6 +942,9 @@ impl PARAM for PARAM192S {
 pub struct PARAM192F;
 
 impl PARAM for PARAM192F {
+    type OWF = PARAMOWF192;
+    type Tau = Tau192Fast;
+
     type L = <U4096 as Sub<U832>>::Output;
 
     type LBYTES = U408;
@@ -864,6 +987,9 @@ impl PARAM for PARAM192F {
 pub struct PARAM256S;
 
 impl PARAM for PARAM256S {
+    type OWF = PARAMOWF256;
+    type Tau = Tau256Small;
+
     type L = <U4096 as Sub<U96>>::Output;
 
     type LBYTES = U500;
@@ -906,6 +1032,9 @@ impl PARAM for PARAM256S {
 pub struct PARAM256F;
 
 impl PARAM for PARAM256F {
+    type OWF = PARAMOWF256;
+    type Tau = Tau256Fast;
+
     type L = <U4096 as Sub<U96>>::Output;
 
     type LBYTES = U500;
@@ -948,6 +1077,9 @@ impl PARAM for PARAM256F {
 pub struct PARAM128SEM;
 
 impl PARAM for PARAM128SEM {
+    type OWF = PARAMOWF128EM;
+    type Tau = Tau128Small;
+
     type L = <U1024 as Add<U256>>::Output;
 
     type LBYTES = U160;
@@ -990,6 +1122,9 @@ impl PARAM for PARAM128SEM {
 pub struct PARAM128FEM;
 
 impl PARAM for PARAM128FEM {
+    type OWF = PARAMOWF128EM;
+    type Tau = Tau128Fast;
+
     type L = <U1024 as Add<U256>>::Output;
 
     type LBYTES = U160;
@@ -1032,6 +1167,9 @@ impl PARAM for PARAM128FEM {
 pub struct PARAM192SEM;
 
 impl PARAM for PARAM192SEM {
+    type OWF = PARAMOWF192EM;
+    type Tau = Tau192Small;
+
     type L = <U2048 as Add<U256>>::Output;
 
     type LBYTES = U288;
@@ -1074,6 +1212,9 @@ impl PARAM for PARAM192SEM {
 pub struct PARAM192FEM;
 
 impl PARAM for PARAM192FEM {
+    type OWF = PARAMOWF192EM;
+    type Tau = Tau192Fast;
+
     type L = <U2048 as Add<U256>>::Output;
 
     type LBYTES = U288;
@@ -1116,6 +1257,9 @@ impl PARAM for PARAM192FEM {
 pub struct PARAM256SEM;
 
 impl PARAM for PARAM256SEM {
+    type OWF = PARAMOWF256EM;
+    type Tau = Tau256Small;
+
     type L = Diff<U4096, U512>;
 
     type LBYTES = U448;
@@ -1158,6 +1302,9 @@ impl PARAM for PARAM256SEM {
 pub struct PARAM256FEM;
 
 impl PARAM for PARAM256FEM {
+    type OWF = PARAMOWF256EM;
+    type Tau = Tau256Fast;
+
     type L = Diff<U4096, U512>;
 
     type LBYTES = U448;
