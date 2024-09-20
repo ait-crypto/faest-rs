@@ -290,38 +290,6 @@ pub(crate) fn rijndael_key_schedule(
     }
 }
 
-/// Fully-fixsliced AES-128 decryption (the InvShiftRows is completely omitted).
-///
-/// Decrypts four blocks in-place and in parallel.
-#[allow(dead_code)]
-pub(crate) fn rijndael_decrypt(rkeys: &[u32], blocks: &BatchBlocks, bc: u8, r: u8) -> BatchBlocks {
-    let mut state = State::default();
-    bitslice(&mut state, &blocks[0], &blocks[1]);
-
-    rijndael_add_round_key(&mut state, &rkeys[(r * 8) as usize..((r + 1) * 8) as usize]);
-    rijndael_inv_shift_rows_1(&mut state, bc);
-    sub_bytes_nots(&mut state);
-    inv_sub_bytes(&mut state);
-
-    let mut rk_off = (r - 1) * 8;
-    loop {
-        rijndael_add_round_key(&mut state, &rkeys[(rk_off) as usize..(rk_off + 8) as usize]);
-        inv_mix_columns_0(&mut state);
-        rijndael_inv_shift_rows_1(&mut state, bc);
-        sub_bytes_nots(&mut state);
-        inv_sub_bytes(&mut state);
-        rk_off -= 8;
-
-        if rk_off == 0 {
-            break;
-        }
-    }
-
-    rijndael_add_round_key(&mut state, &rkeys[..8]);
-
-    inv_bitslice(&state)
-}
-
 /// Fully-fixsliced AES-128 encryption (the ShiftRows is completely omitted).
 ///
 /// Encrypts four blocks in-place and in parallel.
@@ -1183,7 +1151,7 @@ fn ror(x: u32, y: u32) -> u32 {
 }
 
 #[inline(always)]
-fn ror_distance(rows: u32, cols: u32) -> u32 {
+const fn ror_distance(rows: u32, cols: u32) -> u32 {
     (rows << 3) + (cols << 1)
 }
 
@@ -1198,17 +1166,13 @@ fn rotate_rows_2(x: u32) -> u32 {
 }
 
 #[inline(always)]
-#[rustfmt::skip]
 fn rotate_rows_and_columns_1_1(x: u32) -> u32 {
-    (ror(x, ror_distance(1, 1)) & 0x3f3f3f3f) |
-    (ror(x, ror_distance(0, 1)) & 0xc0c0c0c0)
+    (ror(x, ror_distance(1, 1)) & 0x3f3f3f3f) | (ror(x, ror_distance(0, 1)) & 0xc0c0c0c0)
 }
 
 #[inline(always)]
-#[rustfmt::skip]
 fn rotate_rows_and_columns_2_2(x: u32) -> u32 {
-    (ror(x, ror_distance(2, 2)) & 0x0f0f0f0f) |
-    (ror(x, ror_distance(1, 2)) & 0xf0f0f0f0)
+    (ror(x, ror_distance(2, 2)) & 0x0f0f0f0f) | (ror(x, ror_distance(1, 2)) & 0xf0f0f0f0)
 }
 
 #[cfg(test)]
@@ -1352,30 +1316,6 @@ mod test {
                 }
             }
             assert_eq!(input, output);
-        }
-    }
-
-    #[test]
-    fn rijndael_decrypt_test() {
-        for k in 2..5 {
-            let kc = 2 * k;
-            for b in 2..5 {
-                let bc = 2 * b;
-                for _i in 0..1000 {
-                    let key: Vec<u8> = (0..4 * kc).map(|_| rand::thread_rng().gen()).collect();
-                    let text: Vec<u8> = (0..4 * bc).map(|_| rand::thread_rng().gen()).collect();
-                    let mut padded_text = [0u8; 32];
-                    padded_text[..text.len()].copy_from_slice(&text[..]);
-                    let r = max(kc, bc) + 6;
-                    let mut state_text = State::default();
-                    let (rkeys, _) =
-                        rijndael_key_schedule(&key, bc, kc, r, 4 * (((r + 1) * bc) / kc));
-                    let crypted = rijndael_encrypt(&rkeys, &padded_text, bc, bc, r);
-                    let res = rijndael_decrypt(&rkeys, &crypted, bc, r);
-                    bitslice(&mut state_text, &padded_text[..16], &padded_text[16..]);
-                    assert_eq!(res, inv_bitslice(&state_text));
-                }
-            }
         }
     }
 }
