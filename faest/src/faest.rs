@@ -281,21 +281,12 @@ type RO<O> = <<O as PARAMOWF>::BaseParams as BaseParameters>::RandomOracle;
 ///last challenge (lambda bits), initialisation vector
 #[allow(clippy::needless_range_loop)]
 #[allow(clippy::type_complexity)]
-#[allow(clippy::unnecessary_to_owned)]
 pub fn faest_sign<C, P, O>(
     msg: &[u8],
     sk: &GenericArray<u8, O::LAMBDABYTES>,
     pk: &GenericArray<u8, O::PK>,
     rho: &[u8],
-) -> (
-    Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>,
-    GenericArray<u8, O::LAMBDAPLUS2>,
-    GenericArray<u8, O::LBYTES>,
-    GenericArray<u8, O::LAMBDABYTES>,
-    Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>>,
-    GenericArray<u8, P::LAMBDABYTES>,
-    IV,
-)
+) -> Box<GenericArray<u8, P::SIG>>
 where
     C: Variant,
     P: PARAM,
@@ -396,7 +387,8 @@ where
                 open::<RO<O>, P::POWK1, P::K1, P::N1>(&decom[i], GenericArray::from_slice(&s));
         }
     }
-    (
+
+    sigma_to_signature::<P, O>((
         Box::new(
             c.iter()
                 .map(|x| GenericArray::from_slice(&x[..]).clone())
@@ -408,12 +400,12 @@ where
         pdecom,
         chall3,
         iv,
-    )
+    ))
 }
 
 #[allow(unused_assignments)]
 #[allow(clippy::type_complexity)]
-pub fn faest_verify<C, P, O>(msg: &[u8], pk: GenericArray<u8, O::PK>, sigma: &[u8]) -> bool
+pub fn faest_verify<C, P, O>(msg: &[u8], pk: &GenericArray<u8, O::PK>, sigma: &[u8]) -> bool
 where
     C: Variant,
     P: PARAM,
@@ -559,7 +551,7 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-pub fn sigma_to_signature<P, O>(
+fn sigma_to_signature<P, O>(
     sigma: (
         Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>,
         GenericArray<u8, O::LAMBDAPLUS2>,
@@ -569,7 +561,7 @@ pub fn sigma_to_signature<P, O>(
         GenericArray<u8, P::LAMBDABYTES>,
         IV,
     ),
-) -> GenericArray<u8, P::SIG>
+) -> Box<GenericArray<u8, P::SIG>>
 where
     O: PARAMOWF,
     P: PARAM,
@@ -589,7 +581,7 @@ where
     signature.extend_from_slice(&sigma.5);
     signature.extend_from_slice(&sigma.6);
 
-    let mut res = GenericArray::default();
+    let mut res = GenericArray::default_boxed();
     res.copy_from_slice(&signature);
     res
 }
@@ -665,12 +657,13 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
     use generic_array::GenericArray;
     use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
     use rand::RngCore;
 
     use crate::{
-        faest::{faest_sign, faest_verify, sigma_to_signature, AesCypher, EmCypher, Variant},
         parameter::{
             PARAM, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM,
             PARAM192S, PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF,
@@ -704,8 +697,8 @@ mod test {
             );
             let res_true = faest_verify::<AesCypher, PARAM128S, PARAMOWF128>(
                 &msg,
-                *GenericArray::from_slice(&pk),
-                &sigma_to_signature::<PARAM128S, PARAMOWF128>(sigma),
+                GenericArray::from_slice(&pk),
+                &sigma,
             );
             assert!(res_true);
         }
@@ -725,8 +718,8 @@ mod test {
             );
             let res_true = faest_verify::<AesCypher, PARAM128F, PARAMOWF128>(
                 &msg,
-                *GenericArray::from_slice(&pk),
-                &sigma_to_signature::<PARAM128F, PARAMOWF128>(sigma),
+                GenericArray::from_slice(&pk),
+                &sigma,
             );
 
             assert!(res_true);
@@ -747,8 +740,8 @@ mod test {
             );
             let res_true = faest_verify::<AesCypher, PARAM192S, PARAMOWF192>(
                 &msg,
-                *GenericArray::from_slice(&pk),
-                &sigma_to_signature::<PARAM192S, PARAMOWF192>(sigma),
+                GenericArray::from_slice(&pk),
+                &sigma,
             );
             assert!(res_true);
         }
@@ -768,8 +761,8 @@ mod test {
             );
             let res_true = faest_verify::<AesCypher, PARAM192F, PARAMOWF192>(
                 &msg,
-                *GenericArray::from_slice(&pk),
-                &sigma_to_signature::<PARAM192F, PARAMOWF192>(sigma),
+                GenericArray::from_slice(&pk),
+                &sigma,
             );
             assert!(res_true);
         }
@@ -789,8 +782,8 @@ mod test {
             );
             let res_true = faest_verify::<AesCypher, PARAM256S, PARAMOWF256>(
                 &msg,
-                *GenericArray::from_slice(&pk),
-                &sigma_to_signature::<PARAM256S, PARAMOWF256>(sigma),
+                GenericArray::from_slice(&pk),
+                &sigma,
             );
             assert!(res_true);
         }
@@ -810,8 +803,8 @@ mod test {
             );
             let res_true = faest_verify::<AesCypher, PARAM256F, PARAMOWF256>(
                 &msg,
-                *GenericArray::from_slice(&pk),
-                &sigma_to_signature::<PARAM256F, PARAMOWF256>(sigma),
+                GenericArray::from_slice(&pk),
+                &sigma,
             );
             assert!(res_true);
         }
@@ -831,8 +824,8 @@ mod test {
             );
             let res_true = faest_verify::<EmCypher, PARAM128SEM, PARAMOWF128EM>(
                 &msg,
-                *GenericArray::from_slice(&pk),
-                &sigma_to_signature::<PARAM128SEM, PARAMOWF128EM>(sigma),
+                GenericArray::from_slice(&pk),
+                &sigma,
             );
             assert!(res_true);
         }
@@ -852,8 +845,8 @@ mod test {
             );
             let res_true = faest_verify::<EmCypher, PARAM128FEM, PARAMOWF128EM>(
                 &msg,
-                *GenericArray::from_slice(&pk),
-                &sigma_to_signature::<PARAM128FEM, PARAMOWF128EM>(sigma),
+                GenericArray::from_slice(&pk),
+                &sigma,
             );
             assert!(res_true);
         }
@@ -873,8 +866,8 @@ mod test {
             );
             let res_true = faest_verify::<EmCypher, PARAM192SEM, PARAMOWF192EM>(
                 &msg,
-                *GenericArray::from_slice(&pk),
-                &sigma_to_signature::<PARAM192SEM, PARAMOWF192EM>(sigma),
+                GenericArray::from_slice(&pk),
+                &sigma,
             );
             assert!(res_true);
         }
@@ -894,8 +887,8 @@ mod test {
             );
             let res_true = faest_verify::<EmCypher, PARAM192FEM, PARAMOWF192EM>(
                 &msg,
-                *GenericArray::from_slice(&pk),
-                &sigma_to_signature::<PARAM192FEM, PARAMOWF192EM>(sigma),
+                GenericArray::from_slice(&pk),
+                &sigma,
             );
             assert!(res_true);
         }
@@ -915,8 +908,8 @@ mod test {
             );
             let res_true = faest_verify::<EmCypher, PARAM256SEM, PARAMOWF256EM>(
                 &msg,
-                *GenericArray::from_slice(&pk),
-                &sigma_to_signature::<PARAM256SEM, PARAMOWF256EM>(sigma),
+                GenericArray::from_slice(&pk),
+                &sigma,
             );
             assert!(res_true);
         }
@@ -936,8 +929,8 @@ mod test {
             );
             let res_true = faest_verify::<EmCypher, PARAM256FEM, PARAMOWF256EM>(
                 &msg,
-                *GenericArray::from_slice(&pk),
-                &sigma_to_signature::<PARAM256FEM, PARAMOWF256EM>(sigma),
+                GenericArray::from_slice(&pk),
+                &sigma,
             );
             assert!(res_true);
         }
@@ -1015,24 +1008,20 @@ mod test {
             let sig = data.sm;
 
             let keypair = C::keygen_with_rng::<P, O>(&mut rng);
+            assert_eq!(pk.as_slice(), keypair.0.as_slice());
+
             let mut rho = GenericArray::<u8, O::LAMBDABYTES>::default();
             rng.fill_bytes(&mut rho);
 
-            assert_eq!(pk.as_slice(), keypair.0.as_slice());
-            assert_eq!(
-                sig,
-                [
-                    msg.clone(),
-                    sigma_to_signature::<P, O>(faest_sign::<C, P, O>(
+            let signature = faest_sign::<C, P, O>(
                         &msg,
                         GenericArray::from_slice(&keypair.1[sk_offset..sk_offset_2]),
                         GenericArray::from_slice(&pk),
                         &rho
-                    ))
-                    .to_vec()
-                ]
-                .concat()
-            );
+                    );
+            assert_eq!(&sig[..sig.len() - signature.len()], &msg);
+            assert_eq!(&sig[sig.len() - signature.len()..], signature.as_slice());
+            assert!(faest_verify::<C, P, O>(&msg, GenericArray::from_slice(&pk), &signature));
         }
     }
 
