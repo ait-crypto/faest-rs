@@ -60,10 +60,9 @@ where
     // Length of the field (in bits)
     const LENGTH: usize;
 
-    fn new(first_value: u128, second_value: u128) -> Self;
-
     fn to_bytes(&self) -> Vec<u8>;
 
+    #[deprecated]
     fn to_field(x: &[u8]) -> Vec<Self> {
         let n = (8 * x.len()) / Self::LENGTH;
         let mut res = vec![];
@@ -686,10 +685,6 @@ impl From<&[u8]> for BigGF<u128, 1, 128> {
 impl BigGaloisField for BigGF<u128, 1, 128> {
     const LENGTH: usize = 128;
 
-    fn new(first_value: u128, _second_value: u128) -> Self {
-        Self([first_value])
-    }
-
     fn to_bytes(&self) -> Vec<u8> {
         self.0[0].to_le_bytes().to_vec()
     }
@@ -798,10 +793,6 @@ impl From<&[u8]> for BigGF<u128, 2, 192> {
 
 impl BigGaloisField for BigGF<u128, 2, 192> {
     const LENGTH: usize = 192;
-
-    fn new(first_value: u128, second_value: u128) -> Self {
-        Self([first_value, second_value]).clear_high_bits()
-    }
 
     fn to_bytes(&self) -> Vec<u8> {
         let mut res = Vec::with_capacity(Self::LENGTH / 8);
@@ -919,10 +910,6 @@ impl From<&[u8]> for BigGF<u128, 2, 256> {
 impl BigGaloisField for BigGF<u128, 2, 256> {
     const LENGTH: usize = 256;
 
-    fn new(first_value: u128, second_value: u128) -> Self {
-        Self([first_value, second_value])
-    }
-
     fn to_bytes(&self) -> Vec<u8> {
         let mut res = Vec::with_capacity(Self::LENGTH / 8);
         res.extend_from_slice(&self.0[0].to_le_bytes());
@@ -965,12 +952,40 @@ impl Distribution<GF256> for Standard {
 }
 
 #[cfg(test)]
+/// Construct fields from `u128` representations
+///
+/// Only for tests!
+pub(crate) trait NewFromU128 {
+    fn new(first_value: u128, second_value: u128) -> Self;
+}
+
+#[cfg(test)]
+impl NewFromU128 for GF128 {
+    fn new(first_value: u128, _second_value: u128) -> Self {
+        Self([first_value])
+    }
+}
+
+#[cfg(test)]
+impl NewFromU128 for GF192 {
+    fn new(first_value: u128, second_value: u128) -> Self {
+        Self([first_value, second_value]).clear_high_bits()
+    }
+}
+
+#[cfg(test)]
+impl NewFromU128 for GF256 {
+    fn new(first_value: u128, second_value: u128) -> Self {
+        Self([first_value, second_value])
+    }
+}
+
+#[cfg(test)]
 mod test {
     use super::*;
 
     use num_bigint::BigUint;
     use rand::{rngs::SmallRng, SeedableRng};
-
     //GF128
 
     #[test]

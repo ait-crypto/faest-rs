@@ -287,10 +287,8 @@ where
     let nst = <O::NST as Unsigned>::to_usize();
     let r = <O::R as Unsigned>::to_usize();
     if !mkey {
-        let new_w = convert_to_bit::<O, O::L, O::LBYTES>(w);
-        let new_x = convert_to_bit::<O, O::LAMBDAR1, O::LAMBDAR1BYTE>(GenericArray::from_slice(
-            &x[..4 * nst * (r + 1)],
-        ));
+        let new_w = convert_to_bit::<O::Field, O::L>(w);
+        let new_x = convert_to_bit::<O::Field, O::LAMBDAR1>(&x[..4 * nst * (r + 1)]);
         let mut w_out: Box<GenericArray<O::Field, O::LAMBDA>> = GenericArray::default_boxed();
         let mut index = 0;
         for i in 0..lambda / 8 {
@@ -319,7 +317,7 @@ where
         }
         (a0, a1)
     } else {
-        let new_output = &convert_to_bit::<O, O::LAMBDA, O::LAMBDABYTES>(output);
+        let new_output = &convert_to_bit::<O::Field, O::LAMBDA>(output);
         let mut new_x: Box<GenericArray<O::Field, O::LAMBDAR1>> = GenericArray::default_boxed();
         let mut index = 0;
         for byte in x.iter().take(4 * nst * (r + 1)) {
@@ -497,6 +495,17 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
+    use crate::{
+        aes::convert_to_bit,
+        fields::{large_fields::NewFromU128, BigGaloisField, GF128, GF192, GF256},
+        parameter::{
+            PARAM128FEM, PARAM128SEM, PARAM192FEM, PARAM192SEM, PARAM256FEM, PARAM256SEM,
+            PARAMOWF128, PARAMOWF128EM, PARAMOWF192EM, PARAMOWF256EM,
+        },
+    };
+
     use std::fs::File;
 
     use generic_array::{
@@ -504,16 +513,6 @@ mod test {
         GenericArray,
     };
     use serde::Deserialize;
-
-    use crate::{
-        aes::convert_to_bit,
-        em::{em_enc_bkwd, em_enc_cstrnts, em_enc_fwd, em_extendedwitness, em_prove, em_verify},
-        fields::{BigGaloisField, GF128, GF192, GF256},
-        parameter::{
-            PARAM128FEM, PARAM128SEM, PARAM192FEM, PARAM192SEM, PARAM256FEM, PARAM256SEM,
-            PARAMOWF128, PARAMOWF128EM, PARAMOWF192EM, PARAMOWF256EM,
-        },
-    };
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -556,13 +555,9 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct EmEncFwd {
         lambda: u16,
-
         m: u8,
-
         x: Vec<[u64; 4]>,
-
         z: Vec<[u64; 4]>,
-
         res: Vec<[u64; 4]>,
     }
 
@@ -578,17 +573,17 @@ mod test {
                         data.x
                             .iter()
                             .flat_map(|x| {
-                                convert_to_bit::<PARAMOWF128, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF128 as PARAMOWF>::Field, U8>(
                                     &x[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect(),
                         data.z
                             .iter()
                             .flat_map(|z| {
-                                convert_to_bit::<PARAMOWF128, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF128 as PARAMOWF>::Field, U8>(
                                     &z[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect(),
                     )
@@ -624,17 +619,17 @@ mod test {
                         data.x
                             .iter()
                             .flat_map(|x| {
-                                convert_to_bit::<PARAMOWF192EM, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF192EM as PARAMOWF>::Field, U8>(
                                     &x[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect(),
                         data.z
                             .iter()
                             .flat_map(|z| {
-                                convert_to_bit::<PARAMOWF192EM, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF192EM as PARAMOWF>::Field, U8>(
                                     &z[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect(),
                     )
@@ -677,17 +672,17 @@ mod test {
                         data.x
                             .iter()
                             .flat_map(|x| {
-                                convert_to_bit::<PARAMOWF256EM, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF256EM as PARAMOWF>::Field, U8>(
                                     &x[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect(),
                         data.z
                             .iter()
                             .flat_map(|z| {
-                                convert_to_bit::<PARAMOWF256EM, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF256EM as PARAMOWF>::Field, U8>(
                                     &z[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect(),
                     )
@@ -768,25 +763,25 @@ mod test {
                         data.x
                             .iter()
                             .flat_map(|x| {
-                                convert_to_bit::<PARAMOWF128, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF128 as PARAMOWF>::Field, U8>(
                                     &x[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect::<Vec<GF128>>(),
                         data.z
                             .iter()
                             .flat_map(|z| {
-                                convert_to_bit::<PARAMOWF128, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF128 as PARAMOWF>::Field, U8>(
                                     &z[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect::<Vec<GF128>>(),
                         data.zout
                             .iter()
                             .flat_map(|z| {
-                                convert_to_bit::<PARAMOWF128, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF128 as PARAMOWF>::Field, U8>(
                                     &z[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect::<Vec<GF128>>(),
                     )
@@ -830,25 +825,25 @@ mod test {
                         data.x
                             .iter()
                             .flat_map(|x| {
-                                convert_to_bit::<PARAMOWF192EM, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF192EM as PARAMOWF>::Field, U8>(
                                     &x[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect::<Vec<GF192>>(),
                         data.z
                             .iter()
                             .flat_map(|z| {
-                                convert_to_bit::<PARAMOWF192EM, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF192EM as PARAMOWF>::Field, U8>(
                                     &z[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect::<Vec<GF192>>(),
                         data.zout
                             .iter()
                             .flat_map(|z| {
-                                convert_to_bit::<PARAMOWF192EM, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF192EM as PARAMOWF>::Field, U8>(
                                     &z[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect::<Vec<GF192>>(),
                     )
@@ -901,25 +896,25 @@ mod test {
                         data.x
                             .iter()
                             .flat_map(|x| {
-                                convert_to_bit::<PARAMOWF256EM, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF256EM as PARAMOWF>::Field, U8>(
                                     &x[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect::<Vec<GF256>>(),
                         data.z
                             .iter()
                             .flat_map(|z| {
-                                convert_to_bit::<PARAMOWF256EM, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF256EM as PARAMOWF>::Field, U8>(
                                     &z[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect::<Vec<GF256>>(),
                         data.zout
                             .iter()
                             .flat_map(|z| {
-                                convert_to_bit::<PARAMOWF256EM, U8, U1>(GenericArray::from_slice(
+                                convert_to_bit::<<PARAMOWF256EM as PARAMOWF>::Field, U8>(
                                     &z[0].to_le_bytes()[..1],
-                                ))
+                                )
                             })
                             .collect::<Vec<GF256>>(),
                     )
@@ -1105,21 +1100,13 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct EmProve {
         lambda: u16,
-
         gv: Vec<Vec<u8>>,
-
         w: Vec<u8>,
-
         u: Vec<u8>,
-
         input: Vec<u8>,
-
         output: Vec<u8>,
-
         chall: Vec<u8>,
-
         at: Vec<u8>,
-
         bt: Vec<u8>,
     }
 

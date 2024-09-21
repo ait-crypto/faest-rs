@@ -2,12 +2,12 @@ use std::iter::zip;
 
 use generic_array::{
     typenum::{Unsigned, U8},
-    GenericArray,
+    ArrayLength, GenericArray,
 };
 
 use crate::{
     fields::{BigGaloisField, ByteCombine, Field, SumPoly},
-    parameter::{TauParameters, PARAM, PARAMOWF},
+    parameter::{BaseParameters, TauParameters, PARAM, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
@@ -49,16 +49,16 @@ pub fn byte_to_bit(input: u8) -> Vec<u8> {
     (0..8).map(|i| (input >> i) & 1).collect()
 }
 
-pub fn convert_to_bit<O, S, I>(input: &GenericArray<u8, I>) -> Box<GenericArray<O::Field, S>>
+pub fn convert_to_bit<F, S>(input: &[u8]) -> Box<GenericArray<F, S>>
 where
-    O: PARAMOWF,
-    I: generic_array::ArrayLength,
-    S: generic_array::ArrayLength,
+    F: BigGaloisField,
+    S: ArrayLength,
 {
     let mut res = GenericArray::default_boxed();
     for i in 0..res.len() / 8 {
         for j in 0..8 {
-            res[i * 8 + j] = O::Field::new(((input[i] >> j) & 1) as u128, 0)
+            // FIXME
+            res[i * 8 + j] = F::ONE * ((input[i] >> j) & 1);
         }
     }
     res
@@ -680,7 +680,8 @@ where
         let mut field_w: Box<GenericArray<O::Field, O::LENC>> = GenericArray::default_boxed();
         for i in 0..w.len() {
             for j in 0..8 {
-                field_w[i * 8 + j] = O::Field::new(((w[i] >> j) & 1) as u128, 0)
+                // FIXME
+                field_w[i * 8 + j] = O::Field::ONE * ((w[i] >> j) & 1);
             }
         }
         let s = aes_enc_fwd::<O>(&field_w, k, false, false, input, O::Field::default());
@@ -812,26 +813,24 @@ where
     } else {
         (GenericArray::from_slice(&[&a1[..], &a_01[senc..], &a_01_bis[senc..]].concat())).clone()
     };
+
     let u_s = O::Field::to_field(&u[l / 8..])[0];
+    let v_s = O::Field::sum_poly(&new_v[l..l + lambda]);
 
-    let mut v_s = new_v[l];
-    let alpha = O::Field::new(2, 0);
-    let mut cur_alpha = alpha;
-    for i in 1..lambda {
-        v_s += new_v[l + i] * cur_alpha;
-        cur_alpha *= alpha;
-    }
+    let mut a_t_hasher =
+        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
+    let mut b_t_hasher =
+        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
 
-    let mut a_t = O::ZKHasher::new_zk_hasher(chall);
-    let mut b_t = O::ZKHasher::new_zk_hasher(chall);
     for i in 0..a1_array.len() {
-        a_t.update(&a1_array[i]);
-        b_t.update(&a0_array[i]);
+        a_t_hasher.update(&a1_array[i]);
+        b_t_hasher.update(&a0_array[i]);
     }
-    (
-        Box::new(GenericArray::from_slice(&(a_t.finalize(&u_s).to_bytes())[..]).clone()),
-        Box::new(GenericArray::from_slice(&(b_t.finalize(&v_s).to_bytes())[..]).clone()),
-    )
+
+    let a_t = a_t_hasher.finalize(&u_s);
+    let b_t = b_t_hasher.finalize(&v_s);
+
+    (Box::new(a_t.as_bytes()), Box::new(b_t.as_bytes()))
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
@@ -951,34 +950,27 @@ where
 mod test {
     use super::*;
 
-    use crate::fields::{BigGaloisField, GF128, GF192, GF256};
+    use crate::{
+        fields::{large_fields::NewFromU128, BigGaloisField, GF128, GF192, GF256},
+        parameter::{
+            PARAM128S, PARAM192S, PARAM256S, PARAMOWF, PARAMOWF128, PARAMOWF192, PARAMOWF256,
+        },
+    };
 
-    use crate::parameter::{
-        self, PARAM128S, PARAM192S, PARAM256S, PARAMOWF128, PARAMOWF192, PARAMOWF256,
-    };
-    use generic_array::{
-        typenum::{U176, U208, U240, U8},
-        GenericArray,
-    };
+    use generic_array::{typenum::U8, GenericArray};
     use serde::Deserialize;
     use std::fs::File;
 
-    type ZkHash256 =
-        Box<GenericArray<u8, <parameter::PARAMOWF256 as parameter::PARAMOWF>::LAMBDABYTES>>;
-    type ZkHash192 =
-        Box<GenericArray<u8, <parameter::PARAMOWF192 as parameter::PARAMOWF>::LAMBDABYTES>>;
-    type ZkHash128 =
-        Box<GenericArray<u8, <parameter::PARAMOWF128 as parameter::PARAMOWF>::LAMBDABYTES>>;
+    type ZkHash256 = Box<GenericArray<u8, <PARAMOWF256 as PARAMOWF>::LAMBDABYTES>>;
+    type ZkHash192 = Box<GenericArray<u8, <PARAMOWF192 as PARAMOWF>::LAMBDABYTES>>;
+    type ZkHash128 = Box<GenericArray<u8, <PARAMOWF128 as PARAMOWF>::LAMBDABYTES>>;
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct AesExtendedWitness {
         lambda: u16,
-
         key: Vec<u8>,
-
         input: Vec<u8>,
-
         w: Vec<u8>,
     }
 
@@ -1022,13 +1014,9 @@ mod test {
 
     fn convtobit<T>(x: u8) -> Box<GenericArray<T, U8>>
     where
-        T: BigGaloisField + std::default::Default,
+        T: BigGaloisField,
     {
-        let mut res: Box<GenericArray<T, U8>> = GenericArray::default_boxed();
-        for j in 0..8 {
-            res[j] = T::new(((x >> j) & 1) as u128, 0)
-        }
-        res
+        convert_to_bit(&[x])
     }
 
     #[test]
@@ -1061,10 +1049,8 @@ mod test {
                             .collect(),
                     )
                 };
-                let res: GenericArray<
-                    GF128,
-                    <parameter::PARAMOWF128 as parameter::PARAMOWF>::PRODRUN128,
-                > = *aes_key_exp_fwd::<PARAMOWF128>(GenericArray::from_slice(&input));
+                let res: GenericArray<GF128, <PARAMOWF128 as PARAMOWF>::PRODRUN128> =
+                    *aes_key_exp_fwd::<PARAMOWF128>(GenericArray::from_slice(&input));
                 assert_eq!(res, *GenericArray::from_slice(&out));
             } else if data.lambda == 192 {
                 let (out, input): (Vec<GF192>, Vec<GF192>) = if data.x.len() >= 448 {
@@ -1087,10 +1073,8 @@ mod test {
                         data.x.iter().flat_map(|x| convtobit(x[0] as u8)).collect(),
                     )
                 };
-                let res: GenericArray<
-                    GF192,
-                    <parameter::PARAMOWF192 as parameter::PARAMOWF>::PRODRUN128,
-                > = *aes_key_exp_fwd::<PARAMOWF192>(GenericArray::from_slice(&input));
+                let res: GenericArray<GF192, <PARAMOWF192 as PARAMOWF>::PRODRUN128> =
+                    *aes_key_exp_fwd::<PARAMOWF192>(GenericArray::from_slice(&input));
                 assert_eq!(res, *GenericArray::from_slice(&out));
             } else {
                 let (out, input): (Vec<GF256>, Vec<GF256>) = if data.x.len() >= 448 {
@@ -1113,10 +1097,8 @@ mod test {
                         data.x.iter().flat_map(|x| convtobit(x[0] as u8)).collect(),
                     )
                 };
-                let res: GenericArray<
-                    GF256,
-                    <parameter::PARAMOWF256 as parameter::PARAMOWF>::PRODRUN128,
-                > = *aes_key_exp_fwd::<PARAMOWF256>(GenericArray::from_slice(&input));
+                let res: GenericArray<GF256, <PARAMOWF256 as PARAMOWF>::PRODRUN128> =
+                    *aes_key_exp_fwd::<PARAMOWF256>(GenericArray::from_slice(&input));
                 assert_eq!(res, *GenericArray::from_slice(&out));
             }
         }
@@ -1353,16 +1335,10 @@ mod test {
                         )
                     })
                     .collect();
-                let fields_res_1: GenericArray<
-                    GF128,
-                    <parameter::PARAMOWF128 as parameter::PARAMOWF>::PRODRUN128,
-                > = *GenericArray::from_slice(&convert_to_bit::<
-                    PARAMOWF128,
-                    <parameter::PARAMOWF128 as parameter::PARAMOWF>::PRODRUN128,
-                    U176,
-                >(GenericArray::from_slice(
-                    &data.res1[..176],
-                )));
+                let fields_res_1 = convert_to_bit::<
+                    <PARAMOWF128 as PARAMOWF>::Field,
+                    <PARAMOWF128 as PARAMOWF>::PRODRUN128,
+                >(&data.res1[..176]);
                 let fields_res_2: Vec<GF128> = data
                     .res2
                     .iter()
@@ -1398,7 +1374,7 @@ mod test {
                     assert_eq!(field_ab[i].0, res.0[i]);
                     assert_eq!(field_ab[i].1, res.1[i]);
                 }
-                assert_eq!(fields_res_1, *res.2);
+                assert_eq!(fields_res_1, res.2);
                 assert_eq!(*GenericArray::from_slice(&fields_res_2), *res.3);
             } else if data.lambda == 192 {
                 let fields_v = &(data
@@ -1438,16 +1414,10 @@ mod test {
                         )
                     })
                     .collect();
-                let fields_res_1: GenericArray<
-                    GF192,
-                    <parameter::PARAMOWF192 as parameter::PARAMOWF>::PRODRUN128,
-                > = *GenericArray::from_slice(&convert_to_bit::<
-                    PARAMOWF192,
-                    <parameter::PARAMOWF192 as parameter::PARAMOWF>::PRODRUN128,
-                    U208,
-                >(GenericArray::from_slice(
-                    &data.res1[..208],
-                )));
+                let fields_res_1 = convert_to_bit::<
+                    <PARAMOWF192 as PARAMOWF>::Field,
+                    <PARAMOWF192 as PARAMOWF>::PRODRUN128,
+                >(&data.res1[..208]);
                 let fields_res_2: Vec<GF192> = data
                     .res2
                     .iter()
@@ -1471,7 +1441,7 @@ mod test {
                     assert_eq!(field_ab[i].0, res.0[i]);
                     assert_eq!(field_ab[i].1, res.1[i]);
                 }
-                assert_eq!(fields_res_1, *res.2);
+                assert_eq!(fields_res_1, res.2);
                 assert_eq!(*GenericArray::from_slice(&fields_res_2), *res.3);
             } else {
                 let fields_v = &(data
@@ -1511,16 +1481,10 @@ mod test {
                         )
                     })
                     .collect();
-                let fields_res_1: GenericArray<
-                    GF256,
-                    <parameter::PARAMOWF256 as parameter::PARAMOWF>::PRODRUN128,
-                > = *GenericArray::from_slice(&convert_to_bit::<
-                    PARAMOWF256,
-                    <parameter::PARAMOWF256 as parameter::PARAMOWF>::PRODRUN128,
-                    U240,
-                >(GenericArray::from_slice(
-                    &data.res1[..240],
-                )));
+                let fields_res_1 = convert_to_bit::<
+                    <PARAMOWF256 as PARAMOWF>::Field,
+                    <PARAMOWF256 as PARAMOWF>::PRODRUN128,
+                >(&data.res1[..240]);
                 let fields_res_2: Vec<GF256> = data
                     .res2
                     .iter()
@@ -1544,7 +1508,7 @@ mod test {
                     assert_eq!(field_ab[i].0, res.0[i]);
                     assert_eq!(field_ab[i].1, res.1[i]);
                 }
-                assert_eq!(fields_res_1, *res.2);
+                assert_eq!(fields_res_1, res.2);
                 assert_eq!(*GenericArray::from_slice(&fields_res_2), *res.3);
             }
         }
