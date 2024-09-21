@@ -1,4 +1,4 @@
-use std::iter::zip;
+use std::{io::Write, iter::zip};
 
 use crate::{
     aes::{aes_extendedwitness, aes_prove, aes_verify},
@@ -340,7 +340,7 @@ where
     h1_hasher.finish().read(&mut hv);
 
     let w = C::witness::<P, O>(sk, pk);
-    let d = GenericArray::from_iter(zip(w.iter(), &u[..l]).map(|(w, u)| w ^ *u));
+    let d = GenericArray::<u8, O::LBYTES>::from_iter(zip(w.iter(), &u[..l]).map(|(w, u)| w ^ *u));
 
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall1);
@@ -373,34 +373,25 @@ where
     h2_hasher.update(&chall2);
     h2_hasher.update(&a_t);
     h2_hasher.update(&b_t);
-    let mut chall3 = GenericArray::default();
+    let mut chall3 = GenericArray::<u8, P::LAMBDABYTES>::default();
     h2_hasher.finish().read(&mut chall3);
 
-    let mut pdecom = GenericArray::default_boxed();
-    for i in 0..tau {
-        let s = P::Tau::decode_challenge(&chall3, i);
-        if i < t0 {
-            pdecom[i] =
-                open::<RO<O>, P::POWK0, P::K0, P::N0>(&decom[i], GenericArray::from_slice(&s));
-        } else {
-            pdecom[i] =
-                open::<RO<O>, P::POWK1, P::K1, P::N1>(&decom[i], GenericArray::from_slice(&s));
-        }
-    }
-
-    sigma_to_signature::<P, O>((
-        Box::new(
-            c.iter()
-                .map(|x| GenericArray::from_slice(&x[..]).clone())
-                .collect::<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>(),
-        ),
-        u_t,
-        d,
-        *a_t,
-        pdecom,
-        chall3,
-        iv,
-    ))
+    sigma_to_signature::<P, O>(
+        c.iter().map(|value| value.as_ref()),
+        &u_t,
+        &d,
+        a_t.as_slice(),
+        (0..tau).map(|i| {
+            let s = P::Tau::decode_challenge(&chall3, i);
+            if i < t0 {
+                open::<RO<O>, P::POWK0, P::K0, P::N0>(&decom[i], GenericArray::from_slice(&s))
+            } else {
+                open::<RO<O>, P::POWK1, P::K1, P::N1>(&decom[i], GenericArray::from_slice(&s))
+            }
+        }),
+        &chall3,
+        &iv,
+    )
 }
 
 #[allow(unused_assignments)]
@@ -419,7 +410,7 @@ where
 
     let chall3 = GenericArray::from_slice(&sigma[sig - (16 + lambda)..sig - 16]);
     let mut h1_hasher = RO::<O>::h1_init();
-    h1_hasher.update(&pk);
+    h1_hasher.update(pk);
     h1_hasher.update(msg);
     let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
         GenericArray::default();
@@ -538,7 +529,7 @@ where
         GenericArray::from_slice(a_t),
         &chall2,
         chall3,
-        &pk,
+        pk,
     );
 
     let mut h2_hasher = RO::<O>::h2_init();
@@ -550,39 +541,36 @@ where
     *chall3 == chall3_p
 }
 
-#[allow(clippy::type_complexity)]
-fn sigma_to_signature<P, O>(
-    sigma: (
-        Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>,
-        GenericArray<u8, O::LAMBDAPLUS2>,
-        GenericArray<u8, O::LBYTES>,
-        GenericArray<u8, O::LAMBDABYTES>,
-        Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>>,
-        GenericArray<u8, P::LAMBDABYTES>,
-        IV,
-    ),
+fn sigma_to_signature<'a, P, O>(
+    c: impl Iterator<Item = &'a [u8]>, // Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>,
+    u_t: &[u8],
+    d: &[u8],
+    a_t: &[u8],
+    pdecom: impl Iterator<Item = (Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>)>,
+    chall3: &[u8],
+    iv: &IV,
 ) -> Box<GenericArray<u8, P::SIG>>
 where
     O: PARAMOWF,
     P: PARAM,
 {
-    let mut signature = sigma
-        .0
-        .into_iter()
-        .flat_map(|x| x.to_vec())
-        .collect::<Vec<u8>>();
-    signature.extend_from_slice(&sigma.1);
-    signature.extend_from_slice(&sigma.2);
-    signature.extend_from_slice(&sigma.3);
-    sigma.4.iter().for_each(|x| {
-        x.0.iter().for_each(|v| signature.extend_from_slice(v));
-        signature.extend_from_slice(&x.1);
-    });
-    signature.extend_from_slice(&sigma.5);
-    signature.extend_from_slice(&sigma.6);
-
     let mut res = GenericArray::default_boxed();
-    res.copy_from_slice(&signature);
+    let mut signature = res.as_mut_slice();
+
+    c.for_each(|x| {
+        signature.write_all(x).unwrap();
+    });
+    signature.write_all(u_t).unwrap();
+    signature.write_all(d).unwrap();
+    signature.write_all(a_t).unwrap();
+    pdecom.for_each(|x| {
+        x.0.iter().for_each(|v| {
+            signature.write_all(v).unwrap();
+        });
+        signature.write_all(&x.1).unwrap();
+    });
+    signature.write_all(chall3).unwrap();
+    signature.write_all(iv).unwrap();
     res
 }
 
@@ -663,12 +651,10 @@ mod test {
     use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
     use rand::RngCore;
 
-    use crate::{
-        parameter::{
-            PARAM, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM,
-            PARAM192S, PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF,
-            PARAMOWF128, PARAMOWF128EM, PARAMOWF192, PARAMOWF192EM, PARAMOWF256, PARAMOWF256EM,
-        },
+    use crate::parameter::{
+        PARAM, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
+        PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF, PARAMOWF128,
+        PARAMOWF128EM, PARAMOWF192, PARAMOWF192EM, PARAMOWF256, PARAMOWF256EM,
     };
 
     const RUNS: usize = 10;
@@ -1014,14 +1000,18 @@ mod test {
             rng.fill_bytes(&mut rho);
 
             let signature = faest_sign::<C, P, O>(
-                        &msg,
-                        GenericArray::from_slice(&keypair.1[sk_offset..sk_offset_2]),
-                        GenericArray::from_slice(&pk),
-                        &rho
-                    );
+                &msg,
+                GenericArray::from_slice(&keypair.1[sk_offset..sk_offset_2]),
+                GenericArray::from_slice(&pk),
+                &rho,
+            );
             assert_eq!(&sig[..sig.len() - signature.len()], &msg);
             assert_eq!(&sig[sig.len() - signature.len()..], signature.as_slice());
-            assert!(faest_verify::<C, P, O>(&msg, GenericArray::from_slice(&pk), &signature));
+            assert!(faest_verify::<C, P, O>(
+                &msg,
+                GenericArray::from_slice(&pk),
+                &signature
+            ));
         }
     }
 
