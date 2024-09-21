@@ -1177,7 +1177,6 @@ fn rotate_rows_and_columns_2_2(x: u32) -> u32 {
 
 #[cfg(test)]
 mod test {
-    use rand::Rng;
     use serde::Deserialize;
     use std::{cmp::max, fs::File};
 

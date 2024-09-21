@@ -1,6 +1,5 @@
-use generic_array::{typenum::Unsigned, GenericArray};
+use generic_array::GenericArray;
 use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
-use rand::random;
 use rand::RngCore;
 
 use crate::{
@@ -11965,26 +11964,30 @@ fn faest_sign_test() {
     assert!(res);
 }
 
+fn random_message(mut rng: impl RngCore) -> Vec<u8> {
+    let mut length = [0];
+    while length[0] == 0 {
+        rng.fill_bytes(&mut length);
+    }
+    let mut ret = vec![0; length[0] as usize];
+    rng.fill_bytes(&mut ret);
+    ret
+}
+
 #[test]
 fn faest_aes_test_128s() {
-    //128-s
+    let mut rng = rand::thread_rng();
     for _i in 0..RUNS {
-        let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
-            [..48]
-            .try_into()
-            .unwrap();
-        let rng = NistPqcAes256CtrRng::from(seed);
-        let (pk, sk) = AesCypher::keygen_with_rng::<PARAM128S, PARAMOWF128>(rng);
-        let length: u8 = random();
-        let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
+        let (pk, sk) = AesCypher::keygen_with_rng::<PARAM128S, PARAMOWF128>(&mut rng);
+        let msg = random_message(&mut rng);
         let sigma = faest_sign::<AesCypher, PARAM128S, PARAMOWF128>(
-            msg,
+            &msg,
             GenericArray::from_slice(&sk[16..]),
             GenericArray::from_slice(&pk),
             &[],
         );
         let res_true = faest_verify::<AesCypher, PARAM128S, PARAMOWF128>(
-            msg,
+            &msg,
             *GenericArray::from_slice(&pk),
             &sigma_to_signature::<PARAM128S, PARAMOWF128>(sigma),
         );
@@ -11994,24 +11997,18 @@ fn faest_aes_test_128s() {
 
 #[test]
 fn faest_aes_test_128f() {
-    //128-f
+    let mut rng = rand::thread_rng();
     for _i in 0..RUNS {
-        let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
-            [..48]
-            .try_into()
-            .unwrap();
-        let rng = NistPqcAes256CtrRng::from(seed);
-        let (pk, sk) = AesCypher::keygen_with_rng::<PARAM128F, PARAMOWF128>(rng);
-        let length: u8 = random();
-        let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
+        let (pk, sk) = AesCypher::keygen_with_rng::<PARAM128F, PARAMOWF128>(&mut rng);
+        let msg = random_message(&mut rng);
         let sigma = faest_sign::<AesCypher, PARAM128F, PARAMOWF128>(
-            msg,
+            &msg,
             GenericArray::from_slice(&sk[16..]),
             GenericArray::from_slice(&pk),
             &[],
         );
         let res_true = faest_verify::<AesCypher, PARAM128F, PARAMOWF128>(
-            msg,
+            &msg,
             *GenericArray::from_slice(&pk),
             &sigma_to_signature::<PARAM128F, PARAMOWF128>(sigma),
         );
@@ -12022,52 +12019,39 @@ fn faest_aes_test_128f() {
 
 #[test]
 fn faest_aes_test_192s() {
-    //192-s
+    let mut rng = rand::thread_rng();
     for _i in 0..RUNS {
-        let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
-            [..48]
-            .try_into()
-            .unwrap();
-        let rng = NistPqcAes256CtrRng::from(seed);
-        let (pk, sk) = AesCypher::keygen_with_rng::<PARAM192S, PARAMOWF192>(rng);
-        let length: u8 = random();
-        let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
+        let (pk, sk) = AesCypher::keygen_with_rng::<PARAM192S, PARAMOWF192>(&mut rng);
+        let msg = random_message(&mut rng);
         let sigma = faest_sign::<AesCypher, PARAM192S, PARAMOWF192>(
-            msg,
+            &msg,
             GenericArray::from_slice(&sk[32..56]),
             GenericArray::from_slice(&pk),
             &[],
         );
         let res_true = faest_verify::<AesCypher, PARAM192S, PARAMOWF192>(
-            msg,
+            &msg,
             *GenericArray::from_slice(&pk),
             &sigma_to_signature::<PARAM192S, PARAMOWF192>(sigma),
         );
-
         assert!(res_true);
     }
 }
 
 #[test]
 fn faest_aes_test_192f() {
-    //192-f
+    let mut rng = rand::thread_rng();
     for _i in 0..RUNS {
-        let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
-            [..48]
-            .try_into()
-            .unwrap();
-        let rng = NistPqcAes256CtrRng::from(seed);
-        let (pk, sk) = AesCypher::keygen_with_rng::<PARAM192F, PARAMOWF192>(rng);
-        let length: u8 = random();
-        let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
+        let (pk, sk) = AesCypher::keygen_with_rng::<PARAM192F, PARAMOWF192>(&mut rng);
+        let msg = random_message(&mut rng);
         let sigma = faest_sign::<AesCypher, PARAM192F, PARAMOWF192>(
-            msg,
+            &msg,
             GenericArray::from_slice(&sk[32..56]),
             GenericArray::from_slice(&pk),
             &[],
         );
         let res_true = faest_verify::<AesCypher, PARAM192F, PARAMOWF192>(
-            msg,
+            &msg,
             *GenericArray::from_slice(&pk),
             &sigma_to_signature::<PARAM192F, PARAMOWF192>(sigma),
         );
@@ -12077,24 +12061,18 @@ fn faest_aes_test_192f() {
 
 #[test]
 fn faest_aes_test_256s() {
-    //256-s
+    let mut rng = rand::thread_rng();
     for _i in 0..RUNS {
-        let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
-            [..48]
-            .try_into()
-            .unwrap();
-        let rng = NistPqcAes256CtrRng::from(seed);
-        let (pk, sk) = AesCypher::keygen_with_rng::<PARAM256S, PARAMOWF256>(rng);
-        let length: u8 = random();
-        let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
+        let (pk, sk) = AesCypher::keygen_with_rng::<PARAM256S, PARAMOWF256>(&mut rng);
+        let msg = random_message(&mut rng);
         let sigma = faest_sign::<AesCypher, PARAM256S, PARAMOWF256>(
-            msg,
+            &msg,
             GenericArray::from_slice(&sk[32..]),
             GenericArray::from_slice(&pk),
             &[],
         );
         let res_true = faest_verify::<AesCypher, PARAM256S, PARAMOWF256>(
-            msg,
+            &msg,
             *GenericArray::from_slice(&pk),
             &sigma_to_signature::<PARAM256S, PARAMOWF256>(sigma),
         );
@@ -12104,24 +12082,18 @@ fn faest_aes_test_256s() {
 
 #[test]
 fn faest_aes_test_256f() {
-    //256-f
+    let mut rng = rand::thread_rng();
     for _i in 0..RUNS {
-        let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
-            [..48]
-            .try_into()
-            .unwrap();
-        let rng = NistPqcAes256CtrRng::from(seed);
-        let (pk, sk) = AesCypher::keygen_with_rng::<PARAM256F, PARAMOWF256>(rng);
-        let length: u8 = random();
-        let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
+        let (pk, sk) = AesCypher::keygen_with_rng::<PARAM256F, PARAMOWF256>(&mut rng);
+        let msg = random_message(&mut rng);
         let sigma = faest_sign::<AesCypher, PARAM256F, PARAMOWF256>(
-            msg,
+            &msg,
             GenericArray::from_slice(&sk[32..]),
             GenericArray::from_slice(&pk),
             &[],
         );
         let res_true = faest_verify::<AesCypher, PARAM256F, PARAMOWF256>(
-            msg,
+            &msg,
             *GenericArray::from_slice(&pk),
             &sigma_to_signature::<PARAM256F, PARAMOWF256>(sigma),
         );
@@ -12131,24 +12103,18 @@ fn faest_aes_test_256f() {
 
 #[test]
 fn faest_em_test_128s() {
-    //128-s
+    let mut rng = rand::thread_rng();
     for _i in 0..RUNS {
-        let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
-            [..48]
-            .try_into()
-            .unwrap();
-        let rng = NistPqcAes256CtrRng::from(seed);
-        let (pk, sk) = EmCypher::keygen_with_rng::<PARAM128SEM, PARAMOWF128EM>(rng);
-        let length: u8 = random();
-        let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
+        let (pk, sk) = EmCypher::keygen_with_rng::<PARAM128SEM, PARAMOWF128EM>(&mut rng);
+        let msg = random_message(&mut rng);
         let sigma = faest_sign::<EmCypher, PARAM128SEM, PARAMOWF128EM>(
-            msg,
+            &msg,
             GenericArray::from_slice(&sk[16..]),
             GenericArray::from_slice(&pk),
             &[],
         );
         let res_true = faest_verify::<EmCypher, PARAM128SEM, PARAMOWF128EM>(
-            msg,
+            &msg,
             *GenericArray::from_slice(&pk),
             &sigma_to_signature::<PARAM128SEM, PARAMOWF128EM>(sigma),
         );
@@ -12158,24 +12124,18 @@ fn faest_em_test_128s() {
 
 #[test]
 fn faest_em_test_128f() {
-    //128-f
+    let mut rng = rand::thread_rng();
     for _i in 0..RUNS {
-        let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
-            [..48]
-            .try_into()
-            .unwrap();
-        let rng = NistPqcAes256CtrRng::from(seed);
-        let (pk, sk) = EmCypher::keygen_with_rng::<PARAM128FEM, PARAMOWF128EM>(rng);
-        let length: u8 = random();
-        let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
+        let (pk, sk) = EmCypher::keygen_with_rng::<PARAM128FEM, PARAMOWF128EM>(&mut rng);
+        let msg = random_message(&mut rng);
         let sigma = faest_sign::<EmCypher, PARAM128FEM, PARAMOWF128EM>(
-            msg,
+            &msg,
             GenericArray::from_slice(&sk[16..]),
             GenericArray::from_slice(&pk),
             &[],
         );
         let res_true = faest_verify::<EmCypher, PARAM128FEM, PARAMOWF128EM>(
-            msg,
+            &msg,
             *GenericArray::from_slice(&pk),
             &sigma_to_signature::<PARAM128FEM, PARAMOWF128EM>(sigma),
         );
@@ -12185,24 +12145,18 @@ fn faest_em_test_128f() {
 
 #[test]
 fn faest_em_test_192s() {
-    //192-s
+    let mut rng = rand::thread_rng();
     for _i in 0..RUNS {
-        let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
-            [..48]
-            .try_into()
-            .unwrap();
-        let rng = NistPqcAes256CtrRng::from(seed);
-        let (pk, sk) = EmCypher::keygen_with_rng::<PARAM192SEM, PARAMOWF192EM>(rng);
-        let length: u8 = random();
-        let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
+        let (pk, sk) = EmCypher::keygen_with_rng::<PARAM192SEM, PARAMOWF192EM>(&mut rng);
+        let msg = random_message(&mut rng);
         let sigma = faest_sign::<EmCypher, PARAM192SEM, PARAMOWF192EM>(
-            msg,
+            &msg,
             GenericArray::from_slice(&sk[24..]),
             GenericArray::from_slice(&pk),
             &[],
         );
         let res_true = faest_verify::<EmCypher, PARAM192SEM, PARAMOWF192EM>(
-            msg,
+            &msg,
             *GenericArray::from_slice(&pk),
             &sigma_to_signature::<PARAM192SEM, PARAMOWF192EM>(sigma),
         );
@@ -12212,24 +12166,18 @@ fn faest_em_test_192s() {
 
 #[test]
 fn faest_em_test_192f() {
-    //192-f
+    let mut rng = rand::thread_rng();
     for _i in 0..RUNS {
-        let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
-            [..48]
-            .try_into()
-            .unwrap();
-        let rng = NistPqcAes256CtrRng::from(seed);
-        let (pk, sk) = EmCypher::keygen_with_rng::<PARAM192FEM, PARAMOWF192EM>(rng);
-        let length: u8 = random();
-        let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
+        let (pk, sk) = EmCypher::keygen_with_rng::<PARAM192FEM, PARAMOWF192EM>(&mut rng);
+        let msg = random_message(&mut rng);
         let sigma = faest_sign::<EmCypher, PARAM192FEM, PARAMOWF192EM>(
-            msg,
+            &msg,
             GenericArray::from_slice(&sk[24..]),
             GenericArray::from_slice(&pk),
             &[],
         );
         let res_true = faest_verify::<EmCypher, PARAM192FEM, PARAMOWF192EM>(
-            msg,
+            &msg,
             *GenericArray::from_slice(&pk),
             &sigma_to_signature::<PARAM192FEM, PARAMOWF192EM>(sigma),
         );
@@ -12239,25 +12187,18 @@ fn faest_em_test_192f() {
 
 #[test]
 fn faest_em_test_256s() {
-    //256-s
+    let mut rng = rand::thread_rng();
     for _i in 0..RUNS {
-        let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
-            [..48]
-            .try_into()
-            .unwrap();
-        let rng = NistPqcAes256CtrRng::from(seed);
-
-        let (pk, sk) = EmCypher::keygen_with_rng::<PARAM256SEM, PARAMOWF256EM>(rng);
-        let length: u8 = random();
-        let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
+        let (pk, sk) = EmCypher::keygen_with_rng::<PARAM256SEM, PARAMOWF256EM>(&mut rng);
+        let msg = random_message(&mut rng);
         let sigma = faest_sign::<EmCypher, PARAM256SEM, PARAMOWF256EM>(
-            msg,
+            &msg,
             GenericArray::from_slice(&sk[32..]),
             GenericArray::from_slice(&pk),
             &[],
         );
         let res_true = faest_verify::<EmCypher, PARAM256SEM, PARAMOWF256EM>(
-            msg,
+            &msg,
             *GenericArray::from_slice(&pk),
             &sigma_to_signature::<PARAM256SEM, PARAMOWF256EM>(sigma),
         );
@@ -12267,24 +12208,18 @@ fn faest_em_test_256s() {
 
 #[test]
 fn faest_em_test_256f() {
-    //256-f
+    let mut rng = rand::thread_rng();
     for _i in 0..RUNS {
-        let seed: [u8; 48] = [rand::random::<[u8; 32]>(), rand::random::<[u8; 32]>()].concat()
-            [..48]
-            .try_into()
-            .unwrap();
-        let rng = NistPqcAes256CtrRng::from(seed);
-        let (pk, sk) = EmCypher::keygen_with_rng::<PARAM256FEM, PARAMOWF256EM>(rng);
-        let length: u8 = random();
-        let msg = &(0..length).map(|_| random::<u8>()).collect::<Vec<u8>>()[..];
+        let (pk, sk) = EmCypher::keygen_with_rng::<PARAM256FEM, PARAMOWF256EM>(&mut rng);
+        let msg = random_message(&mut rng);
         let sigma = faest_sign::<EmCypher, PARAM256FEM, PARAMOWF256EM>(
-            msg,
+            &msg,
             GenericArray::from_slice(&sk[32..]),
             GenericArray::from_slice(&pk),
             &[],
         );
         let res_true = faest_verify::<EmCypher, PARAM256FEM, PARAMOWF256EM>(
-            msg,
+            &msg,
             *GenericArray::from_slice(&pk),
             &sigma_to_signature::<PARAM256FEM, PARAMOWF256EM>(sigma),
         );
@@ -12449,7 +12384,6 @@ fn test_nist_faest_128s_em() {
 }
 
 #[test]
-
 fn test_nist_faest_128f_em() {
     test_nist::<PARAM128FEM, PARAMOWF128EM, EmCypher>(
         include_str!("../PQCsignKAT_faest_em_128f.rsp"),
@@ -12459,7 +12393,6 @@ fn test_nist_faest_128f_em() {
 }
 
 #[test]
-
 fn test_nist_faest_192s_em() {
     test_nist::<PARAM192SEM, PARAMOWF192EM, EmCypher>(
         include_str!("../PQCsignKAT_faest_em_192s.rsp"),
@@ -12469,8 +12402,7 @@ fn test_nist_faest_192s_em() {
 }
 
 #[test]
-
-fn test_nist_faest192f_em_() {
+fn test_nist_faest192f_em() {
     test_nist::<PARAM192FEM, PARAMOWF192EM, EmCypher>(
         include_str!("../PQCsignKAT_faest_em_192f.rsp"),
         24,
@@ -12488,8 +12420,7 @@ fn test_nist_faest_256s_em() {
 }
 
 #[test]
-
-fn test_nist_faest256f_em_() {
+fn test_nist_faest_256f_em() {
     test_nist::<PARAM256FEM, PARAMOWF256EM, EmCypher>(
         include_str!("../PQCsignKAT_faest_em_256f.rsp"),
         32,
