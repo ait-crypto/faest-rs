@@ -20,7 +20,7 @@ type QSProof<O> = (
 );
 type Key<O> = (
     GenericArray<u8, <O as PARAMOWF>::PK>,
-    Box<GenericArray<u8, <O as PARAMOWF>::PK>>,
+    GenericArray<u8, <O as PARAMOWF>::PK>,
 );
 
 pub trait Variant {
@@ -129,7 +129,7 @@ impl Variant for AesCypher {
         let beta = <P::BETA as Unsigned>::to_u8();
         let pk_len = <O::PK as Unsigned>::to_usize() / 2;
         'boucle: loop {
-            let mut sk: Box<GenericArray<u8, O::PK>> = GenericArray::default_boxed();
+            let mut sk: GenericArray<u8, O::PK> = GenericArray::default();
             rng.fill_bytes(&mut sk);
 
             let test = aes_extendedwitness::<P, O>(
@@ -145,14 +145,14 @@ impl Variant for AesCypher {
                 _,
             >;
             let rk = rijndael_key_schedule(
-                &sk[16 * <P::BETA as Unsigned>::to_usize()..],
+                &sk[16 * P::BETA::USIZE..],
                 4,
-                <O::NK as Unsigned>::to_u8(),
-                <O::R as Unsigned>::to_u8(),
-                <O::SKE as Unsigned>::to_u8(),
+                O::NK::U8,
+                O::R::U8,
+                O::SKE::U8,
             )
             .0;
-            let mut y: Box<GenericArray<u8, O::PK>> = GenericArray::default_boxed();
+            let mut y: GenericArray<u8, O::PK> = GenericArray::default();
             let mut index = 0;
             if beta == 1 {
                 cypher = rijndael_encrypt(&rk, &[&sk[..16], &[0u8; 16]].concat(), 4, nk, r);
@@ -236,7 +236,7 @@ impl Variant for EmCypher {
         let r = <O::R as Unsigned>::to_u8();
         let nst = <O::NST as Unsigned>::to_u8();
         'boucle: loop {
-            let mut sk: Box<GenericArray<u8, O::PK>> = GenericArray::default_boxed();
+            let mut sk: GenericArray<u8, O::PK> = GenericArray::default();
             rng.fill_bytes(&mut sk);
             let test = em_extendedwitness::<P, O>(
                 GenericArray::from_slice(&sk[lambda..]),
@@ -294,11 +294,8 @@ where
 {
     let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
     let l = <P::L as Unsigned>::to_usize() / 8;
-    let _b = <P::B as Unsigned>::to_usize() / 8;
     let tau = <P::TAU as Unsigned>::to_usize();
     let t0 = <P::TAU0 as Unsigned>::to_usize();
-    let _k0 = <P::K0 as Unsigned>::to_u16();
-    let _k1 = <P::K1 as Unsigned>::to_u16();
 
     let mut h1_hasher = RO::<O>::h1_init();
     h1_hasher.update(pk);
@@ -542,7 +539,7 @@ where
 }
 
 fn sigma_to_signature<'a, P, O>(
-    c: impl Iterator<Item = &'a [u8]>, // Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>,
+    c: impl Iterator<Item = &'a [u8]>,
     u_t: &[u8],
     d: &[u8],
     a_t: &[u8],
