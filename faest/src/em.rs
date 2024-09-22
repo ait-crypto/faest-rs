@@ -368,8 +368,9 @@ where
             }
         }
     }
-    let inside = &O::Field::to_field(&temp_v);
-    let new_v: &GenericArray<_, O::LAMBDAL> = GenericArray::from_slice(inside);
+    let new_v = GenericArray::<O::Field, O::LAMBDAL>::from_iter(
+        temp_v.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
+    );
     let x = rijndael_key_schedule(&pk[..lambda / 8], nst, nk, r, 4 * (((r + 1) * nst) / nk));
     let (a0, a1) = em_enc_cstrnts::<P, O>(
         GenericArray::from_slice(&pk[lambda / 8..]),
@@ -389,7 +390,7 @@ where
         false,
         O::Field::default(),
     );
-    let u_s = O::Field::to_field(&u[l / 8..])[0];
+    let u_s = O::Field::from(&u[l / 8..]);
     let v_s = O::Field::sum_poly(&new_v[l..l + lambda]);
 
     let mut a_t_hasher =
@@ -426,7 +427,7 @@ where
     let t0 = <P::TAU0 as Unsigned>::to_usize();
     let t1 = <P::TAU1 as Unsigned>::to_usize();
     let l = <O::L as Unsigned>::to_usize();
-    let delta = O::Field::to_field(chall3)[0];
+    let delta = O::Field::from(chall3);
     let nst = <O::NST as Unsigned>::to_u8();
     let nk = <O::NK as Unsigned>::to_u8();
     let r = <O::R as Unsigned>::to_u8();
@@ -464,7 +465,9 @@ where
             }
         }
     }
-    let new_q = O::Field::to_field(&temp_q);
+    let new_q = GenericArray::<O::Field, O::LAMBDAL>::from_iter(
+        temp_q.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
+    );
     let x = rijndael_key_schedule(&pk[..lambda / 8], nst, nk, r, 4 * (((r + 1) * nst) / nk));
     let (b, _) = em_enc_cstrnts::<P, O>(
         GenericArray::from_slice(&pk[lambda / 8..]),
@@ -499,7 +502,7 @@ mod test {
 
     use crate::{
         aes::convert_to_bit,
-        fields::{large_fields::NewFromU128, BigGaloisField, GF128, GF192, GF256},
+        fields::{large_fields::NewFromU128, GF128, GF192, GF256},
         parameter::{
             PARAM128FEM, PARAM128SEM, PARAM192FEM, PARAM192SEM, PARAM256FEM, PARAM256SEM,
             PARAMOWF128, PARAMOWF128EM, PARAMOWF192EM, PARAMOWF256EM,
@@ -508,10 +511,7 @@ mod test {
 
     use std::fs::File;
 
-    use generic_array::{
-        typenum::{U1, U8},
-        GenericArray,
-    };
+    use generic_array::{typenum::U8, GenericArray};
     use serde::Deserialize;
 
     #[derive(Debug, Deserialize)]
@@ -1013,7 +1013,7 @@ mod test {
                     GenericArray::from_slice(vq),
                     GenericArray::from_slice(vq),
                     data.mkey != 0,
-                    GF128::to_field(&data.delta)[0],
+                    GF128::from(data.delta.as_slice()),
                 );
                 let (mut a0, mut a1) = (vec![], vec![]);
                 for i in 0..data.ab.len() {
@@ -1042,7 +1042,7 @@ mod test {
                     GenericArray::from_slice(vq),
                     GenericArray::from_slice(vq),
                     data.mkey != 0,
-                    GF192::to_field(&data.delta)[0],
+                    GF192::from(data.delta.as_slice()),
                 );
                 let (mut a0, mut a1) = (vec![], vec![]);
                 for i in 0..data.ab.len() {
@@ -1076,7 +1076,7 @@ mod test {
                     GenericArray::from_slice(vq),
                     GenericArray::from_slice(vq),
                     data.mkey != 0,
-                    GF256::to_field(&data.delta)[0],
+                    GF256::from(data.delta.as_slice()),
                 );
                 let (mut a0, mut a1) = (vec![], vec![]);
                 for i in 0..data.ab.len() {

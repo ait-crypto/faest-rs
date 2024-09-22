@@ -61,20 +61,6 @@ where
     const LENGTH: usize;
 
     fn to_bytes(&self) -> Vec<u8>;
-
-    #[deprecated]
-    fn to_field(x: &[u8]) -> Vec<Self> {
-        let n = (8 * x.len()) / Self::LENGTH;
-        let mut res = vec![];
-        let padding_array = [0u8; 16];
-        for i in 0..n {
-            let padded_value =
-                &mut x[(i * Self::LENGTH / 8)..((i + 1) * Self::LENGTH / 8)].to_vec();
-            padded_value.append(&mut padding_array[..(32 - Self::LENGTH / 8)].to_vec());
-            res.push(Self::from(padded_value));
-        }
-        res
-    }
 }
 
 /// Trait providing methods for "byte combination"
@@ -984,7 +970,6 @@ impl NewFromU128 for GF256 {
 mod test {
     use super::*;
 
-    use num_bigint::BigUint;
     use rand::{rngs::SmallRng, SeedableRng};
     //GF128
 
@@ -2349,34 +2334,6 @@ mod test {
         );
     }
 
-    #[test]
-    //We see if the to field function give the same result that what we could have with BigUint
-    fn gf128_test_to_field() {
-        let mut rng = SmallRng::from_entropy();
-
-        for _i in 0..1000 {
-            let random: [u8; 16] = rng.gen();
-            let pol = GF128::to_field(&random);
-            let verif_big = BigUint::from_bytes_le(&random);
-            let verif = verif_big.to_u64_digits()[0] as u128
-                + ((verif_big.to_u64_digits()[1] as u128) << 64);
-            assert_eq!(pol[0].0[0], verif)
-        }
-        //with many polynomes
-        for _i in 0..1000 {
-            let random: [u8; 32] = rng.gen();
-            let pol = GF128::to_field(&random);
-            let verif_big = BigUint::from_bytes_le(&random);
-            let verif_0 = verif_big.to_u64_digits()[0] as u128
-                + ((verif_big.to_u64_digits()[1] as u128) << 64);
-            let verif_1 = verif_big.to_u64_digits()[2] as u128
-                + ((verif_big.to_u64_digits()[3] as u128) << 64);
-            assert_eq!(pol[0].0[0], verif_0);
-            assert_eq!(pol[1].0[0], verif_1);
-        }
-    }
-
-    //GF192
     #[test]
     //input : two GF192
     //output : the product of the two according to te rules of Galois Fields arithmetic
@@ -4552,41 +4509,6 @@ mod test {
                 0xffffffffffffffffffffffffffffffffu128
             )
         );
-    }
-
-    #[test]
-    //We see if the to field function give the same result that what we could have with BigUint
-    fn gf192_test_to_field() {
-        let mut rng = SmallRng::from_entropy();
-
-        for _i in 0..1000 {
-            let random: [u8; 24] = rng.gen();
-            let pol = GF192::to_field(&random);
-            let verif_big = BigUint::from_bytes_le(&random);
-            let verif_0_0 = verif_big.to_u64_digits()[0] as u128
-                + ((verif_big.to_u64_digits()[1] as u128) << 64);
-            let verif_0_1 = verif_big.to_u64_digits()[2] as u128;
-            assert_eq!(pol[0].0[0], verif_0_0);
-            assert_eq!(pol[0].0[1], verif_0_1);
-        }
-        //with many polynomes
-        for _i in 0..1000 {
-            let mut random_1 = rng.gen::<[u8; 24]>().to_vec();
-            let mut random_2 = rng.gen::<[u8; 24]>().to_vec();
-            random_1.append(&mut random_2);
-            let pol = GF192::to_field(&random_1);
-            let verif_big = BigUint::from_bytes_le(&random_1);
-            let verif_0_0 = verif_big.to_u64_digits()[0] as u128
-                + ((verif_big.to_u64_digits()[1] as u128) << 64);
-            let verif_0_1 = verif_big.to_u64_digits()[2] as u128;
-            let verif_1_0 = verif_big.to_u64_digits()[3] as u128
-                + ((verif_big.to_u64_digits()[4] as u128) << 64);
-            let verif_1_1 = verif_big.to_u64_digits()[5] as u128;
-            assert_eq!(pol[0].0[0], verif_0_0);
-            assert_eq!(pol[0].0[1], verif_0_1);
-            assert_eq!(pol[1].0[0], verif_1_0);
-            assert_eq!(pol[1].0[1], verif_1_1);
-        }
     }
 
     //GF256
@@ -6765,43 +6687,5 @@ mod test {
                 0xffffffffffffffffffffffffffffffffu128
             )
         );
-    }
-
-    #[test]
-    //We see if the to field function give the same result that what we could have with BigUint
-    fn gf256_test_to_field() {
-        let mut rng = SmallRng::from_entropy();
-
-        for _i in 0..1000 {
-            let random: [u8; 32] = rng.gen();
-            let pol = GF256::to_field(&random);
-            let verif_big = BigUint::from_bytes_le(&random);
-            let verif_0_0 = verif_big.to_u64_digits()[0] as u128
-                + ((verif_big.to_u64_digits()[1] as u128) << 64);
-            let verif_0_1 = verif_big.to_u64_digits()[2] as u128
-                + ((verif_big.to_u64_digits()[3] as u128) << 64);
-            assert_eq!(pol[0].0[0], verif_0_0);
-            assert_eq!(pol[0].0[1], verif_0_1);
-        }
-        //with many polynomes
-        for _i in 0..1000 {
-            let mut random_1 = rng.gen::<[u8; 32]>().to_vec();
-            let mut random_2 = rng.gen::<[u8; 32]>().to_vec();
-            random_1.append(&mut random_2);
-            let pol = GF256::to_field(&random_1);
-            let verif_big = BigUint::from_bytes_le(&random_1);
-            let verif_0_0 = verif_big.to_u64_digits()[0] as u128
-                + ((verif_big.to_u64_digits()[1] as u128) << 64);
-            let verif_0_1 = verif_big.to_u64_digits()[2] as u128
-                + ((verif_big.to_u64_digits()[3] as u128) << 64);
-            let verif_1_0 = verif_big.to_u64_digits()[4] as u128
-                + ((verif_big.to_u64_digits()[5] as u128) << 64);
-            let verif_1_1 = verif_big.to_u64_digits()[6] as u128
-                + ((verif_big.to_u64_digits()[7] as u128) << 64);
-            assert_eq!(pol[0].0[0], verif_0_0);
-            assert_eq!(pol[0].0[1], verif_0_1);
-            assert_eq!(pol[1].0[0], verif_1_0);
-            assert_eq!(pol[1].0[1], verif_1_1);
-        }
     }
 }

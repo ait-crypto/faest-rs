@@ -16,7 +16,6 @@ rand_core = { version = "0.6", default-features = false }
 zeroize = { version = "1", default-fatures = false, features = ["derive"] }
 
 [dev-dependencies]
-num-bigint = "0.4.4"
 serde_derive = "1.0.200"
 serde = { version = "1.0.200", features = ["derive"] }
 serde_json = "1.0.116"

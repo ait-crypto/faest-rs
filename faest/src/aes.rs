@@ -747,8 +747,9 @@ where
             }
         }
     }
-    let inside = &O::Field::to_field(&temp_v);
-    let new_v: &GenericArray<O::Field, O::LAMBDAL> = GenericArray::from_slice(inside);
+    let new_v = GenericArray::<O::Field, O::LAMBDAL>::from_iter(
+        temp_v.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
+    );
 
     let (input, output): Keypair<O> = (
         GenericArray::from_slice(&pk[..pk_val / 2]),
@@ -814,7 +815,7 @@ where
         (GenericArray::from_slice(&[&a1[..], &a_01[senc..], &a_01_bis[senc..]].concat())).clone()
     };
 
-    let u_s = O::Field::to_field(&u[l / 8..])[0];
+    let u_s = O::Field::from(&u[l / 8..]);
     let v_s = O::Field::sum_poly(&new_v[l..l + lambda]);
 
     let mut a_t_hasher =
@@ -854,7 +855,7 @@ where
     let t1 = <P::TAU1 as Unsigned>::to_usize();
     let l = <P::L as Unsigned>::to_usize();
     let _c = <O::C as Unsigned>::to_usize();
-    let delta = O::Field::to_field(chall3)[0];
+    let delta = O::Field::from(chall3);
     let lke = <O::LKE as Unsigned>::to_usize();
     let lenc = <O::LENC as Unsigned>::to_usize();
     let senc = <O::SENC as Unsigned>::to_usize();
@@ -899,8 +900,9 @@ where
     }
 
     let mut zk_hasher = O::ZKHasher::new_zk_hasher(chall2);
-
-    let new_q = O::Field::to_field(&temp_q);
+    let new_q = GenericArray::<O::Field, O::LAMBDAL>::from_iter(
+        temp_q.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
+    );
 
     let (b1, _, _, qk) = aes_key_exp_cstrnts::<O>(
         &GenericArray::default_boxed(),
@@ -2221,7 +2223,7 @@ mod test {
                 );
                 assert_eq!(
                     GF128::new(data.res[0] as u128 + ((data.res[1] as u128) << 64), 0),
-                    GF128::to_field(&out[..])[0]
+                    GF128::from(&out[..])
                 );
             } else if data.lambda == 192 {
                 let mut pk = data.input.to_vec();
@@ -2245,7 +2247,7 @@ mod test {
                         data.res[0] as u128 + ((data.res[1] as u128) << 64),
                         data.res[2] as u128
                     ),
-                    GF192::to_field(&out[..])[0]
+                    GF192::from(&out[..])
                 );
             } else {
                 let mut pk = data.input.to_vec();
@@ -2269,7 +2271,7 @@ mod test {
                         data.res[0] as u128 + ((data.res[1] as u128) << 64),
                         data.res[2] as u128 + ((data.res[3] as u128) << 64)
                     ),
-                    GF256::to_field(&out[..])[0]
+                    GF256::from(&out[..])
                 );
             }
         }
