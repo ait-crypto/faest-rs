@@ -645,6 +645,10 @@ fn xor_columns(rkeys: &mut [u32], offset: usize, idx_xor: usize, idx_ror: u32, n
     }
 }
 
+const M0: u32 = 0x55555555;
+const M1: u32 = 0x33333333;
+const M2: u32 = 0x0f0f0f0f;
+
 /// Bitslice two 128-bit input blocks input0, input1 into a 256-bit internal state.
 pub fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
     debug_assert_eq!(output.len(), 8);
@@ -688,7 +692,6 @@ pub fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
 
     // Bit Index Swap 5 <-> 0:
     //     __ __ b0 __ __ __ __ p0 => __ __ p0 __ __ __ __ b0
-    const M0: u32 = 0x55555555;
     delta_swap_2(&mut t1, &mut t0, 1, M0);
     delta_swap_2(&mut t3, &mut t2, 1, M0);
     delta_swap_2(&mut t5, &mut t4, 1, M0);
@@ -696,7 +699,6 @@ pub fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
 
     // Bit Index Swap 6 <-> 1:
     //     __ c0 __ __ __ __ p1 __ => __ p1 __ __ __ __ c0 __
-    const M1: u32 = 0x33333333;
     delta_swap_2(&mut t2, &mut t0, 2, M1);
     delta_swap_2(&mut t3, &mut t1, 2, M1);
     delta_swap_2(&mut t6, &mut t4, 2, M1);
@@ -704,7 +706,6 @@ pub fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
 
     // Bit Index Swap 7 <-> 2:
     //     c1 __ __ __ __ p2 __ __ => p2 __ __ __ __ c1 __ __
-    const M2: u32 = 0x0f0f0f0f;
     delta_swap_2(&mut t4, &mut t0, 4, M2);
     delta_swap_2(&mut t5, &mut t1, 4, M2);
     delta_swap_2(&mut t6, &mut t2, 4, M2);
@@ -747,27 +748,24 @@ pub fn inv_bitslice(input: &[u32]) -> BatchBlocks {
 
     // Bit Index Swap 5 <-> 0:
     //     __ __ p0 __ __ __ __ b0 => __ __ b0 __ __ __ __ p0
-    let m0 = 0x55555555;
-    delta_swap_2(&mut t1, &mut t0, 1, m0);
-    delta_swap_2(&mut t3, &mut t2, 1, m0);
-    delta_swap_2(&mut t5, &mut t4, 1, m0);
-    delta_swap_2(&mut t7, &mut t6, 1, m0);
+    delta_swap_2(&mut t1, &mut t0, 1, M0);
+    delta_swap_2(&mut t3, &mut t2, 1, M0);
+    delta_swap_2(&mut t5, &mut t4, 1, M0);
+    delta_swap_2(&mut t7, &mut t6, 1, M0);
 
     // Bit Index Swap 6 <-> 1:
     //     __ p1 __ __ __ __ c0 __ => __ c0 __ __ __ __ p1 __
-    let m1 = 0x33333333;
-    delta_swap_2(&mut t2, &mut t0, 2, m1);
-    delta_swap_2(&mut t3, &mut t1, 2, m1);
-    delta_swap_2(&mut t6, &mut t4, 2, m1);
-    delta_swap_2(&mut t7, &mut t5, 2, m1);
+    delta_swap_2(&mut t2, &mut t0, 2, M1);
+    delta_swap_2(&mut t3, &mut t1, 2, M1);
+    delta_swap_2(&mut t6, &mut t4, 2, M1);
+    delta_swap_2(&mut t7, &mut t5, 2, M1);
 
     // Bit Index Swap 7 <-> 2:
     //     p2 __ __ __ __ c1 __ __ => c1 __ __ __ __ p2 __ __
-    let m2 = 0x0f0f0f0f;
-    delta_swap_2(&mut t4, &mut t0, 4, m2);
-    delta_swap_2(&mut t5, &mut t1, 4, m2);
-    delta_swap_2(&mut t6, &mut t2, 4, m2);
-    delta_swap_2(&mut t7, &mut t3, 4, m2);
+    delta_swap_2(&mut t4, &mut t0, 4, M2);
+    delta_swap_2(&mut t5, &mut t1, 4, M2);
+    delta_swap_2(&mut t6, &mut t2, 4, M2);
+    delta_swap_2(&mut t7, &mut t3, 4, M2);
 
     let mut output = BatchBlocks::default();
     // De-interleave the columns on output (note the order of output)
