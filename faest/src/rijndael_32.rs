@@ -13,7 +13,13 @@
 
 #![allow(clippy::unreadable_literal)]
 
-use aes::Block;
+use aes::{
+    cipher::{
+        generic_array::typenum::{U24, U32},
+        BlockEncrypt, BlockSizeUser, KeyInit, KeySizeUser,
+    },
+    Block,
+};
 use cipher::{array::Array, consts::U2};
 
 /// AES block batch size for this implementation
@@ -294,13 +300,7 @@ pub(crate) fn rijndael_key_schedule(
 ///
 /// Encrypts four blocks in-place and in parallel.
 #[allow(dead_code)]
-pub(crate) fn rijndael_encrypt(
-    rkeys: &[u32],
-    input: &[u8],
-    nst: u8,
-    _bc: u8,
-    r: u8,
-) -> BatchBlocks {
+fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst: u8, r: u8) -> BatchBlocks {
     let mut state = State::default();
     bitslice(&mut state, &input[..16], &input[16..]);
     rijndael_add_round_key(&mut state, &rkeys[..8]);
@@ -824,13 +824,13 @@ macro_rules! define_mix_columns {
 
 define_mix_columns!(
     mix_columns_0,
-    inv_mix_columns_0,
+    _inv_mix_columns_0,
     rotate_rows_1,
     rotate_rows_2
 );
 
 define_mix_columns!(
-    mix_columns_1,
+    _mix_columns_1,
     _inv_mix_columns_1,
     rotate_rows_and_columns_1_1,
     rotate_rows_and_columns_2_2
@@ -875,7 +875,7 @@ pub fn rijndael_shift_rows_1(state: &mut [u32], bc: u8) {
 
 /// Applies ShiftRows twice on an AES state (or key).
 #[inline]
-pub fn rijndael_shift_rows_2(state: &mut [u32], bc: u8) {
+fn rijndael_shift_rows_2(state: &mut [u32], bc: u8) {
     debug_assert_eq!(state.len(), 8);
     for x in state.iter_mut() {
         if bc == 4 {
@@ -991,7 +991,7 @@ fn xor_columns(rkeys: &mut [u32], offset: usize, idx_xor: usize, idx_ror: u32, n
 pub fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
     debug_assert_eq!(output.len(), 8);
     debug_assert_eq!(input0.len(), 16);
-    debug_assert_eq!(input1.len(), 16);
+    debug_assert!(input1.len() == 16 || input1.len() == 8);
 
     // Bitslicing is a bit index manipulation. 256 bits of data means each bit is positioned at an
     // 8-bit index. AES data is 2 blocks, each one a 4x4 column-major matrix of bytes, so the
@@ -1009,8 +1009,16 @@ pub fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
     let mut t6 = u32::from_le_bytes(input0[0x0c..0x10].try_into().unwrap());
     let mut t1 = u32::from_le_bytes(input1[0x00..0x04].try_into().unwrap());
     let mut t3 = u32::from_le_bytes(input1[0x04..0x08].try_into().unwrap());
-    let mut t5 = u32::from_le_bytes(input1[0x08..0x0c].try_into().unwrap());
-    let mut t7 = u32::from_le_bytes(input1[0x0c..0x10].try_into().unwrap());
+    let mut t5 = if input1.len() > 8 {
+        u32::from_le_bytes(input1[0x08..0x0c].try_into().unwrap())
+    } else {
+        0
+    };
+    let mut t7 = if input1.len() > 8 {
+        u32::from_le_bytes(input1[0x0c..0x10].try_into().unwrap())
+    } else {
+        0
+    };
 
     // Bit Index Swap 5 <-> 0:
     //     __ __ b0 __ __ __ __ p0 => __ __ p0 __ __ __ __ b0
@@ -1146,7 +1154,7 @@ pub fn rijndael_add_round_key(state: &mut State, rkey: &[u32]) {
 }
 
 #[inline(always)]
-fn ror(x: u32, y: u32) -> u32 {
+const fn ror(x: u32, y: u32) -> u32 {
     x.rotate_right(y)
 }
 
@@ -1156,12 +1164,12 @@ const fn ror_distance(rows: u32, cols: u32) -> u32 {
 }
 
 #[inline(always)]
-fn rotate_rows_1(x: u32) -> u32 {
+const fn rotate_rows_1(x: u32) -> u32 {
     ror(x, ror_distance(1, 0))
 }
 
 #[inline(always)]
-fn rotate_rows_2(x: u32) -> u32 {
+const fn rotate_rows_2(x: u32) -> u32 {
     ror(x, ror_distance(2, 0))
 }
 
@@ -1175,8 +1183,83 @@ fn rotate_rows_and_columns_2_2(x: u32) -> u32 {
     (ror(x, ror_distance(2, 2)) & 0x0f0f0f0f) | (ror(x, ror_distance(1, 2)) & 0xf0f0f0f0)
 }
 
+const fn ske(r: usize, nst: usize, nk: usize) -> usize {
+    4 * (r + 1) * nst / nk
+}
+
+pub struct Rijndael192(Vec<u32>);
+
+impl KeySizeUser for Rijndael192 {
+    type KeySize = U24;
+}
+
+impl KeyInit for Rijndael192 {
+    fn new(key: &aes::cipher::Key<Self>) -> Self {
+        Self(rijndael_key_schedule(key.as_slice(), 6, 6, 12, ske(12, 6, 6) as u8).0)
+    }
+}
+
+impl BlockSizeUser for Rijndael192 {
+    type BlockSize = U24;
+}
+
+impl BlockEncrypt for Rijndael192 {
+    fn encrypt_with_backend(
+        &self,
+        _f: impl aes::cipher::BlockClosure<BlockSize = Self::BlockSize>,
+    ) {
+        todo!()
+    }
+
+    fn encrypt_block_b2b(
+        &self,
+        in_block: &aes::cipher::Block<Self>,
+        out_block: &mut aes::cipher::Block<Self>,
+    ) {
+        let out = rijndael_encrypt(&self.0, in_block.as_slice(), 6, 12);
+        out_block[..16].copy_from_slice(&out[0]);
+        out_block[16..].copy_from_slice(&out[1][..8]);
+    }
+}
+
+pub struct Rijndael256(Vec<u32>);
+
+impl KeySizeUser for Rijndael256 {
+    type KeySize = U32;
+}
+
+impl KeyInit for Rijndael256 {
+    fn new(key: &aes::cipher::Key<Self>) -> Self {
+        Self(rijndael_key_schedule(key.as_slice(), 8, 8, 14, ske(14, 8, 8) as u8).0)
+    }
+}
+
+impl BlockSizeUser for Rijndael256 {
+    type BlockSize = U32;
+}
+
+impl BlockEncrypt for Rijndael256 {
+    fn encrypt_with_backend(
+        &self,
+        _f: impl aes::cipher::BlockClosure<BlockSize = Self::BlockSize>,
+    ) {
+        todo!()
+    }
+
+    fn encrypt_block_b2b(
+        &self,
+        in_block: &aes::cipher::Block<Self>,
+        out_block: &mut aes::cipher::Block<Self>,
+    ) {
+        let out = rijndael_encrypt(&self.0, in_block.as_slice(), 8, 14);
+        out_block[..16].copy_from_slice(&out[0]);
+        out_block[16..].copy_from_slice(&out[1]);
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use aes::cipher::generic_array::GenericArray;
     use serde::Deserialize;
     use std::{cmp::max, fs::File};
 
@@ -1302,7 +1385,7 @@ mod test {
                 r,
                 4 * (((r + 1) * data.bc) / data.kc),
             );
-            let res = rijndael_encrypt(&rkeys.0, &input, data.bc, data.bc, r);
+            let res = rijndael_encrypt(&rkeys.0, &input, data.bc, r);
             let mut input = [0u32; 8];
             let mut output = [0u32; 8];
             for i in 0..data.bc {
@@ -1316,5 +1399,42 @@ mod test {
             }
             assert_eq!(input, output);
         }
+    }
+
+    #[test]
+    fn test_rijndael192() {
+        let mut key = GenericArray::default();
+        key[0] = 0x80;
+
+        let expected = [
+            0x56, 0x4d, 0x36, 0xfd, 0xeb, 0x8b, 0xf7, 0xe2, 0x75, 0xf0, 0x10, 0xb2, 0xf5, 0xee,
+            0x69, 0xcf, 0xea, 0xe6, 0x7e, 0xa0, 0xe3, 0x7e, 0x32, 0x09,
+        ];
+
+        let rijndael = Rijndael192::new(&key);
+        let plaintext = GenericArray::default();
+        let mut ciphertext = GenericArray::default();
+
+        rijndael.encrypt_block_b2b(&plaintext, &mut ciphertext);
+        assert_eq!(ciphertext.as_slice(), &expected);
+    }
+
+    #[test]
+    fn test_rijndael256() {
+        let mut key = GenericArray::default();
+        key[0] = 0x80;
+
+        let expected = [
+            0xE6, 0x2A, 0xBC, 0xE0, 0x69, 0x83, 0x7B, 0x65, 0x30, 0x9B, 0xE4, 0xED, 0xA2, 0xC0,
+            0xE1, 0x49, 0xFE, 0x56, 0xC0, 0x7B, 0x70, 0x82, 0xD3, 0x28, 0x7F, 0x59, 0x2C, 0x4A,
+            0x49, 0x27, 0xA2, 0x77,
+        ];
+
+        let rijndael = Rijndael256::new(&key);
+        let plaintext = GenericArray::default();
+        let mut ciphertext = GenericArray::default();
+
+        rijndael.encrypt_block_b2b(&plaintext, &mut ciphertext);
+        assert_eq!(ciphertext.as_slice(), &expected);
     }
 }

@@ -5,12 +5,17 @@ use crate::{
     em::{em_extendedwitness, em_prove, em_verify},
     parameter::{BaseParameters, TauParameters, PARAM, PARAMOWF},
     random_oracles::{Hasher, RandomOracle, Reader, IV},
-    rijndael_32::{rijndael_encrypt, rijndael_key_schedule},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
     vc::open,
     vole::{volecommit, volereconstruct},
 };
 
+use aes::{
+    cipher::{
+        generic_array::GenericArray as GenericArray_0_14, BlockCipher, BlockEncrypt, KeyInit,
+    },
+    Aes128Enc, Aes192Enc, Aes256Enc,
+};
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand_core::RngCore;
 
@@ -117,64 +122,34 @@ impl Variant for AesCypher {
 
     ///Input : the parameter of the faest protocol
     /// Output : sk : inputOWF||keyOWF, pk : inputOWF||outputOWF
-    #[allow(clippy::never_loop)]
     fn keygen_with_rng<P, O>(mut rng: impl RngCore) -> Key<O>
     where
         P: PARAM,
         O: PARAMOWF,
     {
-        let nk = <O::NK as Unsigned>::to_u8();
-        let lambda = <O::LAMBDABYTES as Unsigned>::to_usize();
-        let r = <O::R as Unsigned>::to_u8();
-        let beta = <P::BETA as Unsigned>::to_u8();
         let pk_len = <O::PK as Unsigned>::to_usize() / 2;
-        'boucle: loop {
+        loop {
+            // TODO: why is this O::PK?
             let mut sk: GenericArray<u8, O::PK> = GenericArray::default();
             rng.fill_bytes(&mut sk);
 
             let test = aes_extendedwitness::<P, O>(
-                GenericArray::from_slice(&sk[pk_len..pk_len + lambda]),
+                GenericArray::from_slice(&sk[pk_len..pk_len + O::LAMBDABYTES::USIZE]),
                 GenericArray::from_slice(&sk),
             )
             .1;
             if !test {
-                continue 'boucle;
+                continue;
             }
-            let mut cypher: cipher::array::Array<
-                aes::cipher::generic_array::GenericArray<u8, _>,
-                _,
-            >;
-            let rk = rijndael_key_schedule(
-                &sk[16 * P::BETA::USIZE..],
-                4,
-                O::NK::U8,
-                O::R::U8,
-                O::SKE::U8,
-            )
-            .0;
-            let mut y: GenericArray<u8, O::PK> = GenericArray::default();
-            let mut index = 0;
-            if beta == 1 {
-                cypher = rijndael_encrypt(&rk, &[&sk[..16], &[0u8; 16]].concat(), 4, nk, r);
-                for i in cypher.into_iter().flatten().take(16).collect::<Vec<_>>() {
-                    y[index] = i;
-                    index += 1;
-                }
-            } else {
-                cypher = rijndael_encrypt(&rk, &[&sk[..16], &[0u8; 16]].concat(), 4, nk, r);
-                for i in cypher.into_iter().flatten().take(16).collect::<Vec<_>>() {
-                    y[index] = i;
-                    index += 1;
-                }
-                cypher = rijndael_encrypt(&rk, &[&sk[16..32], &[0u8; 16]].concat(), 4, nk, r);
-                for i in cypher.into_iter().flatten().take(16).collect::<Vec<_>>() {
-                    y[index] = i;
-                    index += 1;
-                }
-            };
+
             let mut res = GenericArray::default();
-            res[..16 * beta as usize].copy_from_slice(&sk[..16 * beta as usize]);
-            res[16 * beta as usize..].copy_from_slice(&y[..pk_len]);
+            res[..16 * O::BETA::USIZE].copy_from_slice(&sk[..16 * O::BETA::USIZE]);
+            O::evaluate_owf(
+                &sk[16 * O::BETA::USIZE..16 * O::BETA::USIZE + O::LAMBDABYTES::USIZE],
+                &sk[..16 * O::BETA::USIZE],
+                &mut res[16 * O::BETA::USIZE..],
+            );
+
             return (res, sk);
         }
     }
@@ -231,40 +206,28 @@ impl Variant for EmCypher {
         P: PARAM,
         O: PARAMOWF,
     {
-        let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
-        let nk = <O::NK as Unsigned>::to_u8();
-        let r = <O::R as Unsigned>::to_u8();
-        let nst = <O::NST as Unsigned>::to_u8();
-        'boucle: loop {
+        let pk_len = <O::PK as Unsigned>::to_usize() / 2;
+        loop {
+            // TODO: why is this O::PK?
             let mut sk: GenericArray<u8, O::PK> = GenericArray::default();
             rng.fill_bytes(&mut sk);
+
             let test = em_extendedwitness::<P, O>(
-                GenericArray::from_slice(&sk[lambda..]),
+                GenericArray::from_slice(&sk[O::LAMBDABYTES::USIZE..]),
                 GenericArray::from_slice(&sk),
             )
             .1;
             if !test {
-                continue 'boucle;
+                continue;
             }
 
-            let rk = rijndael_key_schedule(&sk[..lambda], nst, nk, r, 4 * (((r + 1) * nst) / nk));
-            let cypher = rijndael_encrypt(
-                &rk.0,
-                &[&sk[lambda..], &vec![0u8; 32 - lambda]].concat(),
-                nst,
-                nk,
-                r,
-            );
-            let y: GenericArray<u8, O::LAMBDABYTES> = cypher
-                .into_iter()
-                .flatten()
-                .take(lambda)
-                .zip(&sk[lambda..])
-                .map(|(y, k)| y ^ k)
-                .collect();
             let mut res = GenericArray::default();
-            res[..lambda].copy_from_slice(&sk[..lambda]);
-            res[lambda..].copy_from_slice(&y[..]);
+            res[..O::LAMBDABYTES::USIZE].copy_from_slice(&sk[..O::LAMBDABYTES::USIZE]);
+            O::evaluate_owf(
+                &sk[O::LAMBDABYTES::USIZE..2 * O::LAMBDABYTES::USIZE],
+                &sk[..O::LAMBDABYTES::USIZE],
+                &mut res[O::LAMBDABYTES::USIZE..],
+            );
             return (res, sk);
         }
     }

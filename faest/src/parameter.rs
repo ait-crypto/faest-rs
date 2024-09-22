@@ -1,5 +1,12 @@
-use std::ops::{Add, Sub};
+use std::{
+    iter::zip,
+    ops::{Add, Sub},
+};
 
+use aes::{
+    cipher::{generic_array::GenericArray as GenericArray_AES, BlockEncrypt, KeyInit},
+    Aes128Enc, Aes192Enc, Aes256Enc,
+};
 use generic_array::{
     typenum::{
         Diff, Double, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1024, U11, U112, U12, U128, U14,
@@ -17,6 +24,7 @@ use crate::{
         PseudoRandomGenerator, RandomOracle, RandomOracleShake128, RandomOracleShake192,
         RandomOracleShake256, PRG128, PRG192, PRG256,
     },
+    rijndael_32::{Rijndael192, Rijndael256},
     universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
 };
 
@@ -157,6 +165,8 @@ pub trait PARAMOWF {
     type LAMBDALBYTESLAMBDA: ArrayLength;
     type LAMBDAR1: ArrayLength;
     type LAMBDAR1BYTE: ArrayLength;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]);
 }
 
 pub struct PARAMOWF128;
@@ -243,6 +253,14 @@ impl PARAMOWF for PARAMOWF128 {
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     type XK = Sum<U1024, U160>;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
+        let aes = Aes128Enc::new(GenericArray_AES::from_slice(key));
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(input),
+            GenericArray_AES::from_mut_slice(output),
+        );
+    }
 }
 
 pub struct PARAMOWF192;
@@ -329,6 +347,18 @@ impl PARAMOWF for PARAMOWF192 {
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     type XK = Sum<U1024, U352>;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
+        let aes = Aes192Enc::new(GenericArray_AES::from_slice(key));
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(&input[..16]),
+            GenericArray_AES::from_mut_slice(&mut output[..16]),
+        );
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(&input[16..]),
+            GenericArray_AES::from_mut_slice(&mut output[16..]),
+        );
+    }
 }
 
 pub struct PARAMOWF256;
@@ -415,6 +445,18 @@ impl PARAMOWF for PARAMOWF256 {
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     type XK = Sum<U1024, U544>;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
+        let aes = Aes256Enc::new(GenericArray_AES::from_slice(key));
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(&input[..16]),
+            GenericArray_AES::from_mut_slice(&mut output[..16]),
+        );
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(&input[16..]),
+            GenericArray_AES::from_mut_slice(&mut output[16..]),
+        );
+    }
 }
 
 pub struct PARAMOWF128EM;
@@ -500,6 +542,15 @@ impl PARAMOWF for PARAMOWF128EM {
 
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
     type XK = Sum<U1024, U160>;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
+        let aes = Aes128Enc::new(GenericArray_AES::from_slice(input));
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(key),
+            GenericArray_AES::from_mut_slice(output),
+        );
+        zip(output.iter_mut(), key).for_each(|(o, k)| *o ^= k);
+    }
 }
 
 pub struct PARAMOWF192EM;
@@ -586,6 +637,15 @@ impl PARAMOWF for PARAMOWF192EM {
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     type XK = Sum<U1024, U160>;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
+        let aes = Rijndael192::new(GenericArray_AES::from_slice(input));
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(key),
+            GenericArray_AES::from_mut_slice(output),
+        );
+        zip(output.iter_mut(), key).for_each(|(o, k)| *o ^= k);
+    }
 }
 
 pub struct PARAMOWF256EM;
@@ -672,6 +732,15 @@ impl PARAMOWF for PARAMOWF256EM {
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     type XK = Sum<U1024, U160>;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
+        let aes = Rijndael256::new(GenericArray_AES::from_slice(input));
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(key),
+            GenericArray_AES::from_mut_slice(output),
+        );
+        zip(output.iter_mut(), key).for_each(|(o, k)| *o ^= k);
+    }
 }
 
 pub trait TauParameters {
