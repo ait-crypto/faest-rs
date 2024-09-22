@@ -6,7 +6,7 @@ use generic_array::{
 };
 
 use crate::{
-    fields::{BigGaloisField, ByteCombine, Field, SumPoly},
+    fields::{BigGaloisField, ByteCombine, ByteCombineConstants, Field, SumPoly},
     parameter::{BaseParameters, TauParameters, PARAM, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
@@ -548,6 +548,7 @@ where
             };
             *xin_item = temp_xin;
         }
+        // TODO: use byte_combine_bits if possible
         res[index] = O::Field::byte_combine(xin[0..8].try_into().unwrap())
             + O::Field::byte_combine(xk[8 * i..(8 * i) + 8].try_into().unwrap());
         index += 1;
@@ -565,34 +566,12 @@ where
                 x_hat_k[r] =
                     O::Field::byte_combine(xk[ik + 8 * r..ik + 8 * r + 8].try_into().unwrap());
             }
-            let (a, b, c) = (
-                O::Field::ONE,
-                O::Field::byte_combine(&[
-                    O::Field::default(),
-                    O::Field::ONE,
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                ]),
-                O::Field::byte_combine(&[
-                    O::Field::ONE,
-                    O::Field::ONE,
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                ]),
-            );
+
             //Step 16
-            res[index] = x_hat[0] * b + x_hat[1] * c + x_hat[2] * a + x_hat[3] * a + x_hat_k[0];
-            res[index + 1] = x_hat[0] * a + x_hat[1] * b + x_hat[2] * c + x_hat[3] * a + x_hat_k[1];
-            res[index + 2] = x_hat[0] * a + x_hat[1] * a + x_hat[2] * b + x_hat[3] * c + x_hat_k[2];
-            res[index + 3] = x_hat[0] * c + x_hat[1] * a + x_hat[2] * a + x_hat[3] * b + x_hat_k[3];
+            res[index] = x_hat[0] * O::Field::BYTE_COMBINE_2  + x_hat[1] * O::Field::BYTE_COMBINE_3  + x_hat[2] /* * a */  + x_hat[3] /* * a */ + x_hat_k[0];
+            res[index + 1] = x_hat[0] /* * a */ + x_hat[1] * O::Field::BYTE_COMBINE_2  + x_hat[2] * O::Field::BYTE_COMBINE_3  + x_hat[3] /* * a */ + x_hat_k[1];
+            res[index + 2] = x_hat[0] /* * a */ + x_hat[1] /* * a */ + x_hat[2] * O::Field::BYTE_COMBINE_2  + x_hat[3] * O::Field::BYTE_COMBINE_3  + x_hat_k[2];
+            res[index + 3] = x_hat[0] * O::Field::BYTE_COMBINE_3  + x_hat[1] /* * a */ + x_hat[2] /* * a */ + x_hat[3] * O::Field::BYTE_COMBINE_2  + x_hat_k[3];
             index += 4;
         }
     }

@@ -47,6 +47,7 @@ pub trait BigGaloisField:
     + Mul<GF64, Output = Self>
     + ConditionallySelectable
     + ByteCombine
+    + ByteCombineConstants
     + SumPoly
 where
     Self: for<'a> From<&'a [u8]>,
@@ -89,6 +90,11 @@ where
             },
         )
     }
+}
+
+pub trait ByteCombineConstants: Field {
+    const BYTE_COMBINE_2: Self;
+    const BYTE_COMBINE_3: Self;
 }
 
 /// Helper trait for blanket implementations of [SumPoly]
@@ -656,6 +662,11 @@ impl Alphas for BigGF<u128, 1, 128> {
     ];
 }
 
+impl ByteCombineConstants for BigGF<u128, 1, 128> {
+    const BYTE_COMBINE_2: Self = Self::ALPHA[0];
+    const BYTE_COMBINE_3: Self = Self([Self::ALPHA[0].0[0] ^ Self::ONE.0[0]]);
+}
+
 impl From<&[u8]> for BigGF<u128, 1, 128> {
     fn from(value: &[u8]) -> Self {
         // FIXME
@@ -757,6 +768,14 @@ impl Alphas for BigGF<u128, 2, 192> {
             0xc77c56540f87c4b0u128,
         ]),
     ];
+}
+
+impl ByteCombineConstants for BigGF<u128, 2, 192> {
+    const BYTE_COMBINE_2: Self = Self::ALPHA[0];
+    const BYTE_COMBINE_3: Self = Self([
+        Self::ALPHA[0].0[0] ^ Self::ONE.0[0],
+        Self::ALPHA[0].0[1] ^ Self::ONE.0[1],
+    ]);
 }
 
 impl From<&[u8]> for BigGF<u128, 2, 192> {
@@ -867,6 +886,14 @@ impl Alphas for BigGF<u128, 2, 256> {
             0x133eea09d26b7bb82f652b2af4e81545u128,
         ]),
     ];
+}
+
+impl ByteCombineConstants for BigGF<u128, 2, 256> {
+    const BYTE_COMBINE_2: Self = Self::ALPHA[0];
+    const BYTE_COMBINE_3: Self = Self([
+        Self::ALPHA[0].0[0] ^ Self::ONE.0[0],
+        Self::ALPHA[0].0[1] ^ Self::ONE.0[1],
+    ]);
 }
 
 impl From<&[u8]> for BigGF<u128, 2, 256> {
@@ -6666,6 +6693,96 @@ mod test {
                 0xffffffffffffffffffffffffffffffffu128,
                 0xffffffffffffffffffffffffffffffffu128
             )
+        );
+    }
+
+    #[test]
+    fn gf128_byte_combine_constants() {
+        assert_eq!(
+            GF128::BYTE_COMBINE_2,
+            GF128::byte_combine(&[
+                GF128::ZERO,
+                GF128::ONE,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO
+            ])
+        );
+        assert_eq!(
+            GF128::BYTE_COMBINE_3,
+            GF128::byte_combine(&[
+                GF128::ONE,
+                GF128::ONE,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO
+            ])
+        );
+    }
+
+    #[test]
+    fn gf192_byte_combine_constants() {
+        assert_eq!(
+            GF192::BYTE_COMBINE_2,
+            GF192::byte_combine(&[
+                GF192::ZERO,
+                GF192::ONE,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO
+            ])
+        );
+        assert_eq!(
+            GF192::BYTE_COMBINE_3,
+            GF192::byte_combine(&[
+                GF192::ONE,
+                GF192::ONE,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO
+            ])
+        );
+    }
+
+    #[test]
+    fn gf256_byte_combine_constants() {
+        assert_eq!(
+            GF256::BYTE_COMBINE_2,
+            GF256::byte_combine(&[
+                GF256::ZERO,
+                GF256::ONE,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO
+            ])
+        );
+        assert_eq!(
+            GF256::BYTE_COMBINE_3,
+            GF256::byte_combine(&[
+                GF256::ONE,
+                GF256::ONE,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO
+            ])
         );
     }
 }

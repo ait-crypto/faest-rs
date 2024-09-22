@@ -4,7 +4,7 @@ use generic_array::{typenum::Unsigned, GenericArray};
 
 use crate::{
     aes::convert_to_bit,
-    fields::{BigGaloisField, ByteCombine, Field, SumPoly},
+    fields::{ByteCombine, ByteCombineConstants, Field, SumPoly},
     parameter::{BaseParameters, TauParameters, PARAM, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
@@ -170,34 +170,12 @@ where
                 z_hat[r] = O::Field::byte_combine(z[i + 8 * r..i + 8 * r + 8].try_into().unwrap());
                 x_hat[r] = O::Field::byte_combine(x[i + 8 * r..i + 8 * r + 8].try_into().unwrap());
             }
-            let (a, b, c) = (
-                O::Field::ONE,
-                O::Field::byte_combine(&[
-                    O::Field::default(),
-                    O::Field::ONE,
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                ]),
-                O::Field::byte_combine(&[
-                    O::Field::ONE,
-                    O::Field::ONE,
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                ]),
-            );
+
             //Step 16
-            res[index] = z_hat[0] * b + z_hat[1] * c + z_hat[2] * a + z_hat[3] * a + x_hat[0];
-            res[index + 1] = z_hat[0] * a + z_hat[1] * b + z_hat[2] * c + z_hat[3] * a + x_hat[1];
-            res[index + 2] = z_hat[0] * a + z_hat[1] * a + z_hat[2] * b + z_hat[3] * c + x_hat[2];
-            res[index + 3] = z_hat[0] * c + z_hat[1] * a + z_hat[2] * a + z_hat[3] * b + x_hat[3];
+            res[index] = z_hat[0] * O::Field::BYTE_COMBINE_2  + z_hat[1] * O::Field::BYTE_COMBINE_3  + z_hat[2] /* * a */ + z_hat[3] /* * a */ + x_hat[0];
+            res[index + 1] = z_hat[0] /* * a */ + z_hat[1] * O::Field::BYTE_COMBINE_2  + z_hat[2] * O::Field::BYTE_COMBINE_3  + z_hat[3] /* * a */ + x_hat[1];
+            res[index + 2] = z_hat[0] /* * a */ + z_hat[1] /* * a */ + z_hat[2] * O::Field::BYTE_COMBINE_2  + z_hat[3] * O::Field::BYTE_COMBINE_3  + x_hat[2];
+            res[index + 3] = z_hat[0] * O::Field::BYTE_COMBINE_3  + z_hat[1] /* * a */ + z_hat[2] /* * a */ + z_hat[3] * O::Field::BYTE_COMBINE_2  + x_hat[3];
             index += 4;
         }
     }
