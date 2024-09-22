@@ -59,8 +59,6 @@ where
 {
     // Length of the field (in bits)
     const LENGTH: usize;
-
-    fn to_bytes(&self) -> Vec<u8>;
 }
 
 /// Trait providing methods for "byte combination"
@@ -670,10 +668,6 @@ impl From<&[u8]> for BigGF<u128, 1, 128> {
 
 impl BigGaloisField for BigGF<u128, 1, 128> {
     const LENGTH: usize = 128;
-
-    fn to_bytes(&self) -> Vec<u8> {
-        self.0[0].to_le_bytes().to_vec()
-    }
 }
 
 #[cfg(test)]
@@ -779,13 +773,6 @@ impl From<&[u8]> for BigGF<u128, 2, 192> {
 
 impl BigGaloisField for BigGF<u128, 2, 192> {
     const LENGTH: usize = 192;
-
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut res = Vec::with_capacity(Self::LENGTH / 8);
-        res.extend_from_slice(&self.0[0].to_le_bytes());
-        res.extend_from_slice(&self.0[1].to_le_bytes()[..8]);
-        res
-    }
 }
 
 #[cfg(test)]
@@ -895,13 +882,6 @@ impl From<&[u8]> for BigGF<u128, 2, 256> {
 
 impl BigGaloisField for BigGF<u128, 2, 256> {
     const LENGTH: usize = 256;
-
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut res = Vec::with_capacity(Self::LENGTH / 8);
-        res.extend_from_slice(&self.0[0].to_le_bytes());
-        res.extend_from_slice(&self.0[1].to_le_bytes());
-        res
-    }
 }
 
 #[cfg(test)]
