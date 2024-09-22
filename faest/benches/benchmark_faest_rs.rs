@@ -8,7 +8,7 @@ use ::faest::{
 };
 use criterion::{criterion_group, criterion_main, Criterion};
 use faest::faest;
-use generic_array::{GenericArray, typenum::Unsigned};
+use generic_array::{typenum::Unsigned, GenericArray};
 use rand::RngCore;
 
 type Signature<P> = Box<GenericArray<u8, <P as PARAM>::SIG>>;
@@ -20,14 +20,14 @@ type KeyInput<O> = (
 );
 
 fn random_message(mut rng: impl RngCore) -> Vec<u8> {
-        let mut length = [0];
-        while length[0] == 0 {
-            rng.fill_bytes(&mut length);
-        }
-        let mut ret = vec![0; length[0] as usize];
-        rng.fill_bytes(&mut ret);
-        ret
+    let mut length = [0];
+    while length[0] == 0 {
+        rng.fill_bytes(&mut length);
     }
+    let mut ret = vec![0; length[0] as usize];
+    rng.fill_bytes(&mut ret);
+    ret
+}
 
 fn generate_sign_input_aes<C, P, O>() -> KeyInput<O>
 where
@@ -91,7 +91,7 @@ where
         GenericArray::from_slice(&pk),
         &[],
     );
-    (msg, *pk, sign)
+    (msg, pk, sign)
 }
 
 fn generate_verify_input_em<C, P, O>() -> (Vec<u8>, GenericArray<u8, O::PK>, Signature<P>)
@@ -109,11 +109,7 @@ where
         GenericArray::from_slice(&pk),
         &[],
     );
-    (
-        msg,
-        *pk,
-        sign,
-    )
+    (msg, pk, sign)
 }
 
 fn bench_verify_aes<C, P, O>(input: (Vec<u8>, GenericArray<u8, O::PK>, Signature<P>))
