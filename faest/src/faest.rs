@@ -10,12 +10,6 @@ use crate::{
     vole::{volecommit, volereconstruct},
 };
 
-use aes::{
-    cipher::{
-        generic_array::GenericArray as GenericArray_0_14, BlockCipher, BlockEncrypt, KeyInit,
-    },
-    Aes128Enc, Aes192Enc, Aes256Enc,
-};
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand_core::RngCore;
 
@@ -206,7 +200,6 @@ impl Variant for EmCypher {
         P: PARAM,
         O: PARAMOWF,
     {
-        let pk_len = <O::PK as Unsigned>::to_usize() / 2;
         loop {
             // TODO: why is this O::PK?
             let mut sk: GenericArray<u8, O::PK> = GenericArray::default();
@@ -312,14 +305,14 @@ where
     h2_hasher.finish().read(&mut chall2);
 
     let new_u = GenericArray::from_slice(&u[..l + lambda]);
-    let new_gv: &Box<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>> = &Box::new(
+    let new_gv = Box::new(
         gv.iter()
             .flat_map(|x| {
                 x.iter()
                     .map(|y| {
-                        y.clone()
-                            .into_iter()
+                        y.iter()
                             .take(l + lambda)
+                            .copied()
                             .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
                     })
                     .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
@@ -327,7 +320,7 @@ where
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
     );
 
-    let (a_t, b_t) = C::prove::<P, O>(&w, new_u, new_gv, pk, &chall2);
+    let (a_t, b_t) = C::prove::<P, O>(&w, new_u, &new_gv, pk, &chall2);
 
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&chall2);
@@ -395,8 +388,6 @@ where
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let def = GenericArray::default();
     let def2 = GenericArray::default();
-    let def3 = GenericArray::default();
-    let def4 = GenericArray::default();
     let mut gq: Box<GenericArray<Vec<GenericArray<u8, <P as PARAM>::LH>>, P::TAU>> =
         GenericArray::default_boxed();
     let mut gd_t: Box<GenericArray<Vec<&GenericArray<u8, O::LAMBDAPLUS2>>, O::LAMBDALBYTES>> =
@@ -414,8 +405,6 @@ where
             }
         })
         .collect();
-    let mut temp: Vec<GenericArray<u8, P::LH>> = vec![def3];
-    let mut dtemp = vec![def4];
     for i in 1..tau {
         /* ok */
         let delta = P::Tau::decode_challenge(chall3, i);
@@ -429,26 +418,21 @@ where
                 }
             })
             .collect::<Vec<_>>();
-        dtemp = delta
+        gq[i] = gq_p[i]
             .iter()
-            .map(|d| {
+            .zip(delta.iter().map(|d| {
                 if *d == 1 {
-                    GenericArray::from_slice(&c[lhat * (i - 1)..lhat * i]).clone()
+                    GenericArray::<u8, P::LH>::from_slice(&c[lhat * (i - 1)..lhat * i])
                 } else {
-                    def2.clone()
+                    &def2
                 }
-            })
-            .collect::<Vec<GenericArray<u8, P::LH>>>();
-        temp = gq_p[i]
-            .iter()
-            .zip(dtemp)
+            }))
             .map(|(q, d)| {
                 zip(q, d)
                     .map(|(q, d)| (q ^ d))
                     .collect::<GenericArray<u8, P::LH>>()
             })
             .collect::<Vec<GenericArray<u8, <P as PARAM>::LH>>>();
-        gq[i] = temp;
     }
     let gq_t = gq
         .iter()
