@@ -13,7 +13,7 @@ signature = "2.2.0"
 subtle = { version = "2.6", features = ["const-generics"] }
 generic-array = { version = "1", features = ["alloc"] }
 rand_core = { version = "0.6", default-features = false }
-zeroize = { version = "1", default-fatures = false, features = ["derive"] }
+zeroize = { version = "1", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
 serde_derive = "1.0.200"
