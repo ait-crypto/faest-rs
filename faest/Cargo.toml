@@ -13,7 +13,9 @@ signature = "2.2.0"
 subtle = { version = "2.6", features = ["const-generics"] }
 generic-array = { version = "1", features = ["alloc"] }
 rand_core = { version = "0.6", default-features = false }
-zeroize = { version = "1", default-features = false, features = ["derive"] }
+zeroize = { version = "1", default-features = false, features = [
+  "derive",
+], optional = true }
 
 [dev-dependencies]
 serde_derive = "1.0.200"
@@ -23,6 +25,10 @@ criterion = "0.5.1"
 rand = { version = "0.8", features = ["small_rng"] }
 nist-pqc-seeded-rng = "0.2"
 hex = "0.4.3"
+
+[features]
+default = ["zeroize"]
+zeroize = ["dep:zeroize", "aes/zeroize", "ctr/zeroize"]
 
 [[bench]]
 name = "benchmark_faest_rs"
@@ -37,7 +43,3 @@ debug = true
 [profile.release]
 # `lto = true` should also work
 lto = 'fat'
-
-[lib]
-name = "faest"
-path = "src/lib.rs"

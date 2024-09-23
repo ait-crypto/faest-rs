@@ -19,6 +19,7 @@ use aes::{
     Block,
 };
 use cipher::{array::Array, consts::U2};
+#[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
 /// AES block batch size for this implementation
@@ -841,7 +842,7 @@ const fn ske(r: usize, nst: usize, nk: usize) -> usize {
     4 * (r + 1) * nst / nk
 }
 
-#[derive(ZeroizeOnDrop)]
+#[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
 pub struct Rijndael192(Vec<u32>);
 
 impl KeySizeUser for Rijndael192 {
@@ -877,7 +878,7 @@ impl BlockEncrypt for Rijndael192 {
     }
 }
 
-#[derive(ZeroizeOnDrop)]
+#[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
 pub struct Rijndael256(Vec<u32>);
 
 impl KeySizeUser for Rijndael256 {
