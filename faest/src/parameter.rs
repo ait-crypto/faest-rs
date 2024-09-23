@@ -12,8 +12,8 @@ use generic_array::{
         Diff, Double, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1024, U11, U112, U12, U128, U14,
         U142, U152, U16, U160, U16384, U176, U192, U194, U2, U200, U2048, U22, U224, U234, U24,
         U256, U288, U3, U32, U338, U352, U384, U4, U40, U408, U4096, U416, U448, U458, U470, U476,
-        U48, U5, U500, U511, U512, U514, U52, U544, U566, U576, U584, U596, U6, U600, U64, U640,
-        U672, U7, U704, U752, U8, U8192, U832, U96,
+        U48, U5, U500, U511, U512, U514, U52, U544, U56, U566, U576, U584, U596, U6, U600, U64,
+        U640, U672, U7, U704, U752, U8, U8192, U832, U96,
     },
     ArrayLength,
 };
@@ -317,7 +317,7 @@ impl PARAMOWF for PARAMOWF192 {
 
     type PK = U64;
 
-    type SK = U64;
+    type SK = U56;
 
     type CHALL = Sum<U8, Prod<U3, Self::LAMBDABYTES>>;
 
