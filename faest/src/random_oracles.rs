@@ -7,6 +7,8 @@ use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128, Shake128Reader, Shake256, Shake256Reader,
 };
+#[cfg(feature = "zeroize")]
+use zeroize::ZeroizeOnDrop;
 
 type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
 type Aes192Ctr128BE = ctr::Ctr128BE<aes::Aes192>;
@@ -29,6 +31,7 @@ pub trait PseudoRandomGenerator: Sized + Reader {
     fn new_prg(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> Self;
 }
 
+#[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
 pub struct PRG128(Aes128Ctr128BE);
 
 impl PseudoRandomGenerator for PRG128 {
@@ -48,6 +51,7 @@ impl Reader for PRG128 {
     }
 }
 
+#[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
 pub struct PRG192(Aes192Ctr128BE);
 
 impl PseudoRandomGenerator for PRG192 {
@@ -67,6 +71,7 @@ impl Reader for PRG192 {
     }
 }
 
+#[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
 pub struct PRG256(Aes256Ctr128BE);
 
 impl PseudoRandomGenerator for PRG256 {
