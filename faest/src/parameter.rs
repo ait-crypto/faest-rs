@@ -130,6 +130,10 @@ pub trait PARAMOWF {
         SDLength = Self::CHALL1,
         OutputLength = Self::LAMBDAPLUS2,
     >;
+
+    type InputSize: ArrayLength;
+    type OutputSize: ArrayLength;
+
     type XK: ArrayLength;
     type LAMBDA: ArrayLength;
     type LAMBDABYTES: ArrayLength;
@@ -181,6 +185,9 @@ impl PARAMOWF for PARAMOWF128 {
     type Field = GF128;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+
+    type InputSize = U16;
+    type OutputSize = U16;
 
     type LAMBDA = U128;
 
@@ -276,6 +283,9 @@ impl PARAMOWF for PARAMOWF192 {
     type Field = GF192;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+
+    type InputSize = U32;
+    type OutputSize = U32;
 
     type LAMBDA = U192;
 
@@ -376,6 +386,9 @@ impl PARAMOWF for PARAMOWF256 {
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
 
+    type InputSize = U32;
+    type OutputSize = U32;
+
     type LAMBDA = U256;
 
     type LAMBDABYTES = U32;
@@ -475,6 +488,9 @@ impl PARAMOWF for PARAMOWF128EM {
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
 
+    type InputSize = U16;
+    type OutputSize = U16;
+
     type LAMBDA = U128;
 
     type LAMBDABYTES = U16;
@@ -569,6 +585,9 @@ impl PARAMOWF for PARAMOWF192EM {
     type Field = GF192;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+
+    type InputSize = U24;
+    type OutputSize = U24;
 
     type LAMBDA = U192;
 
@@ -665,6 +684,9 @@ impl PARAMOWF for PARAMOWF256EM {
     type Field = GF256;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+
+    type InputSize = U32;
+    type OutputSize = U32;
 
     type LAMBDA = U256;
 
@@ -1467,5 +1489,40 @@ mod test {
                 assert_eq!(res, data.res);
             }
         }
+    }
+
+    fn test_parameters_owf<O: PARAMOWF>() {
+        assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LAMBDABYTES::USIZE);
+        assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::OutputSize::USIZE);
+    }
+
+    #[test]
+    fn test_parameters_owf_128() {
+        test_parameters_owf::<PARAMOWF128>();
+    }
+
+    #[test]
+    fn test_parameters_owf_192() {
+        test_parameters_owf::<PARAMOWF192>();
+    }
+
+    #[test]
+    fn test_parameters_owf_256() {
+        test_parameters_owf::<PARAMOWF256>();
+    }
+
+    #[test]
+    fn test_parameters_owf_128em() {
+        test_parameters_owf::<PARAMOWF128EM>();
+    }
+
+    #[test]
+    fn test_parameters_owf_192em() {
+        test_parameters_owf::<PARAMOWF192EM>();
+    }
+
+    #[test]
+    fn test_parameters_owf_256em() {
+        test_parameters_owf::<PARAMOWF256EM>();
     }
 }
