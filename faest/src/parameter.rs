@@ -45,15 +45,16 @@ pub trait BaseParameters {
     /// Associated PRG
     type PRG: PseudoRandomGenerator<Lambda = Self::LambdaBytes>;
 
-    /// Size of the field [Self::Field] in bits
+    /// Security parameter (in bits)
     type Lambda: ArrayLength;
-    /// Size of the field [Self::Field] in bytes
+    /// Security parameter (in bytes)
     type LambdaBytes: ArrayLength + Add<B>;
     type LambdaBytesTimes2: ArrayLength;
     type Chall: ArrayLength;
     type Chall1: ArrayLength;
 }
 
+#[derive(Debug, Clone)]
 pub struct BaseParams128;
 
 impl BaseParameters for BaseParams128 {
@@ -71,6 +72,7 @@ impl BaseParameters for BaseParams128 {
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
 }
 
+#[derive(Debug, Clone)]
 pub struct BaseParams192;
 
 impl BaseParameters for BaseParams192 {
@@ -88,6 +90,7 @@ impl BaseParameters for BaseParams192 {
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
 }
 
+#[derive(Debug, Clone)]
 pub struct BaseParams256;
 
 impl BaseParameters for BaseParams256 {
@@ -169,6 +172,7 @@ pub trait PARAMOWF {
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]);
 }
 
+#[derive(Debug, Clone)]
 pub struct PARAMOWF128;
 
 impl PARAMOWF for PARAMOWF128 {
@@ -263,6 +267,7 @@ impl PARAMOWF for PARAMOWF128 {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PARAMOWF192;
 
 impl PARAMOWF for PARAMOWF192 {
@@ -361,6 +366,7 @@ impl PARAMOWF for PARAMOWF192 {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PARAMOWF256;
 
 impl PARAMOWF for PARAMOWF256 {
@@ -459,6 +465,7 @@ impl PARAMOWF for PARAMOWF256 {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PARAMOWF128EM;
 
 impl PARAMOWF for PARAMOWF128EM {
@@ -553,6 +560,7 @@ impl PARAMOWF for PARAMOWF128EM {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PARAMOWF192EM;
 
 impl PARAMOWF for PARAMOWF192EM {
@@ -648,6 +656,7 @@ impl PARAMOWF for PARAMOWF192EM {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PARAMOWF256EM;
 
 impl PARAMOWF for PARAMOWF256EM {
