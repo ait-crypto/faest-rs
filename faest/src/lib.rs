@@ -32,7 +32,9 @@ use crate::{
     },
 };
 
+/// Generate a key pair from a cryptographically secure RNG
 pub trait KeypairGenerator: Keypair {
+    /// Generate a new keypair
     fn generate<R>(rng: R) -> Self
     where
         R: CryptoRngCore;
@@ -52,6 +54,14 @@ macro_rules! define_impl {
         #[derive(Debug, Clone)]
         #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
         pub struct $kp($sk, #[cfg_attr(feature = "zeroize", zeroize(skip))] $vk);
+
+        impl Keypair for $sk {
+            type VerifyingKey = $vk;
+
+            fn verifying_key(&self) -> Self::VerifyingKey {
+                $vk(self.0.as_public_key())
+            }
+        }
 
         impl Keypair for $kp {
             type VerifyingKey = $vk;
@@ -73,12 +83,22 @@ macro_rules! define_impl {
             }
         }
 
+        impl KeypairGenerator for $sk {
+            fn generate<R>(rng: R) -> Self
+            where
+                R: CryptoRngCore,
+            {
+                Self(faest_keygen::<$param, R>(rng))
+            }
+        }
+
         impl KeypairGenerator for $kp {
             fn generate<R>(rng: R) -> Self
             where
                 R: CryptoRngCore,
             {
-                let (sk, pk) = faest_keygen::<$param, R>(rng);
+                let sk = faest_keygen::<$param, R>(rng);
+                let pk = sk.as_public_key();
                 Self($sk(sk), $vk(pk))
             }
         }

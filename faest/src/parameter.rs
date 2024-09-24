@@ -22,7 +22,7 @@ use rand_core::RngCore;
 use crate::{
     aes::{aes_extendedwitness, aes_prove, aes_verify},
     em::{em_extendedwitness, em_prove, em_verify},
-    faest::{Key, PublicKey, SecretKey},
+    faest::SecretKey,
     fields::{BigGaloisField, Field, GF128, GF192, GF256},
     prg::{PseudoRandomGenerator, PRG128, PRG192, PRG256},
     random_oracles::{
@@ -152,7 +152,7 @@ pub(crate) trait Variant<O: PARAMOWF> {
 
     ///input : a random number generator
     /// output = pk : input, output; sk : input, key
-    fn keygen_with_rng(rng: impl RngCore) -> Key<O>;
+    fn keygen_with_rng(rng: impl RngCore) -> SecretKey<O>;
 }
 
 pub(crate) trait PARAMOWF {
@@ -1531,7 +1531,7 @@ impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
 
     ///Input : the parameter of the faest protocol
     /// Output : sk : inputOWF||keyOWF, pk : inputOWF||outputOWF
-    fn keygen_with_rng(mut rng: impl RngCore) -> Key<OWF> {
+    fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<OWF> {
         loop {
             // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
             let mut sk: GenericArray<u8, OWF::SK> = GenericArray::default();
@@ -1548,17 +1548,11 @@ impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
             let mut owf_output = GenericArray::default();
             OWF::evaluate_owf(owf_key, owf_input, &mut owf_output);
 
-            return (
-                SecretKey {
-                    owf_key: owf_key.clone(),
-                    owf_input: owf_input.clone(),
-                    owf_output: owf_output.clone(),
-                },
-                PublicKey {
-                    owf_input: owf_input.clone(),
-                    owf_output,
-                },
-            );
+            return SecretKey {
+                owf_key: owf_key.clone(),
+                owf_input: owf_input.clone(),
+                owf_output,
+            };
         }
     }
 }
@@ -1604,7 +1598,7 @@ impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
         em_verify::<P, OWF>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
     }
 
-    fn keygen_with_rng(mut rng: impl RngCore) -> Key<OWF> {
+    fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<OWF> {
         loop {
             // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
             let mut sk: GenericArray<u8, OWF::SK> = GenericArray::default();
@@ -1621,17 +1615,11 @@ impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
             let mut owf_output = GenericArray::default();
             OWF::evaluate_owf(owf_key, owf_input, &mut owf_output);
 
-            return (
-                SecretKey {
-                    owf_key: owf_key.clone(),
-                    owf_input: owf_input.clone(),
-                    owf_output: owf_output.clone(),
-                },
-                PublicKey {
-                    owf_input: owf_input.clone(),
-                    owf_output,
-                },
-            );
+            return SecretKey {
+                owf_key: owf_key.clone(),
+                owf_input: owf_input.clone(),
+                owf_output,
+            };
         }
     }
 }

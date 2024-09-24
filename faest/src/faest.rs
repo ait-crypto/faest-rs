@@ -17,8 +17,6 @@ use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
-pub(crate) type Key<O> = (SecretKey<O>, PublicKey<O>);
-
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
 pub(crate) struct SecretKey<O>
@@ -58,6 +56,13 @@ where
             owf_key: owf_key.clone(),
             owf_input: owf_input.clone(),
             owf_output,
+        }
+    }
+
+    pub(crate) fn as_public_key(&self) -> PublicKey<O> {
+        PublicKey {
+            owf_input: self.owf_input.clone(),
+            owf_output: self.owf_output.clone(),
         }
     }
 }
@@ -201,7 +206,7 @@ where
 type RO<P> = <<<P as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::RandomOracle;
 
 #[inline]
-pub(crate) fn faest_keygen<P, R>(rng: R) -> Key<P::OWF>
+pub(crate) fn faest_keygen<P, R>(rng: R) -> SecretKey<P::OWF>
 where
     P: PARAM,
     R: CryptoRngCore,
@@ -527,10 +532,11 @@ mod test {
     fn run_faest_test<P: PARAM>() {
         let mut rng = rand::thread_rng();
         for _i in 0..RUNS {
-            let (sk, pk) = P::Cypher::keygen_with_rng(&mut rng);
+            let sk = P::Cypher::keygen_with_rng(&mut rng);
             let msg = random_message(&mut rng);
             let mut sigma = GenericArray::default_boxed();
             faest_sign::<P, P::OWF>(&msg, &sk, &[], &mut sigma);
+            let pk = sk.as_public_key();
             let res_true = faest_verify::<P, P::OWF>(&msg, &pk, &sigma);
             assert!(res_true);
         }
@@ -662,18 +668,19 @@ mod test {
             let msg = data.message;
             let sig = data.sm;
 
-            let keypair = P::Cypher::keygen_with_rng(&mut rng);
-            assert_eq!(data.pk.as_slice(), keypair.1.as_bytes().as_slice());
-            assert_eq!(data.sk.as_slice(), keypair.0.as_bytes().as_slice());
+            let sk = P::Cypher::keygen_with_rng(&mut rng);
+            let pk = sk.as_public_key();
+            assert_eq!(data.pk.as_slice(), pk.as_bytes().as_slice());
+            assert_eq!(data.sk.as_slice(), sk.as_bytes().as_slice());
 
             let mut rho = GenericArray::<u8, <P::OWF as PARAMOWF>::LAMBDABYTES>::default();
             rng.fill_bytes(&mut rho);
 
             let mut signature = GenericArray::default_boxed();
-            faest_sign::<P, P::OWF>(&msg, &keypair.0, &rho, &mut signature);
+            faest_sign::<P, P::OWF>(&msg, &sk, &rho, &mut signature);
             assert_eq!(&sig[..sig.len() - signature.len()], &msg);
             assert_eq!(&sig[sig.len() - signature.len()..], signature.as_slice());
-            assert!(faest_verify::<P, P::OWF>(&msg, &keypair.1, &signature));
+            assert!(faest_verify::<P, P::OWF>(&msg, &pk, &signature));
         }
     }
 
