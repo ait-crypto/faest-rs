@@ -17,11 +17,11 @@ use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
-pub type Key<O> = (SecretKey<O>, PublicKey<O>);
+pub(crate) type Key<O> = (SecretKey<O>, PublicKey<O>);
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
-pub struct SecretKey<O>
+pub(crate) struct SecretKey<O>
 where
     O: PARAMOWF,
 {
@@ -112,7 +112,7 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PublicKey<O>
+pub(crate) struct PublicKey<O>
 where
     O: PARAMOWF,
 {

@@ -9,10 +9,10 @@ use crate::fields::{BigGaloisField, Field, GF128, GF192, GF256, GF64};
 
 type BBits = U16;
 // Additional bytes returned by VOLE hash
-pub type B = Quot<BBits, U8>;
+pub(crate) type B = Quot<BBits, U8>;
 
 /// Interface to instantiate a VOLE hasher
-pub trait VoleHasherInit<F>
+pub(crate) trait VoleHasherInit<F>
 where
     F: BigGaloisField,
 {
@@ -24,7 +24,7 @@ where
 }
 
 /// Process the input to VOLE hash and produce the hash
-pub trait VoleHasherProcess<F, OutputLength>
+pub(crate) trait VoleHasherProcess<F, OutputLength>
 where
     Self: Clone + Sized,
     F: BigGaloisField,
@@ -48,7 +48,7 @@ where
 
 /// The VOLE hasher
 #[derive(Debug, Clone)]
-pub struct VoleHasher<F>
+pub(crate) struct VoleHasher<F>
 where
     F: BigGaloisField,
 {
@@ -180,7 +180,7 @@ where
 }
 
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Init part
-pub trait ZKHasherInit<F>
+pub(crate) trait ZKHasherInit<F>
 where
     F: BigGaloisField,
 {
@@ -191,7 +191,7 @@ where
 }
 
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Update and Finalize part
-pub trait ZKHasherProcess<F>
+pub(crate) trait ZKHasherProcess<F>
 where
     Self: Clone,
     F: BigGaloisField,
@@ -202,7 +202,7 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct ZKHasher<F>
+pub(crate) struct ZKHasher<F>
 where
     F: BigGaloisField,
 {

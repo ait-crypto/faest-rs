@@ -326,7 +326,7 @@ fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst: u8, r: u8) -> BatchBlocks 
 /// See: <http://www.cs.yale.edu/homes/peralta/CircuitStuff/SLP_AES_113.txt>
 ///
 /// Note that the 4 bitwise NOT (^= 0xffffffff) are moved to the key schedule.
-pub fn sub_bytes(state: &mut [u32]) {
+pub(crate) fn sub_bytes(state: &mut [u32]) {
     // Scheduled using https://github.com/Ko-/aes-armcortexm/tree/public/scheduler
     // Inline "stack" comments reflect suggested stores and loads (ARM Cortex-M3 and M4)
 
@@ -497,7 +497,7 @@ pub fn sub_bytes(state: &mut [u32]) {
 
 /// NOT operations that are omitted in S-box
 #[inline]
-pub fn sub_bytes_nots(state: &mut [u32]) {
+pub(crate) fn sub_bytes_nots(state: &mut [u32]) {
     debug_assert_eq!(state.len(), 8);
     state[0] ^= 0xffffffff;
     state[1] ^= 0xffffffff;
@@ -516,7 +516,7 @@ macro_rules! define_mix_columns {
         $second_rotate:path
     ) => {
         #[rustfmt::skip]
-        pub fn $name(state: &mut State) {
+        pub(crate) fn $name(state: &mut State) {
             let (a0, a1, a2, a3, a4, a5, a6, a7) = (
                 state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7]
             );
@@ -572,7 +572,7 @@ fn delta_swap_2(a: &mut u32, b: &mut u32, shift: u32, mask: u32) {
 ///
 /// /// Applies ShiftRows once on an AES state (or key).
 #[inline]
-pub fn rijndael_shift_rows_1(state: &mut [u32], bc: u8) {
+pub(crate) fn rijndael_shift_rows_1(state: &mut [u32], bc: u8) {
     debug_assert_eq!(state.len(), 8);
     for x in state.iter_mut() {
         if bc == 4 {
@@ -651,7 +651,7 @@ const M1: u32 = 0x33333333;
 const M2: u32 = 0x0f0f0f0f;
 
 /// Bitslice two 128-bit input blocks input0, input1 into a 256-bit internal state.
-pub fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
+pub(crate) fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
     debug_assert_eq!(output.len(), 8);
     debug_assert_eq!(input0.len(), 16);
     debug_assert!(input1.is_empty() || input1.len() == 16 || input1.len() == 8);
@@ -725,7 +725,7 @@ pub fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
 }
 
 /// Un-bitslice a 256-bit internal state into two 128-bit blocks of output.
-pub fn inv_bitslice(input: &[u32]) -> BatchBlocks {
+pub(crate) fn inv_bitslice(input: &[u32]) -> BatchBlocks {
     debug_assert_eq!(input.len(), 8);
 
     // Unbitslicing is a bit index manipulation. 256 bits of data means each bit is positioned at
@@ -785,7 +785,7 @@ pub fn inv_bitslice(input: &[u32]) -> BatchBlocks {
     output
 }
 
-pub fn convert_from_batchblocks(input: BatchBlocks) -> Vec<u32> {
+pub(crate) fn convert_from_batchblocks(input: BatchBlocks) -> Vec<u32> {
     let mut output = Vec::<u32>::new();
     for i in 0..2 {
         for j in 0..4 {
@@ -811,7 +811,7 @@ fn memshift32(buffer: &mut [u32], src_offset: usize) {
 /// XOR the round key to the internal state. The round keys are expected to be
 /// pre-computed and to be packed in the fixsliced representation.
 #[inline]
-pub fn rijndael_add_round_key(state: &mut State, rkey: &[u32]) {
+pub(crate) fn rijndael_add_round_key(state: &mut State, rkey: &[u32]) {
     debug_assert_eq!(rkey.len(), 8);
     for (a, b) in state.iter_mut().zip(rkey) {
         *a ^= b;
@@ -843,7 +843,7 @@ const fn ske(r: usize, nst: usize, nk: usize) -> usize {
 }
 
 #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
-pub struct Rijndael192(Vec<u32>);
+pub(crate) struct Rijndael192(Vec<u32>);
 
 impl KeySizeUser for Rijndael192 {
     type KeySize = U24;
@@ -879,7 +879,7 @@ impl BlockEncrypt for Rijndael192 {
 }
 
 #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
-pub struct Rijndael256(Vec<u32>);
+pub(crate) struct Rijndael256(Vec<u32>);
 
 impl KeySizeUser for Rijndael256 {
     type KeySize = U32;

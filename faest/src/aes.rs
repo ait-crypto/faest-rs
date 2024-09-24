@@ -31,11 +31,11 @@ type Cstrnts<O> = (
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::SKE>>,
 );
 
-pub fn byte_to_bit(input: u8) -> Vec<u8> {
+pub(crate) fn byte_to_bit(input: u8) -> Vec<u8> {
     (0..8).map(|i| (input >> i) & 1).collect()
 }
 
-pub fn convert_to_bit<F, S>(input: &[u8]) -> Box<GenericArray<F, S>>
+pub(crate) fn convert_to_bit<F, S>(input: &[u8]) -> Box<GenericArray<F, S>>
 where
     F: BigGaloisField,
     S: ArrayLength,
@@ -51,7 +51,7 @@ where
 }
 
 //The first member of the tuples are the effectives witness while the second is the validity according Faest requiremenbt of the keypair at the origin of the operation
-pub fn aes_extendedwitness<O>(
+pub(crate) fn aes_extendedwitness<O>(
     owf_key: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
 ) -> (Box<GenericArray<u8, O::LBYTES>>, bool)
@@ -222,8 +222,7 @@ fn round_with_save_has0(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///
 ///One of the first path to optimize the code could be to do the distinction
-#[allow(clippy::ptr_arg)]
-pub fn aes_key_exp_fwd<O>(
+fn aes_key_exp_fwd<O>(
     x: &GenericArray<O::Field, O::LKE>,
 ) -> Box<GenericArray<O::Field, O::PRODRUN128>>
 where
@@ -264,8 +263,7 @@ where
 ///
 ///One of the first path to optimize the code could be to do the distinction
 ///Beware when calling it : if Mtag = 1 ∧ Mkey = 1 or Mkey = 1 ∧ ∆ = ⊥ return ⊥
-#[allow(clippy::ptr_arg)]
-pub fn aes_key_exp_bwd<O>(
+fn aes_key_exp_bwd<O>(
     x: &GenericArray<O::Field, O::LKE>,
     xk: &GenericArray<O::Field, O::PRODRUN128>,
     mtag: bool,
@@ -367,7 +365,7 @@ where
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///
 ///One of the first path to optimize the code could be to do the distinction
-pub fn aes_key_exp_cstrnts<O>(
+fn aes_key_exp_cstrnts<O>(
     w: &GenericArray<u8, O::LKE>,
     v: &GenericArray<O::Field, O::LKE>,
     mkey: bool,
@@ -503,7 +501,7 @@ where
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///
 ///One of the first path to optimize the code could be to do the distinction
-pub fn aes_enc_fwd<O>(
+fn aes_enc_fwd<O>(
     x: &GenericArray<O::Field, O::LENC>,
     xk: &GenericArray<O::Field, O::PRODRUN128>,
     mkey: bool,
@@ -566,7 +564,7 @@ where
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///
 ///One of the first path to optimize the code could be to do the distinction
-pub fn aes_enc_bkwd<O>(
+fn aes_enc_bkwd<O>(
     x: &GenericArray<O::Field, O::LENC>,
     xk: &GenericArray<O::Field, O::PRODRUN128>,
     mkey: bool,
@@ -621,7 +619,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn aes_enc_cstrnts<O>(
+fn aes_enc_cstrnts<O>(
     input: [u8; 16],
     output: [u8; 16],
     w: &GenericArray<u8, O::QUOTLENC8>,
@@ -677,7 +675,7 @@ fn bit_to_byte(input: &[u8]) -> u8 {
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
-pub fn aes_prove<P, O>(
+pub(crate) fn aes_prove<P, O>(
     w: &GenericArray<u8, O::LBYTES>,
     u: &GenericArray<u8, O::LAMBDALBYTES>,
     gv: CstrntsVal<O>,
@@ -792,7 +790,7 @@ where
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 #[allow(clippy::too_many_arguments)]
-pub fn aes_verify<P, O>(
+pub(crate) fn aes_verify<P, O>(
     d: &GenericArray<u8, O::LBYTES>,
     gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     a_t: &GenericArray<u8, O::LAMBDABYTES>,

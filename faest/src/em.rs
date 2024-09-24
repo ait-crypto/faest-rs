@@ -18,7 +18,7 @@ type Reveal<O> = (
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>,
 );
 
-pub fn em_extendedwitness<O>(
+pub(crate) fn em_extendedwitness<O>(
     owf_key: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
 ) -> (Box<GenericArray<u8, O::LBYTES>>, bool)
@@ -138,7 +138,7 @@ where
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///
 ///One of the first path to optimize the code could be to do the distinction
-pub fn em_enc_fwd<O>(
+fn em_enc_fwd<O>(
     z: &GenericArray<O::Field, O::L>,
     x: &GenericArray<O::Field, O::LAMBDAR1>,
 ) -> Box<GenericArray<O::Field, O::SENC>>
@@ -182,7 +182,7 @@ where
 ///
 ///One of the first path to optimize the code could be to do the distinction
 #[allow(clippy::too_many_arguments)]
-pub fn em_enc_bkwd<P, O>(
+fn em_enc_bkwd<P, O>(
     x: &GenericArray<O::Field, O::LAMBDAR1>,
     z: &GenericArray<O::Field, O::L>,
     z_out: &GenericArray<O::Field, O::LAMBDA>,
@@ -241,7 +241,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn em_enc_cstrnts<P, O>(
+fn em_enc_cstrnts<P, O>(
     output: &GenericArray<u8, O::OutputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     w: &GenericArray<u8, O::LBYTES>,
@@ -312,7 +312,7 @@ where
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
-pub fn em_prove<P, O>(
+pub(crate) fn em_prove<P, O>(
     w: &GenericArray<u8, O::LBYTES>,
     u: &GenericArray<u8, O::LAMBDALBYTES>,
     gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
@@ -382,7 +382,7 @@ where
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 #[allow(clippy::too_many_arguments)]
-pub fn em_verify<P, O>(
+pub(crate) fn em_verify<P, O>(
     d: &GenericArray<u8, O::LBYTES>,
     gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     a_t: &GenericArray<u8, O::LAMBDABYTES>,
