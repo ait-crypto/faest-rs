@@ -19,8 +19,8 @@ type Reveal<O> = (
 );
 
 type EMProof<O> = (
-    Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
-    Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
+    GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>,
+    GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>,
 );
 
 pub fn em_extendedwitness<P, O>(
@@ -405,7 +405,7 @@ where
     let a_t = a_t_hasher.finalize(&u_s);
     let b_t = b_t_hasher.finalize(&v_s);
 
-    (Box::new(a_t.as_bytes()), Box::new(b_t.as_bytes()))
+    (a_t.as_bytes(), b_t.as_bytes())
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
@@ -1145,8 +1145,8 @@ mod test {
                 );
                 assert_eq!(
                     (
-                        Box::new(*GenericArray::from_slice(&data.at)),
-                        Box::new(*GenericArray::from_slice(&data.bt))
+                        *GenericArray::from_slice(&data.at),
+                        *GenericArray::from_slice(&data.bt)
                     ),
                     res
                 );
@@ -1167,8 +1167,8 @@ mod test {
                 );
                 assert_eq!(
                     (
-                        Box::new(*GenericArray::from_slice(&data.at)),
-                        Box::new(*GenericArray::from_slice(&data.bt))
+                        *GenericArray::from_slice(&data.at),
+                        *GenericArray::from_slice(&data.bt)
                     ),
                     res
                 );
@@ -1188,8 +1188,8 @@ mod test {
                 );
                 assert_eq!(
                     (
-                        Box::new(*GenericArray::from_slice(&data.at)),
-                        Box::new(*GenericArray::from_slice(&data.bt))
+                        *GenericArray::from_slice(&data.at),
+                        *GenericArray::from_slice(&data.bt)
                     ),
                     res
                 );

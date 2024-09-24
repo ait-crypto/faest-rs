@@ -1,5 +1,7 @@
 use std::ops::{Add, Sub};
 
+use rand_core::RngCore;
+
 use generic_array::{
     typenum::{
         Diff, Double, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1024, U11, U112, U12, U128, U14,
@@ -8,15 +10,18 @@ use generic_array::{
         U48, U5, U500, U511, U512, U514, U52, U544, U566, U576, U584, U596, U6, U600, U64, U640,
         U672, U7, U704, U752, U8, U8192, U832, U96,
     },
-    ArrayLength,
+    ArrayLength, GenericArray,
 };
 
 use crate::{
+    aes::{aes_extendedwitness, aes_prove, aes_verify},
+    em::{em_extendedwitness, em_prove, em_verify},
     fields::{BigGaloisField, Field, GF128, GF192, GF256},
     random_oracles::{
         PseudoRandomGenerator, RandomOracle, RandomOracleShake128, RandomOracleShake192,
         RandomOracleShake256, PRG128, PRG192, PRG256,
     },
+    rijndael_32::{rijndael_encrypt, rijndael_key_schedule},
     universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
 };
 
@@ -95,6 +100,60 @@ impl BaseParameters for BaseParams256 {
 
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
+}
+
+type QSProof<O> = (
+    GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>,
+    GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>,
+);
+
+type Key<O> = (
+    GenericArray<u8, <O as PARAMOWF>::PK>,
+    Box<GenericArray<u8, <O as PARAMOWF>::PK>>,
+);
+
+pub trait Variant<O: PARAMOWF> {
+    fn witness<P>(
+        k: &GenericArray<u8, O::LAMBDABYTES>,
+        pk: &GenericArray<u8, O::PK>,
+    ) -> Box<GenericArray<u8, O::LBYTES>>
+    where
+        P: PARAM,
+        O: PARAMOWF;
+
+    ///input : witness of l bits, masking values (l+lambda in aes, lambda in em), Vole tag ((l + lambda) *lambda bits), public key, chall(3lambda + 64)
+    ///Output : QuickSilver response (Lambda bytes)
+    fn prove<P>(
+        w: &GenericArray<u8, O::LBYTES>,
+        u: &GenericArray<u8, O::LAMBDALBYTES>,
+        gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
+        pk: &GenericArray<u8, O::PK>,
+        chall: &GenericArray<u8, O::CHALL>,
+    ) -> QSProof<O>
+    where
+        P: PARAM,
+        O: PARAMOWF;
+
+    ///input : Masked witness (l bits), Vole Key ((l + lambda) * Lambda bits), hash of constrints values (lambda bits), chall2 (3*lambda + 64 bits), chall3 (lambda bits), public key
+    ///output q_tilde - delta * a_tilde (lambda bytes)
+    fn verify<P>(
+        d: &GenericArray<u8, O::LBYTES>,
+        gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
+        a_t: &GenericArray<u8, O::LAMBDABYTES>,
+        chall2: &GenericArray<u8, O::CHALL>,
+        chall3: &GenericArray<u8, P::LAMBDABYTES>,
+        pk: &GenericArray<u8, O::PK>,
+    ) -> GenericArray<u8, O::LAMBDABYTES>
+    where
+        P: PARAM,
+        O: PARAMOWF;
+
+    ///input : a random number generator
+    /// output = pk : input, output; sk : input, key
+    fn keygen_with_rng<P>(rng: impl RngCore) -> Key<O>
+    where
+        P: PARAM,
+        O: PARAMOWF;
 }
 
 pub trait PARAMOWF {
@@ -774,6 +833,9 @@ pub trait PARAM {
         L = Self::L,
         LBYTES = Self::LBYTES,
     >;
+
+    type Cypher: Variant<Self::OWF>;
+
     type Tau: TauParameters<
         Tau = Self::TAU,
         TauMinus1 = Self::TAUMINUS,
@@ -808,6 +870,7 @@ pub struct PARAM128S;
 
 impl PARAM for PARAM128S {
     type OWF = PARAMOWF128;
+
     type Tau = Tau128Small;
 
     type L = <U1024 as Add<U576>>::Output;
@@ -847,6 +910,8 @@ impl PARAM for PARAM128S {
     type SIG = Sum<U142, Sum<U256, Sum<U512, U4096>>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
+    type Cypher = AesCypher<Self::OWF>;
 }
 
 pub struct PARAM128F;
@@ -892,12 +957,15 @@ impl PARAM for PARAM128F {
     type SIG = Sum<U192, Sum<U2048, U4096>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
+    type Cypher = AesCypher<Self::OWF>;
 }
 
 pub struct PARAM192S;
 
 impl PARAM for PARAM192S {
     type OWF = PARAMOWF192;
+
     type Tau = Tau192Small;
 
     type L = <U4096 as Sub<U832>>::Output;
@@ -937,12 +1005,15 @@ impl PARAM for PARAM192S {
     type SIG = Sum<U200, Sum<U256, Sum<U8192, U4096>>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
+    type Cypher = AesCypher<Self::OWF>;
 }
 
 pub struct PARAM192F;
 
 impl PARAM for PARAM192F {
     type OWF = PARAMOWF192;
+
     type Tau = Tau192Fast;
 
     type L = <U4096 as Sub<U832>>::Output;
@@ -982,12 +1053,15 @@ impl PARAM for PARAM192F {
     type SIG = Sum<U152, Sum<U256, U16384>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
+    type Cypher = AesCypher<Self::OWF>;
 }
 
 pub struct PARAM256S;
 
 impl PARAM for PARAM256S {
     type OWF = PARAMOWF256;
+
     type Tau = Tau256Small;
 
     type L = <U4096 as Sub<U96>>::Output;
@@ -1027,12 +1101,15 @@ impl PARAM for PARAM256S {
     type SIG = Sum<U596, Sum<U1024, Sum<U4096, U16384>>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
+    type Cypher = AesCypher<Self::OWF>;
 }
 
 pub struct PARAM256F;
 
 impl PARAM for PARAM256F {
     type OWF = PARAMOWF256;
+
     type Tau = Tau256Fast;
 
     type L = <U4096 as Sub<U96>>::Output;
@@ -1072,12 +1149,15 @@ impl PARAM for PARAM256F {
     type SIG = Sum<U752, Sum<U1024, Sum<U2048, Sum<U8192, U16384>>>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
+    type Cypher = AesCypher<Self::OWF>;
 }
 
 pub struct PARAM128SEM;
 
 impl PARAM for PARAM128SEM {
     type OWF = PARAMOWF128EM;
+
     type Tau = Tau128Small;
 
     type L = <U1024 as Add<U256>>::Output;
@@ -1117,12 +1197,15 @@ impl PARAM for PARAM128SEM {
     type SIG = Sum<U470, U4096>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
+    type Cypher = EmCypher<Self::OWF>;
 }
 
 pub struct PARAM128FEM;
 
 impl PARAM for PARAM128FEM {
     type OWF = PARAMOWF128EM;
+
     type Tau = Tau128Fast;
 
     type L = <U1024 as Add<U256>>::Output;
@@ -1162,12 +1245,15 @@ impl PARAM for PARAM128FEM {
     type SIG = Sum<U576, Sum<U1024, U4096>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
+    type Cypher = EmCypher<Self::OWF>;
 }
 
 pub struct PARAM192SEM;
 
 impl PARAM for PARAM192SEM {
     type OWF = PARAMOWF192EM;
+
     type Tau = Tau192Small;
 
     type L = <U2048 as Add<U256>>::Output;
@@ -1207,12 +1293,15 @@ impl PARAM for PARAM192SEM {
     type SIG = Sum<U584, Sum<U2048, U8192>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
+    type Cypher = EmCypher<Self::OWF>;
 }
 
 pub struct PARAM192FEM;
 
 impl PARAM for PARAM192FEM {
     type OWF = PARAMOWF192EM;
+
     type Tau = Tau192Fast;
 
     type L = <U2048 as Add<U256>>::Output;
@@ -1252,12 +1341,15 @@ impl PARAM for PARAM192FEM {
     type SIG = Sum<U600, Sum<U1024, Sum<U4096, U8192>>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
+    type Cypher = EmCypher<Self::OWF>;
 }
 
 pub struct PARAM256SEM;
 
 impl PARAM for PARAM256SEM {
     type OWF = PARAMOWF256EM;
+
     type Tau = Tau256Small;
 
     type L = Diff<U4096, U512>;
@@ -1297,12 +1389,15 @@ impl PARAM for PARAM256SEM {
     type SIG = Sum<U476, Sum<U4096, U16384>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
+    type Cypher = EmCypher<Self::OWF>;
 }
 
 pub struct PARAM256FEM;
 
 impl PARAM for PARAM256FEM {
     type OWF = PARAMOWF256EM;
+
     type Tau = Tau256Fast;
 
     type L = Diff<U4096, U512>;
@@ -1342,6 +1437,211 @@ impl PARAM for PARAM256FEM {
     type SIG = Sum<U112, Sum<U2048, Sum<U8192, U16384>>>;
 
     type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
+
+    type Cypher = EmCypher<Self::OWF>;
+}
+
+pub struct AesCypher<OWF>
+where
+    OWF: PARAMOWF,
+{
+    _param: OWF,
+}
+
+impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
+    fn witness<P>(
+        k: &generic_array::GenericArray<u8, OWF::LAMBDABYTES>,
+        pk: &GenericArray<u8, OWF::PK>,
+    ) -> Box<GenericArray<u8, OWF::LBYTES>>
+    where
+        P: PARAM,
+    {
+        aes_extendedwitness::<P, OWF>(k, pk).0
+    }
+
+    fn prove<P>(
+        w: &GenericArray<u8, OWF::LBYTES>,
+        u: &GenericArray<u8, OWF::LAMBDALBYTES>,
+        gv: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
+        pk: &GenericArray<u8, OWF::PK>,
+        chall: &GenericArray<u8, OWF::CHALL>,
+    ) -> (
+        GenericArray<u8, OWF::LAMBDABYTES>,
+        GenericArray<u8, OWF::LAMBDABYTES>,
+    )
+    where
+        P: PARAM,
+    {
+        aes_prove::<P, OWF>(w, u, gv, pk, chall)
+    }
+
+    fn verify<P>(
+        d: &GenericArray<u8, OWF::LBYTES>,
+        gq: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
+        a_t: &GenericArray<u8, OWF::LAMBDABYTES>,
+        chall2: &GenericArray<u8, OWF::CHALL>,
+        chall3: &GenericArray<u8, P::LAMBDABYTES>,
+        pk: &GenericArray<u8, OWF::PK>,
+    ) -> GenericArray<u8, OWF::LAMBDABYTES>
+    where
+        P: PARAM,
+    {
+        aes_verify::<P, OWF>(d, gq, a_t, chall2, chall3, pk)
+    }
+
+    ///Input : the parameter of the faest protocol
+    /// Output : sk : inputOWF||keyOWF, pk : inputOWF||outputOWF
+    #[allow(clippy::never_loop)]
+    fn keygen_with_rng<P>(mut rng: impl RngCore) -> Key<OWF>
+    where
+        P: PARAM,
+    {
+        let nk = <OWF::NK as Unsigned>::to_u8();
+        let lambda = <OWF::LAMBDABYTES as Unsigned>::to_usize();
+        let r = <OWF::R as Unsigned>::to_u8();
+        let beta = <P::BETA as Unsigned>::to_u8();
+        let pk_len = <OWF::PK as Unsigned>::to_usize() / 2;
+        'boucle: loop {
+            let mut sk: Box<GenericArray<u8, OWF::PK>> = GenericArray::default_boxed();
+            rng.fill_bytes(&mut sk);
+
+            let test = aes_extendedwitness::<P, OWF>(
+                GenericArray::from_slice(&sk[pk_len..pk_len + lambda]),
+                GenericArray::from_slice(&sk),
+            )
+            .1;
+            if !test {
+                continue 'boucle;
+            }
+            let mut cypher: cipher::array::Array<
+                aes::cipher::generic_array::GenericArray<u8, _>,
+                _,
+            >;
+            let rk = rijndael_key_schedule(
+                &sk[16 * <P::BETA as Unsigned>::to_usize()..],
+                4,
+                <OWF::NK as Unsigned>::to_u8(),
+                <OWF::R as Unsigned>::to_u8(),
+                <OWF::SKE as Unsigned>::to_u8(),
+            )
+            .0;
+            let mut y: Box<GenericArray<u8, OWF::PK>> = GenericArray::default_boxed();
+            let mut index = 0;
+            if beta == 1 {
+                cypher = rijndael_encrypt(&rk, &[&sk[..16], &[0u8; 16]].concat(), 4, nk, r);
+                for i in cypher.into_iter().flatten().take(16).collect::<Vec<_>>() {
+                    y[index] = i;
+                    index += 1;
+                }
+            } else {
+                cypher = rijndael_encrypt(&rk, &[&sk[..16], &[0u8; 16]].concat(), 4, nk, r);
+                for i in cypher.into_iter().flatten().take(16).collect::<Vec<_>>() {
+                    y[index] = i;
+                    index += 1;
+                }
+                cypher = rijndael_encrypt(&rk, &[&sk[16..32], &[0u8; 16]].concat(), 4, nk, r);
+                for i in cypher.into_iter().flatten().take(16).collect::<Vec<_>>() {
+                    y[index] = i;
+                    index += 1;
+                }
+            };
+            let mut res = GenericArray::default();
+            res[..16 * beta as usize].copy_from_slice(&sk[..16 * beta as usize]);
+            res[16 * beta as usize..].copy_from_slice(&y[..pk_len]);
+            return (res, sk);
+        }
+    }
+}
+
+pub struct EmCypher<OWF>
+where
+    OWF: PARAMOWF,
+{
+    _param: OWF,
+}
+
+impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
+    fn witness<P>(
+        k: &GenericArray<u8, OWF::LAMBDABYTES>,
+        pk: &GenericArray<u8, OWF::PK>,
+    ) -> Box<GenericArray<u8, OWF::LBYTES>>
+    where
+        P: PARAM,
+    {
+        em_extendedwitness::<P, OWF>(k, pk).0
+    }
+
+    fn prove<P>(
+        w: &GenericArray<u8, OWF::LBYTES>,
+        u: &GenericArray<u8, OWF::LAMBDALBYTES>,
+        gv: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
+        pk: &GenericArray<u8, OWF::PK>,
+        chall: &GenericArray<u8, OWF::CHALL>,
+    ) -> (
+        GenericArray<u8, OWF::LAMBDABYTES>,
+        GenericArray<u8, OWF::LAMBDABYTES>,
+    )
+    where
+        P: PARAM,
+    {
+        em_prove::<P, OWF>(w, u, gv, pk, chall)
+    }
+
+    fn verify<P>(
+        d: &GenericArray<u8, OWF::LBYTES>,
+        gq: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
+        a_t: &GenericArray<u8, OWF::LAMBDABYTES>,
+        chall2: &GenericArray<u8, OWF::CHALL>,
+        chall3: &GenericArray<u8, P::LAMBDABYTES>,
+        pk: &GenericArray<u8, OWF::PK>,
+    ) -> GenericArray<u8, OWF::LAMBDABYTES>
+    where
+        P: PARAM,
+    {
+        em_verify::<P, OWF>(d, gq, a_t, chall2, chall3, pk)
+    }
+
+    fn keygen_with_rng<P>(mut rng: impl RngCore) -> Key<OWF>
+    where
+        P: PARAM,
+    {
+        let lambda = <OWF::LAMBDA as Unsigned>::to_usize() / 8;
+        let nk = <OWF::NK as Unsigned>::to_u8();
+        let r = <OWF::R as Unsigned>::to_u8();
+        let nst = <OWF::NST as Unsigned>::to_u8();
+        'boucle: loop {
+            let mut sk: Box<GenericArray<u8, OWF::PK>> = GenericArray::default_boxed();
+            rng.fill_bytes(&mut sk);
+            let test = em_extendedwitness::<P, OWF>(
+                GenericArray::from_slice(&sk[lambda..]),
+                GenericArray::from_slice(&sk),
+            )
+            .1;
+            if !test {
+                continue 'boucle;
+            }
+
+            let rk = rijndael_key_schedule(&sk[..lambda], nst, nk, r, 4 * (((r + 1) * nst) / nk));
+            let cypher = rijndael_encrypt(
+                &rk.0,
+                &[&sk[lambda..], &vec![0u8; 32 - lambda]].concat(),
+                nst,
+                nk,
+                r,
+            );
+            let y: GenericArray<u8, OWF::LAMBDABYTES> = cypher
+                .into_iter()
+                .flatten()
+                .take(lambda)
+                .zip(&sk[lambda..])
+                .map(|(y, k)| y ^ k)
+                .collect();
+            let mut res = GenericArray::default();
+            res[..lambda].copy_from_slice(&sk[..lambda]);
+            res[lambda..].copy_from_slice(&y[..]);
+            return (res, sk);
+        }
+    }
 }
 
 #[cfg(test)]
