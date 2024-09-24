@@ -1,5 +1,4 @@
 use std::{
-    iter::zip,
     marker::PhantomData,
     ops::{Add, Sub},
 };
@@ -598,7 +597,9 @@ impl PARAMOWF for PARAMOWF128EM {
             GenericArray_AES::from_slice(key),
             GenericArray_AES::from_mut_slice(output),
         );
-        zip(output.iter_mut(), key).for_each(|(o, k)| *o ^= k);
+        for idx in 0..Self::InputSize::USIZE {
+            output[idx] ^= key[idx];
+        }
     }
 }
 
@@ -691,7 +692,9 @@ impl PARAMOWF for PARAMOWF192EM {
             GenericArray_AES::from_slice(key),
             GenericArray_AES::from_mut_slice(output),
         );
-        zip(output.iter_mut(), key).for_each(|(o, k)| *o ^= k);
+        for idx in 0..Self::InputSize::USIZE {
+            output[idx] ^= key[idx];
+        }
     }
 }
 
@@ -784,7 +787,9 @@ impl PARAMOWF for PARAMOWF256EM {
             GenericArray_AES::from_slice(key),
             GenericArray_AES::from_mut_slice(output),
         );
-        zip(output.iter_mut(), key).for_each(|(o, k)| *o ^= k);
+        for idx in 0..Self::InputSize::USIZE {
+            output[idx] ^= key[idx];
+        }
     }
 }
 
