@@ -686,61 +686,61 @@ mod test {
 
     #[test]
     fn test_nist_faest_128s_aes() {
-        test_nist::<PARAM128S>(include_str!("../PQCsignKAT_faest_128s.rsp"));
+        test_nist::<PARAM128S>(include_str!("../tests/data/PQCsignKAT_faest_128s.rsp"));
     }
 
     #[test]
     fn test_nist_faest_128f_aes() {
-        test_nist::<PARAM128F>(include_str!("../PQCsignKAT_faest_128f.rsp"));
+        test_nist::<PARAM128F>(include_str!("../tests/data/PQCsignKAT_faest_128f.rsp"));
     }
 
     #[test]
     fn test_nist_faest_192s_aes() {
-        test_nist::<PARAM192S>(include_str!("../PQCsignKAT_faest_192s.rsp"));
+        test_nist::<PARAM192S>(include_str!("../tests/data/PQCsignKAT_faest_192s.rsp"));
     }
 
     #[test]
     fn test_nist_faest_192f_aes() {
-        test_nist::<PARAM192F>(include_str!("../PQCsignKAT_faest_192f.rsp"));
+        test_nist::<PARAM192F>(include_str!("../tests/data/PQCsignKAT_faest_192f.rsp"));
     }
 
     #[test]
     fn test_nist_faest_256s_aes() {
-        test_nist::<PARAM256S>(include_str!("../PQCsignKAT_faest_256s.rsp"));
+        test_nist::<PARAM256S>(include_str!("../tests/data/PQCsignKAT_faest_256s.rsp"));
     }
 
     #[test]
     fn test_nist_faest_256f_aes() {
-        test_nist::<PARAM256F>(include_str!("../PQCsignKAT_faest_256f.rsp"));
+        test_nist::<PARAM256F>(include_str!("../tests/data/PQCsignKAT_faest_256f.rsp"));
     }
 
     #[test]
     fn test_nist_faest_128s_em() {
-        test_nist::<PARAM128SEM>(include_str!("../PQCsignKAT_faest_em_128s.rsp"));
+        test_nist::<PARAM128SEM>(include_str!("../tests/data/PQCsignKAT_faest_em_128s.rsp"));
     }
 
     #[test]
     fn test_nist_faest_128f_em() {
-        test_nist::<PARAM128FEM>(include_str!("../PQCsignKAT_faest_em_128f.rsp"));
+        test_nist::<PARAM128FEM>(include_str!("../tests/data/PQCsignKAT_faest_em_128f.rsp"));
     }
 
     #[test]
     fn test_nist_faest_192s_em() {
-        test_nist::<PARAM192SEM>(include_str!("../PQCsignKAT_faest_em_192s.rsp"));
+        test_nist::<PARAM192SEM>(include_str!("../tests/data/PQCsignKAT_faest_em_192s.rsp"));
     }
 
     #[test]
     fn test_nist_faest192f_em() {
-        test_nist::<PARAM192FEM>(include_str!("../PQCsignKAT_faest_em_192f.rsp"));
+        test_nist::<PARAM192FEM>(include_str!("../tests/data/PQCsignKAT_faest_em_192f.rsp"));
     }
 
     #[test]
     fn test_nist_faest_256s_em() {
-        test_nist::<PARAM256SEM>(include_str!("../PQCsignKAT_faest_em_256s.rsp"));
+        test_nist::<PARAM256SEM>(include_str!("../tests/data/PQCsignKAT_faest_em_256s.rsp"));
     }
 
     #[test]
     fn test_nist_faest_256f_em() {
-        test_nist::<PARAM256FEM>(include_str!("../PQCsignKAT_faest_em_256f.rsp"));
+        test_nist::<PARAM256FEM>(include_str!("../tests/data/PQCsignKAT_faest_em_256f.rsp"));
     }
 }

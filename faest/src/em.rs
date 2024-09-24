@@ -93,46 +93,6 @@ where
     (res, valid)
 }
 
-/* pub fn em_witness_has0<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8>
-where
-    P: PARAM,
-    O: PARAMOWF,
-{
-    let lambda = <P::LAMBDA as Unsigned>::to_usize()/ 8;
-    let nst = <O::NST as Unsigned>::to_usize();
-    let r = <O::R as Unsigned>::to_usize();
-    let kc = <O::NK as Unsigned>::to_u8();
-    let mut res: Vec<u8> = vec![];
-    let x = rijndael_key_schedule_has0(
-        &pk[..lambda],
-        nst as u8,
-        kc,
-        r as u8,
-        (4 * (((r + 1) * nst) / kc as usize)) as u8,
-        &mut vec![0],
-    );
-    let mut state = State::default();
-    bitslice(
-        &mut state,
-        &k[..16],
-        &[k[16..].to_vec(), vec![0u8; 32 - lambda]].concat(),
-    );
-    rijndael_add_round_key(&mut state, &x[..8]);
-    for j in 1..r + 1 {
-        res.append(&mut inv_bitslice(&state)[0][..].to_vec());
-        if nst == 6 {
-            res.append(&mut inv_bitslice(&state)[1][..8].to_vec());
-        } else if nst == 8 {
-            res.append(&mut inv_bitslice(&state)[1][..].to_vec());
-        }
-        sub_bytes(&mut state);
-        sub_bytes_nots(&mut state);
-        rijndael_shift_rows_1(&mut state, nst as u8);
-        mix_columns_0(&mut state);
-        rijndael_add_round_key(&mut state, &x[8 * j..8 * (j + 1)]);
-    }
-    res
-} */
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
@@ -483,8 +443,6 @@ mod test {
         },
     };
 
-    use std::fs::File;
-
     use generic_array::{typenum::U8, GenericArray};
     use serde::Deserialize;
 
@@ -499,9 +457,9 @@ mod test {
 
     #[test]
     fn em_extended_witness_test() {
-        let file = File::open("EM-ExtendedWitness.json").unwrap();
         let database: Vec<EmExtendedWitness> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/EM-ExtendedWitness.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let res = em_extendedwitness::<PARAMOWF128EM>(
@@ -543,9 +501,9 @@ mod test {
 
     #[test]
     fn em_enc_fwd_test() {
-        let file = File::open("EmEncFwd.json").unwrap();
         let database: Vec<EmEncFwd> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/EmEncFwd.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let (input_x, input_z): (Vec<GF128>, Vec<GF128>) = if data.m == 1 {
@@ -733,9 +691,9 @@ mod test {
 
     #[test]
     fn em_enc_bkwd_test() {
-        let file = File::open("EmEncBkwd.json").unwrap();
         let database: Vec<EmEncBkwd> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/EmEncBkwd.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let (x_in, z_in, z_out_in): (Vec<GF128>, Vec<GF128>, Vec<GF128>) = if data.m == 1 {
@@ -976,9 +934,9 @@ mod test {
 
     #[test]
     fn em_enc_cstrnts_test() {
-        let file = File::open("EmEncCstrnts.json").unwrap();
         let database: Vec<EmEncCstrnts> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/EmEncCstrnts.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let vq = &data
@@ -1092,9 +1050,9 @@ mod test {
 
     #[test]
     fn em_prove_test() {
-        let file = File::open("EmProve.json").unwrap();
         let database: Vec<EmProve> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/EmProve.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let res = em_prove::<PARAM128SEM, PARAMOWF128EM>(
@@ -1193,9 +1151,9 @@ mod test {
 
     #[test]
     fn em_verify_test() {
-        let file = File::open("EmVerify.json").unwrap();
         let database: Vec<EmVerify> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/EmVerify.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let res = if data.tau == 11 {

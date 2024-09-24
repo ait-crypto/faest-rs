@@ -918,7 +918,7 @@ impl BlockEncrypt for Rijndael256 {
 mod test {
     use aes::cipher::generic_array::GenericArray;
     use serde::Deserialize;
-    use std::{cmp::max, fs::File};
+    use std::cmp::max;
 
     use super::*;
 
@@ -933,9 +933,9 @@ mod test {
 
     #[test]
     fn shift_row_test() {
-        let file = File::open("shift_row_data.json").unwrap();
         let database: Vec<ShiftRows> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/shift_row_data.json"))
+                .expect("error while reading or parsing");
         for mut data in database {
             let mut input = [0u32; 8];
             let mut output = [0u32; 8];
@@ -980,9 +980,9 @@ mod test {
 
     #[test]
     fn mix_column_test() {
-        let file = File::open("mix_column_data.json").unwrap();
         let database: Vec<MixColumns> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/mix_column_data.json"))
+                .expect("error while reading or parsing");
         for mut data in database {
             let mut input = [0u32; 8];
             let mut output = [0u32; 8];
@@ -1026,9 +1026,9 @@ mod test {
 
     #[test]
     fn rijndael_test() {
-        let file = File::open("rijndael_data.json").unwrap();
         let database: Vec<Rijndael> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/rijndael_data.json"))
+                .expect("error while reading or parsing");
         for data in database {
             let mut input = [0u8; 32];
             input[..data.text.len()].copy_from_slice(&data.text[..]);

@@ -912,7 +912,6 @@ mod test {
 
     use generic_array::{typenum::U8, GenericArray};
     use serde::Deserialize;
-    use std::fs::File;
 
     type ZkHash256 = GenericArray<u8, <PARAMOWF256 as PARAMOWF>::LAMBDABYTES>;
     type ZkHash192 = GenericArray<u8, <PARAMOWF192 as PARAMOWF>::LAMBDABYTES>;
@@ -929,9 +928,9 @@ mod test {
 
     #[test]
     fn aes_extended_witness_test() {
-        let file = File::open("AesExtendedWitness.json").unwrap();
         let database: Vec<AesExtendedWitness> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/AesExtendedWitness.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let res = aes_extendedwitness::<PARAMOWF128>(
@@ -980,9 +979,9 @@ mod test {
 
     #[test]
     fn aes_key_exp_fwd_test() {
-        let file = File::open("AesKeyExpFwd.json").unwrap();
         let database: Vec<AesKeyExpFwd> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/AesKeyExpFwd.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let (out, input): (Vec<GF128>, Vec<GF128>) = if data.x.len() >= 448 {
@@ -1077,9 +1076,9 @@ mod test {
 
     #[test]
     fn aes_key_exp_bwd_test() {
-        let file = File::open("AesKeyExpBwd.json").unwrap();
         let database: Vec<AesKeyExpBwd> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/AesKeyExpBwd.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let mtag = data.mtag != 0;
@@ -1246,9 +1245,9 @@ mod test {
 
     #[test]
     fn aes_key_exp_cstrnts_test() {
-        let file = File::open("AesKeyExpCstrnts.json").unwrap();
         let database: Vec<AesKeyExpCstrnts> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/AesKeyExpCstrnts.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let fields_v = &(data
@@ -1474,9 +1473,9 @@ mod test {
 
     #[test]
     fn aes_enc_fwd_test() {
-        let file = File::open("AesEncFwd.json").unwrap();
         let database: Vec<AesEncFwd> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/AesEncFwd.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let mtag = data.mtag != 0;
@@ -1660,9 +1659,9 @@ mod test {
 
     #[test]
     fn aes_enc_bkwd_test() {
-        let file = File::open("AesEncBkwd.json").unwrap();
         let database: Vec<AesEncBkwd> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/AesEncBkwd.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let mtag = data.mtag != 0;
@@ -1827,9 +1826,9 @@ mod test {
 
     #[test]
     fn aes_enc_cstrnts_test() {
-        let file = File::open("AesEncCstrnts.json").unwrap();
         let database: Vec<AesEncCstrnts> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/AesEncCstrnts.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let senc = data.senc as usize;
@@ -2011,9 +2010,9 @@ mod test {
 
     #[test]
     fn aes_prove_test() {
-        let file = File::open("AesProve.json").unwrap();
         let database: Vec<AesProve> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/AesProve.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let res: (ZkHash128, ZkHash128) = aes_prove::<PARAM128S, PARAMOWF128>(
@@ -2099,9 +2098,9 @@ mod test {
 
     #[test]
     fn aes_verify_test() {
-        let file = File::open("AesVerify.json").unwrap();
         let database: Vec<AesVerify> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/AesVerify.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
                 let out = aes_verify::<PARAM128S, PARAMOWF128>(

@@ -185,8 +185,6 @@ where
 mod test {
     use super::*;
 
-    use std::fs::File;
-
     use generic_array::{
         typenum::{U16, U234, U24, U32, U458, U566},
         GenericArray,
@@ -215,7 +213,7 @@ mod test {
 
     #[test]
     fn convert_to_vole_test() {
-        let data = include_str!("../DataConvertToVole.json");
+        let data = include_str!("../tests/data/DataConvertToVole.json");
         let database: Vec<DataConvertToVole> =
             serde_json::from_str(data).expect("error while reading or parsing");
         for data in database {
@@ -290,9 +288,9 @@ mod test {
 
     #[test]
     fn volecommit_test() {
-        let file = File::open("DataVoleCommit.json").unwrap();
         let database: Vec<DataVoleCommit> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/DataVoleCommit.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.lambdabytes[0] == 16 {
                 if data.u.len() == 234 {
@@ -981,9 +979,9 @@ mod test {
 
     #[test]
     fn volereconstruct_test() {
-        let file = File::open("DataVoleReconstruct.json").unwrap();
         let database: Vec<DataVoleReconstruct> =
-            serde_json::from_reader(file).expect("error while reading or parsing");
+            serde_json::from_str(include_str!("../tests/data/DataVoleReconstruct.json"))
+                .expect("error while reading or parsing");
         for data in database {
             if data.chal.len() == 16 {
                 if data.q[0].len() == 8 {
