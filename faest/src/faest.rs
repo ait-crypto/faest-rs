@@ -1,4 +1,4 @@
-use std::{io::Write, iter::zip};
+use std::{fmt, io::Write, iter::zip, marker::PhantomData};
 
 use crate::{
     aes::{aes_extendedwitness, aes_prove, aes_verify},
@@ -11,23 +11,203 @@ use crate::{
 };
 
 use generic_array::{typenum::Unsigned, GenericArray};
-use rand_core::RngCore;
+use rand_core::{CryptoRngCore, RngCore};
+#[cfg(feature = "serde")]
+use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
+#[cfg(feature = "zeroize")]
+use zeroize::ZeroizeOnDrop;
 
 type QSProof<O> = (
     Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
     Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
 );
-type Key<O> = (
-    GenericArray<u8, <O as PARAMOWF>::PK>,
-    GenericArray<u8, <O as PARAMOWF>::PK>,
-);
+type Key<O> = (SecretKey<O>, PublicKey<O>);
+
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
+pub struct SecretKey<O>
+where
+    O: PARAMOWF,
+{
+    owf_key: GenericArray<u8, O::LAMBDABYTES>,
+    owf_input: GenericArray<u8, O::InputSize>,
+    owf_output: GenericArray<u8, O::OutputSize>,
+}
+
+impl<O> SecretKey<O>
+where
+    O: PARAMOWF,
+{
+    fn as_bytes(&self) -> GenericArray<u8, O::SK> {
+        let mut buf = GenericArray::default();
+        buf[..O::InputSize::USIZE].copy_from_slice(&self.owf_input);
+        buf[O::InputSize::USIZE..].copy_from_slice(&self.owf_key);
+        buf
+    }
+
+    fn try_from_bytes(bytes: &[u8]) -> Result<Self, ()> {
+        if bytes.len() == O::SK::USIZE {
+            Ok(Self::from_bytes(GenericArray::from_slice(bytes)))
+        } else {
+            Err(())
+        }
+    }
+
+    fn from_bytes(bytes: &GenericArray<u8, O::SK>) -> Self {
+        let owf_input = GenericArray::from_slice(&bytes[..O::InputSize::USIZE]);
+        let owf_key = GenericArray::from_slice(&bytes[O::InputSize::USIZE..]);
+        let mut owf_output = GenericArray::default();
+        O::evaluate_owf(owf_key, owf_input, &mut owf_output);
+        Self {
+            owf_key: owf_key.clone(),
+            owf_input: owf_input.clone(),
+            owf_output,
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<O> Serialize for SecretKey<O>
+where
+    O: PARAMOWF,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_bytes(&self.as_bytes())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, O> Deserialize<'de> for SecretKey<O>
+where
+    O: PARAMOWF,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct BytesVisitor<O>(PhantomData<O>)
+        where
+            O: PARAMOWF;
+
+        impl<'de, O> Visitor<'de> for BytesVisitor<O>
+        where
+            O: PARAMOWF,
+        {
+            type Value = SecretKey<O>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str(&format!("a byte array of length {}", O::SK::USIZE))
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                SecretKey::<O>::try_from_bytes(v)
+                    .map_err(|_| E::invalid_length(O::SK::USIZE, &self))
+            }
+        }
+
+        deserializer.deserialize_bytes(BytesVisitor(PhantomData))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PublicKey<O>
+where
+    O: PARAMOWF,
+{
+    owf_input: GenericArray<u8, O::InputSize>,
+    owf_output: GenericArray<u8, O::OutputSize>,
+}
+
+impl<O> PublicKey<O>
+where
+    O: PARAMOWF,
+{
+    fn as_bytes(&self) -> GenericArray<u8, O::PK> {
+        let mut buf = GenericArray::default();
+        buf[..O::InputSize::USIZE].copy_from_slice(&self.owf_input);
+        buf[O::InputSize::USIZE..].copy_from_slice(&self.owf_output);
+        buf
+    }
+
+    fn try_from_bytes(bytes: &[u8]) -> Result<Self, ()> {
+        if bytes.len() == O::PK::USIZE {
+            Ok(Self::from_bytes(GenericArray::from_slice(bytes)))
+        } else {
+            Err(())
+        }
+    }
+
+    fn from_bytes(bytes: &GenericArray<u8, O::PK>) -> Self {
+        let owf_input = GenericArray::from_slice(&bytes[..O::InputSize::USIZE]);
+        let owf_output = GenericArray::from_slice(&bytes[O::InputSize::USIZE..]);
+        Self {
+            owf_input: owf_input.clone(),
+            owf_output: owf_output.clone(),
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<O> Serialize for PublicKey<O>
+where
+    O: PARAMOWF,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_bytes(&self.as_bytes())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, O> Deserialize<'de> for PublicKey<O>
+where
+    O: PARAMOWF,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct BytesVisitor<O>(PhantomData<O>)
+        where
+            O: PARAMOWF;
+
+        impl<'de, O> Visitor<'de> for BytesVisitor<O>
+        where
+            O: PARAMOWF,
+        {
+            type Value = PublicKey<O>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str(&format!("a byte array of length {}", O::SK::USIZE))
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                PublicKey::<O>::try_from_bytes(v)
+                    .map_err(|_| E::invalid_length(O::SK::USIZE, &self))
+            }
+        }
+
+        deserializer.deserialize_bytes(BytesVisitor(PhantomData))
+    }
+}
 
 pub trait Variant {
     ///input : key (len lambda, snd part of sk); public key
     ///output : witness of l bits
     fn witness<P, O>(
-        k: &GenericArray<u8, O::LAMBDABYTES>,
-        pk: &GenericArray<u8, O::PK>,
+        owf_key: &GenericArray<u8, O::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, O::InputSize>,
     ) -> Box<GenericArray<u8, O::LBYTES>>
     where
         P: PARAM,
@@ -39,7 +219,8 @@ pub trait Variant {
         w: &GenericArray<u8, O::LBYTES>,
         u: &GenericArray<u8, O::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-        pk: &GenericArray<u8, O::PK>,
+        owf_input: &GenericArray<u8, O::InputSize>,
+        owf_output: &GenericArray<u8, O::OutputSize>,
         chall: &GenericArray<u8, O::CHALL>,
     ) -> QSProof<O>
     where
@@ -54,7 +235,8 @@ pub trait Variant {
         a_t: &GenericArray<u8, O::LAMBDABYTES>,
         chall2: &GenericArray<u8, O::CHALL>,
         chall3: &GenericArray<u8, P::LAMBDABYTES>,
-        pk: &GenericArray<u8, O::PK>,
+        owf_input: &GenericArray<u8, O::InputSize>,
+        owf_output: &GenericArray<u8, O::OutputSize>,
     ) -> GenericArray<u8, O::LAMBDABYTES>
     where
         P: PARAM,
@@ -72,21 +254,22 @@ pub struct AesCypher {}
 
 impl Variant for AesCypher {
     fn witness<P, O>(
-        k: &GenericArray<u8, O::LAMBDABYTES>,
-        pk: &GenericArray<u8, O::PK>,
+        owf_key: &GenericArray<u8, O::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, O::InputSize>,
     ) -> Box<GenericArray<u8, O::LBYTES>>
     where
         P: PARAM,
         O: PARAMOWF,
     {
-        aes_extendedwitness::<P, O>(k, pk).0
+        aes_extendedwitness::<P, O>(owf_key, owf_input).0
     }
 
     fn prove<P, O>(
         w: &GenericArray<u8, O::LBYTES>,
         u: &GenericArray<u8, O::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-        pk: &GenericArray<u8, O::PK>,
+        owf_input: &GenericArray<u8, O::InputSize>,
+        owf_output: &GenericArray<u8, O::OutputSize>,
         chall: &GenericArray<u8, O::CHALL>,
     ) -> (
         Box<GenericArray<u8, O::LAMBDABYTES>>,
@@ -96,7 +279,7 @@ impl Variant for AesCypher {
         P: PARAM,
         O: PARAMOWF,
     {
-        aes_prove::<P, O>(w, u, gv, pk, chall)
+        aes_prove::<P, O>(w, u, gv, owf_input, owf_output, chall)
     }
 
     fn verify<P, O>(
@@ -105,13 +288,14 @@ impl Variant for AesCypher {
         a_t: &GenericArray<u8, O::LAMBDABYTES>,
         chall2: &GenericArray<u8, O::CHALL>,
         chall3: &GenericArray<u8, P::LAMBDABYTES>,
-        pk: &GenericArray<u8, O::PK>,
+        owf_input: &GenericArray<u8, O::InputSize>,
+        owf_output: &GenericArray<u8, O::OutputSize>,
     ) -> GenericArray<u8, O::LAMBDABYTES>
     where
         P: PARAM,
         O: PARAMOWF,
     {
-        aes_verify::<P, O>(d, gq, a_t, chall2, chall3, pk)
+        aes_verify::<P, O>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
     }
 
     ///Input : the parameter of the faest protocol
@@ -121,30 +305,33 @@ impl Variant for AesCypher {
         P: PARAM,
         O: PARAMOWF,
     {
-        let pk_len = <O::PK as Unsigned>::to_usize() / 2;
         loop {
-            // TODO: why is this O::PK?
-            let mut sk: GenericArray<u8, O::PK> = GenericArray::default();
+            // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
+            let mut sk: GenericArray<u8, O::SK> = GenericArray::default();
             rng.fill_bytes(&mut sk);
 
-            let test = aes_extendedwitness::<P, O>(
-                GenericArray::from_slice(&sk[pk_len..pk_len + O::LAMBDABYTES::USIZE]),
-                GenericArray::from_slice(&sk),
-            )
-            .1;
+            let owf_input = GenericArray::from_slice(&sk[..O::InputSize::USIZE]);
+            let owf_key = GenericArray::from_slice(&sk[O::InputSize::USIZE..]);
+
+            let test = aes_extendedwitness::<P, O>(owf_key, owf_input).1;
             if !test {
                 continue;
             }
 
-            let mut res = GenericArray::default();
-            res[..16 * O::BETA::USIZE].copy_from_slice(&sk[..16 * O::BETA::USIZE]);
-            O::evaluate_owf(
-                &sk[16 * O::BETA::USIZE..16 * O::BETA::USIZE + O::LAMBDABYTES::USIZE],
-                &sk[..16 * O::BETA::USIZE],
-                &mut res[16 * O::BETA::USIZE..],
-            );
+            let mut owf_output = GenericArray::default();
+            O::evaluate_owf(owf_key, owf_input, &mut owf_output);
 
-            return (res, sk);
+            return (
+                SecretKey {
+                    owf_key: owf_key.clone(),
+                    owf_input: owf_input.clone(),
+                    owf_output: owf_output.clone(),
+                },
+                PublicKey {
+                    owf_input: owf_input.clone(),
+                    owf_output,
+                },
+            );
         }
     }
 }
@@ -153,21 +340,22 @@ pub struct EmCypher {}
 
 impl Variant for EmCypher {
     fn witness<P, O>(
-        k: &GenericArray<u8, O::LAMBDABYTES>,
-        pk: &GenericArray<u8, O::PK>,
+        owf_key: &GenericArray<u8, O::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, O::InputSize>,
     ) -> Box<GenericArray<u8, O::LBYTES>>
     where
         P: PARAM,
         O: PARAMOWF,
     {
-        em_extendedwitness::<P, O>(k, pk).0
+        em_extendedwitness::<P, O>(owf_key, owf_input).0
     }
 
     fn prove<P, O>(
         w: &GenericArray<u8, O::LBYTES>,
         u: &GenericArray<u8, O::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-        pk: &GenericArray<u8, O::PK>,
+        owf_input: &GenericArray<u8, O::InputSize>,
+        owf_output: &GenericArray<u8, O::OutputSize>,
         chall: &GenericArray<u8, O::CHALL>,
     ) -> (
         Box<GenericArray<u8, O::LAMBDABYTES>>,
@@ -177,7 +365,7 @@ impl Variant for EmCypher {
         P: PARAM,
         O: PARAMOWF,
     {
-        em_prove::<P, O>(w, u, gv, pk, chall)
+        em_prove::<P, O>(w, u, gv, owf_input, owf_output, chall)
     }
 
     fn verify<P, O>(
@@ -186,13 +374,14 @@ impl Variant for EmCypher {
         a_t: &GenericArray<u8, O::LAMBDABYTES>,
         chall2: &GenericArray<u8, O::CHALL>,
         chall3: &GenericArray<u8, P::LAMBDABYTES>,
-        pk: &GenericArray<u8, O::PK>,
+        owf_input: &GenericArray<u8, O::InputSize>,
+        owf_output: &GenericArray<u8, O::OutputSize>,
     ) -> GenericArray<u8, O::LAMBDABYTES>
     where
         P: PARAM,
         O: PARAMOWF,
     {
-        em_verify::<P, O>(d, gq, a_t, chall2, chall3, pk)
+        em_verify::<P, O>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
     }
 
     fn keygen_with_rng<P, O>(mut rng: impl RngCore) -> Key<O>
@@ -201,32 +390,45 @@ impl Variant for EmCypher {
         O: PARAMOWF,
     {
         loop {
-            // TODO: why is this O::PK?
-            let mut sk: GenericArray<u8, O::PK> = GenericArray::default();
+            // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
+            let mut sk: GenericArray<u8, O::SK> = GenericArray::default();
             rng.fill_bytes(&mut sk);
 
-            let test = em_extendedwitness::<P, O>(
-                GenericArray::from_slice(&sk[O::LAMBDABYTES::USIZE..]),
-                GenericArray::from_slice(&sk),
-            )
-            .1;
+            let owf_input = GenericArray::from_slice(&sk[..O::InputSize::USIZE]);
+            let owf_key = GenericArray::from_slice(&sk[O::InputSize::USIZE..]);
+
+            let test = em_extendedwitness::<P, O>(owf_key, owf_input).1;
             if !test {
                 continue;
             }
 
-            let mut res = GenericArray::default();
-            res[..O::LAMBDABYTES::USIZE].copy_from_slice(&sk[..O::LAMBDABYTES::USIZE]);
-            O::evaluate_owf(
-                &sk[O::LAMBDABYTES::USIZE..2 * O::LAMBDABYTES::USIZE],
-                &sk[..O::LAMBDABYTES::USIZE],
-                &mut res[O::LAMBDABYTES::USIZE..],
+            let mut owf_output = GenericArray::default();
+            O::evaluate_owf(owf_key, owf_input, &mut owf_output);
+
+            return (
+                SecretKey {
+                    owf_key: owf_key.clone(),
+                    owf_input: owf_input.clone(),
+                    owf_output: owf_output.clone(),
+                },
+                PublicKey {
+                    owf_input: owf_input.clone(),
+                    owf_output,
+                },
             );
-            return (res, sk);
         }
     }
 }
 
 type RO<P> = <<<P as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::RandomOracle;
+
+pub fn faest_keygen<P, R>(rng: R) -> Key<P::OWF>
+where
+    P: PARAM,
+    R: CryptoRngCore,
+{
+    <<P as PARAM>::OWF as PARAMOWF>::Cypher::keygen_with_rng::<P, <P as PARAM>::OWF>(rng)
+}
 
 ///input : Message (an array of bytes), sk : secret key, pk : public key, rho : lambda bits
 ///
@@ -239,14 +441,13 @@ type RO<P> = <<<P as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::Ra
 #[allow(clippy::type_complexity)]
 pub fn faest_sign<C, P, O>(
     msg: &[u8],
-    sk: &GenericArray<u8, O::LAMBDABYTES>,
-    pk: &GenericArray<u8, O::PK>,
+    sk: &SecretKey<O>,
     rho: &[u8],
-) -> Box<GenericArray<u8, P::SIG>>
-where
+    signature: &mut GenericArray<u8, P::SIG>,
+) where
     C: Variant,
-    P: PARAM,
-    O: PARAMOWF,
+    P: PARAM<OWF = O>,
+    O: PARAMOWF<Cypher = C>,
 {
     let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
     let l = <P::L as Unsigned>::to_usize() / 8;
@@ -254,14 +455,15 @@ where
     let t0 = <P::TAU0 as Unsigned>::to_usize();
 
     let mut h1_hasher = RO::<P>::h1_init();
-    h1_hasher.update(pk);
+    h1_hasher.update(&sk.owf_input);
+    h1_hasher.update(&sk.owf_output);
     h1_hasher.update(msg);
     let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
         GenericArray::default();
     h1_hasher.finish().read(&mut mu);
 
     let mut h3_hasher = RO::<P>::h3_init();
-    h3_hasher.update(sk);
+    h3_hasher.update(&sk.owf_key);
     h3_hasher.update(&mu);
     h3_hasher.update(rho);
 
@@ -272,7 +474,7 @@ where
     h3_reader.read(&mut iv);
 
     let (hcom, decom, c, u, gv) = volecommit::<P, RO<P>>(&r, &iv);
-    let mut h2_hasher = RO::<O>::h2_init();
+    let mut h2_hasher = RO::<P>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
     c.iter().for_each(|buf| h2_hasher.update(buf));
@@ -283,7 +485,7 @@ where
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let u_t = vole_hasher.process(&u);
 
-    let mut h1_hasher = RO::<O>::h1_init();
+    let mut h1_hasher = RO::<P>::h1_init();
     for v in gv.iter() {
         v.iter()
             .for_each(|v| h1_hasher.update(&vole_hasher.process(v)));
@@ -292,7 +494,7 @@ where
         GenericArray::default();
     h1_hasher.finish().read(&mut hv);
 
-    let w = C::witness::<P, O>(sk, pk);
+    let w = C::witness::<P, O>(&sk.owf_key, &sk.owf_input);
     let d = GenericArray::<u8, O::LBYTES>::from_iter(zip(w.iter(), &u[..l]).map(|(w, u)| w ^ *u));
 
     let mut h2_hasher = RO::<P>::h2_init();
@@ -320,7 +522,7 @@ where
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
     );
 
-    let (a_t, b_t) = C::prove::<P, O>(&w, new_u, &new_gv, pk, &chall2);
+    let (a_t, b_t) = C::prove::<P, O>(&w, new_u, &new_gv, &sk.owf_input, &sk.owf_output, &chall2);
 
     let mut h2_hasher = RO::<P>::h2_init();
     h2_hasher.update(&chall2);
@@ -344,12 +546,13 @@ where
         }),
         &chall3,
         &iv,
+        signature,
     )
 }
 
 #[allow(unused_assignments)]
 #[allow(clippy::type_complexity)]
-pub fn faest_verify<C, P, O>(msg: &[u8], pk: &GenericArray<u8, O::PK>, sigma: &[u8]) -> bool
+pub fn faest_verify<C, P, O>(msg: &[u8], pk: &PublicKey<O>, sigma: &[u8]) -> bool
 where
     C: Variant,
     P: PARAM,
@@ -363,7 +566,8 @@ where
 
     let chall3 = GenericArray::from_slice(&sigma[sig - (16 + lambda)..sig - 16]);
     let mut h1_hasher = RO::<P>::h1_init();
-    h1_hasher.update(pk);
+    h1_hasher.update(&pk.owf_input);
+    h1_hasher.update(&pk.owf_output);
     h1_hasher.update(msg);
     let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
         GenericArray::default();
@@ -447,8 +651,8 @@ where
     h1_hasher.finish().read(&mut hv);
 
     let d = &sigma[lhat * (tau - 1) + lambda + 2..lhat * (tau - 1) + lambda + 2 + l];
-    let mut chall2: Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
-    let mut h2_hasher = RO::<O>::h2_init();
+    let mut chall2 = GenericArray::<u8, O::CHALL>::default();
+    let mut h2_hasher = RO::<P>::h2_init();
     h2_hasher.update(&chall1);
     h2_hasher.update(u_t);
     h2_hasher.update(&hv);
@@ -462,9 +666,9 @@ where
             .flat_map(|x| {
                 x.iter()
                     .map(|y| {
-                        y.clone()
-                            .into_iter()
+                        y.into_iter()
                             .take(l + lambda)
+                            .copied()
                             .collect::<GenericArray<u8, _>>()
                     })
                     .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
@@ -473,7 +677,8 @@ where
         GenericArray::from_slice(a_t),
         &chall2,
         chall3,
-        pk,
+        &pk.owf_input,
+        &pk.owf_output,
     );
 
     let mut h2_hasher = RO::<P>::h2_init();
@@ -493,13 +698,12 @@ fn sigma_to_signature<'a, P, O>(
     pdecom: impl Iterator<Item = (Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>)>,
     chall3: &[u8],
     iv: &IV,
-) -> Box<GenericArray<u8, P::SIG>>
-where
+    signature: &mut GenericArray<u8, P::SIG>,
+) where
     O: PARAMOWF,
     P: PARAM,
 {
-    let mut res = GenericArray::default_boxed();
-    let mut signature = res.as_mut_slice();
+    let mut signature = signature.as_mut_slice();
 
     c.for_each(|x| {
         signature.write_all(x).unwrap();
@@ -515,7 +719,6 @@ where
     });
     signature.write_all(chall3).unwrap();
     signature.write_all(iv).unwrap();
-    res
 }
 
 #[allow(clippy::type_complexity)]
@@ -613,257 +816,67 @@ mod test {
         ret
     }
 
+    fn run_faest_test<P: PARAM>() {
+        let mut rng = rand::thread_rng();
+        for _i in 0..RUNS {
+            let (sk, pk) = <P::OWF as PARAMOWF>::Cypher::keygen_with_rng::<P, P::OWF>(&mut rng);
+            let msg = random_message(&mut rng);
+            let mut sigma = GenericArray::default_boxed();
+            faest_sign::<<P::OWF as PARAMOWF>::Cypher, P, P::OWF>(&msg, &sk, &[], &mut sigma);
+            let res_true =
+                faest_verify::<<P::OWF as PARAMOWF>::Cypher, P, P::OWF>(&msg, &pk, &sigma);
+            assert!(res_true);
+        }
+    }
+
     #[test]
     fn faest_aes_test_128s() {
-        let mut rng = rand::thread_rng();
-        for _i in 0..RUNS {
-            let (pk, sk) = AesCypher::keygen_with_rng::<PARAM128S, PARAMOWF128>(&mut rng);
-            let msg = random_message(&mut rng);
-            let sigma = faest_sign::<AesCypher, PARAM128S, PARAMOWF128>(
-                &msg,
-                GenericArray::from_slice(&sk[16..]),
-                GenericArray::from_slice(&pk),
-                &[],
-            );
-            let res_true = faest_verify::<AesCypher, PARAM128S, PARAMOWF128>(
-                &msg,
-                GenericArray::from_slice(&pk),
-                &sigma,
-            );
-            assert!(res_true);
-        }
-    }
-
-    #[test]
-    fn faest_aes_test_128f() {
-        let mut rng = rand::thread_rng();
-        for _i in 0..RUNS {
-            let (pk, sk) = AesCypher::keygen_with_rng::<PARAM128F, PARAMOWF128>(&mut rng);
-            let msg = random_message(&mut rng);
-            let sigma = faest_sign::<AesCypher, PARAM128F, PARAMOWF128>(
-                &msg,
-                GenericArray::from_slice(&sk[16..]),
-                GenericArray::from_slice(&pk),
-                &[],
-            );
-            let res_true = faest_verify::<AesCypher, PARAM128F, PARAMOWF128>(
-                &msg,
-                GenericArray::from_slice(&pk),
-                &sigma,
-            );
-
-            assert!(res_true);
-        }
-    }
-
-    #[test]
-    fn faest_aes_test_192s() {
-        let mut rng = rand::thread_rng();
-        for _i in 0..RUNS {
-            let (pk, sk) = AesCypher::keygen_with_rng::<PARAM192S, PARAMOWF192>(&mut rng);
-            let msg = random_message(&mut rng);
-            let sigma = faest_sign::<AesCypher, PARAM192S, PARAMOWF192>(
-                &msg,
-                GenericArray::from_slice(&sk[32..56]),
-                GenericArray::from_slice(&pk),
-                &[],
-            );
-            let res_true = faest_verify::<AesCypher, PARAM192S, PARAMOWF192>(
-                &msg,
-                GenericArray::from_slice(&pk),
-                &sigma,
-            );
-            assert!(res_true);
-        }
+        run_faest_test::<PARAM128S>();
     }
 
     #[test]
     fn faest_aes_test_192f() {
-        let mut rng = rand::thread_rng();
-        for _i in 0..RUNS {
-            let (pk, sk) = AesCypher::keygen_with_rng::<PARAM192F, PARAMOWF192>(&mut rng);
-            let msg = random_message(&mut rng);
-            let sigma = faest_sign::<AesCypher, PARAM192F, PARAMOWF192>(
-                &msg,
-                GenericArray::from_slice(&sk[32..56]),
-                GenericArray::from_slice(&pk),
-                &[],
-            );
-            let res_true = faest_verify::<AesCypher, PARAM192F, PARAMOWF192>(
-                &msg,
-                GenericArray::from_slice(&pk),
-                &sigma,
-            );
-            assert!(res_true);
-        }
+        run_faest_test::<PARAM192F>();
+    }
+
+    #[test]
+    fn faest_aes_test_192s() {
+        run_faest_test::<PARAM192S>();
     }
 
     #[test]
     fn faest_aes_test_256s() {
-        let mut rng = rand::thread_rng();
-        for _i in 0..RUNS {
-            let (pk, sk) = AesCypher::keygen_with_rng::<PARAM256S, PARAMOWF256>(&mut rng);
-            let msg = random_message(&mut rng);
-            let sigma = faest_sign::<AesCypher, PARAM256S, PARAMOWF256>(
-                &msg,
-                GenericArray::from_slice(&sk[32..]),
-                GenericArray::from_slice(&pk),
-                &[],
-            );
-            let res_true = faest_verify::<AesCypher, PARAM256S, PARAMOWF256>(
-                &msg,
-                GenericArray::from_slice(&pk),
-                &sigma,
-            );
-            assert!(res_true);
-        }
+        run_faest_test::<PARAM256S>();
     }
 
     #[test]
     fn faest_aes_test_256f() {
-        let mut rng = rand::thread_rng();
-        for _i in 0..RUNS {
-            let (pk, sk) = AesCypher::keygen_with_rng::<PARAM256F, PARAMOWF256>(&mut rng);
-            let msg = random_message(&mut rng);
-            let sigma = faest_sign::<AesCypher, PARAM256F, PARAMOWF256>(
-                &msg,
-                GenericArray::from_slice(&sk[32..]),
-                GenericArray::from_slice(&pk),
-                &[],
-            );
-            let res_true = faest_verify::<AesCypher, PARAM256F, PARAMOWF256>(
-                &msg,
-                GenericArray::from_slice(&pk),
-                &sigma,
-            );
-            assert!(res_true);
-        }
+        run_faest_test::<PARAM256F>();
     }
 
     #[test]
     fn faest_em_test_128s() {
-        let mut rng = rand::thread_rng();
-        for _i in 0..RUNS {
-            let (pk, sk) = EmCypher::keygen_with_rng::<PARAM128SEM, PARAMOWF128EM>(&mut rng);
-            let msg = random_message(&mut rng);
-            let sigma = faest_sign::<EmCypher, PARAM128SEM, PARAMOWF128EM>(
-                &msg,
-                GenericArray::from_slice(&sk[16..]),
-                GenericArray::from_slice(&pk),
-                &[],
-            );
-            let res_true = faest_verify::<EmCypher, PARAM128SEM, PARAMOWF128EM>(
-                &msg,
-                GenericArray::from_slice(&pk),
-                &sigma,
-            );
-            assert!(res_true);
-        }
-    }
-
-    #[test]
-    fn faest_em_test_128f() {
-        let mut rng = rand::thread_rng();
-        for _i in 0..RUNS {
-            let (pk, sk) = EmCypher::keygen_with_rng::<PARAM128FEM, PARAMOWF128EM>(&mut rng);
-            let msg = random_message(&mut rng);
-            let sigma = faest_sign::<EmCypher, PARAM128FEM, PARAMOWF128EM>(
-                &msg,
-                GenericArray::from_slice(&sk[16..]),
-                GenericArray::from_slice(&pk),
-                &[],
-            );
-            let res_true = faest_verify::<EmCypher, PARAM128FEM, PARAMOWF128EM>(
-                &msg,
-                GenericArray::from_slice(&pk),
-                &sigma,
-            );
-            assert!(res_true);
-        }
-    }
-
-    #[test]
-    fn faest_em_test_192s() {
-        let mut rng = rand::thread_rng();
-        for _i in 0..RUNS {
-            let (pk, sk) = EmCypher::keygen_with_rng::<PARAM192SEM, PARAMOWF192EM>(&mut rng);
-            let msg = random_message(&mut rng);
-            let sigma = faest_sign::<EmCypher, PARAM192SEM, PARAMOWF192EM>(
-                &msg,
-                GenericArray::from_slice(&sk[24..]),
-                GenericArray::from_slice(&pk),
-                &[],
-            );
-            let res_true = faest_verify::<EmCypher, PARAM192SEM, PARAMOWF192EM>(
-                &msg,
-                GenericArray::from_slice(&pk),
-                &sigma,
-            );
-            assert!(res_true);
-        }
+        run_faest_test::<PARAM128SEM>();
     }
 
     #[test]
     fn faest_em_test_192f() {
-        let mut rng = rand::thread_rng();
-        for _i in 0..RUNS {
-            let (pk, sk) = EmCypher::keygen_with_rng::<PARAM192FEM, PARAMOWF192EM>(&mut rng);
-            let msg = random_message(&mut rng);
-            let sigma = faest_sign::<EmCypher, PARAM192FEM, PARAMOWF192EM>(
-                &msg,
-                GenericArray::from_slice(&sk[24..]),
-                GenericArray::from_slice(&pk),
-                &[],
-            );
-            let res_true = faest_verify::<EmCypher, PARAM192FEM, PARAMOWF192EM>(
-                &msg,
-                GenericArray::from_slice(&pk),
-                &sigma,
-            );
-            assert!(res_true);
-        }
+        run_faest_test::<PARAM192FEM>();
+    }
+
+    #[test]
+    fn faest_em_test_192s() {
+        run_faest_test::<PARAM192SEM>();
     }
 
     #[test]
     fn faest_em_test_256s() {
-        let mut rng = rand::thread_rng();
-        for _i in 0..RUNS {
-            let (pk, sk) = EmCypher::keygen_with_rng::<PARAM256SEM, PARAMOWF256EM>(&mut rng);
-            let msg = random_message(&mut rng);
-            let sigma = faest_sign::<EmCypher, PARAM256SEM, PARAMOWF256EM>(
-                &msg,
-                GenericArray::from_slice(&sk[32..]),
-                GenericArray::from_slice(&pk),
-                &[],
-            );
-            let res_true = faest_verify::<EmCypher, PARAM256SEM, PARAMOWF256EM>(
-                &msg,
-                GenericArray::from_slice(&pk),
-                &sigma,
-            );
-            assert!(res_true);
-        }
+        run_faest_test::<PARAM256SEM>();
     }
 
     #[test]
     fn faest_em_test_256f() {
-        let mut rng = rand::thread_rng();
-        for _i in 0..RUNS {
-            let (pk, sk) = EmCypher::keygen_with_rng::<PARAM256FEM, PARAMOWF256EM>(&mut rng);
-            let msg = random_message(&mut rng);
-            let sigma = faest_sign::<EmCypher, PARAM256FEM, PARAMOWF256EM>(
-                &msg,
-                GenericArray::from_slice(&sk[32..]),
-                GenericArray::from_slice(&pk),
-                &[],
-            );
-            let res_true = faest_verify::<EmCypher, PARAM256FEM, PARAMOWF256EM>(
-                &msg,
-                GenericArray::from_slice(&pk),
-                &sigma,
-            );
-            assert!(res_true);
-        }
+        run_faest_test::<PARAM256FEM>();
     }
 
     ///NIST tests
@@ -925,145 +938,92 @@ mod test {
         ret
     }
 
-    fn test_nist<P: PARAM, O: PARAMOWF, C: Variant>(
-        test_data: &str,
-        sk_offset: usize,
-        sk_offset_2: usize,
-    ) {
+    fn test_nist<P: PARAM>(test_data: &str) {
         let datas = read_kats(test_data);
         for data in datas {
             let mut rng = NistPqcAes256CtrRng::try_from(data.seed.as_slice()).unwrap();
-            let pk = data.pk;
             let msg = data.message;
             let sig = data.sm;
 
-            let keypair = C::keygen_with_rng::<P, O>(&mut rng);
-            assert_eq!(pk.as_slice(), keypair.0.as_slice());
+            let keypair = <P::OWF as PARAMOWF>::Cypher::keygen_with_rng::<P, P::OWF>(&mut rng);
+            assert_eq!(data.pk.as_slice(), keypair.1.as_bytes().as_slice());
+            assert_eq!(data.sk.as_slice(), keypair.0.as_bytes().as_slice());
 
-            let mut rho = GenericArray::<u8, O::LAMBDABYTES>::default();
+            let mut rho = GenericArray::<u8, <P::OWF as PARAMOWF>::LAMBDABYTES>::default();
             rng.fill_bytes(&mut rho);
 
-            let signature = faest_sign::<C, P, O>(
+            let mut signature = GenericArray::default_boxed();
+            faest_sign::<<P::OWF as PARAMOWF>::Cypher, P, P::OWF>(
                 &msg,
-                GenericArray::from_slice(&keypair.1[sk_offset..sk_offset_2]),
-                GenericArray::from_slice(&pk),
+                &keypair.0,
                 &rho,
+                &mut signature,
             );
             assert_eq!(&sig[..sig.len() - signature.len()], &msg);
             assert_eq!(&sig[sig.len() - signature.len()..], signature.as_slice());
-            assert!(faest_verify::<C, P, O>(
-                &msg,
-                GenericArray::from_slice(&pk),
-                &signature
+            assert!(faest_verify::<<P::OWF as PARAMOWF>::Cypher, P, P::OWF>(
+                &msg, &keypair.1, &signature
             ));
         }
     }
 
     #[test]
     fn test_nist_faest_128s_aes() {
-        test_nist::<PARAM128S, PARAMOWF128, AesCypher>(
-            include_str!("../PQCsignKAT_faest_128s.rsp"),
-            16,
-            32,
-        );
+        test_nist::<PARAM128S>(include_str!("../PQCsignKAT_faest_128s.rsp"));
     }
 
     #[test]
     fn test_nist_faest_128f_aes() {
-        test_nist::<PARAM128F, PARAMOWF128, AesCypher>(
-            include_str!("../PQCsignKAT_faest_128f.rsp"),
-            16,
-            32,
-        );
+        test_nist::<PARAM128F>(include_str!("../PQCsignKAT_faest_128f.rsp"));
     }
 
     #[test]
     fn test_nist_faest_192s_aes() {
-        test_nist::<PARAM192S, PARAMOWF192, AesCypher>(
-            include_str!("../PQCsignKAT_faest_192s.rsp"),
-            32,
-            56,
-        );
+        test_nist::<PARAM192S>(include_str!("../PQCsignKAT_faest_192s.rsp"));
     }
 
     #[test]
     fn test_nist_faest_192f_aes() {
-        test_nist::<PARAM192F, PARAMOWF192, AesCypher>(
-            include_str!("../PQCsignKAT_faest_192f.rsp"),
-            32,
-            56,
-        );
+        test_nist::<PARAM192F>(include_str!("../PQCsignKAT_faest_192f.rsp"));
     }
 
     #[test]
     fn test_nist_faest_256s_aes() {
-        test_nist::<PARAM256S, PARAMOWF256, AesCypher>(
-            include_str!("../PQCsignKAT_faest_256s.rsp"),
-            32,
-            64,
-        );
+        test_nist::<PARAM256S>(include_str!("../PQCsignKAT_faest_256s.rsp"));
     }
 
     #[test]
     fn test_nist_faest_256f_aes() {
-        test_nist::<PARAM256F, PARAMOWF256, AesCypher>(
-            include_str!("../PQCsignKAT_faest_256f.rsp"),
-            32,
-            64,
-        );
+        test_nist::<PARAM256F>(include_str!("../PQCsignKAT_faest_256f.rsp"));
     }
 
     #[test]
     fn test_nist_faest_128s_em() {
-        test_nist::<PARAM128SEM, PARAMOWF128EM, EmCypher>(
-            include_str!("../PQCsignKAT_faest_em_128s.rsp"),
-            16,
-            32,
-        );
+        test_nist::<PARAM128SEM>(include_str!("../PQCsignKAT_faest_em_128s.rsp"));
     }
 
     #[test]
     fn test_nist_faest_128f_em() {
-        test_nist::<PARAM128FEM, PARAMOWF128EM, EmCypher>(
-            include_str!("../PQCsignKAT_faest_em_128f.rsp"),
-            16,
-            32,
-        );
+        test_nist::<PARAM128FEM>(include_str!("../PQCsignKAT_faest_em_128f.rsp"));
     }
 
     #[test]
     fn test_nist_faest_192s_em() {
-        test_nist::<PARAM192SEM, PARAMOWF192EM, EmCypher>(
-            include_str!("../PQCsignKAT_faest_em_192s.rsp"),
-            24,
-            48,
-        );
+        test_nist::<PARAM192SEM>(include_str!("../PQCsignKAT_faest_em_192s.rsp"));
     }
 
     #[test]
     fn test_nist_faest192f_em() {
-        test_nist::<PARAM192FEM, PARAMOWF192EM, EmCypher>(
-            include_str!("../PQCsignKAT_faest_em_192f.rsp"),
-            24,
-            48,
-        );
+        test_nist::<PARAM192FEM>(include_str!("../PQCsignKAT_faest_em_192f.rsp"));
     }
 
     #[test]
     fn test_nist_faest_256s_em() {
-        test_nist::<PARAM256SEM, PARAMOWF256EM, EmCypher>(
-            include_str!("../PQCsignKAT_faest_em_256s.rsp"),
-            32,
-            64,
-        );
+        test_nist::<PARAM256SEM>(include_str!("../PQCsignKAT_faest_em_256s.rsp"));
     }
 
     #[test]
     fn test_nist_faest_256f_em() {
-        test_nist::<PARAM256FEM, PARAMOWF256EM, EmCypher>(
-            include_str!("../PQCsignKAT_faest_em_256f.rsp"),
-            32,
-            64,
-        );
+        test_nist::<PARAM256FEM>(include_str!("../PQCsignKAT_faest_em_256f.rsp"));
     }
 }

@@ -19,6 +19,7 @@ use generic_array::{
 };
 
 use crate::{
+    faest::{AesCypher, EmCypher, Variant},
     fields::{BigGaloisField, Field, GF128, GF192, GF256},
     random_oracles::{
         PseudoRandomGenerator, RandomOracle, RandomOracleShake128, RandomOracleShake192,
@@ -130,6 +131,7 @@ pub trait PARAMOWF {
         SDLength = Self::CHALL1,
         OutputLength = Self::LAMBDAPLUS2,
     >;
+    type Cypher: Variant;
 
     type InputSize: ArrayLength;
     type OutputSize: ArrayLength;
@@ -153,7 +155,6 @@ pub trait PARAMOWF {
     type LAMBDALBYTES: ArrayLength;
     type LAMBDAL: ArrayLength;
     type PK: ArrayLength;
-    type QUOTPK2: ArrayLength;
     type SK: ArrayLength;
     type CHALL: ArrayLength;
     type CHALL1: ArrayLength;
@@ -185,6 +186,7 @@ impl PARAMOWF for PARAMOWF128 {
     type Field = GF128;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+    type Cypher = AesCypher;
 
     type InputSize = U16;
     type OutputSize = U16;
@@ -257,8 +259,6 @@ impl PARAMOWF for PARAMOWF128 {
 
     type QUOTSENC4 = Quot<Self::SENC, U4>;
 
-    type QUOTPK2 = Quot<Self::PK, U2>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
@@ -283,6 +283,7 @@ impl PARAMOWF for PARAMOWF192 {
     type Field = GF192;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+    type Cypher = AesCypher;
 
     type InputSize = U32;
     type OutputSize = U32;
@@ -355,8 +356,6 @@ impl PARAMOWF for PARAMOWF192 {
 
     type QUOTSENC4 = Quot<Self::SENC, U4>;
 
-    type QUOTPK2 = Quot<Self::PK, U2>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
@@ -385,6 +384,7 @@ impl PARAMOWF for PARAMOWF256 {
     type Field = GF256;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+    type Cypher = AesCypher;
 
     type InputSize = U32;
     type OutputSize = U32;
@@ -457,8 +457,6 @@ impl PARAMOWF for PARAMOWF256 {
 
     type QUOTSENC4 = Quot<Self::SENC, U4>;
 
-    type QUOTPK2 = Quot<Self::PK, U2>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
@@ -487,6 +485,7 @@ impl PARAMOWF for PARAMOWF128EM {
     type Field = GF128;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+    type Cypher = EmCypher;
 
     type InputSize = U16;
     type OutputSize = U16;
@@ -559,8 +558,6 @@ impl PARAMOWF for PARAMOWF128EM {
 
     type QUOTSENC4 = Quot<Self::SENC, U4>;
 
-    type QUOTPK2 = Self::LAMBDABYTES;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
@@ -585,6 +582,7 @@ impl PARAMOWF for PARAMOWF192EM {
     type Field = GF192;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+    type Cypher = EmCypher;
 
     type InputSize = U24;
     type OutputSize = U24;
@@ -657,8 +655,6 @@ impl PARAMOWF for PARAMOWF192EM {
 
     type QUOTSENC4 = Quot<Self::SENC, U4>;
 
-    type QUOTPK2 = Self::LAMBDABYTES;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
@@ -684,6 +680,7 @@ impl PARAMOWF for PARAMOWF256EM {
     type Field = GF256;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+    type Cypher = EmCypher;
 
     type InputSize = U32;
     type OutputSize = U32;
@@ -755,8 +752,6 @@ impl PARAMOWF for PARAMOWF256EM {
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
 
     type QUOTSENC4 = Quot<Self::SENC, U4>;
-
-    type QUOTPK2 = Self::LAMBDABYTES;
 
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 

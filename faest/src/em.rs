@@ -24,8 +24,8 @@ type EMProof<O> = (
 );
 
 pub fn em_extendedwitness<P, O>(
-    k: &GenericArray<u8, O::LAMBDABYTES>,
-    pk: &GenericArray<u8, O::PK>,
+    owf_key: &GenericArray<u8, O::LAMBDABYTES>,
+    owf_input: &GenericArray<u8, O::InputSize>,
 ) -> (Box<GenericArray<u8, O::LBYTES>>, bool)
 where
     P: PARAM,
@@ -39,21 +39,21 @@ where
     let mut res: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
     let mut index = 0;
     let x = rijndael_key_schedule(
-        &pk[..lambda],
+        &owf_input[..lambda],
         nst as u8,
         kc,
         r as u8,
         (4 * (((r + 1) * nst) / kc as usize)) as u8,
     );
-    for i in k.iter() {
+    for i in owf_key.iter() {
         res[index] = *i;
         index += 1;
     }
     let mut state = State::default();
     bitslice(
         &mut state,
-        &k[..16],
-        &[k[16..].to_vec(), vec![0u8; 32 - lambda]].concat(),
+        &owf_key[..16],
+        &[owf_key[16..].to_vec(), vec![0u8; 32 - lambda]].concat(),
     );
     rijndael_add_round_key(&mut state, &x.0[..8]);
     for j in 1..r {
@@ -248,7 +248,7 @@ where
 
 #[allow(clippy::too_many_arguments)]
 pub fn em_enc_cstrnts<P, O>(
-    output: &GenericArray<u8, O::LAMBDABYTES>,
+    output: &GenericArray<u8, O::OutputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     w: &GenericArray<u8, O::LBYTES>,
     v: &GenericArray<O::Field, O::L>,
@@ -322,7 +322,8 @@ pub fn em_prove<P, O>(
     w: &GenericArray<u8, O::LBYTES>,
     u: &GenericArray<u8, O::LAMBDALBYTES>,
     gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-    pk: &GenericArray<u8, O::PK>,
+    owf_input: &GenericArray<u8, O::InputSize>,
+    owf_output: &GenericArray<u8, O::OutputSize>,
     chall: &GenericArray<u8, O::CHALL>,
 ) -> EMProof<O>
 where
@@ -349,9 +350,9 @@ where
     let new_v = GenericArray::<O::Field, O::LAMBDAL>::from_iter(
         temp_v.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
     );
-    let x = rijndael_key_schedule(&pk[..lambda / 8], nst, nk, r, 4 * (((r + 1) * nst) / nk));
+    let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
     let (a0, a1) = em_enc_cstrnts::<P, O>(
-        GenericArray::from_slice(&pk[lambda / 8..]),
+        owf_output,
         &x.0.chunks(8)
             .flat_map(|x| {
                 convert_from_batchblocks(inv_bitslice(x))
@@ -393,7 +394,8 @@ pub fn em_verify<P, O>(
     a_t: &GenericArray<u8, O::LAMBDABYTES>,
     chall2: &GenericArray<u8, O::CHALL>,
     chall3: &GenericArray<u8, P::LAMBDABYTES>,
-    pk: &GenericArray<u8, O::PK>,
+    owf_input: &GenericArray<u8, O::InputSize>,
+    owf_output: &GenericArray<u8, O::OutputSize>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
 where
     P: PARAM,
@@ -446,9 +448,9 @@ where
     let new_q = GenericArray::<O::Field, O::LAMBDAL>::from_iter(
         temp_q.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
     );
-    let x = rijndael_key_schedule(&pk[..lambda / 8], nst, nk, r, 4 * (((r + 1) * nst) / nk));
+    let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
     let (b, _) = em_enc_cstrnts::<P, O>(
-        GenericArray::from_slice(&pk[lambda / 8..]),
+        owf_output,
         &x.0.chunks(8)
             .flat_map(|x| {
                 convert_from_batchblocks(inv_bitslice(x))
@@ -510,19 +512,25 @@ mod test {
             if data.lambda == 128 {
                 let res = em_extendedwitness::<PARAM128SEM, PARAMOWF128EM>(
                     GenericArray::from_slice(&data.key),
-                    GenericArray::from_slice(&data.input),
+                    GenericArray::from_slice(
+                        &data.input[..<PARAMOWF128EM as PARAMOWF>::InputSize::USIZE],
+                    ),
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
             } else if data.lambda == 192 {
                 let res = em_extendedwitness::<PARAM192SEM, PARAMOWF192EM>(
                     GenericArray::from_slice(&data.key),
-                    GenericArray::from_slice(&[data.input, vec![0u8; 16]].concat()),
+                    GenericArray::from_slice(
+                        &data.input[..<PARAMOWF192EM as PARAMOWF>::InputSize::USIZE],
+                    ),
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
             } else {
                 let res = em_extendedwitness::<PARAM256SEM, PARAMOWF256EM>(
                     GenericArray::from_slice(&data.key),
-                    GenericArray::from_slice(&[data.input, vec![0u8; 32]].concat()),
+                    GenericArray::from_slice(
+                        &data.input[..<PARAMOWF256EM as PARAMOWF>::InputSize::USIZE],
+                    ),
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
             }
@@ -1105,7 +1113,8 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
-                    GenericArray::from_slice(&[data.input, data.output].concat()),
+                    GenericArray::from_slice(&data.input),
+                    GenericArray::from_slice(&data.output),
                     GenericArray::from_slice(&data.chall),
                 );
                 assert_eq!(
@@ -1127,7 +1136,8 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
-                    GenericArray::from_slice(&[data.input, data.output].concat()),
+                    GenericArray::from_slice(&data.input),
+                    GenericArray::from_slice(&data.output),
                     GenericArray::from_slice(&data.chall),
                 );
                 assert_eq!(
@@ -1148,7 +1158,8 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
-                    GenericArray::from_slice(&[data.input, data.output].concat()),
+                    GenericArray::from_slice(&data.input),
+                    GenericArray::from_slice(&data.output),
                     GenericArray::from_slice(&data.chall),
                 );
                 assert_eq!(
@@ -1206,7 +1217,8 @@ mod test {
                         GenericArray::from_slice(&data.at),
                         GenericArray::from_slice(&data.chall2),
                         GenericArray::from_slice(&data.chall3),
-                        GenericArray::from_slice(&[data.input, data.output].concat()),
+                        GenericArray::from_slice(&data.input),
+                        GenericArray::from_slice(&data.output),
                     )
                 } else {
                     em_verify::<PARAM128FEM, PARAMOWF128EM>(
@@ -1221,7 +1233,8 @@ mod test {
                         GenericArray::from_slice(&data.at),
                         GenericArray::from_slice(&data.chall2),
                         GenericArray::from_slice(&data.chall3),
-                        GenericArray::from_slice(&[data.input, data.output].concat()),
+                        GenericArray::from_slice(&data.input),
+                        GenericArray::from_slice(&data.output),
                     )
                 };
                 assert_eq!(res, *GenericArray::from_slice(&data.qt));
@@ -1239,7 +1252,8 @@ mod test {
                         GenericArray::from_slice(&data.at),
                         GenericArray::from_slice(&data.chall2),
                         GenericArray::from_slice(&data.chall3),
-                        GenericArray::from_slice(&[data.input, data.output].concat()),
+                        GenericArray::from_slice(&data.input),
+                        GenericArray::from_slice(&data.output),
                     )
                 } else {
                     em_verify::<PARAM192FEM, PARAMOWF192EM>(
@@ -1254,7 +1268,8 @@ mod test {
                         GenericArray::from_slice(&data.at),
                         GenericArray::from_slice(&data.chall2),
                         GenericArray::from_slice(&data.chall3),
-                        GenericArray::from_slice(&[data.input, data.output].concat()),
+                        GenericArray::from_slice(&data.input),
+                        GenericArray::from_slice(&data.output),
                     )
                 };
                 assert_eq!(res, *GenericArray::from_slice(&data.qt));
@@ -1272,7 +1287,8 @@ mod test {
                         GenericArray::from_slice(&data.at),
                         GenericArray::from_slice(&data.chall2),
                         GenericArray::from_slice(&data.chall3),
-                        GenericArray::from_slice(&[data.input, data.output].concat()),
+                        GenericArray::from_slice(&data.input),
+                        GenericArray::from_slice(&data.output),
                     )
                 } else {
                     em_verify::<PARAM256FEM, PARAMOWF256EM>(
@@ -1287,7 +1303,8 @@ mod test {
                         GenericArray::from_slice(&data.at),
                         GenericArray::from_slice(&data.chall2),
                         GenericArray::from_slice(&data.chall3),
-                        GenericArray::from_slice(&[data.input, data.output].concat()),
+                        GenericArray::from_slice(&data.input),
+                        GenericArray::from_slice(&data.output),
                     )
                 };
                 assert_eq!(res, *GenericArray::from_slice(&data.qt));

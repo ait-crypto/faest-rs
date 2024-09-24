@@ -15,11 +15,6 @@ use crate::{
     universal_hashing::{ZKHasherInit, ZKHasherProcess},
 };
 
-type IO<'a, O> = (
-    &'a GenericArray<u8, <O as PARAMOWF>::QUOTPK2>,
-    &'a GenericArray<u8, <O as PARAMOWF>::QUOTPK2>,
-);
-
 type KeyCstrnts<O> = (
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::SKE>>,
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::SKE>>,
@@ -38,11 +33,6 @@ type Cstrnts<O> = (
 type AESProof<O> = (
     Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
     Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
-);
-
-type Keypair<'a, O> = (
-    &'a GenericArray<u8, <O as PARAMOWF>::QUOTPK2>,
-    &'a GenericArray<u8, <O as PARAMOWF>::QUOTPK2>,
 );
 
 pub fn byte_to_bit(input: u8) -> Vec<u8> {
@@ -66,8 +56,8 @@ where
 
 //The first member of the tuples are the effectives witness while the second is the validity according Faest requiremenbt of the keypair at the origin of the operation
 pub fn aes_extendedwitness<P, O>(
-    key: &GenericArray<u8, O::LAMBDABYTES>,
-    pk: &GenericArray<u8, O::PK>,
+    owf_key: &GenericArray<u8, O::LAMBDABYTES>,
+    owf_input: &GenericArray<u8, O::InputSize>,
 ) -> (Box<GenericArray<u8, O::LBYTES>>, bool)
 where
     P: PARAM,
@@ -81,12 +71,12 @@ where
     let nk = <O::NK as Unsigned>::to_usize();
     let mut input = [0u8; 32];
     //step 0
-    input[..16 * beta].clone_from_slice(&pk[..16 * beta]);
+    input[..16 * beta].clone_from_slice(&owf_input[..16 * beta]);
     let mut w: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
     let mut index = 0;
     //step 3
     let (temp_kb, temp_val) =
-        rijndael_key_schedule(key, bc, nk as u8, r, <O::SKE as Unsigned>::to_u8());
+        rijndael_key_schedule(owf_key, bc, nk as u8, r, <O::SKE as Unsigned>::to_u8());
     let (kb, mut valid): (&GenericArray<u32, O::KBLENGTH>, bool) =
         (GenericArray::from_slice(&temp_kb[..kblen]), temp_val);
     //step 4
@@ -699,7 +689,8 @@ pub fn aes_prove<P, O>(
     w: &GenericArray<u8, O::LBYTES>,
     u: &GenericArray<u8, O::LAMBDALBYTES>,
     gv: CstrntsVal<O>,
-    pk: &GenericArray<u8, O::PK>,
+    owf_input: &GenericArray<u8, O::InputSize>,
+    owf_output: &GenericArray<u8, O::OutputSize>,
     chall: &GenericArray<u8, O::CHALL>,
 ) -> AESProof<O>
 where
@@ -712,7 +703,6 @@ where
     let lenc = <O::LENC as Unsigned>::to_usize();
     let senc = <O::SENC as Unsigned>::to_usize();
     let lambda = <P::LAMBDA as Unsigned>::to_usize();
-    let pk_val = <O::PK as Unsigned>::to_usize();
     let new_w: GenericArray<u8, O::L> = w.iter().flat_map(|x| byte_to_bit(*x)).collect();
     let mut temp_v: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
     for i in 0..(l + lambda) / 8 {
@@ -730,11 +720,6 @@ where
         temp_v.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
     );
 
-    let (input, output): Keypair<O> = (
-        GenericArray::from_slice(&pk[..pk_val / 2]),
-        GenericArray::from_slice(&pk[pk_val / 2..]),
-    );
-
     let (a0, a1, k, vk) = aes_key_exp_cstrnts::<O>(
         GenericArray::from_slice(&new_w[..lke]),
         GenericArray::from_slice(&new_v[..lke]),
@@ -744,8 +729,8 @@ where
     );
 
     let a_01 = aes_enc_cstrnts::<O>(
-        input[..16].try_into().unwrap(),
-        output[..16].try_into().unwrap(),
+        owf_input[..16].try_into().unwrap(),
+        owf_output[..16].try_into().unwrap(),
         //building a T out of w
         GenericArray::from_slice(
             &new_w[lke..(lke + lenc)]
@@ -766,8 +751,8 @@ where
 
     if lambda > 128 {
         a_01_bis = aes_enc_cstrnts::<O>(
-            input[16..].try_into().unwrap(),
-            output[16..].try_into().unwrap(),
+            owf_input[16..].try_into().unwrap(),
+            owf_output[16..].try_into().unwrap(),
             GenericArray::from_slice(
                 &new_w[(lke + lenc)..l]
                     .chunks(8)
@@ -821,7 +806,8 @@ pub fn aes_verify<P, O>(
     a_t: &GenericArray<u8, O::LAMBDABYTES>,
     chall2: &GenericArray<u8, O::CHALL>,
     chall3: &GenericArray<u8, P::LAMBDABYTES>,
-    pk: &GenericArray<u8, O::PK>,
+    owf_input: &GenericArray<u8, O::InputSize>,
+    owf_output: &GenericArray<u8, O::OutputSize>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
 where
     P: PARAM,
@@ -833,16 +819,11 @@ where
     let t0 = <P::TAU0 as Unsigned>::to_usize();
     let t1 = <P::TAU1 as Unsigned>::to_usize();
     let l = <P::L as Unsigned>::to_usize();
-    let _c = <O::C as Unsigned>::to_usize();
     let delta = O::Field::from(chall3);
     let lke = <O::LKE as Unsigned>::to_usize();
     let lenc = <O::LENC as Unsigned>::to_usize();
     let senc = <O::SENC as Unsigned>::to_usize();
-    let pk_len = <O::PK as Unsigned>::to_usize();
-    let (input, output): IO<O> = (
-        GenericArray::from_slice(&pk[..pk_len / 2]),
-        GenericArray::from_slice(&pk[pk_len / 2..]),
-    );
+
     let mut new_gq: GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = gq.clone();
     for i in 0..t0 {
         let sdelta = P::Tau::decode_challenge(chall3, i);
@@ -893,8 +874,8 @@ where
     b1.into_iter().for_each(|value| zk_hasher.update(&value));
 
     let b2 = aes_enc_cstrnts::<O>(
-        input[..16].try_into().unwrap(),
-        output[..16].try_into().unwrap(),
+        owf_input[..16].try_into().unwrap(),
+        owf_output[..16].try_into().unwrap(),
         &GenericArray::default_boxed(),
         &GenericArray::default_boxed(),
         &GenericArray::default_boxed(),
@@ -908,8 +889,8 @@ where
     b2[..senc].iter().for_each(|value| zk_hasher.update(value));
     if lambda > 128 {
         let b3 = aes_enc_cstrnts::<O>(
-            input[16..].try_into().unwrap(),
-            output[16..].try_into().unwrap(),
+            owf_input[16..].try_into().unwrap(),
+            owf_output[16..].try_into().unwrap(),
             &GenericArray::default_boxed(),
             &GenericArray::default_boxed(),
             &GenericArray::default_boxed(),
@@ -964,19 +945,25 @@ mod test {
             if data.lambda == 128 {
                 let res = aes_extendedwitness::<PARAM128S, PARAMOWF128>(
                     GenericArray::from_slice(&data.key),
-                    GenericArray::from_slice(&data.input),
+                    GenericArray::from_slice(
+                        &data.input[..<PARAMOWF128 as PARAMOWF>::InputSize::USIZE],
+                    ),
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
             } else if data.lambda == 192 {
                 let res = aes_extendedwitness::<PARAM192S, PARAMOWF192>(
                     GenericArray::from_slice(&data.key),
-                    GenericArray::from_slice(&data.input),
+                    GenericArray::from_slice(
+                        &data.input[..<PARAMOWF192 as PARAMOWF>::InputSize::USIZE],
+                    ),
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
             } else {
                 let res = aes_extendedwitness::<PARAM256S, PARAMOWF256>(
                     GenericArray::from_slice(&data.key),
-                    GenericArray::from_slice(&data.input),
+                    GenericArray::from_slice(
+                        &data.input[..<PARAMOWF256 as PARAMOWF>::InputSize::USIZE],
+                    ),
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
             }
@@ -1089,17 +1076,11 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct AesKeyExpBwd {
         lambda: u16,
-
         mtag: u8,
-
         mkey: u8,
-
         delta: [u128; 4],
-
         x: Vec<[u128; 4]>,
-
         xk: Vec<[u128; 4]>,
-
         out: Vec<[u128; 4]>,
     }
 
@@ -1262,21 +1243,13 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct AesKeyExpCstrnts {
         lambda: u16,
-
         mkey: u8,
-
         w: Vec<u8>,
-
         v: Vec<[u128; 4]>,
-
         q: Vec<[u128; 4]>,
-
         delta: Vec<u8>,
-
         ab: Vec<[u128; 8]>,
-
         res1: Vec<u8>,
-
         res2: Vec<[u128; 4]>,
     }
 
@@ -1499,19 +1472,12 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct AesEncFwd {
         lambda: u16,
-
         mkey: u8,
-
         mtag: u8,
-
         x: Vec<[u64; 4]>,
-
         xk: Vec<[u64; 4]>,
-
         input: [u8; 16],
-
         delta: [u64; 4],
-
         reslambda: Vec<[u64; 4]>,
     }
 
@@ -1692,19 +1658,12 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct AesEncBkwd {
         lambda: u16,
-
         mkey: u8,
-
         mtag: u8,
-
         x: Vec<[u128; 4]>,
-
         xk: Vec<[u128; 4]>,
-
         output: [u8; 16],
-
         delta: [u128; 4],
-
         reslambda: Vec<[u128; 4]>,
     }
 
@@ -1863,25 +1822,15 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct AesEncCstrnts {
         lambda: u16,
-
         mkey: u8,
-
         w: Vec<u8>,
-
         k: Vec<u8>,
-
         vq: Vec<[u128; 4]>,
-
         vqk: Vec<[u128; 4]>,
-
         input: [u8; 16],
-
         output: [u8; 16],
-
         delta: Vec<u8>,
-
         senc: u8,
-
         ab: Vec<[u128; 8]>,
     }
 
@@ -2059,21 +2008,13 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct AesProve {
         lambda: u16,
-
         gv: Vec<Vec<u8>>,
-
         w: Vec<u8>,
-
         u: Vec<u8>,
-
         input: Vec<u8>,
-
         output: Vec<u8>,
-
         chall: Vec<u8>,
-
         at: Vec<u8>,
-
         bt: Vec<u8>,
     }
 
@@ -2084,8 +2025,6 @@ mod test {
             serde_json::from_reader(file).expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
-                let mut pk = data.input.to_vec();
-                pk.append(&mut data.output.to_vec());
                 let res: (ZkHash128, ZkHash128) = aes_prove::<PARAM128S, PARAMOWF128>(
                     GenericArray::from_slice(&data.w),
                     GenericArray::from_slice(&data.u),
@@ -2096,7 +2035,8 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
-                    GenericArray::from_slice(&pk),
+                    GenericArray::from_slice(&data.input),
+                    GenericArray::from_slice(&data.output),
                     GenericArray::from_slice(&data.chall),
                 );
 
@@ -2109,8 +2049,6 @@ mod test {
                         bitw[8 * i + j] = (data.w[i] >> j) & 1;
                     }
                 }
-                let mut pk = data.input.to_vec();
-                pk.append(&mut data.output.to_vec());
                 let res: (ZkHash192, ZkHash192) = aes_prove::<PARAM192S, PARAMOWF192>(
                     GenericArray::from_slice(&data.w),
                     GenericArray::from_slice(&data.u),
@@ -2121,7 +2059,8 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
-                    GenericArray::from_slice(&pk),
+                    GenericArray::from_slice(&data.input),
+                    GenericArray::from_slice(&data.output),
                     GenericArray::from_slice(&data.chall),
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.at)));
@@ -2133,9 +2072,6 @@ mod test {
                         bitw[8 * i + j] = (data.w[i] >> j) & 1;
                     }
                 }
-
-                let mut pk = data.input.to_vec();
-                pk.append(&mut data.output.to_vec());
                 let res: (ZkHash256, ZkHash256) = aes_prove::<PARAM256S, PARAMOWF256>(
                     GenericArray::from_slice(&data.w),
                     GenericArray::from_slice(&data.u),
@@ -2146,7 +2082,8 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
-                    GenericArray::from_slice(&pk),
+                    GenericArray::from_slice(&data.input),
+                    GenericArray::from_slice(&data.output),
                     GenericArray::from_slice(&data.chall),
                 );
                 assert_eq!(*res.0, *GenericArray::from_slice(&data.at));
@@ -2159,21 +2096,13 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct AesVerify {
         lambda: u16,
-
         gq: Vec<Vec<u8>>,
-
         d: Vec<u8>,
-
         chall2: Vec<u8>,
-
         chall3: Vec<u8>,
-
         at: Vec<u8>,
-
         input: Vec<u8>,
-
         output: Vec<u8>,
-
         res: Vec<u64>,
     }
 
@@ -2184,8 +2113,6 @@ mod test {
             serde_json::from_reader(file).expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
-                let mut pk = data.input.to_vec();
-                pk.append(&mut data.output.to_vec());
                 let out = aes_verify::<PARAM128S, PARAMOWF128>(
                     GenericArray::from_slice(&data.d[..]),
                     GenericArray::from_slice(
@@ -2198,15 +2125,14 @@ mod test {
                     GenericArray::from_slice(&data.at),
                     GenericArray::from_slice(&data.chall2[..]),
                     GenericArray::from_slice(&data.chall3[..]),
-                    GenericArray::from_slice(&pk[..]),
+                    GenericArray::from_slice(&data.input),
+                    GenericArray::from_slice(&data.output),
                 );
                 assert_eq!(
                     GF128::new(data.res[0] as u128 + ((data.res[1] as u128) << 64), 0),
                     GF128::from(&out[..])
                 );
             } else if data.lambda == 192 {
-                let mut pk = data.input.to_vec();
-                pk.append(&mut data.output.to_vec());
                 let out = aes_verify::<PARAM192S, PARAMOWF192>(
                     GenericArray::from_slice(&data.d[..]),
                     GenericArray::from_slice(
@@ -2219,7 +2145,8 @@ mod test {
                     GenericArray::from_slice(&data.at),
                     GenericArray::from_slice(&data.chall2[..]),
                     GenericArray::from_slice(&data.chall3[..]),
-                    GenericArray::from_slice(&pk[..]),
+                    GenericArray::from_slice(&data.input),
+                    GenericArray::from_slice(&data.output),
                 );
                 assert_eq!(
                     GF192::new(
@@ -2229,8 +2156,6 @@ mod test {
                     GF192::from(&out[..])
                 );
             } else {
-                let mut pk = data.input.to_vec();
-                pk.append(&mut data.output.to_vec());
                 let out = aes_verify::<PARAM256S, PARAMOWF256>(
                     GenericArray::from_slice(&data.d[..]),
                     GenericArray::from_slice(
@@ -2243,7 +2168,8 @@ mod test {
                     GenericArray::from_slice(&data.at),
                     GenericArray::from_slice(&data.chall2[..]),
                     GenericArray::from_slice(&data.chall3[..]),
-                    GenericArray::from_slice(&pk[..]),
+                    GenericArray::from_slice(&data.input),
+                    GenericArray::from_slice(&data.output),
                 );
                 assert_eq!(
                     GF256::new(
