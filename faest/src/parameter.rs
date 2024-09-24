@@ -160,7 +160,6 @@ pub(crate) trait PARAMOWF {
         Lambda = Self::LAMBDA,
         LambdaBytes = Self::LAMBDABYTES,
         Field = Self::Field,
-        ZKHasher = Self::ZKHasher,
         VoleHasher = Self::VoleHasher,
         Chall = Self::CHALL,
         Chall1 = Self::CHALL1,
@@ -169,8 +168,6 @@ pub(crate) trait PARAMOWF {
     /// The field that is of size `2^λ` which is defined as [Self::LAMBDA]
     // #[deprecated]
     type Field: BigGaloisField + Field<Length = Self::LAMBDABYTES> + std::fmt::Debug;
-    #[deprecated]
-    type ZKHasher: ZKHasherInit<Self::Field, SDLength = Self::CHALL>;
     #[deprecated]
     type VoleHasher: VoleHasherInit<
         Self::Field,
@@ -227,7 +224,6 @@ impl PARAMOWF for PARAMOWF128 {
     type BaseParams = BaseParams128;
 
     type Field = GF128;
-    type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
 
     type InputSize = U16;
@@ -319,7 +315,6 @@ impl PARAMOWF for PARAMOWF192 {
     type BaseParams = BaseParams192;
 
     type Field = GF192;
-    type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
 
     type InputSize = U32;
@@ -415,7 +410,6 @@ impl PARAMOWF for PARAMOWF256 {
     type BaseParams = BaseParams256;
 
     type Field = GF256;
-    type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
 
     type InputSize = U32;
@@ -511,7 +505,6 @@ impl PARAMOWF for PARAMOWF128EM {
     type BaseParams = BaseParams128;
 
     type Field = GF128;
-    type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
 
     type InputSize = U16;
@@ -606,7 +599,6 @@ impl PARAMOWF for PARAMOWF192EM {
     type BaseParams = BaseParams192;
 
     type Field = GF192;
-    type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
 
     type InputSize = U24;
@@ -701,7 +693,6 @@ impl PARAMOWF for PARAMOWF256EM {
     type BaseParams = BaseParams256;
 
     type Field = GF256;
-    type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
 
     type InputSize = U32;

@@ -851,7 +851,8 @@ where
         }
     }
 
-    let mut zk_hasher = O::ZKHasher::new_zk_hasher(chall2);
+    let mut zk_hasher =
+        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
     let new_q = GenericArray::<O::Field, O::LAMBDAL>::from_iter(
         temp_q.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
     );
