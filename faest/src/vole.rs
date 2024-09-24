@@ -35,16 +35,17 @@ where
     }
 
     // FIXME
-    let mut v: Vec<GenericArray<u8, LH>> = vec![GenericArray::default(); d];
-    for (j, item) in v.iter_mut().enumerate().take(d) {
+    let mut v = vec![GenericArray::<u8, LH>::default(); d];
+    for (j, item) in v.iter_mut().enumerate() {
         let j_offset = (j % 2) * n;
         let j1_offset = ((j + 1) % 2) * n;
         for i in 0..n / (1 << (j + 1)) {
-            zip((*item).as_mut_slice().iter_mut(), &r[j_offset + 2 * i + 1])
-                .for_each(|(vj, rj)| *vj ^= rj);
-            r[j1_offset + i] = zip(&r[j_offset + 2 * i], &r[j_offset + 2 * i + 1])
-                .map(|(x, y)| x ^ y)
-                .collect::<GenericArray<u8, LH>>();
+            let j_offset = j_offset + 2 * i;
+            let j1_offset = j1_offset + i;
+            for k in 0..LH::USIZE {
+                item[k] ^= r[j_offset + 1][k];
+                r[j1_offset][k] = r[j_offset][k] ^ r[j_offset + 1][k];
+            }
         }
     }
     (r[(d % 2) * n].clone(), v)
@@ -77,7 +78,6 @@ where
     let tau = <P::TAU as Unsigned>::to_usize();
     let k0 = <P::K0 as Unsigned>::to_u16();
     let k1 = <P::K1 as Unsigned>::to_u16();
-    let _t1 = <P::TAU1 as Unsigned>::to_u16();
 
     let mut prg = R::PRG::new_prg(r, iv);
 
