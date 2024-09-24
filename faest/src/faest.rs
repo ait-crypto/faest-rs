@@ -8,7 +8,7 @@ use crate::{
     vole::{volecommit, volereconstruct},
 };
 
-use generic_array::{typenum::Unsigned, GenericArray};
+use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
@@ -308,7 +308,7 @@ pub fn faest_sign<P, O>(
     let mut chall3 = GenericArray::<u8, P::LAMBDABYTES>::default();
     h2_hasher.finish().read(&mut chall3);
 
-    sigma_to_signature::<P, O>(
+    sigma_to_signature(
         c.iter().map(|value| value.as_ref()),
         &u_t,
         &d,
@@ -466,21 +466,18 @@ where
     *chall3 == chall3_p
 }
 
-fn sigma_to_signature<'a, P, O>(
+fn sigma_to_signature<'a, Lambda>(
     c: impl Iterator<Item = &'a [u8]>,
     u_t: &[u8],
     d: &[u8],
     a_t: &[u8],
-    pdecom: impl Iterator<Item = (Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>)>,
+    pdecom: impl Iterator<Item = (Vec<GenericArray<u8, Lambda>>, Vec<u8>)>,
     chall3: &[u8],
     iv: &IV,
-    signature: &mut GenericArray<u8, P::SIG>,
+    mut signature: &mut [u8],
 ) where
-    O: PARAMOWF,
-    P: PARAM,
+    Lambda: ArrayLength,
 {
-    let mut signature = signature.as_mut_slice();
-
     c.for_each(|x| {
         signature.write_all(x).unwrap();
     });
