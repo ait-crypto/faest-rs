@@ -1,14 +1,21 @@
-use std::ops::{Add, Sub};
+use std::{
+    iter::zip,
+    ops::{Add, Sub},
+};
 
 use rand_core::RngCore;
 
+use aes::{
+    cipher::{generic_array::GenericArray as GenericArray_AES, BlockEncrypt, KeyInit},
+    Aes128Enc, Aes192Enc, Aes256Enc,
+};
 use generic_array::{
     typenum::{
         Diff, Double, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1024, U11, U112, U12, U128, U14,
         U142, U152, U16, U160, U16384, U176, U192, U194, U2, U200, U2048, U22, U224, U234, U24,
         U256, U288, U3, U32, U338, U352, U384, U4, U40, U408, U4096, U416, U448, U458, U470, U476,
-        U48, U5, U500, U511, U512, U514, U52, U544, U566, U576, U584, U596, U6, U600, U64, U640,
-        U672, U7, U704, U752, U8, U8192, U832, U96,
+        U48, U5, U500, U511, U512, U514, U52, U544, U56, U566, U576, U584, U596, U6, U600, U64,
+        U640, U672, U7, U704, U752, U8, U8192, U832, U96,
     },
     ArrayLength, GenericArray,
 };
@@ -21,13 +28,14 @@ use crate::{
         PseudoRandomGenerator, RandomOracle, RandomOracleShake128, RandomOracleShake192,
         RandomOracleShake256, PRG128, PRG192, PRG256,
     },
+    rijndael_32::{Rijndael192, Rijndael256},
     rijndael_32::{rijndael_encrypt, rijndael_key_schedule},
     universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
 };
 
 /// Base parameters per security level
 pub trait BaseParameters {
-    /// The field that is of size `2^λ` which is defined as [Self::LAMBDA]
+    /// The field that is of size `2^λ` which is defined as [Self::Lambda]
     type Field: BigGaloisField<Length = Self::LambdaBytes> + std::fmt::Debug;
     /// Hasher implementation of `ZKHash`
     type ZKHasher: ZKHasherInit<Self::Field, SDLength = Self::Chall>;
@@ -42,15 +50,16 @@ pub trait BaseParameters {
     /// Associated PRG
     type PRG: PseudoRandomGenerator<Lambda = Self::LambdaBytes>;
 
-    /// Size of the field [Self::Field] in bits
+    /// Security parameter (in bits)
     type Lambda: ArrayLength;
-    /// Size of the field [Self::Field] in bytes
+    /// Security parameter (in bytes)
     type LambdaBytes: ArrayLength + Add<B>;
     type LambdaBytesTimes2: ArrayLength;
     type Chall: ArrayLength;
     type Chall1: ArrayLength;
 }
 
+#[derive(Debug, Clone)]
 pub struct BaseParams128;
 
 impl BaseParameters for BaseParams128 {
@@ -68,6 +77,7 @@ impl BaseParameters for BaseParams128 {
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
 }
 
+#[derive(Debug, Clone)]
 pub struct BaseParams192;
 
 impl BaseParameters for BaseParams192 {
@@ -85,6 +95,7 @@ impl BaseParameters for BaseParams192 {
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
 }
 
+#[derive(Debug, Clone)]
 pub struct BaseParams256;
 
 impl BaseParameters for BaseParams256 {
@@ -178,6 +189,10 @@ pub trait PARAMOWF {
         SDLength = Self::CHALL1,
         OutputLength = Self::LAMBDAPLUS2,
     >;
+
+    type InputSize: ArrayLength;
+    type OutputSize: ArrayLength;
+
     type XK: ArrayLength;
     type LAMBDA: ArrayLength;
     type LAMBDABYTES: ArrayLength;
@@ -216,8 +231,11 @@ pub trait PARAMOWF {
     type LAMBDALBYTESLAMBDA: ArrayLength;
     type LAMBDAR1: ArrayLength;
     type LAMBDAR1BYTE: ArrayLength;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]);
 }
 
+#[derive(Debug, Clone)]
 pub struct PARAMOWF128;
 
 impl PARAMOWF for PARAMOWF128 {
@@ -226,6 +244,9 @@ impl PARAMOWF for PARAMOWF128 {
     type Field = GF128;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+
+    type InputSize = U16;
+    type OutputSize = U16;
 
     type LAMBDA = U128;
 
@@ -302,8 +323,17 @@ impl PARAMOWF for PARAMOWF128 {
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     type XK = Sum<U1024, U160>;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
+        let aes = Aes128Enc::new(GenericArray_AES::from_slice(key));
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(input),
+            GenericArray_AES::from_mut_slice(output),
+        );
+    }
 }
 
+#[derive(Debug, Clone)]
 pub struct PARAMOWF192;
 
 impl PARAMOWF for PARAMOWF192 {
@@ -312,6 +342,9 @@ impl PARAMOWF for PARAMOWF192 {
     type Field = GF192;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+
+    type InputSize = U32;
+    type OutputSize = U32;
 
     type LAMBDA = U192;
 
@@ -343,7 +376,7 @@ impl PARAMOWF for PARAMOWF192 {
 
     type PK = U64;
 
-    type SK = U64;
+    type SK = U56;
 
     type CHALL = Sum<U8, Prod<U3, Self::LAMBDABYTES>>;
 
@@ -388,8 +421,21 @@ impl PARAMOWF for PARAMOWF192 {
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     type XK = Sum<U1024, U352>;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
+        let aes = Aes192Enc::new(GenericArray_AES::from_slice(key));
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(&input[..16]),
+            GenericArray_AES::from_mut_slice(&mut output[..16]),
+        );
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(&input[16..]),
+            GenericArray_AES::from_mut_slice(&mut output[16..]),
+        );
+    }
 }
 
+#[derive(Debug, Clone)]
 pub struct PARAMOWF256;
 
 impl PARAMOWF for PARAMOWF256 {
@@ -398,6 +444,9 @@ impl PARAMOWF for PARAMOWF256 {
     type Field = GF256;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+
+    type InputSize = U32;
+    type OutputSize = U32;
 
     type LAMBDA = U256;
 
@@ -474,8 +523,21 @@ impl PARAMOWF for PARAMOWF256 {
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     type XK = Sum<U1024, U544>;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
+        let aes = Aes256Enc::new(GenericArray_AES::from_slice(key));
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(&input[..16]),
+            GenericArray_AES::from_mut_slice(&mut output[..16]),
+        );
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(&input[16..]),
+            GenericArray_AES::from_mut_slice(&mut output[16..]),
+        );
+    }
 }
 
+#[derive(Debug, Clone)]
 pub struct PARAMOWF128EM;
 
 impl PARAMOWF for PARAMOWF128EM {
@@ -484,6 +546,9 @@ impl PARAMOWF for PARAMOWF128EM {
     type Field = GF128;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+
+    type InputSize = U16;
+    type OutputSize = U16;
 
     type LAMBDA = U128;
 
@@ -559,8 +624,18 @@ impl PARAMOWF for PARAMOWF128EM {
 
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
     type XK = Sum<U1024, U160>;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
+        let aes = Aes128Enc::new(GenericArray_AES::from_slice(input));
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(key),
+            GenericArray_AES::from_mut_slice(output),
+        );
+        zip(output.iter_mut(), key).for_each(|(o, k)| *o ^= k);
+    }
 }
 
+#[derive(Debug, Clone)]
 pub struct PARAMOWF192EM;
 
 impl PARAMOWF for PARAMOWF192EM {
@@ -569,6 +644,9 @@ impl PARAMOWF for PARAMOWF192EM {
     type Field = GF192;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+
+    type InputSize = U24;
+    type OutputSize = U24;
 
     type LAMBDA = U192;
 
@@ -645,8 +723,18 @@ impl PARAMOWF for PARAMOWF192EM {
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     type XK = Sum<U1024, U160>;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
+        let aes = Rijndael192::new(GenericArray_AES::from_slice(input));
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(key),
+            GenericArray_AES::from_mut_slice(output),
+        );
+        zip(output.iter_mut(), key).for_each(|(o, k)| *o ^= k);
+    }
 }
 
+#[derive(Debug, Clone)]
 pub struct PARAMOWF256EM;
 
 impl PARAMOWF for PARAMOWF256EM {
@@ -655,6 +743,9 @@ impl PARAMOWF for PARAMOWF256EM {
     type Field = GF256;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
+
+    type InputSize = U32;
+    type OutputSize = U32;
 
     type LAMBDA = U256;
 
@@ -731,6 +822,15 @@ impl PARAMOWF for PARAMOWF256EM {
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     type XK = Sum<U1024, U160>;
+
+    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
+        let aes = Rijndael256::new(GenericArray_AES::from_slice(input));
+        aes.encrypt_block_b2b(
+            GenericArray_AES::from_slice(key),
+            GenericArray_AES::from_mut_slice(output),
+        );
+        zip(output.iter_mut(), key).for_each(|(o, k)| *o ^= k);
+    }
 }
 
 pub trait TauParameters {
@@ -1689,5 +1789,40 @@ mod test {
                 assert_eq!(res, data.res);
             }
         }
+    }
+
+    fn test_parameters_owf<O: PARAMOWF>() {
+        assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LAMBDABYTES::USIZE);
+        assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::OutputSize::USIZE);
+    }
+
+    #[test]
+    fn test_parameters_owf_128() {
+        test_parameters_owf::<PARAMOWF128>();
+    }
+
+    #[test]
+    fn test_parameters_owf_192() {
+        test_parameters_owf::<PARAMOWF192>();
+    }
+
+    #[test]
+    fn test_parameters_owf_256() {
+        test_parameters_owf::<PARAMOWF256>();
+    }
+
+    #[test]
+    fn test_parameters_owf_128em() {
+        test_parameters_owf::<PARAMOWF128EM>();
+    }
+
+    #[test]
+    fn test_parameters_owf_192em() {
+        test_parameters_owf::<PARAMOWF192EM>();
+    }
+
+    #[test]
+    fn test_parameters_owf_256em() {
+        test_parameters_owf::<PARAMOWF256EM>();
     }
 }

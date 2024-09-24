@@ -11,10 +11,16 @@
 //!
 //! Originally licensed MIT. Relicensed as Apache 2.0+MIT with permission.
 
-#![allow(clippy::unreadable_literal)]
-
-use aes::Block;
+use aes::{
+    cipher::{
+        generic_array::typenum::{U24, U32},
+        BlockEncrypt, BlockSizeUser, KeyInit, KeySizeUser,
+    },
+    Block,
+};
 use cipher::{array::Array, consts::U2};
+#[cfg(feature = "zeroize")]
+use zeroize::ZeroizeOnDrop;
 
 /// AES block batch size for this implementation
 pub(crate) type FixsliceBlocks = U2;
@@ -25,7 +31,6 @@ pub(crate) type BatchBlocks = Array<Block, FixsliceBlocks>;
 pub(crate) type State = [u32; 8];
 
 /// Fully bitsliced Rijndael key schedule to match the fully-fixsliced representation.
-#[allow(dead_code)]
 pub(crate) fn rijndael_key_schedule(
     key: &[u8],
     nst: u8,
@@ -35,11 +40,8 @@ pub(crate) fn rijndael_key_schedule(
 ) -> (Vec<u32>, bool) {
     let mut valid = true;
     let mut rkeys = vec![0u32; (((nst.div_ceil(nk)) * 8 * (r + 1)) + 8).into()];
-    let mut sd_part = [0u8; 16];
-    for i in 0..(nk * 4) - 16 {
-        sd_part[i as usize] = key[(16 + i) as usize];
-    }
-    bitslice(&mut rkeys[..8], &key[..16], &sd_part);
+
+    bitslice(&mut rkeys[..8], &key[..16], &key[16..]);
 
     let mut rk_off = 0;
     let mut count = 0;
@@ -82,15 +84,13 @@ pub(crate) fn rijndael_key_schedule(
             rkeys[rk_off + j] ^= bitsliced_rcon[j];
         }
 
-        let idx_ror: u32;
-
-        if nk == 4 {
-            idx_ror = 14;
+        let idx_ror = if nk == 4 {
+            14
         } else if nk == 6 {
-            idx_ror = 11;
+            11
         } else {
-            idx_ror = 15;
-        }
+            15
+        };
 
         xor_columns(&mut rkeys, rk_off, 8, idx_ror, nk);
         if nk == 8 && count < ske / 4 {
@@ -293,14 +293,7 @@ pub(crate) fn rijndael_key_schedule(
 /// Fully-fixsliced AES-128 encryption (the ShiftRows is completely omitted).
 ///
 /// Encrypts four blocks in-place and in parallel.
-#[allow(dead_code)]
-pub(crate) fn rijndael_encrypt(
-    rkeys: &[u32],
-    input: &[u8],
-    nst: u8,
-    _bc: u8,
-    r: u8,
-) -> BatchBlocks {
+fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst: u8, r: u8) -> BatchBlocks {
     let mut state = State::default();
     bitslice(&mut state, &input[..16], &input[16..]);
     rijndael_add_round_key(&mut state, &rkeys[..8]);
@@ -326,213 +319,6 @@ pub(crate) fn rijndael_encrypt(
     rijndael_shift_rows_1(&mut state, nst);
     rijndael_add_round_key(&mut state, &rkeys[(r * 8) as usize..((r * 8) + 8) as usize]);
     inv_bitslice(&state)
-}
-
-/// Note that the 4 bitwise NOT (^= 0xffffffff) are accounted for here so that it is a true
-/// inverse of 'sub_bytes'.
-#[allow(dead_code)]
-fn inv_sub_bytes(state: &mut [u32]) {
-    debug_assert_eq!(state.len(), 8);
-
-    // Scheduled using https://github.com/Ko-/aes-armcortexm/tree/public/scheduler
-    // Inline "stack" comments reflect suggested stores and loads (ARM Cortex-M3 and M4)
-
-    let u7 = state[0];
-    let u6 = state[1];
-    let u5 = state[2];
-    let u4 = state[3];
-    let u3 = state[4];
-    let u2 = state[5];
-    let u1 = state[6];
-    let u0 = state[7];
-
-    let t23 = u0 ^ u3;
-    let t8 = u1 ^ t23;
-    let m2 = t23 & t8;
-    let t4 = u4 ^ t8;
-    let t22 = u1 ^ u3;
-    let t2 = u0 ^ u1;
-    let t1 = u3 ^ u4;
-    // t23 -> stack
-    let t9 = u7 ^ t1;
-    // t8 -> stack
-    let m7 = t22 & t9;
-    // t9 -> stack
-    let t24 = u4 ^ u7;
-    // m7 -> stack
-    let t10 = t2 ^ t24;
-    // u4 -> stack
-    let m14 = t2 & t10;
-    let r5 = u6 ^ u7;
-    // m2 -> stack
-    let t3 = t1 ^ r5;
-    // t2 -> stack
-    let t13 = t2 ^ r5;
-    let t19 = t22 ^ r5;
-    // t3 -> stack
-    let t17 = u2 ^ t19;
-    // t4 -> stack
-    let t25 = u2 ^ t1;
-    let r13 = u1 ^ u6;
-    // t25 -> stack
-    let t20 = t24 ^ r13;
-    // t17 -> stack
-    let m9 = t20 & t17;
-    // t20 -> stack
-    let r17 = u2 ^ u5;
-    // t22 -> stack
-    let t6 = t22 ^ r17;
-    // t13 -> stack
-    let m1 = t13 & t6;
-    let y5 = u0 ^ r17;
-    let m4 = t19 & y5;
-    let m5 = m4 ^ m1;
-    let m17 = m5 ^ t24;
-    let r18 = u5 ^ u6;
-    let t27 = t1 ^ r18;
-    let t15 = t10 ^ t27;
-    // t6 -> stack
-    let m11 = t1 & t15;
-    let m15 = m14 ^ m11;
-    let m21 = m17 ^ m15;
-    // t1 -> stack
-    // t4 <- stack
-    let m12 = t4 & t27;
-    let m13 = m12 ^ m11;
-    let t14 = t10 ^ r18;
-    let m3 = t14 ^ m1;
-    // m2 <- stack
-    let m16 = m3 ^ m2;
-    let m20 = m16 ^ m13;
-    // u4 <- stack
-    let r19 = u2 ^ u4;
-    let t16 = r13 ^ r19;
-    // t3 <- stack
-    let t26 = t3 ^ t16;
-    let m6 = t3 & t16;
-    let m8 = t26 ^ m6;
-    // t10 -> stack
-    // m7 <- stack
-    let m18 = m8 ^ m7;
-    let m22 = m18 ^ m13;
-    let m25 = m22 & m20;
-    let m26 = m21 ^ m25;
-    let m10 = m9 ^ m6;
-    let m19 = m10 ^ m15;
-    // t25 <- stack
-    let m23 = m19 ^ t25;
-    let m28 = m23 ^ m25;
-    let m24 = m22 ^ m23;
-    let m30 = m26 & m24;
-    let m39 = m23 ^ m30;
-    let m48 = m39 & y5;
-    let m57 = m39 & t19;
-    // m48 -> stack
-    let m36 = m24 ^ m25;
-    let m31 = m20 & m23;
-    let m27 = m20 ^ m21;
-    let m32 = m27 & m31;
-    let m29 = m28 & m27;
-    let m37 = m21 ^ m29;
-    // m39 -> stack
-    let m42 = m37 ^ m39;
-    let m52 = m42 & t15;
-    // t27 -> stack
-    // t1 <- stack
-    let m61 = m42 & t1;
-    let p0 = m52 ^ m61;
-    let p16 = m57 ^ m61;
-    // m57 -> stack
-    // t20 <- stack
-    let m60 = m37 & t20;
-    // p16 -> stack
-    // t17 <- stack
-    let m51 = m37 & t17;
-    let m33 = m27 ^ m25;
-    let m38 = m32 ^ m33;
-    let m43 = m37 ^ m38;
-    let m49 = m43 & t16;
-    let p6 = m49 ^ m60;
-    let p13 = m49 ^ m51;
-    let m58 = m43 & t3;
-    // t9 <- stack
-    let m50 = m38 & t9;
-    // t22 <- stack
-    let m59 = m38 & t22;
-    // p6 -> stack
-    let p1 = m58 ^ m59;
-    let p7 = p0 ^ p1;
-    let m34 = m21 & m22;
-    let m35 = m24 & m34;
-    let m40 = m35 ^ m36;
-    let m41 = m38 ^ m40;
-    let m45 = m42 ^ m41;
-    // t27 <- stack
-    let m53 = m45 & t27;
-    let p8 = m50 ^ m53;
-    let p23 = p7 ^ p8;
-    // t4 <- stack
-    let m62 = m45 & t4;
-    let p14 = m49 ^ m62;
-    let s6 = p14 ^ p23;
-    // t10 <- stack
-    let m54 = m41 & t10;
-    let p2 = m54 ^ m62;
-    let p22 = p2 ^ p7;
-    let s0 = p13 ^ p22;
-    let p17 = m58 ^ p2;
-    let p15 = m54 ^ m59;
-    // t2 <- stack
-    let m63 = m41 & t2;
-    // m39 <- stack
-    let m44 = m39 ^ m40;
-    // p17 -> stack
-    // t6 <- stack
-    let m46 = m44 & t6;
-    let p5 = m46 ^ m51;
-    // p23 -> stack
-    let p18 = m63 ^ p5;
-    let p24 = p5 ^ p7;
-    // m48 <- stack
-    let p12 = m46 ^ m48;
-    let s3 = p12 ^ p22;
-    // t13 <- stack
-    let m55 = m44 & t13;
-    let p9 = m55 ^ m63;
-    // p16 <- stack
-    let s7 = p9 ^ p16;
-    // t8 <- stack
-    let m47 = m40 & t8;
-    let p3 = m47 ^ m50;
-    let p19 = p2 ^ p3;
-    let s5 = p19 ^ p24;
-    let p11 = p0 ^ p3;
-    let p26 = p9 ^ p11;
-    // t23 <- stack
-    let m56 = m40 & t23;
-    let p4 = m48 ^ m56;
-    // p6 <- stack
-    let p20 = p4 ^ p6;
-    let p29 = p15 ^ p20;
-    let s1 = p26 ^ p29;
-    // m57 <- stack
-    let p10 = m57 ^ p4;
-    let p27 = p10 ^ p18;
-    // p23 <- stack
-    let s4 = p23 ^ p27;
-    let p25 = p6 ^ p10;
-    let p28 = p11 ^ p25;
-    // p17 <- stack
-    let s2 = p17 ^ p28;
-
-    state[0] = s7;
-    state[1] = s6;
-    state[2] = s5;
-    state[3] = s4;
-    state[4] = s3;
-    state[5] = s2;
-    state[6] = s1;
-    state[7] = s0;
 }
 
 /// Bitsliced implementation of the AES Sbox based on Boyar, Peralta and Calik.
@@ -726,7 +512,6 @@ pub fn sub_bytes_nots(state: &mut [u32]) {
 macro_rules! define_mix_columns {
     (
         $name:ident,
-        $name_inv:ident,
         $first_rotate:path,
         $second_rotate:path
     ) => {
@@ -764,77 +549,10 @@ macro_rules! define_mix_columns {
             state[6] = b6 ^ c5      ^ $second_rotate(c6);
             state[7] = b7 ^ c6      ^ $second_rotate(c7);
         }
-
-        #[rustfmt::skip]
-        fn $name_inv(state: &mut State) {
-            let (a0, a1, a2, a3, a4, a5, a6, a7) = (
-                state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7]
-            );
-            let (b0, b1, b2, b3, b4, b5, b6, b7) = (
-                $first_rotate(a0),
-                $first_rotate(a1),
-                $first_rotate(a2),
-                $first_rotate(a3),
-                $first_rotate(a4),
-                $first_rotate(a5),
-                $first_rotate(a6),
-                $first_rotate(a7),
-            );
-            let (c0, c1, c2, c3, c4, c5, c6, c7) = (
-                a0 ^ b0,
-                a1 ^ b1,
-                a2 ^ b2,
-                a3 ^ b3,
-                a4 ^ b4,
-                a5 ^ b5,
-                a6 ^ b6,
-                a7 ^ b7,
-            );
-            let (d0, d1, d2, d3, d4, d5, d6, d7) = (
-                a0      ^ c7,
-                a1 ^ c0 ^ c7,
-                a2 ^ c1,
-                a3 ^ c2 ^ c7,
-                a4 ^ c3 ^ c7,
-                a5 ^ c4,
-                a6 ^ c5,
-                a7 ^ c6,
-            );
-            let (e0, e1, e2, e3, e4, e5, e6, e7) = (
-                c0      ^ d6,
-                c1      ^ d6 ^ d7,
-                c2 ^ d0      ^ d7,
-                c3 ^ d1 ^ d6,
-                c4 ^ d2 ^ d6 ^ d7,
-                c5 ^ d3      ^ d7,
-                c6 ^ d4,
-                c7 ^ d5,
-            );
-            state[0] = d0 ^ e0 ^ $second_rotate(e0);
-            state[1] = d1 ^ e1 ^ $second_rotate(e1);
-            state[2] = d2 ^ e2 ^ $second_rotate(e2);
-            state[3] = d3 ^ e3 ^ $second_rotate(e3);
-            state[4] = d4 ^ e4 ^ $second_rotate(e4);
-            state[5] = d5 ^ e5 ^ $second_rotate(e5);
-            state[6] = d6 ^ e6 ^ $second_rotate(e6);
-            state[7] = d7 ^ e7 ^ $second_rotate(e7);
-        }
     }
 }
 
-define_mix_columns!(
-    mix_columns_0,
-    inv_mix_columns_0,
-    rotate_rows_1,
-    rotate_rows_2
-);
-
-define_mix_columns!(
-    mix_columns_1,
-    _inv_mix_columns_1,
-    rotate_rows_and_columns_1_1,
-    rotate_rows_and_columns_2_2
-);
+define_mix_columns!(mix_columns_0, rotate_rows_1, rotate_rows_2);
 
 #[inline]
 fn delta_swap_1(a: &mut u32, shift: u32, mask: u32) {
@@ -869,65 +587,6 @@ pub fn rijndael_shift_rows_1(state: &mut [u32], bc: u8) {
             delta_swap_1(x, 4, 0x000c0300);
             delta_swap_1(x, 2, 0x00333300);
             delta_swap_1(x, 1, 0x55544000);
-        }
-    }
-}
-
-/// Applies ShiftRows twice on an AES state (or key).
-#[inline]
-pub fn rijndael_shift_rows_2(state: &mut [u32], bc: u8) {
-    debug_assert_eq!(state.len(), 8);
-    for x in state.iter_mut() {
-        if bc == 4 {
-            delta_swap_1(x, 4, 0x0f000f00);
-            delta_swap_1(x, 1, 0x00000000);
-        } else if bc == 6 {
-            delta_swap_1(x, 4, 0x00050000);
-            delta_swap_1(x, 3, 0x00000a00);
-            delta_swap_1(x, 1, 0x00050500);
-        } else {
-            delta_swap_1(x, 4, 0x000f0f00);
-            delta_swap_1(x, 2, 0x00000000);
-            delta_swap_1(x, 1, 0x00055000);
-        }
-    }
-}
-
-/// Applies ShiftRows three times on an AES state (or key).
-#[inline]
-pub fn rijndael_shift_rows_3(state: &mut [u32], bc: u8) {
-    debug_assert_eq!(state.len(), 8);
-    for x in state.iter_mut() {
-        if bc == 4 {
-            delta_swap_1(x, 4, 0x030f0c00);
-            delta_swap_1(x, 2, 0x33003300);
-        } else if bc == 6 {
-            delta_swap_1(x, 6, 0x01000100);
-            delta_swap_1(x, 1, 0x0a000a00);
-        } else {
-            delta_swap_1(x, 4, 0x00030c00);
-            delta_swap_1(x, 2, 0x00333300);
-            delta_swap_1(x, 1, 0x55405400);
-        }
-    }
-}
-
-#[inline(always)]
-fn rijndael_inv_shift_rows_1(state: &mut [u32], bc: u8) {
-    if bc == 4 {
-        rijndael_shift_rows_3(state, bc);
-    } else {
-        for x in state.iter_mut() {
-            if bc == 6 {
-                delta_swap_1(x, 1, 0x0a050400);
-                delta_swap_1(x, 2, 0x00003300);
-                delta_swap_1(x, 3, 0x000a0200);
-                delta_swap_1(x, 6, 0x01000000);
-            } else {
-                delta_swap_1(x, 1, 0x55544000);
-                delta_swap_1(x, 2, 0x00333300);
-                delta_swap_1(x, 4, 0x000c0300);
-            }
         }
     }
 }
@@ -987,11 +646,15 @@ fn xor_columns(rkeys: &mut [u32], offset: usize, idx_xor: usize, idx_ror: u32, n
     }
 }
 
+const M0: u32 = 0x55555555;
+const M1: u32 = 0x33333333;
+const M2: u32 = 0x0f0f0f0f;
+
 /// Bitslice two 128-bit input blocks input0, input1 into a 256-bit internal state.
 pub fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
     debug_assert_eq!(output.len(), 8);
     debug_assert_eq!(input0.len(), 16);
-    debug_assert_eq!(input1.len(), 16);
+    debug_assert!(input1.is_empty() || input1.len() == 16 || input1.len() == 8);
 
     // Bitslicing is a bit index manipulation. 256 bits of data means each bit is positioned at an
     // 8-bit index. AES data is 2 blocks, each one a 4x4 column-major matrix of bytes, so the
@@ -1007,14 +670,29 @@ pub fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
     let mut t2 = u32::from_le_bytes(input0[0x04..0x08].try_into().unwrap());
     let mut t4 = u32::from_le_bytes(input0[0x08..0x0c].try_into().unwrap());
     let mut t6 = u32::from_le_bytes(input0[0x0c..0x10].try_into().unwrap());
-    let mut t1 = u32::from_le_bytes(input1[0x00..0x04].try_into().unwrap());
-    let mut t3 = u32::from_le_bytes(input1[0x04..0x08].try_into().unwrap());
-    let mut t5 = u32::from_le_bytes(input1[0x08..0x0c].try_into().unwrap());
-    let mut t7 = u32::from_le_bytes(input1[0x0c..0x10].try_into().unwrap());
+    let mut t1 = if !input1.is_empty() {
+        u32::from_le_bytes(input1[0x00..0x04].try_into().unwrap())
+    } else {
+        0
+    };
+    let mut t3 = if !input1.is_empty() {
+        u32::from_le_bytes(input1[0x04..0x08].try_into().unwrap())
+    } else {
+        0
+    };
+    let mut t5 = if input1.len() > 8 {
+        u32::from_le_bytes(input1[0x08..0x0c].try_into().unwrap())
+    } else {
+        0
+    };
+    let mut t7 = if input1.len() > 8 {
+        u32::from_le_bytes(input1[0x0c..0x10].try_into().unwrap())
+    } else {
+        0
+    };
 
     // Bit Index Swap 5 <-> 0:
     //     __ __ b0 __ __ __ __ p0 => __ __ p0 __ __ __ __ b0
-    const M0: u32 = 0x55555555;
     delta_swap_2(&mut t1, &mut t0, 1, M0);
     delta_swap_2(&mut t3, &mut t2, 1, M0);
     delta_swap_2(&mut t5, &mut t4, 1, M0);
@@ -1022,7 +700,6 @@ pub fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
 
     // Bit Index Swap 6 <-> 1:
     //     __ c0 __ __ __ __ p1 __ => __ p1 __ __ __ __ c0 __
-    const M1: u32 = 0x33333333;
     delta_swap_2(&mut t2, &mut t0, 2, M1);
     delta_swap_2(&mut t3, &mut t1, 2, M1);
     delta_swap_2(&mut t6, &mut t4, 2, M1);
@@ -1030,7 +707,6 @@ pub fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
 
     // Bit Index Swap 7 <-> 2:
     //     c1 __ __ __ __ p2 __ __ => p2 __ __ __ __ c1 __ __
-    const M2: u32 = 0x0f0f0f0f;
     delta_swap_2(&mut t4, &mut t0, 4, M2);
     delta_swap_2(&mut t5, &mut t1, 4, M2);
     delta_swap_2(&mut t6, &mut t2, 4, M2);
@@ -1073,27 +749,24 @@ pub fn inv_bitslice(input: &[u32]) -> BatchBlocks {
 
     // Bit Index Swap 5 <-> 0:
     //     __ __ p0 __ __ __ __ b0 => __ __ b0 __ __ __ __ p0
-    let m0 = 0x55555555;
-    delta_swap_2(&mut t1, &mut t0, 1, m0);
-    delta_swap_2(&mut t3, &mut t2, 1, m0);
-    delta_swap_2(&mut t5, &mut t4, 1, m0);
-    delta_swap_2(&mut t7, &mut t6, 1, m0);
+    delta_swap_2(&mut t1, &mut t0, 1, M0);
+    delta_swap_2(&mut t3, &mut t2, 1, M0);
+    delta_swap_2(&mut t5, &mut t4, 1, M0);
+    delta_swap_2(&mut t7, &mut t6, 1, M0);
 
     // Bit Index Swap 6 <-> 1:
     //     __ p1 __ __ __ __ c0 __ => __ c0 __ __ __ __ p1 __
-    let m1 = 0x33333333;
-    delta_swap_2(&mut t2, &mut t0, 2, m1);
-    delta_swap_2(&mut t3, &mut t1, 2, m1);
-    delta_swap_2(&mut t6, &mut t4, 2, m1);
-    delta_swap_2(&mut t7, &mut t5, 2, m1);
+    delta_swap_2(&mut t2, &mut t0, 2, M1);
+    delta_swap_2(&mut t3, &mut t1, 2, M1);
+    delta_swap_2(&mut t6, &mut t4, 2, M1);
+    delta_swap_2(&mut t7, &mut t5, 2, M1);
 
     // Bit Index Swap 7 <-> 2:
     //     p2 __ __ __ __ c1 __ __ => c1 __ __ __ __ p2 __ __
-    let m2 = 0x0f0f0f0f;
-    delta_swap_2(&mut t4, &mut t0, 4, m2);
-    delta_swap_2(&mut t5, &mut t1, 4, m2);
-    delta_swap_2(&mut t6, &mut t2, 4, m2);
-    delta_swap_2(&mut t7, &mut t3, 4, m2);
+    delta_swap_2(&mut t4, &mut t0, 4, M2);
+    delta_swap_2(&mut t5, &mut t1, 4, M2);
+    delta_swap_2(&mut t6, &mut t2, 4, M2);
+    delta_swap_2(&mut t7, &mut t3, 4, M2);
 
     let mut output = BatchBlocks::default();
     // De-interleave the columns on output (note the order of output)
@@ -1146,7 +819,7 @@ pub fn rijndael_add_round_key(state: &mut State, rkey: &[u32]) {
 }
 
 #[inline(always)]
-fn ror(x: u32, y: u32) -> u32 {
+const fn ror(x: u32, y: u32) -> u32 {
     x.rotate_right(y)
 }
 
@@ -1156,28 +829,94 @@ const fn ror_distance(rows: u32, cols: u32) -> u32 {
 }
 
 #[inline(always)]
-fn rotate_rows_1(x: u32) -> u32 {
+const fn rotate_rows_1(x: u32) -> u32 {
     ror(x, ror_distance(1, 0))
 }
 
 #[inline(always)]
-fn rotate_rows_2(x: u32) -> u32 {
+const fn rotate_rows_2(x: u32) -> u32 {
     ror(x, ror_distance(2, 0))
 }
 
-#[inline(always)]
-fn rotate_rows_and_columns_1_1(x: u32) -> u32 {
-    (ror(x, ror_distance(1, 1)) & 0x3f3f3f3f) | (ror(x, ror_distance(0, 1)) & 0xc0c0c0c0)
+const fn ske(r: usize, nst: usize, nk: usize) -> usize {
+    4 * (r + 1) * nst / nk
 }
 
-#[inline(always)]
-fn rotate_rows_and_columns_2_2(x: u32) -> u32 {
-    (ror(x, ror_distance(2, 2)) & 0x0f0f0f0f) | (ror(x, ror_distance(1, 2)) & 0xf0f0f0f0)
+#[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
+pub struct Rijndael192(Vec<u32>);
+
+impl KeySizeUser for Rijndael192 {
+    type KeySize = U24;
+}
+
+impl KeyInit for Rijndael192 {
+    fn new(key: &aes::cipher::Key<Self>) -> Self {
+        Self(rijndael_key_schedule(key.as_slice(), 6, 6, 12, ske(12, 6, 6) as u8).0)
+    }
+}
+
+impl BlockSizeUser for Rijndael192 {
+    type BlockSize = U24;
+}
+
+impl BlockEncrypt for Rijndael192 {
+    fn encrypt_with_backend(
+        &self,
+        _f: impl aes::cipher::BlockClosure<BlockSize = Self::BlockSize>,
+    ) {
+        unimplemented!();
+    }
+
+    fn encrypt_block_b2b(
+        &self,
+        in_block: &aes::cipher::Block<Self>,
+        out_block: &mut aes::cipher::Block<Self>,
+    ) {
+        let out = rijndael_encrypt(&self.0, in_block.as_slice(), 6, 12);
+        out_block[..16].copy_from_slice(&out[0]);
+        out_block[16..].copy_from_slice(&out[1][..8]);
+    }
+}
+
+#[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
+pub struct Rijndael256(Vec<u32>);
+
+impl KeySizeUser for Rijndael256 {
+    type KeySize = U32;
+}
+
+impl KeyInit for Rijndael256 {
+    fn new(key: &aes::cipher::Key<Self>) -> Self {
+        Self(rijndael_key_schedule(key.as_slice(), 8, 8, 14, ske(14, 8, 8) as u8).0)
+    }
+}
+
+impl BlockSizeUser for Rijndael256 {
+    type BlockSize = U32;
+}
+
+impl BlockEncrypt for Rijndael256 {
+    fn encrypt_with_backend(
+        &self,
+        _f: impl aes::cipher::BlockClosure<BlockSize = Self::BlockSize>,
+    ) {
+        unimplemented!();
+    }
+
+    fn encrypt_block_b2b(
+        &self,
+        in_block: &aes::cipher::Block<Self>,
+        out_block: &mut aes::cipher::Block<Self>,
+    ) {
+        let out = rijndael_encrypt(&self.0, in_block.as_slice(), 8, 14);
+        out_block[..16].copy_from_slice(&out[0]);
+        out_block[16..].copy_from_slice(&out[1]);
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use rand::Rng;
+    use aes::cipher::generic_array::GenericArray;
     use serde::Deserialize;
     use std::{cmp::max, fs::File};
 
@@ -1215,10 +954,8 @@ mod test {
             bitslice(&mut bitsliced_input, &data.input[..16], &data.input[16..]);
             if data.rep == 1 {
                 rijndael_shift_rows_1(&mut bitsliced_input, data.bc);
-            } else if data.rep == 2 {
-                rijndael_shift_rows_2(&mut bitsliced_input, data.bc);
             } else {
-                rijndael_shift_rows_3(&mut bitsliced_input, data.bc);
+                continue;
             }
             let res = inv_bitslice(&bitsliced_input);
             let mut input = [0u32; 8];
@@ -1303,7 +1040,7 @@ mod test {
                 r,
                 4 * (((r + 1) * data.bc) / data.kc),
             );
-            let res = rijndael_encrypt(&rkeys.0, &input, data.bc, data.bc, r);
+            let res = rijndael_encrypt(&rkeys.0, &input, data.bc, r);
             let mut input = [0u32; 8];
             let mut output = [0u32; 8];
             for i in 0..data.bc {
@@ -1317,5 +1054,42 @@ mod test {
             }
             assert_eq!(input, output);
         }
+    }
+
+    #[test]
+    fn test_rijndael192() {
+        let mut key = GenericArray::default();
+        key[0] = 0x80;
+
+        let expected = [
+            0x56, 0x4d, 0x36, 0xfd, 0xeb, 0x8b, 0xf7, 0xe2, 0x75, 0xf0, 0x10, 0xb2, 0xf5, 0xee,
+            0x69, 0xcf, 0xea, 0xe6, 0x7e, 0xa0, 0xe3, 0x7e, 0x32, 0x09,
+        ];
+
+        let rijndael = Rijndael192::new(&key);
+        let plaintext = GenericArray::default();
+        let mut ciphertext = GenericArray::default();
+
+        rijndael.encrypt_block_b2b(&plaintext, &mut ciphertext);
+        assert_eq!(ciphertext.as_slice(), &expected);
+    }
+
+    #[test]
+    fn test_rijndael256() {
+        let mut key = GenericArray::default();
+        key[0] = 0x80;
+
+        let expected = [
+            0xE6, 0x2A, 0xBC, 0xE0, 0x69, 0x83, 0x7B, 0x65, 0x30, 0x9B, 0xE4, 0xED, 0xA2, 0xC0,
+            0xE1, 0x49, 0xFE, 0x56, 0xC0, 0x7B, 0x70, 0x82, 0xD3, 0x28, 0x7F, 0x59, 0x2C, 0x4A,
+            0x49, 0x27, 0xA2, 0x77,
+        ];
+
+        let rijndael = Rijndael256::new(&key);
+        let plaintext = GenericArray::default();
+        let mut ciphertext = GenericArray::default();
+
+        rijndael.encrypt_block_b2b(&plaintext, &mut ciphertext);
+        assert_eq!(ciphertext.as_slice(), &expected);
     }
 }

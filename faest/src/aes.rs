@@ -9,8 +9,8 @@ use crate::parameter::TauParameters;
 use std::iter::zip;
 
 use crate::{
-    fields::{BigGaloisField, ByteCombine, Field, SumPoly},
-    parameter::{self, PARAM, PARAMOWF},
+    fields::{BigGaloisField, ByteCombine, ByteCombineConstants, Field, SumPoly},
+    parameter::{BaseParameters, TauParameters, PARAM, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
@@ -52,16 +52,16 @@ pub fn byte_to_bit(input: u8) -> Vec<u8> {
     (0..8).map(|i| (input >> i) & 1).collect()
 }
 
-pub fn convert_to_bit<O, S, I>(input: &GenericArray<u8, I>) -> Box<GenericArray<O::Field, S>>
+pub fn convert_to_bit<F, S>(input: &[u8]) -> Box<GenericArray<F, S>>
 where
-    O: PARAMOWF,
-    I: generic_array::ArrayLength,
-    S: generic_array::ArrayLength,
+    F: BigGaloisField,
+    S: ArrayLength,
 {
     let mut res = GenericArray::default_boxed();
     for i in 0..res.len() / 8 {
         for j in 0..8 {
-            res[i * 8 + j] = O::Field::new(((input[i] >> j) & 1) as u128, 0)
+            // FIXME
+            res[i * 8 + j] = F::ONE * ((input[i] >> j) & 1);
         }
     }
     res
@@ -551,6 +551,7 @@ where
             };
             *xin_item = temp_xin;
         }
+        // TODO: use byte_combine_bits if possible
         res[index] = O::Field::byte_combine(xin[0..8].try_into().unwrap())
             + O::Field::byte_combine(xk[8 * i..(8 * i) + 8].try_into().unwrap());
         index += 1;
@@ -568,34 +569,12 @@ where
                 x_hat_k[r] =
                     O::Field::byte_combine(xk[ik + 8 * r..ik + 8 * r + 8].try_into().unwrap());
             }
-            let (a, b, c) = (
-                O::Field::ONE,
-                O::Field::byte_combine(&[
-                    O::Field::default(),
-                    O::Field::ONE,
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                ]),
-                O::Field::byte_combine(&[
-                    O::Field::ONE,
-                    O::Field::ONE,
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                    O::Field::default(),
-                ]),
-            );
+
             //Step 16
-            res[index] = x_hat[0] * b + x_hat[1] * c + x_hat[2] * a + x_hat[3] * a + x_hat_k[0];
-            res[index + 1] = x_hat[0] * a + x_hat[1] * b + x_hat[2] * c + x_hat[3] * a + x_hat_k[1];
-            res[index + 2] = x_hat[0] * a + x_hat[1] * a + x_hat[2] * b + x_hat[3] * c + x_hat_k[2];
-            res[index + 3] = x_hat[0] * c + x_hat[1] * a + x_hat[2] * a + x_hat[3] * b + x_hat_k[3];
+            res[index] = x_hat[0] * O::Field::BYTE_COMBINE_2  + x_hat[1] * O::Field::BYTE_COMBINE_3  + x_hat[2] /* * a */  + x_hat[3] /* * a */ + x_hat_k[0];
+            res[index + 1] = x_hat[0] /* * a */ + x_hat[1] * O::Field::BYTE_COMBINE_2  + x_hat[2] * O::Field::BYTE_COMBINE_3  + x_hat[3] /* * a */ + x_hat_k[1];
+            res[index + 2] = x_hat[0] /* * a */ + x_hat[1] /* * a */ + x_hat[2] * O::Field::BYTE_COMBINE_2  + x_hat[3] * O::Field::BYTE_COMBINE_3  + x_hat_k[2];
+            res[index + 3] = x_hat[0] * O::Field::BYTE_COMBINE_3  + x_hat[1] /* * a */ + x_hat[2] /* * a */ + x_hat[3] * O::Field::BYTE_COMBINE_2  + x_hat_k[3];
             index += 4;
         }
     }
@@ -683,7 +662,8 @@ where
         let mut field_w: Box<GenericArray<O::Field, O::LENC>> = GenericArray::default_boxed();
         for i in 0..w.len() {
             for j in 0..8 {
-                field_w[i * 8 + j] = O::Field::new(((w[i] >> j) & 1) as u128, 0)
+                // FIXME
+                field_w[i * 8 + j] = O::Field::ONE * ((w[i] >> j) & 1);
             }
         }
         let s = aes_enc_fwd::<O>(&field_w, k, false, false, input, O::Field::default());
@@ -749,8 +729,9 @@ where
             }
         }
     }
-    let inside = &O::Field::to_field(&temp_v);
-    let new_v: &GenericArray<O::Field, O::LAMBDAL> = GenericArray::from_slice(inside);
+    let new_v = GenericArray::<O::Field, O::LAMBDAL>::from_iter(
+        temp_v.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
+    );
 
     let (input, output): Keypair<O> = (
         GenericArray::from_slice(&pk[..pk_val / 2]),
@@ -815,26 +796,24 @@ where
     } else {
         (GenericArray::from_slice(&[&a1[..], &a_01[senc..], &a_01_bis[senc..]].concat())).clone()
     };
-    let u_s = O::Field::to_field(&u[l / 8..])[0];
 
-    let mut v_s = new_v[l];
-    let alpha = O::Field::new(2, 0);
-    let mut cur_alpha = alpha;
-    for i in 1..lambda {
-        v_s += new_v[l + i] * cur_alpha;
-        cur_alpha *= alpha;
-    }
+    let u_s = O::Field::from(&u[l / 8..]);
+    let v_s = O::Field::sum_poly(&new_v[l..l + lambda]);
 
-    let mut a_t = O::ZKHasher::new_zk_hasher(chall);
-    let mut b_t = O::ZKHasher::new_zk_hasher(chall);
+    let mut a_t_hasher =
+        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
+    let mut b_t_hasher =
+        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
+
     for i in 0..a1_array.len() {
-        a_t.update(&a1_array[i]);
-        b_t.update(&a0_array[i]);
+        a_t_hasher.update(&a1_array[i]);
+        b_t_hasher.update(&a0_array[i]);
     }
-    (
-        GenericArray::from_slice(&(a_t.finalize(&u_s).to_bytes())[..]).clone(),
-        GenericArray::from_slice(&(b_t.finalize(&v_s).to_bytes())[..]).clone(),
-    )
+
+    let a_t = a_t_hasher.finalize(&u_s);
+    let b_t = b_t_hasher.finalize(&v_s);
+
+    (Box::new(a_t.as_bytes()), Box::new(b_t.as_bytes()))
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
@@ -858,7 +837,7 @@ where
     let t1 = <P::TAU1 as Unsigned>::to_usize();
     let l = <P::L as Unsigned>::to_usize();
     let _c = <O::C as Unsigned>::to_usize();
-    let delta = O::Field::to_field(chall3)[0];
+    let delta = O::Field::from(chall3);
     let lke = <O::LKE as Unsigned>::to_usize();
     let lenc = <O::LENC as Unsigned>::to_usize();
     let senc = <O::SENC as Unsigned>::to_usize();
@@ -903,8 +882,9 @@ where
     }
 
     let mut zk_hasher = O::ZKHasher::new_zk_hasher(chall2);
-
-    let new_q = O::Field::to_field(&temp_q);
+    let new_q = GenericArray::<O::Field, O::LAMBDAL>::from_iter(
+        temp_q.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
+    );
 
     let (b1, _, _, qk) = aes_key_exp_cstrnts::<O>(
         &GenericArray::default_boxed(),
@@ -948,4 +928,1334 @@ where
     let q_s = O::Field::sum_poly(&new_q[l..l + lambda]);
 
     (zk_hasher.finalize(&q_s) + O::Field::from(a_t) * delta).as_bytes()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::{
+        fields::{large_fields::NewFromU128, BigGaloisField, GF128, GF192, GF256},
+        parameter::{
+            PARAM128S, PARAM192S, PARAM256S, PARAMOWF, PARAMOWF128, PARAMOWF192, PARAMOWF256,
+        },
+    };
+
+    use generic_array::{typenum::U8, GenericArray};
+    use serde::Deserialize;
+    use std::fs::File;
+
+    type ZkHash256 = Box<GenericArray<u8, <PARAMOWF256 as PARAMOWF>::LAMBDABYTES>>;
+    type ZkHash192 = Box<GenericArray<u8, <PARAMOWF192 as PARAMOWF>::LAMBDABYTES>>;
+    type ZkHash128 = Box<GenericArray<u8, <PARAMOWF128 as PARAMOWF>::LAMBDABYTES>>;
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct AesExtendedWitness {
+        lambda: u16,
+        key: Vec<u8>,
+        input: Vec<u8>,
+        w: Vec<u8>,
+    }
+
+    #[test]
+    fn aes_extended_witness_test() {
+        let file = File::open("AesExtendedWitness.json").unwrap();
+        let database: Vec<AesExtendedWitness> =
+            serde_json::from_reader(file).expect("error while reading or parsing");
+        for data in database {
+            if data.lambda == 128 {
+                let res = aes_extendedwitness::<PARAM128S, PARAMOWF128>(
+                    GenericArray::from_slice(&data.key),
+                    GenericArray::from_slice(&data.input),
+                );
+                assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
+            } else if data.lambda == 192 {
+                let res = aes_extendedwitness::<PARAM192S, PARAMOWF192>(
+                    GenericArray::from_slice(&data.key),
+                    GenericArray::from_slice(&data.input),
+                );
+                assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
+            } else {
+                let res = aes_extendedwitness::<PARAM256S, PARAMOWF256>(
+                    GenericArray::from_slice(&data.key),
+                    GenericArray::from_slice(&data.input),
+                );
+                assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
+            }
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct AesKeyExpFwd {
+        lambda: u16,
+
+        x: Vec<[u128; 4]>,
+
+        out: Vec<[u128; 4]>,
+    }
+
+    fn convtobit<T>(x: u8) -> Box<GenericArray<T, U8>>
+    where
+        T: BigGaloisField,
+    {
+        convert_to_bit(&[x])
+    }
+
+    #[test]
+    fn aes_key_exp_fwd_test() {
+        let file = File::open("AesKeyExpFwd.json").unwrap();
+        let database: Vec<AesKeyExpFwd> =
+            serde_json::from_reader(file).expect("error while reading or parsing");
+        for data in database {
+            if data.lambda == 128 {
+                let (out, input): (Vec<GF128>, Vec<GF128>) = if data.x.len() >= 448 {
+                    (
+                        data.out
+                            .iter()
+                            .map(|x| GF128::new((x[0]) + ((x[1]) << 64), 0))
+                            .collect(),
+                        data.x
+                            .iter()
+                            .map(|x| GF128::new((x[0]) + ((x[1]) << 64), 0))
+                            .collect(),
+                    )
+                } else {
+                    (
+                        data.out
+                            .iter()
+                            .flat_map(|out| convtobit(out[0] as u8))
+                            .collect(),
+                        data.x
+                            .iter()
+                            .flat_map(|out| convtobit(out[0] as u8))
+                            .collect(),
+                    )
+                };
+                let res: GenericArray<GF128, <PARAMOWF128 as PARAMOWF>::PRODRUN128> =
+                    *aes_key_exp_fwd::<PARAMOWF128>(GenericArray::from_slice(&input));
+                assert_eq!(res, *GenericArray::from_slice(&out));
+            } else if data.lambda == 192 {
+                let (out, input): (Vec<GF192>, Vec<GF192>) = if data.x.len() >= 448 {
+                    (
+                        data.out
+                            .iter()
+                            .map(|x| GF192::new((x[0]) + ((x[1]) << 64), x[2]))
+                            .collect(),
+                        data.x
+                            .iter()
+                            .map(|x| GF192::new((x[0]) + ((x[1]) << 64), x[2]))
+                            .collect(),
+                    )
+                } else {
+                    (
+                        data.out
+                            .iter()
+                            .flat_map(|out| convtobit(out[0] as u8))
+                            .collect(),
+                        data.x.iter().flat_map(|x| convtobit(x[0] as u8)).collect(),
+                    )
+                };
+                let res: GenericArray<GF192, <PARAMOWF192 as PARAMOWF>::PRODRUN128> =
+                    *aes_key_exp_fwd::<PARAMOWF192>(GenericArray::from_slice(&input));
+                assert_eq!(res, *GenericArray::from_slice(&out));
+            } else {
+                let (out, input): (Vec<GF256>, Vec<GF256>) = if data.x.len() >= 448 {
+                    (
+                        data.out
+                            .iter()
+                            .map(|x| GF256::new((x[0]) + ((x[1]) << 64), (x[2]) + ((x[3]) << 64)))
+                            .collect(),
+                        data.x
+                            .iter()
+                            .map(|x| GF256::new((x[0]) + ((x[1]) << 64), (x[2]) + ((x[3]) << 64)))
+                            .collect(),
+                    )
+                } else {
+                    (
+                        data.out
+                            .iter()
+                            .flat_map(|out| convtobit(out[0] as u8))
+                            .collect(),
+                        data.x.iter().flat_map(|x| convtobit(x[0] as u8)).collect(),
+                    )
+                };
+                let res: GenericArray<GF256, <PARAMOWF256 as PARAMOWF>::PRODRUN128> =
+                    *aes_key_exp_fwd::<PARAMOWF256>(GenericArray::from_slice(&input));
+                assert_eq!(res, *GenericArray::from_slice(&out));
+            }
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct AesKeyExpBwd {
+        lambda: u16,
+
+        mtag: u8,
+
+        mkey: u8,
+
+        delta: [u128; 4],
+
+        x: Vec<[u128; 4]>,
+
+        xk: Vec<[u128; 4]>,
+
+        out: Vec<[u128; 4]>,
+    }
+
+    #[test]
+    fn aes_key_exp_bwd_test() {
+        let file = File::open("AesKeyExpBwd.json").unwrap();
+        let database: Vec<AesKeyExpBwd> =
+            serde_json::from_reader(file).expect("error while reading or parsing");
+        for data in database {
+            if data.lambda == 128 {
+                let mtag = data.mtag != 0;
+                let mkey = data.mkey != 0;
+                let delta = GF128::new(data.delta[0] + (data.delta[1] << 64), 0);
+                let (x, xk, out): (Vec<GF128>, Vec<GF128>, Vec<GF128>) = if !mtag && !mkey {
+                    (
+                        data.x
+                            .iter()
+                            .flat_map(|x| convtobit(x[0].to_le_bytes()[0]))
+                            .collect(),
+                        data.xk
+                            .iter()
+                            .flat_map(|x| convtobit(x[0].to_le_bytes()[0]))
+                            .collect(),
+                        data.out
+                            .iter()
+                            .flat_map(|x| convtobit(x[0].to_le_bytes()[0]))
+                            .collect(),
+                    )
+                } else {
+                    (
+                        data.x
+                            .iter()
+                            .map(|x| GF128::new(x[0] + (x[1] << 64), 0))
+                            .collect(),
+                        data.xk
+                            .iter()
+                            .map(|xk| GF128::new(xk[0] + (xk[1] << 64), 0))
+                            .collect(),
+                        data.out
+                            .iter()
+                            .map(|out| GF128::new(out[0] + (out[1] << 64), 0))
+                            .collect(),
+                    )
+                };
+
+                let res = aes_key_exp_bwd::<PARAMOWF128>(
+                    GenericArray::from_slice(&x[..448]),
+                    GenericArray::from_slice(
+                        &[&xk[..], &vec![GF128::default(); 224][..]].concat()[..1408],
+                    ),
+                    mtag,
+                    mkey,
+                    delta,
+                );
+                for i in 0..res.len() {
+                    assert_eq!(res[i], out[i]);
+                }
+            } else if data.lambda == 192 {
+                let mtag = data.mtag != 0;
+                let mkey = data.mkey != 0;
+                let delta = GF192::new(data.delta[0] + (data.delta[1] << 64), data.delta[2]);
+                let (x, xk, out): (Vec<GF192>, Vec<GF192>, Vec<GF192>) = if !mtag && !mkey {
+                    (
+                        data.x
+                            .iter()
+                            .flat_map(|x| convtobit(x[0].to_le_bytes()[0]))
+                            .collect(),
+                        data.xk
+                            .iter()
+                            .flat_map(|x| convtobit(x[0].to_le_bytes()[0]))
+                            .collect(),
+                        data.out
+                            .iter()
+                            .flat_map(|x| convtobit(x[0].to_le_bytes()[0]))
+                            .collect(),
+                    )
+                } else {
+                    (
+                        data.x
+                            .iter()
+                            .map(|x| GF192::new(x[0] + (x[1] << 64), x[2]))
+                            .collect(),
+                        data.xk
+                            .iter()
+                            .map(|xk| GF192::new(xk[0] + (xk[1] << 64), xk[2]))
+                            .collect(),
+                        data.out
+                            .iter()
+                            .map(|out| GF192::new(out[0] + (out[1] << 64), out[2]))
+                            .collect(),
+                    )
+                };
+                let res = aes_key_exp_bwd::<PARAMOWF192>(
+                    GenericArray::from_slice(&x[..448]),
+                    GenericArray::from_slice(
+                        &[&xk[..], &vec![GF192::default(); 288][..]].concat()[..1664],
+                    ),
+                    mtag,
+                    mkey,
+                    delta,
+                );
+                for i in 0..res.len() {
+                    assert_eq!(res[i], out[i]);
+                }
+            } else {
+                let mtag = data.mtag != 0;
+                let mkey = data.mkey != 0;
+                let delta = GF256::new(
+                    data.delta[0] + (data.delta[1] << 64),
+                    data.delta[2] + (data.delta[3] << 64),
+                );
+                let (x, xk, out): (Vec<GF256>, Vec<GF256>, Vec<GF256>) = if !mtag && !mkey {
+                    (
+                        data.x
+                            .iter()
+                            .flat_map(|x| convtobit(x[0].to_le_bytes()[0]))
+                            .collect(),
+                        data.xk
+                            .iter()
+                            .flat_map(|x| convtobit(x[0].to_le_bytes()[0]))
+                            .collect(),
+                        data.out
+                            .iter()
+                            .flat_map(|x| convtobit(x[0].to_le_bytes()[0]))
+                            .collect(),
+                    )
+                } else {
+                    (
+                        data.x
+                            .iter()
+                            .map(|x| GF256::new(x[0] + (x[1] << 64), x[2] + (x[3] << 64)))
+                            .collect(),
+                        data.xk
+                            .iter()
+                            .map(|xk| GF256::new(xk[0] + (xk[1] << 64), xk[2] + (xk[3] << 64)))
+                            .collect(),
+                        data.out
+                            .iter()
+                            .map(|out| GF256::new(out[0] + (out[1] << 64), out[2] + (out[3] << 64)))
+                            .collect(),
+                    )
+                };
+                let res = aes_key_exp_bwd::<PARAMOWF256>(
+                    GenericArray::from_slice(&x[..672]),
+                    GenericArray::from_slice(
+                        &[&xk[..], &vec![GF256::default(); 352][..]].concat()[..1920],
+                    ),
+                    mtag,
+                    mkey,
+                    delta,
+                );
+                for i in 0..res.len() {
+                    assert_eq!(res[i], out[i]);
+                }
+            }
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct AesKeyExpCstrnts {
+        lambda: u16,
+
+        mkey: u8,
+
+        w: Vec<u8>,
+
+        v: Vec<[u128; 4]>,
+
+        q: Vec<[u128; 4]>,
+
+        delta: Vec<u8>,
+
+        ab: Vec<[u128; 8]>,
+
+        res1: Vec<u8>,
+
+        res2: Vec<[u128; 4]>,
+    }
+
+    #[test]
+    fn aes_key_exp_cstrnts_test() {
+        let file = File::open("AesKeyExpCstrnts.json").unwrap();
+        let database: Vec<AesKeyExpCstrnts> =
+            serde_json::from_reader(file).expect("error while reading or parsing");
+        for data in database {
+            if data.lambda == 128 {
+                let fields_v = &(data
+                    .v
+                    .iter()
+                    .map(|v| GF128::new(v[0] + ((v[1]) << 64), 0))
+                    .collect::<Vec<GF128>>())[..];
+                let mkey = data.mkey != 0;
+                let fields_q = &(data
+                    .q
+                    .iter()
+                    .map(|q| GF128::new(q[0] + ((q[1]) << 64), 0))
+                    .collect::<Vec<GF128>>())[..];
+                let delta = GF128::new(
+                    data.delta
+                        .iter()
+                        .enumerate()
+                        .map(|(i, x)| ((*x as u128) << (8 * i)))
+                        .sum(),
+                    0,
+                );
+                let field_ab: Vec<(GF128, GF128)> = data
+                    .ab
+                    .iter()
+                    .map(|a| {
+                        (
+                            GF128::new(a[0] + ((a[1]) << 64), 0),
+                            GF128::new(a[4] + ((a[5]) << 64), 0),
+                        )
+                    })
+                    .collect();
+                let fields_res_1 = convert_to_bit::<
+                    <PARAMOWF128 as PARAMOWF>::Field,
+                    <PARAMOWF128 as PARAMOWF>::PRODRUN128,
+                >(&data.res1[..176]);
+                let fields_res_2: Vec<GF128> = data
+                    .res2
+                    .iter()
+                    .map(|res| GF128::new(res[0] + ((res[1]) << 64), 0))
+                    .collect();
+
+                let mut res = aes_key_exp_cstrnts::<PARAMOWF128>(
+                    GenericArray::from_slice(
+                        &(data
+                            .w
+                            .iter()
+                            .flat_map(|x| byte_to_bit(*x))
+                            .collect::<Vec<u8>>())[..448],
+                    ),
+                    GenericArray::from_slice(fields_v),
+                    mkey,
+                    GenericArray::from_slice(fields_q),
+                    delta,
+                );
+                if res.1 == GenericArray::default_boxed() {
+                    for i in 0..field_ab.len() {
+                        res.1[i] = GF128::default();
+                    }
+                }
+                if res.2 == GenericArray::default_boxed() {
+                    for i in 0..field_ab.len() {
+                        res.2[i] = GF128::default();
+                    }
+                }
+
+                #[allow(clippy::needless_range_loop)]
+                for i in 0..field_ab.len() {
+                    assert_eq!(field_ab[i].0, res.0[i]);
+                    assert_eq!(field_ab[i].1, res.1[i]);
+                }
+                assert_eq!(fields_res_1, res.2);
+                assert_eq!(*GenericArray::from_slice(&fields_res_2), *res.3);
+            } else if data.lambda == 192 {
+                let fields_v = &(data
+                    .v
+                    .iter()
+                    .map(|v| GF192::new(v[0] + ((v[1]) << 64), v[2]))
+                    .take(448)
+                    .collect::<Vec<GF192>>());
+                let mkey = data.mkey != 0;
+                let fields_q = &(data
+                    .q
+                    .iter()
+                    .map(|q| GF192::new(q[0] + ((q[1]) << 64), q[2]))
+                    .take(448)
+                    .collect::<Vec<GF192>>());
+                let delta = GF192::new(
+                    data.delta
+                        .iter()
+                        .take(16)
+                        .enumerate()
+                        .map(|(i, x)| ((*x as u128) << (8 * i)))
+                        .sum(),
+                    data.delta
+                        .iter()
+                        .skip(16)
+                        .enumerate()
+                        .map(|(i, x)| ((*x as u128) << (8 * i)))
+                        .sum(),
+                );
+                let field_ab: Vec<(GF192, GF192)> = data
+                    .ab
+                    .iter()
+                    .map(|a| {
+                        (
+                            GF192::new(a[0] + ((a[1]) << 64), a[2]),
+                            GF192::new(a[4] + ((a[5]) << 64), a[6]),
+                        )
+                    })
+                    .collect();
+                let fields_res_1 = convert_to_bit::<
+                    <PARAMOWF192 as PARAMOWF>::Field,
+                    <PARAMOWF192 as PARAMOWF>::PRODRUN128,
+                >(&data.res1[..208]);
+                let fields_res_2: Vec<GF192> = data
+                    .res2
+                    .iter()
+                    .map(|w| GF192::new(w[0] + ((w[1]) << 64), w[2]))
+                    .collect();
+                let res = aes_key_exp_cstrnts::<PARAMOWF192>(
+                    GenericArray::from_slice(
+                        &(data
+                            .w
+                            .iter()
+                            .flat_map(|x| byte_to_bit(*x))
+                            .collect::<Vec<u8>>())[..448],
+                    ),
+                    GenericArray::from_slice(fields_v),
+                    mkey,
+                    GenericArray::from_slice(fields_q),
+                    delta,
+                );
+                #[allow(clippy::needless_range_loop)]
+                for i in 0..field_ab.len() {
+                    assert_eq!(field_ab[i].0, res.0[i]);
+                    assert_eq!(field_ab[i].1, res.1[i]);
+                }
+                assert_eq!(fields_res_1, res.2);
+                assert_eq!(*GenericArray::from_slice(&fields_res_2), *res.3);
+            } else {
+                let fields_v = &(data
+                    .v
+                    .iter()
+                    .map(|v| GF256::new(v[0] + ((v[1]) << 64), v[2] + ((v[3]) << 64)))
+                    .take(672)
+                    .collect::<Vec<GF256>>())[..];
+                let mkey = data.mkey != 0;
+                let fields_q = &(data
+                    .q
+                    .iter()
+                    .map(|q| GF256::new(q[0] + ((q[1]) << 64), q[2] + ((q[3]) << 64)))
+                    .take(672)
+                    .collect::<Vec<GF256>>())[..];
+                let delta = GF256::new(
+                    data.delta
+                        .iter()
+                        .take(16)
+                        .enumerate()
+                        .map(|(i, x)| ((*x as u128) << (8 * i)))
+                        .sum(),
+                    data.delta
+                        .iter()
+                        .skip(16)
+                        .enumerate()
+                        .map(|(i, x)| ((*x as u128) << (8 * i)))
+                        .sum(),
+                );
+                let field_ab: Vec<(GF256, GF256)> = data
+                    .ab
+                    .iter()
+                    .map(|a| {
+                        (
+                            GF256::new(a[0] + ((a[1]) << 64), a[2] + ((a[3]) << 64)),
+                            GF256::new(a[4] + ((a[5]) << 64), a[6] + ((a[7]) << 64)),
+                        )
+                    })
+                    .collect();
+                let fields_res_1 = convert_to_bit::<
+                    <PARAMOWF256 as PARAMOWF>::Field,
+                    <PARAMOWF256 as PARAMOWF>::PRODRUN128,
+                >(&data.res1[..240]);
+                let fields_res_2: Vec<GF256> = data
+                    .res2
+                    .iter()
+                    .map(|w| GF256::new(w[0] + ((w[1]) << 64), w[2] + ((w[3]) << 64)))
+                    .collect();
+                let res = aes_key_exp_cstrnts::<PARAMOWF256>(
+                    GenericArray::from_slice(
+                        &(data
+                            .w
+                            .iter()
+                            .flat_map(|x| byte_to_bit(*x))
+                            .collect::<Vec<u8>>())[..672],
+                    ),
+                    GenericArray::from_slice(fields_v),
+                    mkey,
+                    GenericArray::from_slice(fields_q),
+                    delta,
+                );
+                #[allow(clippy::needless_range_loop)]
+                for i in 0..field_ab.len() {
+                    assert_eq!(field_ab[i].0, res.0[i]);
+                    assert_eq!(field_ab[i].1, res.1[i]);
+                }
+                assert_eq!(fields_res_1, res.2);
+                assert_eq!(*GenericArray::from_slice(&fields_res_2), *res.3);
+            }
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct AesEncFwd {
+        lambda: u16,
+
+        mkey: u8,
+
+        mtag: u8,
+
+        x: Vec<[u64; 4]>,
+
+        xk: Vec<[u64; 4]>,
+
+        input: [u8; 16],
+
+        delta: [u64; 4],
+
+        reslambda: Vec<[u64; 4]>,
+    }
+
+    #[test]
+    fn aes_enc_fwd_test() {
+        let file = File::open("AesEncFwd.json").unwrap();
+        let database: Vec<AesEncFwd> =
+            serde_json::from_reader(file).expect("error while reading or parsing");
+        for data in database {
+            if data.lambda == 128 {
+                let mtag = data.mtag != 0;
+                let mkey = data.mkey != 0;
+                let (x, xk) = if !(mkey || mtag) {
+                    (
+                        (data
+                            .x
+                            .iter()
+                            .flat_map(|x| convtobit::<GF128>(x[0].to_le_bytes()[..1][0]))
+                            .collect::<Vec<GF128>>()),
+                        (data
+                            .xk
+                            .iter()
+                            .flat_map(|x| convtobit::<GF128>(x[0].to_le_bytes()[..1][0]))
+                            .collect::<Vec<GF128>>()),
+                    )
+                } else {
+                    (
+                        (data
+                            .x
+                            .iter()
+                            .map(|v| GF128::new(v[0] as u128 + ((v[1] as u128) << 64), 0))
+                            .collect::<Vec<GF128>>()),
+                        (data
+                            .xk
+                            .iter()
+                            .map(|v| GF128::new(v[0] as u128 + ((v[1] as u128) << 64), 0))
+                            .collect::<Vec<GF128>>()),
+                    )
+                };
+                let res = aes_enc_fwd::<PARAMOWF128>(
+                    GenericArray::from_slice(&x[..]),
+                    GenericArray::from_slice(&xk[..]),
+                    data.mkey != 0,
+                    data.mtag != 0,
+                    data.input,
+                    GF128::new(data.delta[0] as u128 + ((data.delta[1] as u128) << 64), 0),
+                );
+                let out = data
+                    .reslambda
+                    .iter()
+                    .map(|v| GF128::new(v[0] as u128 + ((v[1] as u128) << 64), 0))
+                    .collect::<Vec<GF128>>();
+                for i in 0..out.len() {
+                    assert_eq!(out[i], res[i]);
+                }
+            } else if data.lambda == 192 {
+                let mtag = data.mtag != 0;
+                let mkey = data.mkey != 0;
+                let (x, xk) = if !(mkey || mtag) {
+                    (
+                        (data
+                            .x
+                            .iter()
+                            .flat_map(|x| convtobit::<GF192>(x[0].to_le_bytes()[..1][0]))
+                            .collect::<Vec<GF192>>()),
+                        (data
+                            .xk
+                            .iter()
+                            .flat_map(|x| convtobit::<GF192>(x[0].to_le_bytes()[..1][0]))
+                            .collect::<Vec<GF192>>()),
+                    )
+                } else {
+                    (
+                        (data
+                            .x
+                            .iter()
+                            .map(|v| {
+                                GF192::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128)
+                            })
+                            .collect::<Vec<GF192>>()),
+                        (data
+                            .xk
+                            .iter()
+                            .map(|v| {
+                                GF192::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128)
+                            })
+                            .collect::<Vec<GF192>>()),
+                    )
+                };
+                let res = aes_enc_fwd::<PARAMOWF192>(
+                    GenericArray::from_slice(&x[..]),
+                    GenericArray::from_slice(&xk[..]),
+                    data.mkey != 0,
+                    data.mtag != 0,
+                    data.input,
+                    GF192::new(
+                        data.delta[0] as u128 + ((data.delta[1] as u128) << 64),
+                        data.delta[2] as u128,
+                    ),
+                );
+                let out = data
+                    .reslambda
+                    .iter()
+                    .map(|v| GF192::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128))
+                    .collect::<Vec<GF192>>();
+                for i in 0..out.len() {
+                    assert_eq!(out[i], res[i]);
+                }
+            } else {
+                let mtag = data.mtag != 0;
+                let mkey = data.mkey != 0;
+                let (x, xk) = if !(mkey || mtag) {
+                    (
+                        (data
+                            .x
+                            .iter()
+                            .flat_map(|x| convtobit::<GF256>(x[0].to_le_bytes()[..1][0]))
+                            .collect::<Vec<GF256>>()),
+                        (data
+                            .xk
+                            .iter()
+                            .flat_map(|x| convtobit::<GF256>(x[0].to_le_bytes()[..1][0]))
+                            .collect::<Vec<GF256>>()),
+                    )
+                } else {
+                    (
+                        (data
+                            .x
+                            .iter()
+                            .map(|v| {
+                                GF256::new(
+                                    v[0] as u128 + ((v[1] as u128) << 64),
+                                    v[2] as u128 + ((v[3] as u128) << 64),
+                                )
+                            })
+                            .collect::<Vec<GF256>>()),
+                        (data
+                            .xk
+                            .iter()
+                            .map(|v| {
+                                GF256::new(
+                                    v[0] as u128 + ((v[1] as u128) << 64),
+                                    v[2] as u128 + ((v[3] as u128) << 64),
+                                )
+                            })
+                            .collect::<Vec<GF256>>()),
+                    )
+                };
+                let res = aes_enc_fwd::<PARAMOWF256>(
+                    GenericArray::from_slice(&x[..]),
+                    GenericArray::from_slice(&xk[..]),
+                    data.mkey != 0,
+                    data.mtag != 0,
+                    data.input,
+                    GF256::new(
+                        data.delta[0] as u128 + ((data.delta[1] as u128) << 64),
+                        data.delta[2] as u128 + ((data.delta[3] as u128) << 64),
+                    ),
+                );
+                let out = data
+                    .reslambda
+                    .iter()
+                    .map(|v| {
+                        GF256::new(
+                            v[0] as u128 + ((v[1] as u128) << 64),
+                            v[2] as u128 + ((v[3] as u128) << 64),
+                        )
+                    })
+                    .collect::<Vec<GF256>>();
+                for i in 0..out.len() {
+                    assert_eq!(out[i], res[i]);
+                }
+            }
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct AesEncBkwd {
+        lambda: u16,
+
+        mkey: u8,
+
+        mtag: u8,
+
+        x: Vec<[u128; 4]>,
+
+        xk: Vec<[u128; 4]>,
+
+        output: [u8; 16],
+
+        delta: [u128; 4],
+
+        reslambda: Vec<[u128; 4]>,
+    }
+
+    #[test]
+    fn aes_enc_bkwd_test() {
+        let file = File::open("AesEncBkwd.json").unwrap();
+        let database: Vec<AesEncBkwd> =
+            serde_json::from_reader(file).expect("error while reading or parsing");
+        for data in database {
+            if data.lambda == 128 {
+                let mtag = data.mtag != 0;
+                let mkey = data.mkey != 0;
+                let (x, xk) = if !(mkey || mtag) {
+                    (
+                        (data
+                            .x
+                            .iter()
+                            .flat_map(|x| convtobit::<GF128>(x[0].to_le_bytes()[..1][0]))
+                            .collect::<Vec<GF128>>()),
+                        (data
+                            .xk
+                            .iter()
+                            .flat_map(|x| convtobit::<GF128>(x[0].to_le_bytes()[..1][0]))
+                            .collect::<Vec<GF128>>()),
+                    )
+                } else {
+                    (
+                        (data
+                            .x
+                            .iter()
+                            .map(|v| GF128::new(v[0] + (v[1] << 64), 0))
+                            .collect::<Vec<GF128>>()),
+                        (data
+                            .xk
+                            .iter()
+                            .map(|v| GF128::new(v[0] + (v[1] << 64), 0))
+                            .collect::<Vec<GF128>>()),
+                    )
+                };
+                let res = aes_enc_bkwd::<PARAMOWF128>(
+                    GenericArray::from_slice(&x[..]),
+                    GenericArray::from_slice(&xk[..]),
+                    data.mkey != 0,
+                    data.mtag != 0,
+                    data.output,
+                    GF128::new(data.delta[0] + (data.delta[1] << 64), 0),
+                );
+                let out = data
+                    .reslambda
+                    .iter()
+                    .map(|v| GF128::new(v[0] + (v[1] << 64), 0))
+                    .collect::<Vec<GF128>>();
+                for i in 0..out.len() {
+                    assert_eq!(out[i], res[i]);
+                }
+            } else if data.lambda == 192 {
+                let mtag = data.mtag != 0;
+                let mkey = data.mkey != 0;
+                let (x, xk) = if !(mkey || mtag) {
+                    (
+                        (data
+                            .x
+                            .iter()
+                            .flat_map(|x| convtobit::<GF192>(x[0].to_le_bytes()[..1][0]))
+                            .collect::<Vec<GF192>>()),
+                        (data
+                            .xk
+                            .iter()
+                            .flat_map(|x| convtobit::<GF192>(x[0].to_le_bytes()[..1][0]))
+                            .collect::<Vec<GF192>>()),
+                    )
+                } else {
+                    (
+                        (data
+                            .x
+                            .iter()
+                            .map(|v| GF192::new(v[0] + (v[1] << 64), v[2]))
+                            .collect::<Vec<GF192>>()),
+                        (data
+                            .xk
+                            .iter()
+                            .map(|v| GF192::new(v[0] + (v[1] << 64), v[2]))
+                            .collect::<Vec<GF192>>()),
+                    )
+                };
+                let res = aes_enc_bkwd::<PARAMOWF192>(
+                    GenericArray::from_slice(&x[..]),
+                    GenericArray::from_slice(&xk[..]),
+                    data.mkey != 0,
+                    data.mtag != 0,
+                    data.output,
+                    GF192::new(data.delta[0] + (data.delta[1] << 64), data.delta[2]),
+                );
+                let out = data
+                    .reslambda
+                    .iter()
+                    .map(|v| GF192::new(v[0] + (v[1] << 64), v[2]))
+                    .collect::<Vec<GF192>>();
+                for i in 0..out.len() {
+                    assert_eq!(out[i], res[i]);
+                }
+            } else {
+                let mtag = data.mtag != 0;
+                let mkey = data.mkey != 0;
+                let (x, xk) = if !(mkey || mtag) {
+                    (
+                        (data
+                            .x
+                            .iter()
+                            .flat_map(|x| convtobit::<GF256>(x[0].to_le_bytes()[..1][0]))
+                            .collect::<Vec<GF256>>()),
+                        (data
+                            .xk
+                            .iter()
+                            .flat_map(|x| convtobit::<GF256>(x[0].to_le_bytes()[..1][0]))
+                            .collect::<Vec<GF256>>()),
+                    )
+                } else {
+                    (
+                        (data
+                            .x
+                            .iter()
+                            .map(|v| GF256::new(v[0] + (v[1] << 64), v[2] + (v[3] << 64)))
+                            .collect::<Vec<GF256>>()),
+                        (data
+                            .xk
+                            .iter()
+                            .map(|v| GF256::new(v[0] + (v[1] << 64), v[2] + (v[3] << 64)))
+                            .collect::<Vec<GF256>>()),
+                    )
+                };
+                let res = aes_enc_bkwd::<PARAMOWF256>(
+                    GenericArray::from_slice(&x[..]),
+                    GenericArray::from_slice(&xk[..]),
+                    data.mkey != 0,
+                    data.mtag != 0,
+                    data.output,
+                    GF256::new(
+                        data.delta[0] + (data.delta[1] << 64),
+                        data.delta[2] + (data.delta[3] << 64),
+                    ),
+                );
+                let out = data
+                    .reslambda
+                    .iter()
+                    .map(|v| GF256::new(v[0] + (v[1] << 64), v[2] + (v[3] << 64)))
+                    .collect::<Vec<GF256>>();
+                for i in 0..out.len() {
+                    assert_eq!(out[i], res[i]);
+                }
+            }
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct AesEncCstrnts {
+        lambda: u16,
+
+        mkey: u8,
+
+        w: Vec<u8>,
+
+        k: Vec<u8>,
+
+        vq: Vec<[u128; 4]>,
+
+        vqk: Vec<[u128; 4]>,
+
+        input: [u8; 16],
+
+        output: [u8; 16],
+
+        delta: Vec<u8>,
+
+        senc: u8,
+
+        ab: Vec<[u128; 8]>,
+    }
+
+    #[test]
+    fn aes_enc_cstrnts_test() {
+        let file = File::open("AesEncCstrnts.json").unwrap();
+        let database: Vec<AesEncCstrnts> =
+            serde_json::from_reader(file).expect("error while reading or parsing");
+        for data in database {
+            if data.lambda == 128 {
+                let senc = data.senc as usize;
+                let mkey = data.mkey != 0;
+                let w = data.w;
+                let k: Vec<GF128> = data.k.iter().flat_map(|x| convtobit(*x)).collect();
+                let vq: Vec<GF128> = data
+                    .vq
+                    .iter()
+                    .map(|x| GF128::new(x[0] + (x[1] << 64), 0))
+                    .collect();
+                let vqk: Vec<GF128> = data
+                    .vqk
+                    .iter()
+                    .map(|x| GF128::new(x[0] + (x[1] << 64), 0))
+                    .collect();
+                let delta = GF128::new(
+                    u64::from_le_bytes(data.delta[..8].try_into().unwrap()) as u128
+                        + ((u64::from_le_bytes(data.delta[8..].try_into().unwrap()) as u128) << 64),
+                    0,
+                );
+                let ab: Vec<(GF128, GF128)> = data
+                    .ab
+                    .iter()
+                    .map(|x| {
+                        (
+                            GF128::new(x[0] + (x[1] << 64), 0),
+                            GF128::new(x[4] + (x[5] << 64), 0),
+                        )
+                    })
+                    .collect();
+                let res = aes_enc_cstrnts::<PARAMOWF128>(
+                    data.input,
+                    data.output,
+                    GenericArray::from_slice(&w),
+                    GenericArray::from_slice(&vq),
+                    GenericArray::from_slice(&k),
+                    GenericArray::from_slice(&vqk),
+                    mkey,
+                    GenericArray::from_slice(&vq),
+                    GenericArray::from_slice(&vqk),
+                    delta,
+                );
+                if !mkey {
+                    for i in 0..senc {
+                        assert_eq!(res[i], ab[i].0);
+                        assert_eq!(res[senc + i], ab[i].1);
+                    }
+                } else {
+                    for i in 0..senc {
+                        assert_eq!(res[i], ab[i].0);
+                    }
+                }
+            } else if data.lambda == 192 {
+                let senc = data.senc as usize;
+                let mkey = data.mkey != 0;
+                let w = data.w;
+                let k: Vec<GF192> = data.k.iter().flat_map(|x| convtobit(*x)).collect();
+                let vq: Vec<GF192> = data
+                    .vq
+                    .iter()
+                    .map(|x| GF192::new(x[0] + (x[1] << 64), x[2]))
+                    .collect();
+                let vqk: Vec<GF192> = data
+                    .vqk
+                    .iter()
+                    .map(|x| GF192::new(x[0] + (x[1] << 64), x[2]))
+                    .collect();
+                let delta = GF192::new(
+                    u64::from_le_bytes(data.delta[..8].try_into().unwrap()) as u128
+                        + ((u64::from_le_bytes(data.delta[8..16].try_into().unwrap()) as u128)
+                            << 64),
+                    u64::from_le_bytes(data.delta[16..].try_into().unwrap()) as u128,
+                );
+                let ab: Vec<(GF192, GF192)> = data
+                    .ab
+                    .iter()
+                    .map(|x| {
+                        (
+                            GF192::new(x[0] + (x[1] << 64), x[2]),
+                            GF192::new(x[4] + (x[5] << 64), x[6]),
+                        )
+                    })
+                    .collect();
+                let res = aes_enc_cstrnts::<PARAMOWF192>(
+                    data.input,
+                    data.output,
+                    GenericArray::from_slice(&w),
+                    GenericArray::from_slice(&vq),
+                    GenericArray::from_slice(&k),
+                    GenericArray::from_slice(&vqk),
+                    mkey,
+                    GenericArray::from_slice(&vq),
+                    GenericArray::from_slice(&vqk),
+                    delta,
+                );
+                if res.len() == senc * 2 {
+                    for i in 0..senc {
+                        assert_eq!(res[i], ab[i].0);
+                        assert_eq!(res[senc + i], ab[i].1);
+                    }
+                } else {
+                    for i in 0..senc {
+                        assert_eq!(res[i], ab[i].0);
+                    }
+                }
+            } else {
+                let senc = data.senc as usize;
+                let mkey = data.mkey != 0;
+                let w = data.w;
+                let k: Vec<GF256> = data.k.iter().flat_map(|x| convtobit(*x)).collect();
+                let vq: Vec<GF256> = data
+                    .vq
+                    .iter()
+                    .map(|x| GF256::new(x[0] + (x[1] << 64), x[2] + (x[3] << 64)))
+                    .collect();
+                let vqk: Vec<GF256> = data
+                    .vqk
+                    .iter()
+                    .map(|x| GF256::new(x[0] + (x[1] << 64), x[2] + (x[3] << 64)))
+                    .collect();
+                let delta = GF256::new(
+                    u64::from_le_bytes(data.delta[..8].try_into().unwrap()) as u128
+                        + ((u64::from_le_bytes(data.delta[8..16].try_into().unwrap()) as u128)
+                            << 64),
+                    u64::from_le_bytes(data.delta[16..24].try_into().unwrap()) as u128
+                        + ((u64::from_le_bytes(data.delta[24..].try_into().unwrap()) as u128)
+                            << 64),
+                );
+                let ab: Vec<(GF256, GF256)> = data
+                    .ab
+                    .iter()
+                    .map(|x| {
+                        (
+                            GF256::new(x[0] + (x[1] << 64), x[2] + (x[3] << 64)),
+                            GF256::new(x[4] + (x[5] << 64), x[6] + (x[7] << 64)),
+                        )
+                    })
+                    .collect();
+                let res = aes_enc_cstrnts::<PARAMOWF256>(
+                    data.input,
+                    data.output,
+                    GenericArray::from_slice(&w),
+                    GenericArray::from_slice(&vq),
+                    GenericArray::from_slice(&k),
+                    GenericArray::from_slice(&vqk),
+                    mkey,
+                    GenericArray::from_slice(&vq),
+                    GenericArray::from_slice(&vqk),
+                    delta,
+                );
+                if res.len() == senc * 2 {
+                    for i in 0..senc {
+                        assert_eq!(res[i], ab[i].0);
+                        assert_eq!(res[senc + i], ab[i].1);
+                    }
+                } else {
+                    for i in 0..senc {
+                        assert_eq!(res[i], ab[i].0);
+                    }
+                }
+            }
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct AesProve {
+        lambda: u16,
+
+        gv: Vec<Vec<u8>>,
+
+        w: Vec<u8>,
+
+        u: Vec<u8>,
+
+        input: Vec<u8>,
+
+        output: Vec<u8>,
+
+        chall: Vec<u8>,
+
+        at: Vec<u8>,
+
+        bt: Vec<u8>,
+    }
+
+    #[test]
+    fn aes_prove_test() {
+        let file = File::open("AesProve.json").unwrap();
+        let database: Vec<AesProve> =
+            serde_json::from_reader(file).expect("error while reading or parsing");
+        for data in database {
+            if data.lambda == 128 {
+                let mut pk = data.input.to_vec();
+                pk.append(&mut data.output.to_vec());
+                let res: (ZkHash128, ZkHash128) = aes_prove::<PARAM128S, PARAMOWF128>(
+                    GenericArray::from_slice(&data.w),
+                    GenericArray::from_slice(&data.u),
+                    GenericArray::from_slice(
+                        &data
+                            .gv
+                            .iter()
+                            .map(|x| *GenericArray::from_slice(x))
+                            .collect::<Vec<GenericArray<u8, _>>>(),
+                    ),
+                    GenericArray::from_slice(&pk),
+                    GenericArray::from_slice(&data.chall),
+                );
+
+                assert_eq!((res).0, Box::new(*GenericArray::from_slice(&data.at)));
+                assert_eq!((res).1, Box::new(*GenericArray::from_slice(&data.bt)));
+            } else if data.lambda == 192 {
+                let mut bitw: Vec<u8> = vec![0; 3264];
+                for i in 0..data.w.len() {
+                    for j in 0..8 {
+                        bitw[8 * i + j] = (data.w[i] >> j) & 1;
+                    }
+                }
+                let mut pk = data.input.to_vec();
+                pk.append(&mut data.output.to_vec());
+                let res: (ZkHash192, ZkHash192) = aes_prove::<PARAM192S, PARAMOWF192>(
+                    GenericArray::from_slice(&data.w),
+                    GenericArray::from_slice(&data.u),
+                    GenericArray::from_slice(
+                        &data
+                            .gv
+                            .iter()
+                            .map(|x| *GenericArray::from_slice(x))
+                            .collect::<Vec<GenericArray<u8, _>>>(),
+                    ),
+                    GenericArray::from_slice(&pk),
+                    GenericArray::from_slice(&data.chall),
+                );
+                assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.at)));
+                assert_eq!(res.1, Box::new(*GenericArray::from_slice(&data.bt)));
+            } else {
+                let mut bitw: Vec<u8> = vec![0; 4000];
+                for i in 0..data.w.len() {
+                    for j in 0..8 {
+                        bitw[8 * i + j] = (data.w[i] >> j) & 1;
+                    }
+                }
+
+                let mut pk = data.input.to_vec();
+                pk.append(&mut data.output.to_vec());
+                let res: (ZkHash256, ZkHash256) = aes_prove::<PARAM256S, PARAMOWF256>(
+                    GenericArray::from_slice(&data.w),
+                    GenericArray::from_slice(&data.u),
+                    GenericArray::from_slice(
+                        &data
+                            .gv
+                            .iter()
+                            .map(|x| *GenericArray::from_slice(x))
+                            .collect::<Vec<GenericArray<u8, _>>>(),
+                    ),
+                    GenericArray::from_slice(&pk),
+                    GenericArray::from_slice(&data.chall),
+                );
+                assert_eq!(*res.0, *GenericArray::from_slice(&data.at));
+                assert_eq!(*res.1, *GenericArray::from_slice(&data.bt));
+            }
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct AesVerify {
+        lambda: u16,
+
+        gq: Vec<Vec<u8>>,
+
+        d: Vec<u8>,
+
+        chall2: Vec<u8>,
+
+        chall3: Vec<u8>,
+
+        at: Vec<u8>,
+
+        input: Vec<u8>,
+
+        output: Vec<u8>,
+
+        res: Vec<u64>,
+    }
+
+    #[test]
+    fn aes_verify_test() {
+        let file = File::open("AesVerify.json").unwrap();
+        let database: Vec<AesVerify> =
+            serde_json::from_reader(file).expect("error while reading or parsing");
+        for data in database {
+            if data.lambda == 128 {
+                let mut pk = data.input.to_vec();
+                pk.append(&mut data.output.to_vec());
+                let out = aes_verify::<PARAM128S, PARAMOWF128>(
+                    GenericArray::from_slice(&data.d[..]),
+                    GenericArray::from_slice(
+                        &data
+                            .gq
+                            .iter()
+                            .map(|x| *GenericArray::from_slice(x))
+                            .collect::<Vec<GenericArray<u8, _>>>(),
+                    ),
+                    GenericArray::from_slice(&data.at),
+                    GenericArray::from_slice(&data.chall2[..]),
+                    GenericArray::from_slice(&data.chall3[..]),
+                    GenericArray::from_slice(&pk[..]),
+                );
+                assert_eq!(
+                    GF128::new(data.res[0] as u128 + ((data.res[1] as u128) << 64), 0),
+                    GF128::from(&out[..])
+                );
+            } else if data.lambda == 192 {
+                let mut pk = data.input.to_vec();
+                pk.append(&mut data.output.to_vec());
+                let out = aes_verify::<PARAM192S, PARAMOWF192>(
+                    GenericArray::from_slice(&data.d[..]),
+                    GenericArray::from_slice(
+                        &data
+                            .gq
+                            .iter()
+                            .map(|x| *GenericArray::from_slice(x))
+                            .collect::<Vec<GenericArray<u8, _>>>(),
+                    ),
+                    GenericArray::from_slice(&data.at),
+                    GenericArray::from_slice(&data.chall2[..]),
+                    GenericArray::from_slice(&data.chall3[..]),
+                    GenericArray::from_slice(&pk[..]),
+                );
+                assert_eq!(
+                    GF192::new(
+                        data.res[0] as u128 + ((data.res[1] as u128) << 64),
+                        data.res[2] as u128
+                    ),
+                    GF192::from(&out[..])
+                );
+            } else {
+                let mut pk = data.input.to_vec();
+                pk.append(&mut data.output.to_vec());
+                let out = aes_verify::<PARAM256S, PARAMOWF256>(
+                    GenericArray::from_slice(&data.d[..]),
+                    GenericArray::from_slice(
+                        &data
+                            .gq
+                            .iter()
+                            .map(|x| *GenericArray::from_slice(x))
+                            .collect::<Vec<GenericArray<u8, _>>>(),
+                    ),
+                    GenericArray::from_slice(&data.at),
+                    GenericArray::from_slice(&data.chall2[..]),
+                    GenericArray::from_slice(&data.chall3[..]),
+                    GenericArray::from_slice(&pk[..]),
+                );
+                assert_eq!(
+                    GF256::new(
+                        data.res[0] as u128 + ((data.res[1] as u128) << 64),
+                        data.res[2] as u128 + ((data.res[3] as u128) << 64)
+                    ),
+                    GF256::from(&out[..])
+                );
+            }
+        }
+    }
 }

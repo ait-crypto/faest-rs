@@ -47,6 +47,7 @@ pub trait BigGaloisField:
     + Mul<GF64, Output = Self>
     + ConditionallySelectable
     + ByteCombine
+    + ByteCombineConstants
     + SumPoly
 where
     Self: for<'a> From<&'a [u8]>,
@@ -59,23 +60,6 @@ where
 {
     // Length of the field (in bits)
     const LENGTH: usize;
-
-    fn new(first_value: u128, second_value: u128) -> Self;
-
-    fn to_bytes(&self) -> Vec<u8>;
-
-    fn to_field(x: &[u8]) -> Vec<Self> {
-        let n = (8 * x.len()) / Self::LENGTH;
-        let mut res = vec![];
-        let padding_array = [0u8; 16];
-        for i in 0..n {
-            let padded_value =
-                &mut x[(i * Self::LENGTH / 8)..((i + 1) * Self::LENGTH / 8)].to_vec();
-            padded_value.append(&mut padding_array[..(32 - Self::LENGTH / 8)].to_vec());
-            res.push(Self::from(padded_value));
-        }
-        res
-    }
 }
 
 /// Trait providing methods for "byte combination"
@@ -106,6 +90,11 @@ where
             },
         )
     }
+}
+
+pub trait ByteCombineConstants: Field {
+    const BYTE_COMBINE_2: Self;
+    const BYTE_COMBINE_3: Self;
 }
 
 /// Helper trait for blanket implementations of [SumPoly]
@@ -673,6 +662,11 @@ impl Alphas for BigGF<u128, 1, 128> {
     ];
 }
 
+impl ByteCombineConstants for BigGF<u128, 1, 128> {
+    const BYTE_COMBINE_2: Self = Self::ALPHA[0];
+    const BYTE_COMBINE_3: Self = Self([Self::ALPHA[0].0[0] ^ Self::ONE.0[0]]);
+}
+
 impl From<&[u8]> for BigGF<u128, 1, 128> {
     fn from(value: &[u8]) -> Self {
         // FIXME
@@ -685,14 +679,6 @@ impl From<&[u8]> for BigGF<u128, 1, 128> {
 
 impl BigGaloisField for BigGF<u128, 1, 128> {
     const LENGTH: usize = 128;
-
-    fn new(first_value: u128, _second_value: u128) -> Self {
-        Self([first_value])
-    }
-
-    fn to_bytes(&self) -> Vec<u8> {
-        self.0[0].to_le_bytes().to_vec()
-    }
 }
 
 #[cfg(test)]
@@ -784,6 +770,14 @@ impl Alphas for BigGF<u128, 2, 192> {
     ];
 }
 
+impl ByteCombineConstants for BigGF<u128, 2, 192> {
+    const BYTE_COMBINE_2: Self = Self::ALPHA[0];
+    const BYTE_COMBINE_3: Self = Self([
+        Self::ALPHA[0].0[0] ^ Self::ONE.0[0],
+        Self::ALPHA[0].0[1] ^ Self::ONE.0[1],
+    ]);
+}
+
 impl From<&[u8]> for BigGF<u128, 2, 192> {
     fn from(value: &[u8]) -> Self {
         // FIXME
@@ -798,17 +792,6 @@ impl From<&[u8]> for BigGF<u128, 2, 192> {
 
 impl BigGaloisField for BigGF<u128, 2, 192> {
     const LENGTH: usize = 192;
-
-    fn new(first_value: u128, second_value: u128) -> Self {
-        Self([first_value, second_value]).clear_high_bits()
-    }
-
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut res = Vec::with_capacity(Self::LENGTH / 8);
-        res.extend_from_slice(&self.0[0].to_le_bytes());
-        res.extend_from_slice(&self.0[1].to_le_bytes()[..8]);
-        res
-    }
 }
 
 #[cfg(test)]
@@ -905,6 +888,14 @@ impl Alphas for BigGF<u128, 2, 256> {
     ];
 }
 
+impl ByteCombineConstants for BigGF<u128, 2, 256> {
+    const BYTE_COMBINE_2: Self = Self::ALPHA[0];
+    const BYTE_COMBINE_3: Self = Self([
+        Self::ALPHA[0].0[0] ^ Self::ONE.0[0],
+        Self::ALPHA[0].0[1] ^ Self::ONE.0[1],
+    ]);
+}
+
 impl From<&[u8]> for BigGF<u128, 2, 256> {
     fn from(value: &[u8]) -> Self {
         assert_eq!(value.len(), 32);
@@ -918,17 +909,6 @@ impl From<&[u8]> for BigGF<u128, 2, 256> {
 
 impl BigGaloisField for BigGF<u128, 2, 256> {
     const LENGTH: usize = 256;
-
-    fn new(first_value: u128, second_value: u128) -> Self {
-        Self([first_value, second_value])
-    }
-
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut res = Vec::with_capacity(Self::LENGTH / 8);
-        res.extend_from_slice(&self.0[0].to_le_bytes());
-        res.extend_from_slice(&self.0[1].to_le_bytes());
-        res
-    }
 }
 
 #[cfg(test)]
@@ -965,12 +945,39 @@ impl Distribution<GF256> for Standard {
 }
 
 #[cfg(test)]
+/// Construct fields from `u128` representations
+///
+/// Only for tests!
+pub(crate) trait NewFromU128 {
+    fn new(first_value: u128, second_value: u128) -> Self;
+}
+
+#[cfg(test)]
+impl NewFromU128 for GF128 {
+    fn new(first_value: u128, _second_value: u128) -> Self {
+        Self([first_value])
+    }
+}
+
+#[cfg(test)]
+impl NewFromU128 for GF192 {
+    fn new(first_value: u128, second_value: u128) -> Self {
+        Self([first_value, second_value]).clear_high_bits()
+    }
+}
+
+#[cfg(test)]
+impl NewFromU128 for GF256 {
+    fn new(first_value: u128, second_value: u128) -> Self {
+        Self([first_value, second_value])
+    }
+}
+
+#[cfg(test)]
 mod test {
     use super::*;
 
-    use num_bigint::BigUint;
     use rand::{rngs::SmallRng, SeedableRng};
-
     //GF128
 
     #[test]
@@ -2334,34 +2341,6 @@ mod test {
         );
     }
 
-    #[test]
-    //We see if the to field function give the same result that what we could have with BigUint
-    fn gf128_test_to_field() {
-        let mut rng = SmallRng::from_entropy();
-
-        for _i in 0..1000 {
-            let random: [u8; 16] = rng.gen();
-            let pol = GF128::to_field(&random);
-            let verif_big = BigUint::from_bytes_le(&random);
-            let verif = verif_big.to_u64_digits()[0] as u128
-                + ((verif_big.to_u64_digits()[1] as u128) << 64);
-            assert_eq!(pol[0].0[0], verif)
-        }
-        //with many polynomes
-        for _i in 0..1000 {
-            let random: [u8; 32] = rng.gen();
-            let pol = GF128::to_field(&random);
-            let verif_big = BigUint::from_bytes_le(&random);
-            let verif_0 = verif_big.to_u64_digits()[0] as u128
-                + ((verif_big.to_u64_digits()[1] as u128) << 64);
-            let verif_1 = verif_big.to_u64_digits()[2] as u128
-                + ((verif_big.to_u64_digits()[3] as u128) << 64);
-            assert_eq!(pol[0].0[0], verif_0);
-            assert_eq!(pol[1].0[0], verif_1);
-        }
-    }
-
-    //GF192
     #[test]
     //input : two GF192
     //output : the product of the two according to te rules of Galois Fields arithmetic
@@ -4537,41 +4516,6 @@ mod test {
                 0xffffffffffffffffffffffffffffffffu128
             )
         );
-    }
-
-    #[test]
-    //We see if the to field function give the same result that what we could have with BigUint
-    fn gf192_test_to_field() {
-        let mut rng = SmallRng::from_entropy();
-
-        for _i in 0..1000 {
-            let random: [u8; 24] = rng.gen();
-            let pol = GF192::to_field(&random);
-            let verif_big = BigUint::from_bytes_le(&random);
-            let verif_0_0 = verif_big.to_u64_digits()[0] as u128
-                + ((verif_big.to_u64_digits()[1] as u128) << 64);
-            let verif_0_1 = verif_big.to_u64_digits()[2] as u128;
-            assert_eq!(pol[0].0[0], verif_0_0);
-            assert_eq!(pol[0].0[1], verif_0_1);
-        }
-        //with many polynomes
-        for _i in 0..1000 {
-            let mut random_1 = rng.gen::<[u8; 24]>().to_vec();
-            let mut random_2 = rng.gen::<[u8; 24]>().to_vec();
-            random_1.append(&mut random_2);
-            let pol = GF192::to_field(&random_1);
-            let verif_big = BigUint::from_bytes_le(&random_1);
-            let verif_0_0 = verif_big.to_u64_digits()[0] as u128
-                + ((verif_big.to_u64_digits()[1] as u128) << 64);
-            let verif_0_1 = verif_big.to_u64_digits()[2] as u128;
-            let verif_1_0 = verif_big.to_u64_digits()[3] as u128
-                + ((verif_big.to_u64_digits()[4] as u128) << 64);
-            let verif_1_1 = verif_big.to_u64_digits()[5] as u128;
-            assert_eq!(pol[0].0[0], verif_0_0);
-            assert_eq!(pol[0].0[1], verif_0_1);
-            assert_eq!(pol[1].0[0], verif_1_0);
-            assert_eq!(pol[1].0[1], verif_1_1);
-        }
     }
 
     //GF256
@@ -6753,40 +6697,92 @@ mod test {
     }
 
     #[test]
-    //We see if the to field function give the same result that what we could have with BigUint
-    fn gf256_test_to_field() {
-        let mut rng = SmallRng::from_entropy();
+    fn gf128_byte_combine_constants() {
+        assert_eq!(
+            GF128::BYTE_COMBINE_2,
+            GF128::byte_combine(&[
+                GF128::ZERO,
+                GF128::ONE,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO
+            ])
+        );
+        assert_eq!(
+            GF128::BYTE_COMBINE_3,
+            GF128::byte_combine(&[
+                GF128::ONE,
+                GF128::ONE,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO,
+                GF128::ZERO
+            ])
+        );
+    }
 
-        for _i in 0..1000 {
-            let random: [u8; 32] = rng.gen();
-            let pol = GF256::to_field(&random);
-            let verif_big = BigUint::from_bytes_le(&random);
-            let verif_0_0 = verif_big.to_u64_digits()[0] as u128
-                + ((verif_big.to_u64_digits()[1] as u128) << 64);
-            let verif_0_1 = verif_big.to_u64_digits()[2] as u128
-                + ((verif_big.to_u64_digits()[3] as u128) << 64);
-            assert_eq!(pol[0].0[0], verif_0_0);
-            assert_eq!(pol[0].0[1], verif_0_1);
-        }
-        //with many polynomes
-        for _i in 0..1000 {
-            let mut random_1 = rng.gen::<[u8; 32]>().to_vec();
-            let mut random_2 = rng.gen::<[u8; 32]>().to_vec();
-            random_1.append(&mut random_2);
-            let pol = GF256::to_field(&random_1);
-            let verif_big = BigUint::from_bytes_le(&random_1);
-            let verif_0_0 = verif_big.to_u64_digits()[0] as u128
-                + ((verif_big.to_u64_digits()[1] as u128) << 64);
-            let verif_0_1 = verif_big.to_u64_digits()[2] as u128
-                + ((verif_big.to_u64_digits()[3] as u128) << 64);
-            let verif_1_0 = verif_big.to_u64_digits()[4] as u128
-                + ((verif_big.to_u64_digits()[5] as u128) << 64);
-            let verif_1_1 = verif_big.to_u64_digits()[6] as u128
-                + ((verif_big.to_u64_digits()[7] as u128) << 64);
-            assert_eq!(pol[0].0[0], verif_0_0);
-            assert_eq!(pol[0].0[1], verif_0_1);
-            assert_eq!(pol[1].0[0], verif_1_0);
-            assert_eq!(pol[1].0[1], verif_1_1);
-        }
+    #[test]
+    fn gf192_byte_combine_constants() {
+        assert_eq!(
+            GF192::BYTE_COMBINE_2,
+            GF192::byte_combine(&[
+                GF192::ZERO,
+                GF192::ONE,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO
+            ])
+        );
+        assert_eq!(
+            GF192::BYTE_COMBINE_3,
+            GF192::byte_combine(&[
+                GF192::ONE,
+                GF192::ONE,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO,
+                GF192::ZERO
+            ])
+        );
+    }
+
+    #[test]
+    fn gf256_byte_combine_constants() {
+        assert_eq!(
+            GF256::BYTE_COMBINE_2,
+            GF256::byte_combine(&[
+                GF256::ZERO,
+                GF256::ONE,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO
+            ])
+        );
+        assert_eq!(
+            GF256::BYTE_COMBINE_3,
+            GF256::byte_combine(&[
+                GF256::ONE,
+                GF256::ONE,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO,
+                GF256::ZERO
+            ])
+        );
     }
 }
