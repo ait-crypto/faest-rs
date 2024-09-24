@@ -1,12 +1,14 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use faest::{
-    FAEST128EMfKeyPair, FAEST128EMfSignature, FAEST128EMsKeyPair, FAEST128EMsSignature,
-    FAEST128fKeyPair, FAEST128fSignature, FAEST128sKeyPair, FAEST128sSignature, FAEST192EMfKeyPair,
-    FAEST192EMfSignature, FAEST192EMsKeyPair, FAEST192EMsSignature, FAEST192fKeyPair,
-    FAEST192fSignature, FAEST192sKeyPair, FAEST192sSignature, FAEST256EMfKeyPair,
-    FAEST256EMfSignature, FAEST256EMsKeyPair, FAEST256EMsSignature, FAEST256fKeyPair,
-    FAEST256fSignature, FAEST256sKeyPair, FAEST256sSignature, KeypairGenerator,
+use ::faest::{
+    faest::{faest_sign, faest_verify},
+    parameter::{
+        self, PARAM, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM,
+        PARAM192S, PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF,
+        PARAMOWF128, PARAMOWF128EM, PARAMOWF192, PARAMOWF192EM, PARAMOWF256, PARAMOWF256EM,
+    },
 };
+use criterion::{criterion_group, criterion_main, Criterion};
+use generic_array::{typenum::Unsigned, GenericArray};
+use parameter::{AesCypher, EmCypher, Variant};
 use rand::RngCore;
 use signature::{Signer, Verifier};
 
@@ -26,7 +28,7 @@ where
     KP::VerifyingKey: Verifier<S>,
 {
     let mut c = c.benchmark_group(name);
-    let mut rng = rand::thread_rng();
+
     c.bench_function("keygen", |b| b.iter(|| black_box(KP::generate(&mut rng))));
 
     let kp = KP::generate(&mut rng);
@@ -34,7 +36,6 @@ where
         let message = random_message(&mut rng);
         b.iter(|| black_box(kp.sign(&message)));
     });
-
     c.bench_function("verify", |b| {
         let message = random_message(&mut rng);
         let signature = kp.sign(&message);

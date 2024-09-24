@@ -5,7 +5,7 @@ use generic_array::{typenum::Unsigned, GenericArray};
 use crate::{
     aes::convert_to_bit,
     fields::{ByteCombine, ByteCombineConstants, Field, SumPoly},
-    parameter::{BaseParameters, TauParameters, PARAM, PARAMOWF},
+    parameter::{BaseParameters, QSProof, TauParameters, PARAM, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
@@ -16,11 +16,6 @@ use crate::{
 type Reveal<O> = (
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>,
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>,
-);
-
-type EMProof<O> = (
-    Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
-    Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
 );
 
 pub fn em_extendedwitness<P, O>(
@@ -325,9 +320,9 @@ pub fn em_prove<P, O>(
     owf_input: &GenericArray<u8, O::InputSize>,
     owf_output: &GenericArray<u8, O::OutputSize>,
     chall: &GenericArray<u8, O::CHALL>,
-) -> EMProof<O>
+) -> QSProof<O>
 where
-    P: PARAM,
+    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
     let nst = <O::NST as Unsigned>::to_u8();
@@ -383,7 +378,7 @@ where
     let a_t = a_t_hasher.finalize(&u_s);
     let b_t = b_t_hasher.finalize(&v_s);
 
-    (Box::new(a_t.as_bytes()), Box::new(b_t.as_bytes()))
+    (a_t.as_bytes(), b_t.as_bytes())
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
@@ -1119,8 +1114,8 @@ mod test {
                 );
                 assert_eq!(
                     (
-                        Box::new(*GenericArray::from_slice(&data.at)),
-                        Box::new(*GenericArray::from_slice(&data.bt))
+                        *GenericArray::from_slice(&data.at),
+                        *GenericArray::from_slice(&data.bt)
                     ),
                     res
                 );
@@ -1142,8 +1137,8 @@ mod test {
                 );
                 assert_eq!(
                     (
-                        Box::new(*GenericArray::from_slice(&data.at)),
-                        Box::new(*GenericArray::from_slice(&data.bt))
+                        *GenericArray::from_slice(&data.at),
+                        *GenericArray::from_slice(&data.bt)
                     ),
                     res
                 );
@@ -1164,8 +1159,8 @@ mod test {
                 );
                 assert_eq!(
                     (
-                        Box::new(*GenericArray::from_slice(&data.at)),
-                        Box::new(*GenericArray::from_slice(&data.bt))
+                        *GenericArray::from_slice(&data.at),
+                        *GenericArray::from_slice(&data.bt)
                     ),
                     res
                 );

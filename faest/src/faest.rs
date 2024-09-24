@@ -1,9 +1,7 @@
 use std::{fmt, io::Write, iter::zip, marker::PhantomData};
 
 use crate::{
-    aes::{aes_extendedwitness, aes_prove, aes_verify},
-    em::{em_extendedwitness, em_prove, em_verify},
-    parameter::{BaseParameters, TauParameters, PARAM, PARAMOWF},
+    parameter::{BaseParameters, TauParameters, Variant, PARAM, PARAMOWF},
     random_oracles::{Hasher, RandomOracle, Reader, IV},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
     vc::open,
@@ -11,17 +9,13 @@ use crate::{
 };
 
 use generic_array::{typenum::Unsigned, GenericArray};
-use rand_core::{CryptoRngCore, RngCore};
+use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
-type QSProof<O> = (
-    Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
-    Box<GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>>,
-);
-type Key<O> = (SecretKey<O>, PublicKey<O>);
+pub type Key<O> = (SecretKey<O>, PublicKey<O>);
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
@@ -29,9 +23,9 @@ pub struct SecretKey<O>
 where
     O: PARAMOWF,
 {
-    owf_key: GenericArray<u8, O::LAMBDABYTES>,
-    owf_input: GenericArray<u8, O::InputSize>,
-    owf_output: GenericArray<u8, O::OutputSize>,
+    pub(crate) owf_key: GenericArray<u8, O::LAMBDABYTES>,
+    pub(crate) owf_input: GenericArray<u8, O::InputSize>,
+    pub(crate) owf_output: GenericArray<u8, O::OutputSize>,
 }
 
 impl<O> SecretKey<O>
@@ -120,8 +114,8 @@ pub struct PublicKey<O>
 where
     O: PARAMOWF,
 {
-    owf_input: GenericArray<u8, O::InputSize>,
-    owf_output: GenericArray<u8, O::OutputSize>,
+    pub(crate) owf_input: GenericArray<u8, O::InputSize>,
+    pub(crate) owf_output: GenericArray<u8, O::OutputSize>,
 }
 
 impl<O> PublicKey<O>
@@ -202,224 +196,6 @@ where
     }
 }
 
-pub trait Variant {
-    ///input : key (len lambda, snd part of sk); public key
-    ///output : witness of l bits
-    fn witness<P, O>(
-        owf_key: &GenericArray<u8, O::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-    ) -> Box<GenericArray<u8, O::LBYTES>>
-    where
-        P: PARAM,
-        O: PARAMOWF;
-
-    ///input : witness of l bits, masking values (l+lambda in aes, lambda in em), Vole tag ((l + lambda) *lambda bits), public key, chall(3lambda + 64)
-    ///Output : QuickSilver response (Lambda bytes)
-    fn prove<P, O>(
-        w: &GenericArray<u8, O::LBYTES>,
-        u: &GenericArray<u8, O::LAMBDALBYTES>,
-        gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::OutputSize>,
-        chall: &GenericArray<u8, O::CHALL>,
-    ) -> QSProof<O>
-    where
-        P: PARAM,
-        O: PARAMOWF;
-
-    ///input : Masked witness (l bits), Vole Key ((l + lambda) * Lambda bits), hash of constrints values (lambda bits), chall2 (3*lambda + 64 bits), chall3 (lambda bits), public key
-    ///output q_tilde - delta * a_tilde (lambda bytes)
-    fn verify<P, O>(
-        d: &GenericArray<u8, O::LBYTES>,
-        gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-        a_t: &GenericArray<u8, O::LAMBDABYTES>,
-        chall2: &GenericArray<u8, O::CHALL>,
-        chall3: &GenericArray<u8, P::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::OutputSize>,
-    ) -> GenericArray<u8, O::LAMBDABYTES>
-    where
-        P: PARAM,
-        O: PARAMOWF;
-
-    ///input : a random number generator
-    /// output = pk : input, output; sk : input, key
-    fn keygen_with_rng<P, O>(rng: impl RngCore) -> Key<O>
-    where
-        P: PARAM,
-        O: PARAMOWF;
-}
-
-pub struct AesCypher {}
-
-impl Variant for AesCypher {
-    fn witness<P, O>(
-        owf_key: &GenericArray<u8, O::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-    ) -> Box<GenericArray<u8, O::LBYTES>>
-    where
-        P: PARAM,
-        O: PARAMOWF,
-    {
-        aes_extendedwitness::<P, O>(owf_key, owf_input).0
-    }
-
-    fn prove<P, O>(
-        w: &GenericArray<u8, O::LBYTES>,
-        u: &GenericArray<u8, O::LAMBDALBYTES>,
-        gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::OutputSize>,
-        chall: &GenericArray<u8, O::CHALL>,
-    ) -> (
-        Box<GenericArray<u8, O::LAMBDABYTES>>,
-        Box<GenericArray<u8, O::LAMBDABYTES>>,
-    )
-    where
-        P: PARAM,
-        O: PARAMOWF,
-    {
-        aes_prove::<P, O>(w, u, gv, owf_input, owf_output, chall)
-    }
-
-    fn verify<P, O>(
-        d: &GenericArray<u8, O::LBYTES>,
-        gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-        a_t: &GenericArray<u8, O::LAMBDABYTES>,
-        chall2: &GenericArray<u8, O::CHALL>,
-        chall3: &GenericArray<u8, P::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::OutputSize>,
-    ) -> GenericArray<u8, O::LAMBDABYTES>
-    where
-        P: PARAM,
-        O: PARAMOWF,
-    {
-        aes_verify::<P, O>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
-    }
-
-    ///Input : the parameter of the faest protocol
-    /// Output : sk : inputOWF||keyOWF, pk : inputOWF||outputOWF
-    fn keygen_with_rng<P, O>(mut rng: impl RngCore) -> Key<O>
-    where
-        P: PARAM,
-        O: PARAMOWF,
-    {
-        loop {
-            // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
-            let mut sk: GenericArray<u8, O::SK> = GenericArray::default();
-            rng.fill_bytes(&mut sk);
-
-            let owf_input = GenericArray::from_slice(&sk[..O::InputSize::USIZE]);
-            let owf_key = GenericArray::from_slice(&sk[O::InputSize::USIZE..]);
-
-            let test = aes_extendedwitness::<P, O>(owf_key, owf_input).1;
-            if !test {
-                continue;
-            }
-
-            let mut owf_output = GenericArray::default();
-            O::evaluate_owf(owf_key, owf_input, &mut owf_output);
-
-            return (
-                SecretKey {
-                    owf_key: owf_key.clone(),
-                    owf_input: owf_input.clone(),
-                    owf_output: owf_output.clone(),
-                },
-                PublicKey {
-                    owf_input: owf_input.clone(),
-                    owf_output,
-                },
-            );
-        }
-    }
-}
-
-pub struct EmCypher {}
-
-impl Variant for EmCypher {
-    fn witness<P, O>(
-        owf_key: &GenericArray<u8, O::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-    ) -> Box<GenericArray<u8, O::LBYTES>>
-    where
-        P: PARAM,
-        O: PARAMOWF,
-    {
-        em_extendedwitness::<P, O>(owf_key, owf_input).0
-    }
-
-    fn prove<P, O>(
-        w: &GenericArray<u8, O::LBYTES>,
-        u: &GenericArray<u8, O::LAMBDALBYTES>,
-        gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::OutputSize>,
-        chall: &GenericArray<u8, O::CHALL>,
-    ) -> (
-        Box<GenericArray<u8, O::LAMBDABYTES>>,
-        Box<GenericArray<u8, O::LAMBDABYTES>>,
-    )
-    where
-        P: PARAM,
-        O: PARAMOWF,
-    {
-        em_prove::<P, O>(w, u, gv, owf_input, owf_output, chall)
-    }
-
-    fn verify<P, O>(
-        d: &GenericArray<u8, O::LBYTES>,
-        gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-        a_t: &GenericArray<u8, O::LAMBDABYTES>,
-        chall2: &GenericArray<u8, O::CHALL>,
-        chall3: &GenericArray<u8, P::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::OutputSize>,
-    ) -> GenericArray<u8, O::LAMBDABYTES>
-    where
-        P: PARAM,
-        O: PARAMOWF,
-    {
-        em_verify::<P, O>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
-    }
-
-    fn keygen_with_rng<P, O>(mut rng: impl RngCore) -> Key<O>
-    where
-        P: PARAM,
-        O: PARAMOWF,
-    {
-        loop {
-            // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
-            let mut sk: GenericArray<u8, O::SK> = GenericArray::default();
-            rng.fill_bytes(&mut sk);
-
-            let owf_input = GenericArray::from_slice(&sk[..O::InputSize::USIZE]);
-            let owf_key = GenericArray::from_slice(&sk[O::InputSize::USIZE..]);
-
-            let test = em_extendedwitness::<P, O>(owf_key, owf_input).1;
-            if !test {
-                continue;
-            }
-
-            let mut owf_output = GenericArray::default();
-            O::evaluate_owf(owf_key, owf_input, &mut owf_output);
-
-            return (
-                SecretKey {
-                    owf_key: owf_key.clone(),
-                    owf_input: owf_input.clone(),
-                    owf_output: owf_output.clone(),
-                },
-                PublicKey {
-                    owf_input: owf_input.clone(),
-                    owf_output,
-                },
-            );
-        }
-    }
-}
-
 type RO<P> = <<<P as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::RandomOracle;
 
 pub fn faest_keygen<P, R>(rng: R) -> Key<P::OWF>
@@ -427,7 +203,7 @@ where
     P: PARAM,
     R: CryptoRngCore,
 {
-    <<P as PARAM>::OWF as PARAMOWF>::Cypher::keygen_with_rng::<P, <P as PARAM>::OWF>(rng)
+    P::Cypher::keygen_with_rng::<P>(rng)
 }
 
 ///input : Message (an array of bytes), sk : secret key, pk : public key, rho : lambda bits
@@ -439,15 +215,15 @@ where
 ///last challenge (lambda bits), initialisation vector
 #[allow(clippy::needless_range_loop)]
 #[allow(clippy::type_complexity)]
-pub fn faest_sign<C, P, O>(
+#[allow(clippy::unnecessary_to_owned)]
+pub fn faest_sign<P, O>(
     msg: &[u8],
     sk: &SecretKey<O>,
     rho: &[u8],
     signature: &mut GenericArray<u8, P::SIG>,
 ) where
-    C: Variant,
     P: PARAM<OWF = O>,
-    O: PARAMOWF<Cypher = C>,
+    O: PARAMOWF,
 {
     let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
     let l = <P::L as Unsigned>::to_usize() / 8;
@@ -494,7 +270,7 @@ pub fn faest_sign<C, P, O>(
         GenericArray::default();
     h1_hasher.finish().read(&mut hv);
 
-    let w = C::witness::<P, O>(&sk.owf_key, &sk.owf_input);
+    let w = P::Cypher::witness::<P>(&sk.owf_key, &sk.owf_input);
     let d = GenericArray::<u8, O::LBYTES>::from_iter(zip(w.iter(), &u[..l]).map(|(w, u)| w ^ *u));
 
     let mut h2_hasher = RO::<P>::h2_init();
@@ -503,7 +279,7 @@ pub fn faest_sign<C, P, O>(
     h2_hasher.update(&hv);
     h2_hasher.update(&d);
     // why is this boxed?
-    let mut chall2: Box<GenericArray<u8, O::CHALL>> = GenericArray::default_boxed();
+    let mut chall2: GenericArray<u8, O::CHALL> = GenericArray::default();
     h2_hasher.finish().read(&mut chall2);
 
     let new_u = GenericArray::from_slice(&u[..l + lambda]);
@@ -522,7 +298,8 @@ pub fn faest_sign<C, P, O>(
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
     );
 
-    let (a_t, b_t) = C::prove::<P, O>(&w, new_u, &new_gv, &sk.owf_input, &sk.owf_output, &chall2);
+    let (a_t, b_t) =
+        P::Cypher::prove::<P>(&w, new_u, &new_gv, &sk.owf_input, &sk.owf_output, &chall2);
 
     let mut h2_hasher = RO::<P>::h2_init();
     h2_hasher.update(&chall2);
@@ -552,10 +329,9 @@ pub fn faest_sign<C, P, O>(
 
 #[allow(unused_assignments)]
 #[allow(clippy::type_complexity)]
-pub fn faest_verify<C, P, O>(msg: &[u8], pk: &PublicKey<O>, sigma: &[u8]) -> bool
+pub fn faest_verify<P, O>(msg: &[u8], pk: &PublicKey<O>, sigma: &[u8]) -> bool
 where
-    C: Variant,
-    P: PARAM,
+    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
     let lhat = <O::LHATBYTES as Unsigned>::to_usize();
@@ -660,7 +436,7 @@ where
     h2_hasher.finish().read(&mut chall2);
 
     let a_t = &sigma[lhat * (tau - 1) + lambda + 2 + l..lhat * (tau - 1) + 2 * lambda + 2 + l];
-    let b_t = C::verify::<P, O>(
+    let b_t = P::Cypher::verify::<P>(
         GenericArray::from_slice(d),
         &gq.iter()
             .flat_map(|x| {
@@ -671,9 +447,9 @@ where
                             .copied()
                             .collect::<GenericArray<u8, _>>()
                     })
-                    .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
+                    .collect::<Vec<GenericArray<u8, _>>>()
             })
-            .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
+            .collect::<GenericArray<GenericArray<u8, _>, _>>(),
         GenericArray::from_slice(a_t),
         &chall2,
         chall3,
@@ -819,14 +595,18 @@ mod test {
     fn run_faest_test<P: PARAM>() {
         let mut rng = rand::thread_rng();
         for _i in 0..RUNS {
-            let (sk, pk) = <P::OWF as PARAMOWF>::Cypher::keygen_with_rng::<P, P::OWF>(&mut rng);
+            let (sk, pk) = P::Cypher::keygen_with_rng::<P>(&mut rng);
             let msg = random_message(&mut rng);
             let mut sigma = GenericArray::default_boxed();
-            faest_sign::<<P::OWF as PARAMOWF>::Cypher, P, P::OWF>(&msg, &sk, &[], &mut sigma);
-            let res_true =
-                faest_verify::<<P::OWF as PARAMOWF>::Cypher, P, P::OWF>(&msg, &pk, &sigma);
+            faest_sign::<P, P::OWF>(&msg, &sk, &[], &mut sigma);
+            let res_true = faest_verify::<P, P::OWF>(&msg, &pk, &sigma);
             assert!(res_true);
         }
+    }
+
+    #[test]
+    fn faest_aes_test_128f() {
+        run_faest_test::<PARAM128F>();
     }
 
     #[test]
@@ -857,6 +637,11 @@ mod test {
     #[test]
     fn faest_em_test_128s() {
         run_faest_test::<PARAM128SEM>();
+    }
+
+    #[test]
+    fn faest_em_test_128f() {
+        run_faest_test::<PARAM128FEM>();
     }
 
     #[test]
@@ -945,7 +730,7 @@ mod test {
             let msg = data.message;
             let sig = data.sm;
 
-            let keypair = <P::OWF as PARAMOWF>::Cypher::keygen_with_rng::<P, P::OWF>(&mut rng);
+            let keypair = P::Cypher::keygen_with_rng::<P>(&mut rng);
             assert_eq!(data.pk.as_slice(), keypair.1.as_bytes().as_slice());
             assert_eq!(data.sk.as_slice(), keypair.0.as_bytes().as_slice());
 
@@ -953,17 +738,10 @@ mod test {
             rng.fill_bytes(&mut rho);
 
             let mut signature = GenericArray::default_boxed();
-            faest_sign::<<P::OWF as PARAMOWF>::Cypher, P, P::OWF>(
-                &msg,
-                &keypair.0,
-                &rho,
-                &mut signature,
-            );
+            faest_sign::<P, P::OWF>(&msg, &keypair.0, &rho, &mut signature);
             assert_eq!(&sig[..sig.len() - signature.len()], &msg);
             assert_eq!(&sig[sig.len() - signature.len()..], signature.as_slice());
-            assert!(faest_verify::<<P::OWF as PARAMOWF>::Cypher, P, P::OWF>(
-                &msg, &keypair.1, &signature
-            ));
+            assert!(faest_verify::<P, P::OWF>(&msg, &keypair.1, &signature));
         }
     }
 
