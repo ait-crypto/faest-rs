@@ -4,13 +4,13 @@ use generic_array::{
     ArrayLength, GenericArray,
 };
 
-use crate::parameter::TauParameters;
+use crate::parameter::{self, TauParameters};
 
 use std::iter::zip;
 
 use crate::{
     fields::{BigGaloisField, ByteCombine, ByteCombineConstants, Field, SumPoly},
-    parameter::{BaseParameters, TauParameters, PARAM, PARAMOWF},
+    parameter::{BaseParameters, PARAM, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
@@ -813,7 +813,7 @@ where
     let a_t = a_t_hasher.finalize(&u_s);
     let b_t = b_t_hasher.finalize(&v_s);
 
-    (Box::new(a_t.as_bytes()), Box::new(b_t.as_bytes()))
+    (a_t.as_bytes(), b_t.as_bytes())
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
@@ -945,9 +945,9 @@ mod test {
     use serde::Deserialize;
     use std::fs::File;
 
-    type ZkHash256 = Box<GenericArray<u8, <PARAMOWF256 as PARAMOWF>::LAMBDABYTES>>;
-    type ZkHash192 = Box<GenericArray<u8, <PARAMOWF192 as PARAMOWF>::LAMBDABYTES>>;
-    type ZkHash128 = Box<GenericArray<u8, <PARAMOWF128 as PARAMOWF>::LAMBDABYTES>>;
+    type ZkHash256 = GenericArray<u8, <PARAMOWF256 as PARAMOWF>::LAMBDABYTES>;
+    type ZkHash192 = GenericArray<u8, <PARAMOWF192 as PARAMOWF>::LAMBDABYTES>;
+    type ZkHash128 = GenericArray<u8, <PARAMOWF128 as PARAMOWF>::LAMBDABYTES>;
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -2103,8 +2103,8 @@ mod test {
                     GenericArray::from_slice(&data.chall),
                 );
 
-                assert_eq!((res).0, Box::new(*GenericArray::from_slice(&data.at)));
-                assert_eq!((res).1, Box::new(*GenericArray::from_slice(&data.bt)));
+                assert_eq!((res).0, *GenericArray::from_slice(&data.at));
+                assert_eq!((res).1, *GenericArray::from_slice(&data.bt));
             } else if data.lambda == 192 {
                 let mut bitw: Vec<u8> = vec![0; 3264];
                 for i in 0..data.w.len() {
@@ -2127,8 +2127,8 @@ mod test {
                     GenericArray::from_slice(&pk),
                     GenericArray::from_slice(&data.chall),
                 );
-                assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.at)));
-                assert_eq!(res.1, Box::new(*GenericArray::from_slice(&data.bt)));
+                assert_eq!(res.0, *GenericArray::from_slice(&data.at));
+                assert_eq!(res.1, *GenericArray::from_slice(&data.bt));
             } else {
                 let mut bitw: Vec<u8> = vec![0; 4000];
                 for i in 0..data.w.len() {
@@ -2152,8 +2152,8 @@ mod test {
                     GenericArray::from_slice(&pk),
                     GenericArray::from_slice(&data.chall),
                 );
-                assert_eq!(*res.0, *GenericArray::from_slice(&data.at));
-                assert_eq!(*res.1, *GenericArray::from_slice(&data.bt));
+                assert_eq!(res.0, *GenericArray::from_slice(&data.at));
+                assert_eq!(res.1, *GenericArray::from_slice(&data.bt));
             }
         }
     }

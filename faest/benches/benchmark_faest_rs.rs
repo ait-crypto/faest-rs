@@ -1,5 +1,5 @@
 use ::faest::{
-    faest::{faest_sign, faest_verify, sigma_to_signature},
+    faest::{faest_sign, faest_verify},
     parameter::{
         self, PARAM, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM,
         PARAM192S, PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF,
@@ -32,11 +32,16 @@ fn random_message(mut rng: impl RngCore) -> Vec<u8> {
 fn generate_sign_input_aes<C, P, O>() -> KeyInput<O>
 where
     P: PARAM,
-    O: PARAMOWF,
+    O: PARAMOWF
+        + PARAMOWF<LAMBDABYTES = P::LAMBDABYTES>
+        + PARAMOWF<PK = <<P as parameter::PARAM>::OWF as PARAMOWF>::PK>
+        + PARAMOWF<LAMBDA = P::LAMBDA>
+        + PARAMOWF<CHALL = <<P as parameter::PARAM>::OWF as PARAMOWF>::CHALL>
+        + PARAMOWF<LAMBDALBYTES = <<P as parameter::PARAM>::OWF as PARAMOWF>::LAMBDALBYTES>,
     C: Variant<O>,
 {
     let mut rng = rand::thread_rng();
-    let (sk, pk) = C::keygen_with_rng::<P, O>(&mut rng);
+    let (sk, pk) = C::keygen_with_rng::<P>(&mut rng);
     let msg = random_message(&mut rng);
     (
         msg,
@@ -46,7 +51,6 @@ where
         ))
         .clone(),
         (*GenericArray::from_slice(&pk[..<O::PK as Unsigned>::to_usize()])).clone(),
-        (*GenericArray::from_slice(&rho[..<O::LAMBDABYTES as Unsigned>::to_usize()])).clone(),
     )
 }
 
@@ -63,17 +67,16 @@ where
     C: Variant<O>,
 {
     let mut rng = rand::thread_rng();
-    let (sk, pk) = C::keygen_with_rng::<P, O>(&mut rng);
+    let (sk, pk) = C::keygen_with_rng::<P>(&mut rng);
     let msg = random_message(&mut rng);
     (
         msg,
         (*GenericArray::from_slice(&sk[<P::LAMBDA as Unsigned>::to_usize() / 8..])).clone(),
         (*GenericArray::from_slice(&pk)).clone(),
-        (*GenericArray::from_slice(&rho[..<P::LAMBDA as Unsigned>::to_usize() / 8])).clone(),
     )
 }
 
-fn bench_sign<C, P, O>(input: KeyInput<O>) -> Signature<P>
+fn bench_sign<P, O>(input: KeyInput<O>) -> Signature<P>
 where
     P: PARAM,
     O: PARAMOWF
@@ -83,9 +86,8 @@ where
         + PARAMOWF<CHALL = <<P as parameter::PARAM>::OWF as PARAMOWF>::CHALL>
         + PARAMOWF<LAMBDALBYTES = <<P as parameter::PARAM>::OWF as PARAMOWF>::LAMBDALBYTES>,
 
-    C: Variant<O>,
 {
-    faest_sign::<C, P, O>(&input.0, &input.1, &input.2, &[])
+    faest_sign::<P, O>(&input.0, &input.1, &input.2, &[])
 }
 
 fn generate_verify_input_aes<C, P, O>() -> (Vec<u8>, GenericArray<u8, O::PK>, Signature<P>)
@@ -101,17 +103,17 @@ where
     C: Variant<O>,
 {
     let mut rng = rand::thread_rng();
-    let (sk, pk) = C::keygen_with_rng::<P, O>(&mut rng);
+    let (sk, pk) = C::keygen_with_rng::<P>(&mut rng);
     let msg = random_message(&mut rng);
-    let sign = faest_sign::<C, P, O>(
+    let sign = faest_sign::<P, O>(
         &msg,
         GenericArray::from_slice(
             &sk[<O::PK as Unsigned>::to_usize() - <O::LAMBDABYTES as Unsigned>::to_usize()..],
         ),
         GenericArray::from_slice(&pk),
-        &rho[..<O::LAMBDABYTES as Unsigned>::to_usize()],
+        &[],
     );
-    (msg, pk, sign)
+    (msg, *pk, sign)
 }
 
 fn generate_verify_input_em<C, P, O>() -> (Vec<u8>, GenericArray<u8, O::PK>, Signature<P>)
@@ -127,18 +129,18 @@ where
     C: Variant<O>,
 {
     let mut rng = rand::thread_rng();
-    let (sk, pk) = C::keygen_with_rng::<P, O>(&mut rng);
+    let (sk, pk) = C::keygen_with_rng::<P>(&mut rng);
     let msg = random_message(&mut rng);
-    let sign = faest_sign::<C, P, O>(
+    let sign = faest_sign::<P, O>(
         &msg,
         GenericArray::from_slice(&sk[<P::LAMBDA as Unsigned>::to_usize() / 8..]),
         GenericArray::from_slice(&pk),
-        &rho[..<P::LAMBDA as Unsigned>::to_usize() / 8],
+        &[],
     );
-    (msg, pk, sign)
+    (msg, *pk, sign)
 }
 
-fn bench_verify_aes<C, P, O>(input: (Vec<u8>, GenericArray<u8, O::PK>, Signature<P>))
+fn bench_verify_aes<P, O>(input: (Vec<u8>, GenericArray<u8, O::PK>, Signature<P>))
 where
     P: PARAM,
     O: PARAMOWF
@@ -148,12 +150,11 @@ where
         + PARAMOWF<CHALL = <<P as parameter::PARAM>::OWF as PARAMOWF>::CHALL>
         + PARAMOWF<LAMBDALBYTES = <<P as parameter::PARAM>::OWF as PARAMOWF>::LAMBDALBYTES>,
 
-    C: Variant<O>,
 {
-    faest_verify::<P, O>(&input.0, &input.1, &input.2);
+    faest_verify::<P, O>(&input.0, input.1, &input.2);
 }
 
-fn bench_verify_em<C, P, O>(input: (Vec<u8>, GenericArray<u8, O::PK>, Signature<P>))
+fn bench_verify_em<P, O>(input: (Vec<u8>, GenericArray<u8, O::PK>, Signature<P>))
 where
     P: PARAM,
     O: PARAMOWF
@@ -163,49 +164,48 @@ where
         + PARAMOWF<CHALL = <<P as parameter::PARAM>::OWF as PARAMOWF>::CHALL>
         + PARAMOWF<LAMBDALBYTES = <<P as parameter::PARAM>::OWF as PARAMOWF>::LAMBDALBYTES>,
 
-    C: Variant<O>,
 {
-    faest_verify::<P, O>(&input.0, &input.1, &input.2);
+    faest_verify::<P, O>(&input.0, input.1, &input.2);
 }
 
 pub fn faest_benchmark(c: &mut Criterion) {
     let mut rng = rand::thread_rng();
 
     c.bench_function("Keygen aes 128s", |b| {
-        b.iter(|| faest::AesCypher::keygen_with_rng::<PARAM128S>(&mut rng))
+        b.iter(|| AesCypher::<PARAMOWF128>::keygen_with_rng::<PARAM128S>(&mut rng))
     });
     c.bench_function("Keygen aes 128f", |b| {
-        b.iter(|| faest::AesCypher::keygen_with_rng::<PARAM128S>(&mut rng))
+        b.iter(|| AesCypher::<PARAMOWF128>::keygen_with_rng::<PARAM128F>(&mut rng))
     });
     c.bench_function("Keygen aes 192s", |b| {
-        b.iter(|| faest::AesCypher::keygen_with_rng::<PARAM192F>(&mut rng))
+        b.iter(|| AesCypher::<PARAMOWF192>::keygen_with_rng::<PARAM192S>(&mut rng))
     });
     c.bench_function("Keygen aes 192f", |b| {
-        b.iter(|| faest::AesCypher::keygen_with_rng::<PARAM192S>(&mut rng))
+        b.iter(|| AesCypher::<PARAMOWF192>::keygen_with_rng::<PARAM192F>(&mut rng))
     });
     c.bench_function("Keygen aes 256s", |b| {
-        b.iter(|| faest::AesCypher::keygen_with_rng::<PARAM256F>(&mut rng))
+        b.iter(|| AesCypher::<PARAMOWF256>::keygen_with_rng::<PARAM256S>(&mut rng))
     });
     c.bench_function("Keygen aes 256f", |b| {
-        b.iter(|| faest::AesCypher::keygen_with_rng::<PARAM256S>(&mut rng))
+        b.iter(|| AesCypher::<PARAMOWF256>::keygen_with_rng::<PARAM256F>(&mut rng))
     });
     c.bench_function("Keygen em 128s", |b| {
-        b.iter(|| faest::EmCypher::keygen_with_rng::<PARAM128SEM>(&mut rng))
+        b.iter(|| EmCypher::<PARAMOWF128EM>::keygen_with_rng::<PARAM128SEM>(&mut rng))
     });
     c.bench_function("Keygen em 128f", |b| {
-        b.iter(|| faest::EmCypher::keygen_with_rng::<PARAM128FEM>(&mut rng))
+        b.iter(|| EmCypher::<PARAMOWF128EM>::keygen_with_rng::<PARAM128FEM>(&mut rng))
     });
     c.bench_function("Keygen em 192s", |b| {
-        b.iter(|| faest::EmCypher::keygen_with_rng::<PARAM192SEM>(&mut rng))
+        b.iter(|| EmCypher::<PARAMOWF192EM>::keygen_with_rng::<PARAM192SEM>(&mut rng))
     });
     c.bench_function("Keygen em 192f", |b| {
-        b.iter(|| faest::EmCypher::keygen_with_rng::<PARAM192FEM>(&mut rng))
+        b.iter(|| EmCypher::<PARAMOWF192EM>::keygen_with_rng::<PARAM192FEM>(&mut rng))
     });
     c.bench_function("Keygen em 256s", |b| {
-        b.iter(|| faest::EmCypher::keygen_with_rng::<PARAM256SEM>(&mut rng))
+        b.iter(|| EmCypher::<PARAMOWF256EM>::keygen_with_rng::<PARAM256SEM>(&mut rng))
     });
     c.bench_function("Keygen em 256f", |b| {
-        b.iter(|| faest::EmCypher::keygen_with_rng::<PARAM256FEM>(&mut rng))
+        b.iter(|| EmCypher::<PARAMOWF256EM>::keygen_with_rng::<PARAM256FEM>(&mut rng))
     });
     c.bench_function("Sign aes 128s", |b| {
         let input = generate_sign_input_aes::<AesCypher<PARAMOWF128>, PARAM128S, PARAMOWF128>();

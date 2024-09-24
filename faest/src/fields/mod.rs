@@ -7,7 +7,7 @@ use generic_array::{ArrayLength, GenericArray};
 pub use large_fields::{
     BigGaloisField, ByteCombine, ByteCombineConstants, SumPoly, GF128, GF192, GF256,
 };
-pub use small_fields::{GaloisField, GF64, GF8};
+pub use small_fields::GF64;
 
 /// Trait covering the basic functionality of a field
 ///
