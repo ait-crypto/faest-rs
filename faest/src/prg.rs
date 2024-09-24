@@ -12,10 +12,10 @@ type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
 type Aes192Ctr128BE = ctr::Ctr128BE<aes::Aes192>;
 type Aes256Ctr128BE = ctr::Ctr128BE<aes::Aes256>;
 
-pub type IV = [u8; 16];
+pub(crate) type IV = [u8; 16];
 
 /// Interface for the PRG
-pub trait PseudoRandomGenerator: Sized + Reader {
+pub(crate) trait PseudoRandomGenerator: Sized + Reader {
     /// Size of the PRG key
     type Lambda: ArrayLength;
 
@@ -24,7 +24,7 @@ pub trait PseudoRandomGenerator: Sized + Reader {
 }
 
 #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
-pub struct PRG128(Aes128Ctr128BE);
+pub(crate) struct PRG128(Aes128Ctr128BE);
 
 impl PseudoRandomGenerator for PRG128 {
     type Lambda = U16;
@@ -44,7 +44,7 @@ impl Reader for PRG128 {
 }
 
 #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
-pub struct PRG192(Aes192Ctr128BE);
+pub(crate) struct PRG192(Aes192Ctr128BE);
 
 impl PseudoRandomGenerator for PRG192 {
     type Lambda = U24;
@@ -64,7 +64,7 @@ impl Reader for PRG192 {
 }
 
 #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
-pub struct PRG256(Aes256Ctr128BE);
+pub(crate) struct PRG256(Aes256Ctr128BE);
 
 impl PseudoRandomGenerator for PRG256 {
     type Lambda = U32;

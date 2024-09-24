@@ -12,7 +12,7 @@ use crate::{
     utils::Reader,
 };
 
-pub trait RandomOracle {
+pub(crate) trait RandomOracle {
     type Hasher<const SEP: u8>: Hasher + Default;
     // FIXME: get rid of PRG;
     type PRG: PseudoRandomGenerator<Lambda = Self::LAMBDA>;
@@ -43,7 +43,7 @@ pub trait RandomOracle {
 }
 
 /// Interface for hashers associated ot the random oracles
-pub trait Hasher {
+pub(crate) trait Hasher {
     /// Digest reader
     type Reader: Reader;
 
@@ -76,15 +76,15 @@ pub trait Hasher {
     fn finish(self) -> Self::Reader;
 }
 
-pub struct RandomOracleShake128 {}
+pub(crate) struct RandomOracleShake128 {}
 
 /// Hasher based on `SHAKE128`
 #[derive(Debug, Default)]
-pub struct Hasher128<const SEP: u8> {
+pub(crate) struct Hasher128<const SEP: u8> {
     hasher: Shake128,
 }
 
-pub struct Hasher128Reader(Shake128Reader);
+pub(crate) struct Hasher128Reader(Shake128Reader);
 
 impl Reader for Hasher128Reader {
     fn read(&mut self, dst: &mut [u8]) {
@@ -112,7 +112,7 @@ impl<const SEP: u8> Hasher for Hasher128<SEP> {
     }
 }
 
-pub struct RandomOracleShake192 {}
+pub(crate) struct RandomOracleShake192 {}
 
 impl RandomOracle for RandomOracleShake192 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
@@ -134,15 +134,15 @@ impl<const SEP: u8> Hasher for Hasher256<SEP> {
     }
 }
 
-pub struct RandomOracleShake256 {}
+pub(crate) struct RandomOracleShake256 {}
 
 /// Hasher based on SHAKE256
 #[derive(Default)]
-pub struct Hasher256<const SEP: u8> {
+pub(crate) struct Hasher256<const SEP: u8> {
     hasher: Shake256,
 }
 
-pub struct Hasher256Reader(Shake256Reader);
+pub(crate) struct Hasher256Reader(Shake256Reader);
 
 impl Reader for Hasher256Reader {
     fn read(&mut self, dst: &mut [u8]) {
@@ -159,8 +159,6 @@ impl RandomOracle for RandomOracleShake256 {
 
 #[cfg(test)]
 mod test {
-    use generic_array::GenericArray;
-
     use super::*;
 
     //We don't test Random oracle 192 except for prg, since it is the ony thing that distinguish it from Random oracle 256
