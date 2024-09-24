@@ -23,7 +23,7 @@ pub fn em_extendedwitness<P, O>(
     owf_input: &GenericArray<u8, O::InputSize>,
 ) -> (Box<GenericArray<u8, O::LBYTES>>, bool)
 where
-    P: PARAM,
+    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
     let mut valid = true;
@@ -192,7 +192,7 @@ pub fn em_enc_bkwd<P, O>(
     delta: O::Field,
 ) -> Box<GenericArray<O::Field, O::SENC>>
 where
-    P: PARAM,
+    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
     let mut res: Box<GenericArray<O::Field, O::SENC>> = GenericArray::default_boxed();
@@ -252,7 +252,7 @@ pub fn em_enc_cstrnts<P, O>(
     delta: O::Field,
 ) -> Reveal<O>
 where
-    P: PARAM,
+    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
     let lambda = <P::LAMBDA as Unsigned>::to_usize();
@@ -393,7 +393,7 @@ pub fn em_verify<P, O>(
     owf_output: &GenericArray<u8, O::OutputSize>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
 where
-    P: PARAM,
+    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
     let lambda = <P::LAMBDA as Unsigned>::to_usize();

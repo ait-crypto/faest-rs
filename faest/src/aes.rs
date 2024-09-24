@@ -56,7 +56,7 @@ pub fn aes_extendedwitness<P, O>(
     owf_input: &GenericArray<u8, O::InputSize>,
 ) -> (Box<GenericArray<u8, O::LBYTES>>, bool)
 where
-    P: PARAM,
+    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
     let beta = <P::BETA as Unsigned>::to_usize();
@@ -805,7 +805,7 @@ pub fn aes_verify<P, O>(
     owf_output: &GenericArray<u8, O::OutputSize>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
 where
-    P: PARAM,
+    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
     let lambda = O::Field::LENGTH;
