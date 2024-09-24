@@ -13,12 +13,12 @@ use crate::{
 ///# Panics
 ///
 ///If sdi is an None Option
-fn to_vole_convert<R, LH>(
-    sd: &[Option<GenericArray<u8, R::LAMBDA>>],
-    iv: &[u8],
+fn to_vole_convert<PRG, LH>(
+    sd: &[Option<GenericArray<u8, PRG::Lambda>>],
+    iv: &IV,
 ) -> (GenericArray<u8, LH>, Vec<GenericArray<u8, LH>>)
 where
-    R: RandomOracle,
+    PRG: PseudoRandomGenerator,
     LH: ArrayLength,
 {
     // this parameters are known upfront!
@@ -26,11 +26,11 @@ where
     let d = (128 - (n as u128).leading_zeros() - 1) as usize;
     let mut r = vec![GenericArray::<u8, LH>::default(); n * 2];
     if let Some(ref sd0) = sd[0] {
-        let mut prg = R::PRG::new_prg(sd0, iv.try_into().unwrap());
+        let mut prg = PRG::new_prg(sd0, iv);
         prg.read(&mut r[0]);
     }
     for (i, sdi) in sd.iter().enumerate().skip(1).take(n) {
-        let mut prg = R::PRG::new_prg(sdi.as_ref().unwrap(), iv.try_into().unwrap());
+        let mut prg = PRG::new_prg(sdi.as_ref().unwrap(), iv);
         prg.read(&mut r[i]);
     }
 
@@ -109,7 +109,7 @@ where
         let k = ((1 - b) * k0) + b * k1;
         (com[i], decom[i], sd[i]) = commit::<R>(&r[i], iv, 1 << k);
         hasher.update(&com[i]);
-        (u[i], v[i]) = to_vole_convert::<R, P::LH>(&sd[i], iv);
+        (u[i], v[i]) = to_vole_convert::<R::PRG, P::LH>(&sd[i], iv);
     }
     for i in 1..tau {
         c[i - 1] = u[0]
@@ -175,7 +175,7 @@ where
         }
         sd[i][0] = None;
 
-        (_, q[i]) = to_vole_convert::<R, P::LH>(&sd[i], iv);
+        (_, q[i]) = to_vole_convert::<R::PRG, P::LH>(&sd[i], iv);
     }
     let mut hcom: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
     hasher.finish().read(&mut hcom);
@@ -199,7 +199,10 @@ mod test {
             PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
             PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM,
         },
-        random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
+        random_oracles::{
+            RandomOracleShake128, RandomOracleShake192, RandomOracleShake256, PRG128, PRG192,
+            PRG256,
+        },
     };
 
     #[derive(Debug, Deserialize)]
@@ -230,7 +233,7 @@ mod test {
                     opt_sd[0] = None;
                 }
                 type LH = U234;
-                let res = to_vole_convert::<RandomOracleShake128, LH>(&opt_sd, &data.iv);
+                let res = to_vole_convert::<PRG128, LH>(&opt_sd, &data.iv);
                 assert_eq!(res.0, *GenericArray::from_slice(&data.u));
                 assert_eq!(
                     res.1,
@@ -245,7 +248,7 @@ mod test {
                     opt_sd[0] = None;
                 }
                 type LH = U458;
-                let res = to_vole_convert::<RandomOracleShake192, LH>(&opt_sd, &data.iv);
+                let res = to_vole_convert::<PRG192, LH>(&opt_sd, &data.iv);
                 assert_eq!(res.0, *GenericArray::from_slice(&data.u));
                 assert_eq!(
                     res.1,
@@ -260,7 +263,7 @@ mod test {
                     opt_sd[0] = None;
                 }
                 type LH = U566;
-                let res = to_vole_convert::<RandomOracleShake256, LH>(&opt_sd, &data.iv);
+                let res = to_vole_convert::<PRG256, LH>(&opt_sd, &data.iv);
                 assert_eq!(res.0, *GenericArray::from_slice(&data.u));
                 assert_eq!(
                     res.1,
