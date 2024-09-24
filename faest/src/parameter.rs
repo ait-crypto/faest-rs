@@ -29,7 +29,7 @@ use crate::{
         PseudoRandomGenerator, RandomOracle, RandomOracleShake128, RandomOracleShake192,
         RandomOracleShake256, PRG128, PRG192, PRG256,
     },
-    rijndael_32::{rijndael_key_schedule, Rijndael192, Rijndael256},
+    rijndael_32::{Rijndael192, Rijndael256},
     universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
 };
 
@@ -1602,12 +1602,9 @@ impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
     }
 }
 
-pub struct EmCypher<OWF>
+pub struct EmCypher<OWF>(PhantomData<OWF>)
 where
-    OWF: PARAMOWF,
-{
-    _param: OWF,
-}
+    OWF: PARAMOWF;
 
 impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
     fn witness<P>(
