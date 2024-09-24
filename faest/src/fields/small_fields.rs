@@ -12,14 +12,6 @@ use generic_array::{
 
 use super::Field;
 
-/// Marker trait for binary Galois fields up to a size of `2^64`
-pub trait GaloisField<T>: Field
-where
-    Self: From<T> + Copy,
-    T: From<Self>,
-{
-}
-
 trait GaloisFieldHelper<T>
 where
     T: Sized + Copy,
@@ -238,8 +230,6 @@ impl GF8 {
     }
 }
 
-impl GaloisField<u8> for GF8 {}
-
 impl From<&[u8]> for GF64 {
     fn from(value: &[u8]) -> Self {
         let mut array = [0u8; 8];
@@ -258,8 +248,6 @@ impl GF64 {
         res
     }
 }
-
-impl GaloisField<u64> for GF64 {}
 
 #[cfg(test)]
 mod test {

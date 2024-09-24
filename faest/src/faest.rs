@@ -497,75 +497,6 @@ fn sigma_to_signature<'a, P, O>(
     signature.write_all(iv).unwrap();
 }
 
-#[allow(clippy::type_complexity)]
-pub fn signature_to_sigma<P, O>(
-    signature: &[u8],
-) -> (
-    Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>>,
-    &GenericArray<u8, O::LAMBDAPLUS2>,
-    &GenericArray<u8, O::LBYTES>,
-    &GenericArray<u8, O::LAMBDABYTES>,
-    Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>>,
-    &GenericArray<u8, P::LAMBDABYTES>,
-    [u8; 16],
-)
-where
-    P: PARAM,
-    O: PARAMOWF,
-{
-    let mut index = 0;
-    let tau = <P::TAU as Unsigned>::to_usize();
-    let lambda = <P::LAMBDA as Unsigned>::to_usize() / 8;
-    let l = <P::L as Unsigned>::to_usize() / 8;
-    let k0 = <P::K0 as Unsigned>::to_usize();
-    let k1 = <P::K1 as Unsigned>::to_usize();
-    let tau0 = <P::TAU0 as Unsigned>::to_usize();
-    let tau1 = <P::TAU1 as Unsigned>::to_usize();
-    let l_b = l + 2 * lambda + 2;
-    let mut c: Box<GenericArray<GenericArray<u8, O::LHATBYTES>, P::TAUMINUS>> =
-        GenericArray::default_boxed();
-
-    for i in c.iter_mut().take(tau - 1) {
-        for (indice, j) in signature[index..index + l_b].iter().enumerate() {
-            i[indice] = *j;
-        }
-        index += l_b;
-    }
-
-    let u_tilde = GenericArray::from_slice(&signature[index..index + lambda + 2]);
-    index += lambda + 2;
-    let d = GenericArray::from_slice(&signature[index..index + l]);
-    index += l;
-    let a_tilde = GenericArray::from_slice(&signature[index..index + lambda]);
-    index += lambda;
-    let mut pdecom: Box<GenericArray<(Vec<GenericArray<u8, O::LAMBDABYTES>>, Vec<u8>), P::TAU>> =
-        GenericArray::default_boxed();
-    for i in pdecom.iter_mut().take(tau0) {
-        for _j in 0..k0 {
-            i.0.push((GenericArray::from_slice(&signature[index..index + lambda])).clone());
-            index += lambda;
-        }
-        i.1 = signature[index..index + 2 * lambda].to_vec();
-        index += 2 * lambda;
-    }
-    for i in 0..tau1 {
-        for _j in 0..k1 {
-            pdecom[tau0 + i]
-                .0
-                .push(GenericArray::from_slice(&signature[index..index + lambda]).clone());
-            index += lambda;
-        }
-        pdecom[tau0 + i]
-            .1
-            .append(&mut signature[index..index + 2 * lambda].to_vec());
-        index += 2 * lambda;
-    }
-    let chall3 = GenericArray::from_slice(&signature[index..index + lambda]);
-    index += lambda;
-    let iv = signature[index..].try_into().unwrap();
-    (c, u_tilde, d, a_tilde, pdecom, chall3, iv)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -576,8 +507,7 @@ mod test {
 
     use crate::parameter::{
         PARAM, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
-        PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF, PARAMOWF128,
-        PARAMOWF128EM, PARAMOWF192, PARAMOWF192EM, PARAMOWF256, PARAMOWF256EM,
+        PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF,
     };
 
     const RUNS: usize = 10;
