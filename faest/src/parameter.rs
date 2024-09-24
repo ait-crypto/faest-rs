@@ -176,7 +176,7 @@ pub trait PARAMOWF {
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]);
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PARAMOWF128;
 
 impl PARAMOWF for PARAMOWF128 {
@@ -274,7 +274,7 @@ impl PARAMOWF for PARAMOWF128 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PARAMOWF192;
 
 impl PARAMOWF for PARAMOWF192 {
@@ -376,7 +376,7 @@ impl PARAMOWF for PARAMOWF192 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PARAMOWF256;
 
 impl PARAMOWF for PARAMOWF256 {
@@ -478,7 +478,7 @@ impl PARAMOWF for PARAMOWF256 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PARAMOWF128EM;
 
 impl PARAMOWF for PARAMOWF128EM {
@@ -576,7 +576,7 @@ impl PARAMOWF for PARAMOWF128EM {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PARAMOWF192EM;
 
 impl PARAMOWF for PARAMOWF192EM {
@@ -675,7 +675,7 @@ impl PARAMOWF for PARAMOWF192EM {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PARAMOWF256EM;
 
 impl PARAMOWF for PARAMOWF256EM {
