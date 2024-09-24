@@ -226,7 +226,7 @@ impl Variant for EmCypher {
     }
 }
 
-type RO<O> = <<O as PARAMOWF>::BaseParams as BaseParameters>::RandomOracle;
+type RO<P> = <<<P as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::RandomOracle;
 
 ///input : Message (an array of bytes), sk : secret key, pk : public key, rho : lambda bits
 ///
@@ -253,14 +253,14 @@ where
     let tau = <P::TAU as Unsigned>::to_usize();
     let t0 = <P::TAU0 as Unsigned>::to_usize();
 
-    let mut h1_hasher = RO::<O>::h1_init();
+    let mut h1_hasher = RO::<P>::h1_init();
     h1_hasher.update(pk);
     h1_hasher.update(msg);
     let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
         GenericArray::default();
     h1_hasher.finish().read(&mut mu);
 
-    let mut h3_hasher = RO::<O>::h3_init();
+    let mut h3_hasher = RO::<P>::h3_init();
     h3_hasher.update(sk);
     h3_hasher.update(&mu);
     h3_hasher.update(rho);
@@ -271,7 +271,7 @@ where
     h3_reader.read(&mut r);
     h3_reader.read(&mut iv);
 
-    let (hcom, decom, c, u, gv) = volecommit::<P, RO<O>>(&r, &iv);
+    let (hcom, decom, c, u, gv) = volecommit::<P, RO<P>>(&r, &iv);
     let mut h2_hasher = RO::<O>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
@@ -295,7 +295,7 @@ where
     let w = C::witness::<P, O>(sk, pk);
     let d = GenericArray::<u8, O::LBYTES>::from_iter(zip(w.iter(), &u[..l]).map(|(w, u)| w ^ *u));
 
-    let mut h2_hasher = RO::<O>::h2_init();
+    let mut h2_hasher = RO::<P>::h2_init();
     h2_hasher.update(&chall1);
     h2_hasher.update(&u_t);
     h2_hasher.update(&hv);
@@ -322,7 +322,7 @@ where
 
     let (a_t, b_t) = C::prove::<P, O>(&w, new_u, &new_gv, pk, &chall2);
 
-    let mut h2_hasher = RO::<O>::h2_init();
+    let mut h2_hasher = RO::<P>::h2_init();
     h2_hasher.update(&chall2);
     h2_hasher.update(&a_t);
     h2_hasher.update(&b_t);
@@ -337,9 +337,9 @@ where
         (0..tau).map(|i| {
             let s = P::Tau::decode_challenge(&chall3, i);
             if i < t0 {
-                open::<RO<O>, P::POWK0, P::K0, P::N0>(&decom[i], GenericArray::from_slice(&s))
+                open::<RO<P>, P::POWK0, P::K0, P::N0>(&decom[i], GenericArray::from_slice(&s))
             } else {
-                open::<RO<O>, P::POWK1, P::K1, P::N1>(&decom[i], GenericArray::from_slice(&s))
+                open::<RO<P>, P::POWK1, P::K1, P::N1>(&decom[i], GenericArray::from_slice(&s))
             }
         }),
         &chall3,
@@ -362,20 +362,20 @@ where
     let tau = <P::TAU as Unsigned>::to_usize();
 
     let chall3 = GenericArray::from_slice(&sigma[sig - (16 + lambda)..sig - 16]);
-    let mut h1_hasher = RO::<O>::h1_init();
+    let mut h1_hasher = RO::<P>::h1_init();
     h1_hasher.update(pk);
     h1_hasher.update(msg);
     let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
         GenericArray::default();
     h1_hasher.finish().read(&mut mu);
-    let (hcom, gq_p) = volereconstruct::<RO<O>, P>(
+    let (hcom, gq_p) = volereconstruct::<RO<P>, P>(
         chall3,
         &sigma[(lhat * (tau - 1)) + (2 * lambda) + l + 2..sig - (16 + lambda)],
         &sigma[sig - 16..].try_into().unwrap(),
     );
 
     let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
-    let mut h2_hasher = RO::<O>::h2_init();
+    let mut h2_hasher = RO::<P>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
     let c = &sigma[..lhat * (tau - 1)];
@@ -438,7 +438,7 @@ where
         .iter()
         .flat_map(|q| q.iter().map(|q| vole_hasher.process(q)));
 
-    let mut h1_hasher = RO::<O>::h1_init();
+    let mut h1_hasher = RO::<P>::h1_init();
     zip(gq_t, gd_t.into_iter().flatten())
         .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d))
         .for_each(|v| h1_hasher.update(&[v]));
@@ -476,7 +476,7 @@ where
         pk,
     );
 
-    let mut h2_hasher = RO::<O>::h2_init();
+    let mut h2_hasher = RO::<P>::h2_init();
     h2_hasher.update(&chall2);
     h2_hasher.update(a_t);
     h2_hasher.update(&b_t);
