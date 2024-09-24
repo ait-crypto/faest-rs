@@ -18,16 +18,15 @@ type Reveal<O> = (
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>,
 );
 
-pub fn em_extendedwitness<P, O>(
+pub fn em_extendedwitness<O>(
     owf_key: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
 ) -> (Box<GenericArray<u8, O::LBYTES>>, bool)
 where
-    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
     let mut valid = true;
-    let lambda = <P::LAMBDA as Unsigned>::to_usize() / 8;
+    let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
     let nst = <O::NST as Unsigned>::to_usize();
     let r = <O::R as Unsigned>::to_usize();
     let kc = <O::NK as Unsigned>::to_u8();
@@ -505,7 +504,7 @@ mod test {
             serde_json::from_reader(file).expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
-                let res = em_extendedwitness::<PARAM128SEM, PARAMOWF128EM>(
+                let res = em_extendedwitness::<PARAMOWF128EM>(
                     GenericArray::from_slice(&data.key),
                     GenericArray::from_slice(
                         &data.input[..<PARAMOWF128EM as PARAMOWF>::InputSize::USIZE],
@@ -513,7 +512,7 @@ mod test {
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
             } else if data.lambda == 192 {
-                let res = em_extendedwitness::<PARAM192SEM, PARAMOWF192EM>(
+                let res = em_extendedwitness::<PARAMOWF192EM>(
                     GenericArray::from_slice(&data.key),
                     GenericArray::from_slice(
                         &data.input[..<PARAMOWF192EM as PARAMOWF>::InputSize::USIZE],
@@ -521,7 +520,7 @@ mod test {
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
             } else {
-                let res = em_extendedwitness::<PARAM256SEM, PARAMOWF256EM>(
+                let res = em_extendedwitness::<PARAMOWF256EM>(
                     GenericArray::from_slice(&data.key),
                     GenericArray::from_slice(
                         &data.input[..<PARAMOWF256EM as PARAMOWF>::InputSize::USIZE],

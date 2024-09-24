@@ -51,15 +51,14 @@ where
 }
 
 //The first member of the tuples are the effectives witness while the second is the validity according Faest requiremenbt of the keypair at the origin of the operation
-pub fn aes_extendedwitness<P, O>(
+pub fn aes_extendedwitness<O>(
     owf_key: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
 ) -> (Box<GenericArray<u8, O::LBYTES>>, bool)
 where
-    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
-    let beta = <P::BETA as Unsigned>::to_usize();
+    let beta = <O::BETA as Unsigned>::to_usize();
     let kblen = <O::KBLENGTH as Unsigned>::to_usize();
     let bc = 4;
     let r = <O::R as Unsigned>::to_u8();
@@ -120,7 +119,7 @@ where
     }
     //step 5
     for b in 0..beta {
-        round_with_save::<O>(
+        round_with_save(
             input[16 * b..16 * (b + 1)].try_into().unwrap(),
             [0; 16],
             kb,
@@ -165,17 +164,15 @@ where
 } */
 
 #[allow(clippy::too_many_arguments)]
-fn round_with_save<O>(
+fn round_with_save(
     input1: [u8; 16],
     input2: [u8; 16],
     kb: &[u32],
     r: u8,
-    w: &mut GenericArray<u8, O::LBYTES>,
+    w: &mut [u8],
     index: &mut usize,
     valid: &mut bool,
-) where
-    O: PARAMOWF,
-{
+) {
     let mut state = State::default();
     bitslice(&mut state, &input1, &input2);
     rijndael_add_round_key(&mut state, &kb[..8]);
@@ -938,7 +935,7 @@ mod test {
             serde_json::from_reader(file).expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
-                let res = aes_extendedwitness::<PARAM128S, PARAMOWF128>(
+                let res = aes_extendedwitness::<PARAMOWF128>(
                     GenericArray::from_slice(&data.key),
                     GenericArray::from_slice(
                         &data.input[..<PARAMOWF128 as PARAMOWF>::InputSize::USIZE],
@@ -946,7 +943,7 @@ mod test {
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
             } else if data.lambda == 192 {
-                let res = aes_extendedwitness::<PARAM192S, PARAMOWF192>(
+                let res = aes_extendedwitness::<PARAMOWF192>(
                     GenericArray::from_slice(&data.key),
                     GenericArray::from_slice(
                         &data.input[..<PARAMOWF192 as PARAMOWF>::InputSize::USIZE],
@@ -954,7 +951,7 @@ mod test {
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
             } else {
-                let res = aes_extendedwitness::<PARAM256S, PARAMOWF256>(
+                let res = aes_extendedwitness::<PARAMOWF256>(
                     GenericArray::from_slice(&data.key),
                     GenericArray::from_slice(
                         &data.input[..<PARAMOWF256 as PARAMOWF>::InputSize::USIZE],

@@ -200,12 +200,13 @@ where
 
 type RO<P> = <<<P as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::RandomOracle;
 
-pub fn faest_keygen<P, R>(rng: R) -> Key<P::OWF>
+#[inline]
+pub(crate) fn faest_keygen<P, R>(rng: R) -> Key<P::OWF>
 where
     P: PARAM,
     R: CryptoRngCore,
 {
-    P::Cypher::keygen_with_rng::<P>(rng)
+    P::Cypher::keygen_with_rng(rng)
 }
 
 ///input : Message (an array of bytes), sk : secret key, pk : public key, rho : lambda bits
@@ -218,7 +219,7 @@ where
 #[allow(clippy::needless_range_loop)]
 #[allow(clippy::type_complexity)]
 #[allow(clippy::unnecessary_to_owned)]
-pub fn faest_sign<P, O>(
+pub(crate) fn faest_sign<P, O>(
     msg: &[u8],
     sk: &SecretKey<O>,
     rho: &[u8],
@@ -270,7 +271,7 @@ pub fn faest_sign<P, O>(
         GenericArray::default();
     h1_hasher.finish().read(&mut hv);
 
-    let w = P::Cypher::witness::<P>(&sk.owf_key, &sk.owf_input);
+    let w = P::Cypher::witness(&sk.owf_key, &sk.owf_input);
     let d = GenericArray::<u8, O::LBYTES>::from_iter(zip(w.iter(), &u[..l]).map(|(w, u)| w ^ *u));
 
     let mut h2_hasher = RO::<P>::h2_init();
@@ -329,7 +330,7 @@ pub fn faest_sign<P, O>(
 
 #[allow(unused_assignments)]
 #[allow(clippy::type_complexity)]
-pub fn faest_verify<P, O>(msg: &[u8], pk: &PublicKey<O>, sigma: &[u8]) -> bool
+pub(crate) fn faest_verify<P, O>(msg: &[u8], pk: &PublicKey<O>, sigma: &[u8]) -> bool
 where
     P: PARAM<OWF = O>,
     O: PARAMOWF,
@@ -526,7 +527,7 @@ mod test {
     fn run_faest_test<P: PARAM>() {
         let mut rng = rand::thread_rng();
         for _i in 0..RUNS {
-            let (sk, pk) = P::Cypher::keygen_with_rng::<P>(&mut rng);
+            let (sk, pk) = P::Cypher::keygen_with_rng(&mut rng);
             let msg = random_message(&mut rng);
             let mut sigma = GenericArray::default_boxed();
             faest_sign::<P, P::OWF>(&msg, &sk, &[], &mut sigma);
@@ -661,7 +662,7 @@ mod test {
             let msg = data.message;
             let sig = data.sm;
 
-            let keypair = P::Cypher::keygen_with_rng::<P>(&mut rng);
+            let keypair = P::Cypher::keygen_with_rng(&mut rng);
             assert_eq!(data.pk.as_slice(), keypair.1.as_bytes().as_slice());
             assert_eq!(data.sk.as_slice(), keypair.0.as_bytes().as_slice());
 

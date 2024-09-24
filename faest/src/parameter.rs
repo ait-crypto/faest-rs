@@ -118,12 +118,10 @@ pub(crate) type QSProof<O> = (
 );
 
 pub(crate) trait Variant<O: PARAMOWF> {
-    fn witness<P>(
+    fn witness(
         owf_key: &GenericArray<u8, O::LAMBDABYTES>,
         owf_input: &GenericArray<u8, O::InputSize>,
-    ) -> Box<GenericArray<u8, O::LBYTES>>
-    where
-        P: PARAM<OWF = O>;
+    ) -> Box<GenericArray<u8, O::LBYTES>>;
 
     ///input : witness of l bits, masking values (l+lambda in aes, lambda in em), Vole tag ((l + lambda) *lambda bits), public key, chall(3lambda + 64)
     ///Output : QuickSilver response (Lambda bytes)
@@ -154,9 +152,7 @@ pub(crate) trait Variant<O: PARAMOWF> {
 
     ///input : a random number generator
     /// output = pk : input, output; sk : input, key
-    fn keygen_with_rng<P>(rng: impl RngCore) -> Key<O>
-    where
-        P: PARAM<OWF = O>;
+    fn keygen_with_rng(rng: impl RngCore) -> Key<O>;
 }
 
 pub(crate) trait PARAMOWF {
@@ -1506,14 +1502,11 @@ where
     OWF: PARAMOWF;
 
 impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
-    fn witness<P>(
+    fn witness(
         owf_key: &GenericArray<u8, OWF::LAMBDABYTES>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
-    ) -> Box<GenericArray<u8, OWF::LBYTES>>
-    where
-        P: PARAM<OWF = OWF>,
-    {
-        aes_extendedwitness::<P, OWF>(owf_key, owf_input).0
+    ) -> Box<GenericArray<u8, OWF::LBYTES>> {
+        aes_extendedwitness::<OWF>(owf_key, owf_input).0
     }
 
     fn prove<P>(
@@ -1547,10 +1540,7 @@ impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
 
     ///Input : the parameter of the faest protocol
     /// Output : sk : inputOWF||keyOWF, pk : inputOWF||outputOWF
-    fn keygen_with_rng<P>(mut rng: impl RngCore) -> Key<OWF>
-    where
-        P: PARAM<OWF = OWF>,
-    {
+    fn keygen_with_rng(mut rng: impl RngCore) -> Key<OWF> {
         loop {
             // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
             let mut sk: GenericArray<u8, OWF::SK> = GenericArray::default();
@@ -1559,7 +1549,7 @@ impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
             let owf_input = GenericArray::from_slice(&sk[..OWF::InputSize::USIZE]);
             let owf_key = GenericArray::from_slice(&sk[OWF::InputSize::USIZE..]);
 
-            let test = aes_extendedwitness::<P, OWF>(owf_key, owf_input).1;
+            let test = aes_extendedwitness::<OWF>(owf_key, owf_input).1;
             if !test {
                 continue;
             }
@@ -1587,14 +1577,11 @@ where
     OWF: PARAMOWF;
 
 impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
-    fn witness<P>(
+    fn witness(
         owf_key: &GenericArray<u8, OWF::LAMBDABYTES>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
-    ) -> Box<GenericArray<u8, OWF::LBYTES>>
-    where
-        P: PARAM<OWF = OWF>,
-    {
-        em_extendedwitness::<P, OWF>(owf_key, owf_input).0
+    ) -> Box<GenericArray<u8, OWF::LBYTES>> {
+        em_extendedwitness::<OWF>(owf_key, owf_input).0
     }
 
     fn prove<P>(
@@ -1626,10 +1613,7 @@ impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
         em_verify::<P, OWF>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
     }
 
-    fn keygen_with_rng<P>(mut rng: impl RngCore) -> Key<OWF>
-    where
-        P: PARAM<OWF = OWF>,
-    {
+    fn keygen_with_rng(mut rng: impl RngCore) -> Key<OWF> {
         loop {
             // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
             let mut sk: GenericArray<u8, OWF::SK> = GenericArray::default();
@@ -1638,7 +1622,7 @@ impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
             let owf_input = GenericArray::from_slice(&sk[..OWF::InputSize::USIZE]);
             let owf_key = GenericArray::from_slice(&sk[OWF::InputSize::USIZE..]);
 
-            let test = em_extendedwitness::<P, OWF>(owf_key, owf_input).1;
+            let test = em_extendedwitness::<OWF>(owf_key, owf_input).1;
             if !test {
                 continue;
             }
