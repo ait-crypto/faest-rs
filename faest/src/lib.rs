@@ -16,9 +16,11 @@ mod em;
 mod faest;
 mod fields;
 mod parameter;
+mod prg;
 mod random_oracles;
 mod rijndael_32;
 mod universal_hashing;
+mod utils;
 mod vc;
 mod vole;
 

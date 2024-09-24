@@ -1,11 +1,10 @@
-use std::iter::zip;
-
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
 use crate::{
     parameter::{TauParameters, PARAM},
-    random_oracles::{Hasher, Reader, IV},
-    random_oracles::{PseudoRandomGenerator, RandomOracle},
+    prg::{PseudoRandomGenerator, IV},
+    random_oracles::{Hasher, RandomOracle},
+    utils::Reader,
     vc::{commit, reconstruct},
 };
 
@@ -109,7 +108,7 @@ where
         let k = ((1 - b) * k0) + b * k1;
         (com[i], decom[i], sd[i]) = commit::<R>(&r[i], iv, 1 << k);
         hasher.update(&com[i]);
-        (u[i], v[i]) = to_vole_convert::<R::PRG, P::LH>(&sd[i], iv);
+        (u[i], v[i]) = to_vole_convert::<R::PRG, _>(&sd[i], iv);
     }
     for i in 1..tau {
         c[i - 1] = u[0]
@@ -199,10 +198,8 @@ mod test {
             PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
             PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM,
         },
-        random_oracles::{
-            RandomOracleShake128, RandomOracleShake192, RandomOracleShake256, PRG128, PRG192,
-            PRG256,
-        },
+        prg::{PRG128, PRG192, PRG256},
+        random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
     };
 
     #[derive(Debug, Deserialize)]
@@ -280,23 +277,14 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct DataVoleCommit {
         r: Vec<u8>,
-
         iv: [u8; 16],
-
         lambdabytes: [u16; 1],
-
         k0: [u8; 1],
-
         hcom: Vec<u8>,
-
         k: Vec<Vec<Vec<u8>>>,
-
         com: Vec<Vec<Vec<u8>>>,
-
         c: Vec<Vec<u8>>,
-
         u: Vec<u8>,
-
         v: Vec<Vec<Vec<u8>>>,
     }
 
@@ -984,15 +972,10 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct DataVoleReconstruct {
         chal: Vec<u8>,
-
         pdec: Vec<Vec<Vec<u8>>>,
-
         com: Vec<Vec<u8>>,
-
         iv: [u8; 16],
-
         hcom: Vec<u8>,
-
         q: Vec<Vec<Vec<u8>>>,
     }
 

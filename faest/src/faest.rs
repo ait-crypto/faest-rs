@@ -2,8 +2,10 @@ use std::{fmt, io::Write, iter::zip, marker::PhantomData};
 
 use crate::{
     parameter::{BaseParameters, TauParameters, Variant, PARAM, PARAMOWF},
-    random_oracles::{Hasher, RandomOracle, Reader, IV},
+    prg::IV,
+    random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
+    utils::Reader,
     vc::open,
     vole::{volecommit, volereconstruct},
 };
@@ -227,8 +229,6 @@ pub fn faest_sign<P, O>(
 {
     let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
     let l = <P::L as Unsigned>::to_usize() / 8;
-    let tau = <P::TAU as Unsigned>::to_usize();
-    let t0 = <P::TAU0 as Unsigned>::to_usize();
 
     let mut h1_hasher = RO::<P>::h1_init();
     h1_hasher.update(&sk.owf_input);
@@ -313,9 +313,9 @@ pub fn faest_sign<P, O>(
         &u_t,
         &d,
         a_t.as_slice(),
-        (0..tau).map(|i| {
+        (0..<P::Tau as TauParameters>::Tau::USIZE).map(|i| {
             let s = P::Tau::decode_challenge(&chall3, i);
-            if i < t0 {
+            if i < <P::Tau as TauParameters>::Tau0::USIZE {
                 open::<RO<P>, P::POWK0, P::K0, P::N0>(&decom[i], GenericArray::from_slice(&s))
             } else {
                 open::<RO<P>, P::POWK1, P::K1, P::N1>(&decom[i], GenericArray::from_slice(&s))
@@ -338,7 +338,6 @@ where
     let sig = <P::SIG as Unsigned>::to_usize();
     let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
     let l = <P::L as Unsigned>::to_usize() / 8;
-    let tau = <P::TAU as Unsigned>::to_usize();
 
     let chall3 = GenericArray::from_slice(&sigma[sig - (16 + lambda)..sig - 16]);
     let mut h1_hasher = RO::<P>::h1_init();
@@ -350,7 +349,8 @@ where
     h1_hasher.finish().read(&mut mu);
     let (hcom, gq_p) = volereconstruct::<RO<P>, P>(
         chall3,
-        &sigma[(lhat * (tau - 1)) + (2 * lambda) + l + 2..sig - (16 + lambda)],
+        &sigma[(lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)) + (2 * lambda) + l + 2
+            ..sig - (16 + lambda)],
         &sigma[sig - 16..].try_into().unwrap(),
     );
 
@@ -358,7 +358,7 @@ where
     let mut h2_hasher = RO::<P>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
-    let c = &sigma[..lhat * (tau - 1)];
+    let c = &sigma[..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)];
 
     h2_hasher.update(c);
     h2_hasher.update(&sigma[sig - 16..]);
@@ -368,13 +368,15 @@ where
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let def = GenericArray::default();
     let def2 = GenericArray::default();
-    let mut gq: Box<GenericArray<Vec<GenericArray<u8, <P as PARAM>::LH>>, P::TAU>> =
-        GenericArray::default_boxed();
+    let mut gq: Box<
+        GenericArray<Vec<GenericArray<u8, <P as PARAM>::LH>>, <P::Tau as TauParameters>::Tau>,
+    > = GenericArray::default_boxed();
     let mut gd_t: Box<GenericArray<Vec<&GenericArray<u8, O::LAMBDAPLUS2>>, O::LAMBDALBYTES>> =
         GenericArray::default_boxed();
     gq[0] = gq_p[0].clone();
     let delta0 = P::Tau::decode_challenge(chall3, 0);
-    let u_t = &sigma[lhat * (tau - 1)..lhat * (tau - 1) + lambda + 2];
+    let u_t = &sigma[lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+        ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + lambda + 2];
     gd_t[0] = delta0
         .iter()
         .map(|d| {
@@ -385,7 +387,7 @@ where
             }
         })
         .collect();
-    for i in 1..tau {
+    for i in 1..<P::Tau as TauParameters>::Tau::USIZE {
         /* ok */
         let delta = P::Tau::decode_challenge(chall3, i);
         gd_t[i] = delta
@@ -426,7 +428,8 @@ where
         GenericArray::default();
     h1_hasher.finish().read(&mut hv);
 
-    let d = &sigma[lhat * (tau - 1) + lambda + 2..lhat * (tau - 1) + lambda + 2 + l];
+    let d = &sigma[lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + lambda + 2
+        ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + lambda + 2 + l];
     let mut chall2 = GenericArray::<u8, O::CHALL>::default();
     let mut h2_hasher = RO::<P>::h2_init();
     h2_hasher.update(&chall1);
@@ -435,7 +438,8 @@ where
     h2_hasher.update(d);
     h2_hasher.finish().read(&mut chall2);
 
-    let a_t = &sigma[lhat * (tau - 1) + lambda + 2 + l..lhat * (tau - 1) + 2 * lambda + 2 + l];
+    let a_t = &sigma[lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + lambda + 2 + l
+        ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + 2 * lambda + 2 + l];
     let b_t = P::Cypher::verify::<P>(
         GenericArray::from_slice(d),
         &gq.iter()

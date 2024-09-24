@@ -1,6 +1,10 @@
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
-use crate::random_oracles::{Hasher, PseudoRandomGenerator, RandomOracle, Reader, IV};
+use crate::{
+    prg::{PseudoRandomGenerator, IV},
+    random_oracles::{Hasher, RandomOracle},
+    utils::Reader,
+};
 
 type Decom<R> = (
     Vec<GenericArray<u8, <R as RandomOracle>::LAMBDA>>,

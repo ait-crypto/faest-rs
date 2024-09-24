@@ -25,9 +25,9 @@ use crate::{
     em::{em_extendedwitness, em_prove, em_verify},
     faest::{Key, PublicKey, SecretKey},
     fields::{BigGaloisField, Field, GF128, GF192, GF256},
+    prg::{PseudoRandomGenerator, PRG128, PRG192, PRG256},
     random_oracles::{
-        PseudoRandomGenerator, RandomOracle, RandomOracleShake128, RandomOracleShake192,
-        RandomOracleShake256, PRG128, PRG192, PRG256,
+        RandomOracle, RandomOracleShake128, RandomOracleShake192, RandomOracleShake256,
     },
     rijndael_32::{Rijndael192, Rijndael256},
     universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
