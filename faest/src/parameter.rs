@@ -12,9 +12,9 @@ use generic_array::{
     typenum::{
         Diff, Double, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1024, U11, U112, U12, U128, U14,
         U142, U152, U16, U160, U16384, U176, U192, U194, U2, U200, U2048, U22, U224, U234, U24,
-        U256, U288, U3, U32, U338, U352, U384, U4, U40, U408, U4096, U416, U448, U458, U470, U476,
-        U48, U5, U500, U511, U512, U514, U52, U544, U56, U566, U576, U584, U596, U6, U600, U64,
-        U640, U672, U7, U704, U752, U8, U8192, U832, U96,
+        U256, U288, U3, U32, U338, U384, U4, U40, U408, U4096, U416, U448, U458, U470, U476, U48,
+        U5, U500, U511, U512, U514, U52, U56, U566, U576, U584, U596, U6, U600, U64, U640, U672,
+        U7, U704, U752, U8, U8192, U832, U96,
     },
     ArrayLength, GenericArray,
 };
@@ -186,7 +186,6 @@ pub(crate) trait PARAMOWF {
     type InputSize: ArrayLength;
     type OutputSize: ArrayLength;
 
-    type XK: ArrayLength;
     type LAMBDA: ArrayLength;
     type LAMBDABYTES: ArrayLength;
     type L: ArrayLength;
@@ -195,7 +194,6 @@ pub(crate) trait PARAMOWF {
     type R: ArrayLength;
     type SKE: ArrayLength;
     type SENC: ArrayLength;
-    type QUOTSENC4: ArrayLength;
     type LKE: ArrayLength;
     type LENC: ArrayLength;
     type QUOTLENC8: ArrayLength;
@@ -306,13 +304,9 @@ impl PARAMOWF for PARAMOWF128 {
 
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
 
-    type QUOTSENC4 = Quot<Self::SENC, U4>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
-
-    type XK = Sum<U1024, U160>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes128Enc::new(GenericArray_AES::from_slice(key));
@@ -402,13 +396,9 @@ impl PARAMOWF for PARAMOWF192 {
 
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
 
-    type QUOTSENC4 = Quot<Self::SENC, U4>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
-
-    type XK = Sum<U1024, U352>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes192Enc::new(GenericArray_AES::from_slice(key));
@@ -502,13 +492,9 @@ impl PARAMOWF for PARAMOWF256 {
 
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
 
-    type QUOTSENC4 = Quot<Self::SENC, U4>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
-
-    type XK = Sum<U1024, U544>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes256Enc::new(GenericArray_AES::from_slice(key));
@@ -602,12 +588,9 @@ impl PARAMOWF for PARAMOWF128EM {
 
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
 
-    type QUOTSENC4 = Quot<Self::SENC, U4>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
-    type XK = Sum<U1024, U160>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes128Enc::new(GenericArray_AES::from_slice(input));
@@ -698,13 +681,9 @@ impl PARAMOWF for PARAMOWF192EM {
 
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
 
-    type QUOTSENC4 = Quot<Self::SENC, U4>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
-
-    type XK = Sum<U1024, U160>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Rijndael192::new(GenericArray_AES::from_slice(input));
@@ -795,13 +774,9 @@ impl PARAMOWF for PARAMOWF256EM {
 
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
 
-    type QUOTSENC4 = Quot<Self::SENC, U4>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
 
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
-
-    type XK = Sum<U1024, U160>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Rijndael256::new(GenericArray_AES::from_slice(input));
