@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
 use crate::{
@@ -6,129 +8,168 @@ use crate::{
     utils::Reader,
 };
 
-type Decom<R> = (
-    Vec<GenericArray<u8, <R as RandomOracle>::LAMBDA>>,
-    Vec<GenericArray<u8, <R as RandomOracle>::PRODLAMBDA2>>,
-);
+type Decom<L, L2> = (Vec<GenericArray<u8, L>>, Vec<GenericArray<u8, L2>>);
 
-#[allow(clippy::type_complexity)]
-pub fn commit<R>(
-    r: &GenericArray<u8, R::LAMBDA>,
-    iv: &IV,
-    n: usize,
-) -> (
-    GenericArray<u8, R::PRODLAMBDA2>,
-    (
-        Vec<GenericArray<u8, R::LAMBDA>>,
-        Vec<GenericArray<u8, R::PRODLAMBDA2>>,
-    ),
-    Vec<GenericArray<u8, R::LAMBDA>>,
-)
-where
-    R: RandomOracle,
-{
-    let mut k = vec![GenericArray::default(); 2 * n - 1];
-    //step 2..3
-    k[0].copy_from_slice(r);
+pub(crate) trait VectorCommitment {
+    type Lambda: ArrayLength;
+    type LambdaTimes2: ArrayLength;
+    type PRG: PseudoRandomGenerator<Lambda = Self::Lambda>;
+    type RO: RandomOracle;
 
-    for i in 0..n - 1 {
-        let mut prg = R::PRG::new_prg(&k[i], iv);
-        prg.read(&mut k[2 * i + 1]);
-        prg.read(&mut k[2 * i + 2]);
-    }
-    //step 4..5
-    let mut h1_hasher = R::h1_init();
-    let mut sd = vec![GenericArray::default(); n];
-    let mut com = vec![GenericArray::default(); n];
-    for j in 0..n {
-        let mut h0_hasher = R::h0_init();
-        h0_hasher.update(&k[n - 1 + j]);
-        h0_hasher.update(iv);
-        let mut reader = h0_hasher.finish();
-        reader.read(&mut sd[j]);
-        reader.read(&mut com[j]);
-        h1_hasher.update(&com[j]);
-    }
-    //step 6
-    let mut h = GenericArray::default();
-    let mut reader = h1_hasher.finish();
-    reader.read(&mut h);
-    (h, (k, com), sd)
+    fn commit(
+        r: &GenericArray<u8, Self::Lambda>,
+        iv: &IV,
+        n: usize,
+    ) -> (
+        GenericArray<u8, Self::LambdaTimes2>,
+        (
+            Vec<GenericArray<u8, Self::Lambda>>,
+            Vec<GenericArray<u8, Self::LambdaTimes2>>,
+        ),
+        Vec<GenericArray<u8, Self::Lambda>>,
+    );
+
+    fn open<DPOW /*2N - 1 */, D, N>(
+        decom: &Decom<Self::Lambda, Self::LambdaTimes2>,
+        b: &GenericArray<u8, D>,
+    ) -> (Vec<GenericArray<u8, Self::Lambda>>, Vec<u8>)
+    where
+        D: ArrayLength;
+
+    fn reconstruct(
+        pdecom: &[u8],
+        b: &[u8],
+        iv: &IV,
+    ) -> (
+        GenericArray<u8, Self::LambdaTimes2>,
+        Vec<GenericArray<u8, Self::Lambda>>,
+    );
 }
 
-pub fn open<R, DPOW /*2N - 1 */, D, N>(
-    decom: &Decom<R>,
-    b: &GenericArray<u8, D>,
-) -> (Vec<GenericArray<u8, R::LAMBDA>>, Vec<u8>)
+pub(crate) struct VC<PRG, R>(PhantomData<PRG>, PhantomData<R>)
 where
-    R: RandomOracle,
-    D: ArrayLength,
-{
-    let mut a = 0;
-    let d = (usize::BITS - decom.0.len().leading_zeros() - 1) as usize;
-    let mut cop = Vec::with_capacity(d);
-    //step 4
+    PRG: PseudoRandomGenerator,
+    R: RandomOracle;
 
-    for i in 0..d {
-        cop.push(decom.0[(1 << (i + 1)) + 2 * a + (1 - b[d - i - 1] as usize) - 1].clone());
-        a = 2 * a + b[d - i - 1] as usize;
-    }
-    (cop, decom.1[a].to_vec())
-}
-
-#[allow(clippy::type_complexity)]
-pub fn reconstruct<R>(
-    pdecom: &[u8],
-    b: &[u8],
-    iv: &IV,
-) -> (
-    GenericArray<u8, R::PRODLAMBDA2>,
-    Vec<GenericArray<u8, R::LAMBDA>>,
-)
+impl<PRG, R> VectorCommitment for VC<PRG, R>
 where
+    PRG: PseudoRandomGenerator<Lambda = R::LAMBDA>,
     R: RandomOracle,
 {
-    let lambda = <R::LAMBDA as Unsigned>::USIZE;
-    let mut a = 0;
-    let d = b.len();
-    let def = GenericArray::default();
-    let mut k = vec![def; (1 << (d + 1)) - 1];
-    //step 4
-    for i in 1..d + 1 {
-        let b_d_i = b[d - i] as usize;
-        k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)]
-            .copy_from_slice(&pdecom[(i - 1) * lambda..i * lambda]);
-        //step 7
-        for j in 0..1 << (i - 1) {
-            if j != a {
-                let rank = (1 << (i - 1)) - 1 + j;
-                let mut prg = R::PRG::new_prg(&k[rank], iv);
-                prg.read(&mut k[rank * 2 + 1]);
-                prg.read(&mut k[rank * 2 + 2]);
-            }
+    type Lambda = PRG::Lambda;
+    type LambdaTimes2 = R::PRODLAMBDA2;
+    type PRG = PRG;
+    type RO = R;
+
+    fn commit(
+        r: &GenericArray<u8, Self::Lambda>,
+        iv: &IV,
+        n: usize,
+    ) -> (
+        GenericArray<u8, Self::LambdaTimes2>,
+        (
+            Vec<GenericArray<u8, Self::Lambda>>,
+            Vec<GenericArray<u8, Self::LambdaTimes2>>,
+        ),
+        Vec<GenericArray<u8, Self::Lambda>>,
+    ) {
+        let mut k = vec![GenericArray::default(); 2 * n - 1];
+        //step 2..3
+        k[0].copy_from_slice(r);
+
+        for i in 0..n - 1 {
+            let mut prg = PRG::new_prg(&k[i], iv);
+            prg.read(&mut k[2 * i + 1]);
+            prg.read(&mut k[2 * i + 2]);
         }
-        a = 2 * a + b_d_i;
-    }
-    let mut sd = vec![GenericArray::default(); 1 << d];
-    let mut h1_hasher = R::h1_init();
-    //step 11
-    for j in 0..(1 << d) {
-        if j != a {
+        //step 4..5
+        let mut h1_hasher = R::h1_init();
+        let mut sd = vec![GenericArray::default(); n];
+        let mut com = vec![GenericArray::default(); n];
+        for j in 0..n {
             let mut h0_hasher = R::h0_init();
-            h0_hasher.update(&k[(1 << d) - 1 + j]);
+            h0_hasher.update(&k[n - 1 + j]);
             h0_hasher.update(iv);
             let mut reader = h0_hasher.finish();
             reader.read(&mut sd[j]);
-            let mut com_j = GenericArray::<u8, R::PRODLAMBDA2>::default();
-            reader.read(&mut com_j);
-            h1_hasher.update(&com_j);
-        } else {
-            h1_hasher.update(&pdecom[pdecom.len() - 2 * lambda..]);
+            reader.read(&mut com[j]);
+            h1_hasher.update(&com[j]);
         }
+        //step 6
+        let mut h = GenericArray::default();
+        let mut reader = h1_hasher.finish();
+        reader.read(&mut h);
+        (h, (k, com), sd)
     }
-    let mut h = GenericArray::default();
-    h1_hasher.finish().read(&mut h);
-    (h, sd)
+
+    fn open<DPOW /*2N - 1 */, D, N>(
+        decom: &Decom<Self::Lambda, Self::LambdaTimes2>,
+        b: &GenericArray<u8, D>,
+    ) -> (Vec<GenericArray<u8, Self::Lambda>>, Vec<u8>)
+    where
+        D: ArrayLength,
+    {
+        let mut a = 0;
+        let d = (usize::BITS - decom.0.len().leading_zeros() - 1) as usize;
+        let mut cop = Vec::with_capacity(d);
+        //step 4
+
+        for i in 0..d {
+            cop.push(decom.0[(1 << (i + 1)) + 2 * a + (1 - b[d - i - 1] as usize) - 1].clone());
+            a = 2 * a + b[d - i - 1] as usize;
+        }
+        (cop, decom.1[a].to_vec())
+    }
+
+    fn reconstruct(
+        pdecom: &[u8],
+        b: &[u8],
+        iv: &IV,
+    ) -> (
+        GenericArray<u8, Self::LambdaTimes2>,
+        Vec<GenericArray<u8, Self::Lambda>>,
+    ) {
+        let mut a = 0;
+        let d = b.len();
+        let def = GenericArray::default();
+        let mut k = vec![def; (1 << (d + 1)) - 1];
+        //step 4
+        for i in 1..d + 1 {
+            let b_d_i = b[d - i] as usize;
+            k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)]
+                .copy_from_slice(&pdecom[(i - 1) * Self::Lambda::USIZE..i * Self::Lambda::USIZE]);
+            //step 7
+            for j in 0..1 << (i - 1) {
+                if j != a {
+                    let rank = (1 << (i - 1)) - 1 + j;
+                    let mut prg = PRG::new_prg(&k[rank], iv);
+                    prg.read(&mut k[rank * 2 + 1]);
+                    prg.read(&mut k[rank * 2 + 2]);
+                }
+            }
+            a = 2 * a + b_d_i;
+        }
+        let mut sd = vec![GenericArray::default(); 1 << d];
+        let mut h1_hasher = R::h1_init();
+        //step 11
+        for j in 0..(1 << d) {
+            if j != a {
+                let mut h0_hasher = R::h0_init();
+                h0_hasher.update(&k[(1 << d) - 1 + j]);
+                h0_hasher.update(iv);
+                let mut reader = h0_hasher.finish();
+                reader.read(&mut sd[j]);
+                let mut com_j = GenericArray::<u8, Self::LambdaTimes2>::default();
+                reader.read(&mut com_j);
+                h1_hasher.update(&com_j);
+            } else {
+                h1_hasher.update(&pdecom[pdecom.len() - 2 * Self::Lambda::USIZE..]);
+            }
+        }
+        let mut h = GenericArray::default();
+        h1_hasher.finish().read(&mut h);
+        (h, sd)
+    }
 }
 
 //reconstruct is tested in the integration_test_vc test_commitment_and_decomitment() function.
@@ -145,7 +186,10 @@ mod test {
     };
     use serde::Deserialize;
 
-    use crate::random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256};
+    use crate::{
+        prg::{PRG128, PRG192, PRG256},
+        random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
+    };
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -213,21 +257,21 @@ mod test {
         for data in database {
             let lamdabytes = data.keyroot.len();
             if lamdabytes == 16 {
-                let res = commit::<RandomOracleShake128>(
+                let res = VC::<PRG128, RandomOracleShake128>::commit(
                     GenericArray::from_slice(&data.keyroot),
                     &data.iv,
                     1 << data.depth,
                 );
                 compare_expected_with_result(&data, res);
             } else if lamdabytes == 24 {
-                let res = commit::<RandomOracleShake192>(
+                let res = VC::<PRG192, RandomOracleShake192>::commit(
                     GenericArray::from_slice(&data.keyroot),
                     &data.iv,
                     1 << data.depth,
                 );
                 compare_expected_with_result(&data, res);
             } else {
-                let res = commit::<RandomOracleShake256>(
+                let res = VC::<PRG256, RandomOracleShake256>::commit(
                     GenericArray::from_slice(&data.keyroot),
                     &data.iv,
                     1 << data.depth,
@@ -247,7 +291,7 @@ mod test {
                 type D = U4;
                 type Dpow = U31;
                 type N = U16;
-                let res = open::<RandomOracleShake128, Dpow, D, N>(
+                let res = VC::<PRG128, RandomOracleShake128>::open::<Dpow, D, N>(
                     &(
                         data.k
                             .iter()
@@ -268,7 +312,7 @@ mod test {
                 type D = U4;
                 type Dpow = U31;
                 type N = U16;
-                let res = open::<RandomOracleShake192, Dpow, D, N>(
+                let res = VC::<PRG192, RandomOracleShake192>::open::<Dpow, D, N>(
                     &(
                         data.k
                             .iter()
@@ -289,7 +333,7 @@ mod test {
                 type D = U4;
                 type Dpow = U31;
                 type N = U16;
-                let res = open::<RandomOracleShake256, Dpow, D, N>(
+                let res = VC::<PRG256, RandomOracleShake256>::open::<Dpow, D, N>(
                     &(
                         data.k
                             .iter()
@@ -310,7 +354,7 @@ mod test {
                 type D = U5;
                 type Dpow = U63;
                 type N = U32;
-                let res = open::<RandomOracleShake256, Dpow, D, N>(
+                let res = VC::<PRG256, RandomOracleShake256>::open::<Dpow, D, N>(
                     &(
                         data.k
                             .iter()
@@ -353,7 +397,7 @@ mod test {
         for data in database {
             let lambdabyte = data.com_j.len();
             if lambdabyte == 32 {
-                let res = reconstruct::<RandomOracleShake128>(
+                let res = VC::<PRG128, RandomOracleShake128>::reconstruct(
                     &[
                         &data.cop.iter().flatten().copied().collect::<Vec<u8>>()[..],
                         &data.com_j[..],
@@ -364,7 +408,7 @@ mod test {
                 );
                 compare_expected_with_reconstruct_result(&data, res);
             } else if lambdabyte == 48 {
-                let res = reconstruct::<RandomOracleShake192>(
+                let res = VC::<PRG192, RandomOracleShake192>::reconstruct(
                     &[
                         &data.cop.iter().flatten().copied().collect::<Vec<u8>>()[..],
                         &data.com_j[..],
@@ -375,7 +419,7 @@ mod test {
                 );
                 compare_expected_with_reconstruct_result(&data, res);
             } else {
-                let res = reconstruct::<RandomOracleShake256>(
+                let res = VC::<PRG256, RandomOracleShake256>::reconstruct(
                     &[
                         &data.cop.iter().flatten().copied().collect::<Vec<u8>>()[..],
                         &data.com_j[..],

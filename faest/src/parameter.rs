@@ -30,6 +30,7 @@ use crate::{
     },
     rijndael_32::{Rijndael192, Rijndael256},
     universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
+    vc::{VectorCommitment, VC},
 };
 
 /// Base parameters per security level
@@ -45,9 +46,13 @@ pub(crate) trait BaseParameters {
         OutputLength = Sum<Self::LambdaBytes, B>,
     >;
     /// Associated random oracle
-    type RandomOracle: RandomOracle<LAMBDA = Self::LambdaBytes>;
+    type RandomOracle: RandomOracle<
+        LAMBDA = Self::LambdaBytes,
+        PRODLAMBDA2 = Self::LambdaBytesTimes2,
+    >;
     /// Associated PRG
     type PRG: PseudoRandomGenerator<Lambda = Self::LambdaBytes>;
+    type VC: VectorCommitment<Lambda = Self::LambdaBytes, LambdaTimes2 = Self::LambdaBytesTimes2>;
 
     /// Security parameter (in bits)
     type Lambda: ArrayLength;
@@ -67,6 +72,7 @@ impl BaseParameters for BaseParams128 {
     type VoleHasher = VoleHasher<Self::Field>;
     type RandomOracle = RandomOracleShake128;
     type PRG = PRG128;
+    type VC = VC<Self::PRG, Self::RandomOracle>;
 
     type Lambda = U128;
     type LambdaBytes = U16;
@@ -85,6 +91,7 @@ impl BaseParameters for BaseParams192 {
     type VoleHasher = VoleHasher<Self::Field>;
     type RandomOracle = RandomOracleShake192;
     type PRG = PRG192;
+    type VC = VC<Self::PRG, Self::RandomOracle>;
 
     type Lambda = U192;
     type LambdaBytes = U24;
@@ -103,6 +110,7 @@ impl BaseParameters for BaseParams256 {
     type VoleHasher = VoleHasher<Self::Field>;
     type RandomOracle = RandomOracleShake256;
     type PRG = PRG256;
+    type VC = VC<Self::PRG, Self::RandomOracle>;
 
     type Lambda = U256;
     type LambdaBytes = U32;

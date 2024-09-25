@@ -1,11 +1,11 @@
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
 use crate::{
-    parameter::{TauParameters, PARAM},
+    parameter::TauParameters,
     prg::{PseudoRandomGenerator, IV},
     random_oracles::{Hasher, RandomOracle},
     utils::Reader,
-    vc::{commit, reconstruct},
+    vc::VectorCommitment,
 };
 
 #[allow(clippy::type_complexity)]
@@ -49,49 +49,50 @@ where
 }
 
 #[allow(clippy::type_complexity, clippy::many_single_char_names)]
-pub fn volecommit<P, R>(
-    r: &GenericArray<u8, <R as RandomOracle>::LAMBDA>,
+pub fn volecommit<VC, Tau, LH>(
+    r: &GenericArray<u8, VC::Lambda>,
     iv: &IV,
 ) -> (
-    GenericArray<u8, R::PRODLAMBDA2>,
+    GenericArray<u8, VC::LambdaTimes2>,
     //Here decom can have two diferent length, depending on if it's a i < t0 or > 0 so we use vectors
     Box<
         GenericArray<
             (
-                Vec<GenericArray<u8, R::LAMBDA>>,
-                Vec<GenericArray<u8, R::PRODLAMBDA2>>,
+                Vec<GenericArray<u8, VC::Lambda>>,
+                Vec<GenericArray<u8, VC::LambdaTimes2>>,
             ),
-            P::TAU,
+            Tau::Tau,
         >,
     >,
-    Box<GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS>>,
-    GenericArray<u8, P::LH>,
-    Box<GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>>,
+    Box<GenericArray<GenericArray<u8, LH>, Tau::TauMinus1>>,
+    GenericArray<u8, LH>,
+    Box<GenericArray<Vec<GenericArray<u8, LH>>, Tau::Tau>>,
 )
 where
-    P: PARAM,
-    R: RandomOracle,
+    Tau: TauParameters,
+    VC: VectorCommitment,
+    LH: ArrayLength,
 {
-    let mut prg = R::PRG::new_prg(r, iv);
+    let mut prg = VC::PRG::new_prg(r, iv);
     let mut decom = GenericArray::default_boxed();
-    let mut u: GenericArray<GenericArray<u8, P::LH>, P::TAU> = GenericArray::default();
-    let mut v: Box<GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>> =
+    let mut u: GenericArray<GenericArray<u8, LH>, Tau::Tau> = GenericArray::default();
+    let mut v: Box<GenericArray<Vec<GenericArray<u8, LH>>, Tau::Tau>> =
         GenericArray::default_boxed();
-    let mut c: Box<GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS>> =
+    let mut c: Box<GenericArray<GenericArray<u8, LH>, Tau::TauMinus1>> =
         GenericArray::default_boxed();
 
-    let mut hasher = R::h1_init();
-    for i in 0..P::TAU::USIZE {
-        let b = usize::from(i < P::TAU0::USIZE);
-        let k = b * P::K0::USIZE + (1 - b) * P::K1::USIZE;
+    let mut hasher = VC::RO::h1_init();
+    for i in 0..Tau::Tau::USIZE {
+        let b = usize::from(i < Tau::Tau0::USIZE);
+        let k = b * Tau::K0::USIZE + (1 - b) * Tau::K1::USIZE;
         let mut r_i = GenericArray::default();
         prg.read(&mut r_i);
-        let (com_i, decom_i, sd_i) = commit::<R>(&r_i, iv, 1 << k);
+        let (com_i, decom_i, sd_i) = VC::commit(&r_i, iv, 1 << k);
         decom[i] = decom_i;
         hasher.update(&com_i);
-        (u[i], v[i]) = to_vole_convert::<R::PRG, _>(Some(&sd_i[0]), sd_i.iter().skip(1), iv);
+        (u[i], v[i]) = to_vole_convert::<VC::PRG, _>(Some(&sd_i[0]), sd_i.iter().skip(1), iv);
     }
-    for i in 1..P::TAU::USIZE {
+    for i in 1..Tau::Tau::USIZE {
         c[i - 1] = u[0]
             .iter()
             .zip(u[i].iter())
@@ -108,37 +109,38 @@ where
 ///# Panics
 ///
 /// if i is too big for being a u16
-pub fn volereconstruct<R, P>(
-    chal: &GenericArray<u8, P::LAMBDABYTES>,
+pub fn volereconstruct<VC, Tau, LH>(
+    chal: &[u8],
     pdecom: &[u8],
     iv: &IV,
 ) -> (
-    GenericArray<u8, R::PRODLAMBDA2>,
-    GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>,
+    GenericArray<u8, VC::LambdaTimes2>,
+    GenericArray<Vec<GenericArray<u8, LH>>, Tau::Tau>,
 )
 where
-    R: RandomOracle,
-    P: PARAM,
+    Tau: TauParameters,
+    VC: VectorCommitment,
+    LH: ArrayLength,
 {
-    let lambda = <R::LAMBDA as Unsigned>::to_usize();
-    let tau = <P::TAU as Unsigned>::to_usize();
-    let k0 = <P::K0 as Unsigned>::to_usize();
-    let k1 = <P::K1 as Unsigned>::to_usize();
-    let t0 = <P::TAU0 as Unsigned>::to_usize();
+    let mut q: GenericArray<Vec<GenericArray<u8, LH>>, Tau::Tau> = GenericArray::default();
+    let mut hasher = VC::RO::h1_init();
+    for i in 0..Tau::Tau::USIZE {
+        let b = usize::from(i < Tau::Tau0::USIZE);
+        let k = b * Tau::K0::USIZE + (1 - b) * Tau::K1::USIZE;
+        let pad = b * (Tau::K0::USIZE * i)
+            + (1 - b)
+                * (Tau::K0::USIZE * Tau::Tau0::USIZE
+                    + (i - Tau::Tau0::USIZE * (1 - b)) * Tau::K1::USIZE);
+        let delta_p: Vec<u8> = Tau::decode_challenge(chal, i);
 
-    let mut q: GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU> = GenericArray::default();
-    let mut hasher = R::h1_init();
-    for i in 0..tau {
-        let b = usize::from(i < t0);
-        let k = b * k0 + (1 - b) * k1;
-        let pad = b * (k0 * i) + (1 - b) * (k0 * t0 + (i - t0 * (1 - b)) * k1);
-        let delta_p: Vec<u8> = P::Tau::decode_challenge(chal, i);
-
-        let (com_i, s_i) = reconstruct::<R>(
-            &pdecom[pad * lambda + i * 2 * lambda
-                ..(b * (k0 * (i + 1)) + (1 - b) * (k0 * t0 + ((i + 1) - t0 * (1 - b)) * k1))
-                    * lambda
-                    + (i + 1) * 2 * lambda],
+        let (com_i, s_i) = VC::reconstruct(
+            &pdecom[pad * VC::Lambda::USIZE + i * 2 * VC::Lambda::USIZE
+                ..(b * (Tau::K0::USIZE * (i + 1))
+                    + (1 - b)
+                        * (Tau::K0::USIZE * Tau::Tau0::USIZE
+                            + ((i + 1) - Tau::Tau0::USIZE * (1 - b)) * Tau::K1::USIZE))
+                    * VC::Lambda::USIZE
+                    + (i + 1) * 2 * VC::Lambda::USIZE],
             &delta_p,
             iv,
         );
@@ -150,7 +152,7 @@ where
             .map(|(j, d)| usize::from(d) << j)
             .sum();
 
-        (_, q[i]) = to_vole_convert::<R::PRG, _>(None, (1..(1 << k)).map(|j| &s_i[j ^ delta]), iv);
+        (_, q[i]) = to_vole_convert::<VC::PRG, _>(None, (1..(1 << k)).map(|j| &s_i[j ^ delta]), iv);
     }
     let mut hcom = GenericArray::default();
     hasher.finish().read(&mut hcom);
@@ -164,12 +166,10 @@ mod test {
     use generic_array::GenericArray;
     use serde::Deserialize;
 
-    use crate::{
-        parameter::{
-            PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
-            PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM,
-        },
-        random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
+    use crate::parameter::{
+        BaseParameters, PARAM, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F,
+        PARAM192FEM, PARAM192S, PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM,
+        PARAMOWF,
     };
 
     #[derive(Debug, Deserialize)]
@@ -196,9 +196,12 @@ mod test {
             if data.lambdabytes[0] == 16 {
                 if data.u.len() == 234 {
                     if data.k0[0] == 12 {
-                        let res = volecommit::<PARAM128S, RandomOracleShake128>(
-                            GenericArray::from_slice(&data.r),
-                            &data.iv,
+                        let res = volecommit::<
+                            <<<PARAM128S as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                            <PARAM128S as PARAM>::Tau,
+                            <PARAM128S as PARAM>::LH,
+                        >(
+                            GenericArray::from_slice(&data.r), &data.iv
                         );
                         assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                         for i in 0..res.1.len() {
@@ -251,7 +254,9 @@ mod test {
                                 .collect()
                         );
                     } else {
-                        let res = volecommit::<PARAM128F, RandomOracleShake128>(
+                        let res = volecommit::<<<<PARAM128F as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                            <PARAM128F as PARAM>::Tau,
+                            <PARAM128F as PARAM>::LH>(
                             GenericArray::from_slice(&data.r),
                             &data.iv,
                         );
@@ -307,7 +312,9 @@ mod test {
                         );
                     }
                 } else if data.k0[0] == 12 {
-                    let res = volecommit::<PARAM128SEM, RandomOracleShake128>(
+                    let res = volecommit::<<<<PARAM128SEM as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                            <PARAM128SEM as PARAM>::Tau,
+                            <PARAM128SEM as PARAM>::LH>(
                         GenericArray::from_slice(&data.r),
                         &data.iv,
                     );
@@ -362,10 +369,8 @@ mod test {
                             .collect()
                     );
                 } else {
-                    let res = volecommit::<PARAM128FEM, RandomOracleShake128>(
-                        GenericArray::from_slice(&data.r),
-                        &data.iv,
-                    );
+                    let res =
+                        volecommit::<<<<PARAM128FEM as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC, <PARAM128FEM as PARAM>::Tau, <PARAM128FEM as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(
@@ -420,10 +425,8 @@ mod test {
             } else if data.lambdabytes[0] == 24 {
                 if data.u.len() == 458 {
                     if data.k0[0] == 12 {
-                        let res = volecommit::<PARAM192S, RandomOracleShake192>(
-                            GenericArray::from_slice(&data.r),
-                            &data.iv,
-                        );
+                        let res =
+                            volecommit::<<<<PARAM192S as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC, <PARAM192S as PARAM>::Tau, <PARAM192S as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                         assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                         for i in 0..res.1.len() {
                             assert_eq!(
@@ -475,10 +478,8 @@ mod test {
                                 .collect()
                         );
                     } else {
-                        let res = volecommit::<PARAM192F, RandomOracleShake192>(
-                            GenericArray::from_slice(&data.r),
-                            &data.iv,
-                        );
+                        let res =
+                            volecommit::<<<<PARAM192F as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC, <PARAM192F as PARAM>::Tau, <PARAM192F as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                         assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                         for i in 0..res.1.len() {
                             assert_eq!(
@@ -531,10 +532,8 @@ mod test {
                         );
                     }
                 } else if data.k0[0] == 12 {
-                    let res = volecommit::<PARAM192SEM, RandomOracleShake192>(
-                        GenericArray::from_slice(&data.r),
-                        &data.iv,
-                    );
+                    let res =
+                        volecommit::<<<<PARAM192SEM as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC, <PARAM192SEM as PARAM>::Tau, <PARAM192SEM as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(
@@ -586,10 +585,8 @@ mod test {
                             .collect()
                     );
                 } else {
-                    let res = volecommit::<PARAM192FEM, RandomOracleShake192>(
-                        GenericArray::from_slice(&data.r),
-                        &data.iv,
-                    );
+                    let res =
+                        volecommit::<<<<PARAM192FEM as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC, <PARAM192FEM as PARAM>::Tau, <PARAM192FEM as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(
@@ -643,10 +640,11 @@ mod test {
                 }
             } else if data.u.len() == 566 {
                 if data.k0[0] == 12 {
-                    let res = volecommit::<PARAM256S, RandomOracleShake256>(
-                        GenericArray::from_slice(&data.r),
-                        &data.iv,
-                    );
+                    let res = volecommit::<
+                        <<<PARAM256S as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                        <PARAM256S as PARAM>::Tau,
+                        <PARAM256S as PARAM>::LH,
+                    >(GenericArray::from_slice(&data.r), &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(
@@ -698,10 +696,11 @@ mod test {
                             .collect()
                     );
                 } else {
-                    let res = volecommit::<PARAM256F, RandomOracleShake256>(
-                        GenericArray::from_slice(&data.r),
-                        &data.iv,
-                    );
+                    let res = volecommit::<
+                        <<<PARAM256F as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                        <PARAM256F as PARAM>::Tau,
+                        <PARAM256F as PARAM>::LH,
+                    >(GenericArray::from_slice(&data.r), &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(
@@ -754,10 +753,11 @@ mod test {
                     );
                 }
             } else if data.k0[0] == 12 {
-                let res = volecommit::<PARAM256SEM, RandomOracleShake256>(
-                    GenericArray::from_slice(&data.r),
-                    &data.iv,
-                );
+                let res = volecommit::<
+                    <<<PARAM256SEM as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                    <PARAM256SEM as PARAM>::Tau,
+                    <PARAM256SEM as PARAM>::LH,
+                >(GenericArray::from_slice(&data.r), &data.iv);
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
                     assert_eq!(
@@ -809,10 +809,11 @@ mod test {
                         .collect()
                 );
             } else {
-                let res = volecommit::<PARAM256FEM, RandomOracleShake256>(
-                    GenericArray::from_slice(&data.r),
-                    &data.iv,
-                );
+                let res = volecommit::<
+                    <<<PARAM256FEM as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                    <PARAM256FEM as PARAM>::Tau,
+                    <PARAM256FEM as PARAM>::LH,
+                >(GenericArray::from_slice(&data.r), &data.iv);
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
                     assert_eq!(
@@ -894,11 +895,11 @@ mod test {
                             [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
                         })
                         .collect::<Vec<u8>>();
-                    let res = volereconstruct::<RandomOracleShake128, PARAM128F>(
-                        GenericArray::from_slice(&data.chal),
-                        pdecom,
-                        &data.iv,
-                    );
+                    let res = volereconstruct::<
+                        <<<PARAM128F as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                        <PARAM128F as PARAM>::Tau,
+                        <PARAM128F as PARAM>::LH,
+                    >(&data.chal, pdecom, &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(res.1[i].len(), data.q[i].len());
@@ -912,11 +913,11 @@ mod test {
                             [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
                         })
                         .collect::<Vec<u8>>();
-                    let res = volereconstruct::<RandomOracleShake128, PARAM128S>(
-                        GenericArray::from_slice(&data.chal),
-                        pdecom,
-                        &data.iv,
-                    );
+                    let res = volereconstruct::<
+                        <<<PARAM128S as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                        <PARAM128S as PARAM>::Tau,
+                        <PARAM128S as PARAM>::LH,
+                    >(&data.chal, pdecom, &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(res.1[i].len(), data.q[i].len());
@@ -932,11 +933,11 @@ mod test {
                             [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
                         })
                         .collect::<Vec<u8>>();
-                    let res = volereconstruct::<RandomOracleShake192, PARAM192F>(
-                        GenericArray::from_slice(&data.chal),
-                        pdecom,
-                        &data.iv,
-                    );
+                    let res = volereconstruct::<
+                        <<<PARAM192F as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                        <PARAM192F as PARAM>::Tau,
+                        <PARAM192F as PARAM>::LH,
+                    >(&data.chal, pdecom, &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(res.1[i].len(), data.q[i].len());
@@ -950,11 +951,11 @@ mod test {
                             [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
                         })
                         .collect::<Vec<u8>>();
-                    let res = volereconstruct::<RandomOracleShake192, PARAM192S>(
-                        GenericArray::from_slice(&data.chal),
-                        pdecom,
-                        &data.iv,
-                    );
+                    let res = volereconstruct::<
+                        <<<PARAM192S as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                        <PARAM192S as PARAM>::Tau,
+                        <PARAM192S as PARAM>::LH,
+                    >(&data.chal, pdecom, &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(res.1[i].len(), data.q[i].len());
@@ -969,11 +970,11 @@ mod test {
                         [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
                     })
                     .collect::<Vec<u8>>();
-                let res = volereconstruct::<RandomOracleShake256, PARAM256F>(
-                    GenericArray::from_slice(&data.chal),
-                    pdecom,
-                    &data.iv,
-                );
+                let res = volereconstruct::<
+                    <<<PARAM256F as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                    <PARAM256F as PARAM>::Tau,
+                    <PARAM256F as PARAM>::LH,
+                >(&data.chal, pdecom, &data.iv);
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
                     assert_eq!(res.1[i].len(), data.q[i].len());
@@ -987,11 +988,11 @@ mod test {
                         [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
                     })
                     .collect::<Vec<u8>>();
-                let res = volereconstruct::<RandomOracleShake256, PARAM256S>(
-                    GenericArray::from_slice(&data.chal),
-                    pdecom,
-                    &data.iv,
-                );
+                let res = volereconstruct::<
+                    <<<PARAM256S as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                    <PARAM256S as PARAM>::Tau,
+                    <PARAM256S as PARAM>::LH,
+                >(&data.chal, pdecom, &data.iv);
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
                     assert_eq!(res.1[i].len(), data.q[i].len());

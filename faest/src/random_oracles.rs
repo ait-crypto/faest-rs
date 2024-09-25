@@ -7,15 +7,10 @@ use sha3::{
     Shake128, Shake128Reader, Shake256, Shake256Reader,
 };
 
-use crate::{
-    prg::{PseudoRandomGenerator, PRG128, PRG192, PRG256},
-    utils::Reader,
-};
+use crate::utils::Reader;
 
 pub(crate) trait RandomOracle {
     type Hasher<const SEP: u8>: Hasher + Default;
-    // FIXME: get rid of PRG;
-    type PRG: PseudoRandomGenerator<Lambda = Self::LAMBDA>;
     #[deprecated]
     type LAMBDA: ArrayLength;
     #[deprecated]
@@ -94,7 +89,6 @@ impl Reader for Hasher128Reader {
 
 impl RandomOracle for RandomOracleShake128 {
     type Hasher<const SEP: u8> = Hasher128<SEP>;
-    type PRG = PRG128;
     type LAMBDA = U16;
     type PRODLAMBDA2 = U32;
 }
@@ -116,7 +110,6 @@ pub(crate) struct RandomOracleShake192 {}
 
 impl RandomOracle for RandomOracleShake192 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
-    type PRG = PRG192;
     type LAMBDA = U24;
     type PRODLAMBDA2 = U48;
 }
@@ -152,7 +145,6 @@ impl Reader for Hasher256Reader {
 
 impl RandomOracle for RandomOracleShake256 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
-    type PRG = PRG256;
     type LAMBDA = U32;
     type PRODLAMBDA2 = U64;
 }

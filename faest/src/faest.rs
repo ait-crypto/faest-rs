@@ -6,7 +6,7 @@ use crate::{
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
     utils::Reader,
-    vc::open,
+    vc::VectorCommitment,
     vole::{volecommit, volereconstruct},
 };
 
@@ -255,7 +255,8 @@ pub(crate) fn faest_sign<P, O>(
     h3_reader.read(&mut r);
     h3_reader.read(&mut iv);
 
-    let (hcom, decom, c, u, gv) = volecommit::<P, RO<P>>(&r, &iv);
+    let (hcom, decom, c, u, gv) =
+        volecommit::<<O::BaseParams as BaseParameters>::VC, P::Tau, P::LH>(&r, &iv);
     let mut h2_hasher = RO::<P>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
@@ -322,9 +323,15 @@ pub(crate) fn faest_sign<P, O>(
         (0..<P::Tau as TauParameters>::Tau::USIZE).map(|i| {
             let s = P::Tau::decode_challenge(&chall3, i);
             if i < <P::Tau as TauParameters>::Tau0::USIZE {
-                open::<RO<P>, P::POWK0, P::K0, P::N0>(&decom[i], GenericArray::from_slice(&s))
+                <O::BaseParams as BaseParameters>::VC::open::<P::POWK0, P::K0, P::N0>(
+                    &decom[i],
+                    GenericArray::from_slice(&s),
+                )
             } else {
-                open::<RO<P>, P::POWK1, P::K1, P::N1>(&decom[i], GenericArray::from_slice(&s))
+                <O::BaseParams as BaseParameters>::VC::open::<P::POWK1, P::K1, P::N1>(
+                    &decom[i],
+                    GenericArray::from_slice(&s),
+                )
             }
         }),
         &chall3,
@@ -353,7 +360,7 @@ where
     let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
         GenericArray::default();
     h1_hasher.finish().read(&mut mu);
-    let (hcom, gq_p) = volereconstruct::<RO<P>, P>(
+    let (hcom, gq_p) = volereconstruct::<<O::BaseParams as BaseParameters>::VC, P::Tau, P::LH>(
         chall3,
         &sigma[(lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)) + (2 * lambda) + l + 2
             ..sig - (16 + lambda)],
