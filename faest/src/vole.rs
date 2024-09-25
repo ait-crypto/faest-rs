@@ -155,11 +155,6 @@ where
         let k = b * k0 + (1 - b) * k1;
         let pad = b * (k0 * i) + (1 - b) * (k0 * t0 + (i - t0 * (1 - b)) * k1);
         let delta_p: Vec<u8> = P::Tau::decode_challenge(chal, i);
-        let delta: u32 = delta_p
-            .iter()
-            .enumerate()
-            .map(|(j, d)| u32::from(*d) << j)
-            .sum();
 
         let (com_i, s_i) = reconstruct::<R>(
             &pdecom[pad * lambda + i * 2 * lambda
@@ -171,8 +166,13 @@ where
         );
         hasher.update(&com_i);
 
+        let delta: usize = delta_p
+            .into_iter()
+            .enumerate()
+            .map(|(j, d)| usize::from(d) << j)
+            .sum();
         for j in 1..(1 << k) {
-            sd[j] = Some(s_i[j ^ delta as usize].clone());
+            sd[j] = Some(s_i[j ^ delta].clone());
         }
         (_, q[i]) = to_vole_convert::<R::PRG, _>(&sd[..1 << k], iv);
     }
