@@ -16,7 +16,7 @@ use crate::{
 ///If sdi is an None Option
 fn to_vole_convert<'a, PRG, LH>(
     sd_0: Option<&GenericArray<u8, PRG::Lambda>>,
-    sd: impl Iterator<Item = &'a GenericArray<u8, PRG::Lambda>> + ExactSizeIterator,
+    sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, PRG::Lambda>>,
     iv: &IV,
 ) -> (GenericArray<u8, LH>, Vec<GenericArray<u8, LH>>)
 where
@@ -27,7 +27,7 @@ where
     let n = sd.len() + 1;
     let d = (128 - (n as u128).leading_zeros() - 1) as usize;
     let mut r = vec![GenericArray::<u8, LH>::default(); n * 2];
-    if let Some(ref sd0) = sd_0 {
+    if let Some(sd0) = sd_0 {
         let mut prg = PRG::new_prg(sd0, iv);
         prg.read(&mut r[0]);
     }
@@ -174,7 +174,6 @@ mod test {
             PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
             PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM,
         },
-        prg::{PRG128, PRG192, PRG256},
         random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
     };
 
