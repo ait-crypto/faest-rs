@@ -22,7 +22,7 @@ pub fn commit<R>(
         Vec<GenericArray<u8, R::LAMBDA>>,
         Vec<GenericArray<u8, R::PRODLAMBDA2>>,
     ),
-    Vec<Option<GenericArray<u8, R::LAMBDA>>>,
+    Vec<GenericArray<u8, R::LAMBDA>>,
 )
 where
     R: RandomOracle,
@@ -38,16 +38,14 @@ where
     }
     //step 4..5
     let mut h1_hasher = R::h1_init();
-    let mut sd = vec![None; n];
+    let mut sd = vec![GenericArray::default(); n];
     let mut com = vec![GenericArray::default(); n];
     for j in 0..n {
         let mut h0_hasher = R::h0_init();
         h0_hasher.update(&k[n - 1 + j]);
         h0_hasher.update(iv);
         let mut reader = h0_hasher.finish();
-        let mut sd_j = GenericArray::default();
-        reader.read(&mut sd_j);
-        sd[j] = Some(sd_j);
+        reader.read(&mut sd[j]);
         reader.read(&mut com[j]);
         h1_hasher.update(&com[j]);
     }
@@ -188,7 +186,7 @@ mod test {
             Vec<GenericArray<u8, Lambda>>,
             Vec<GenericArray<u8, Lambda2>>,
         ),
-        Vec<Option<GenericArray<u8, Lambda>>>,
+        Vec<GenericArray<u8, Lambda>>,
     );
 
     fn compare_expected_with_result<Lambda: ArrayLength, Lambda2: ArrayLength>(
@@ -203,7 +201,6 @@ mod test {
             assert_eq!(com.as_slice(), com_expected.as_slice());
         }
         for (sd, sd_expected) in zip(&res.2, &expected.sd) {
-            let sd = sd.as_ref().unwrap();
             assert_eq!(sd.as_slice(), sd_expected.as_slice());
         }
     }

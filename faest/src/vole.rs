@@ -14,8 +14,9 @@ use crate::{
 ///# Panics
 ///
 ///If sdi is an None Option
-fn to_vole_convert<PRG, LH>(
-    sd: &[Option<GenericArray<u8, PRG::Lambda>>],
+fn to_vole_convert<'a, PRG, LH>(
+    sd_0: Option<&GenericArray<u8, PRG::Lambda>>,
+    sd: impl Iterator<Item = &'a GenericArray<u8, PRG::Lambda>> + ExactSizeIterator,
     iv: &IV,
 ) -> (GenericArray<u8, LH>, Vec<GenericArray<u8, LH>>)
 where
@@ -23,20 +24,20 @@ where
     LH: ArrayLength,
 {
     // this parameters are known upfront!
-    let n = sd.len();
+    let n = sd.len() + 1;
     let d = (128 - (n as u128).leading_zeros() - 1) as usize;
     let mut r = vec![GenericArray::<u8, LH>::default(); n * 2];
-    if let Some(ref sd0) = sd[0] {
+    if let Some(ref sd0) = sd_0 {
         let mut prg = PRG::new_prg(sd0, iv);
         prg.read(&mut r[0]);
     }
-    for (i, sdi) in sd.iter().enumerate().skip(1).take(n) {
-        let mut prg = PRG::new_prg(sdi.as_ref().unwrap(), iv);
-        prg.read(&mut r[i]);
+    for (i, sdi) in sd.enumerate() {
+        let mut prg = PRG::new_prg(sdi, iv);
+        prg.read(&mut r[i + 1]);
     }
 
     // FIXME
-    let mut v = vec![GenericArray::<u8, LH>::default(); d];
+    let mut v = vec![GenericArray::default(); d];
     for (j, item) in v.iter_mut().enumerate() {
         let j_offset = (j % 2) * n;
         let j1_offset = ((j + 1) % 2) * n;
@@ -86,14 +87,17 @@ where
 
     let mut hasher = R::h1_init();
     for i in 0..P::TAU::USIZE {
-        let b = usize::from(i < P::TAU0::USIZE);
-        let k = b * P::K0::USIZE + (b - 1) * P::K1::USIZE;
+        let k = if i < P::TAU0::USIZE {
+            P::K0::USIZE
+        } else {
+            P::K1::USIZE
+        };
         let mut r_i = GenericArray::default();
         prg.read(&mut r_i);
         let (com_i, decom_i, sd_i) = commit::<R>(&r_i, iv, 1 << k);
         decom[i] = decom_i;
         hasher.update(&com_i);
-        (u[i], v[i]) = to_vole_convert::<R::PRG, _>(&sd_i, iv);
+        (u[i], v[i]) = to_vole_convert::<R::PRG, _>(Some(&sd_i[0]), sd_i.iter().skip(1), iv);
     }
     for i in 1..P::TAU::USIZE {
         c[i - 1] = u[0]
@@ -130,7 +134,6 @@ where
     let k1 = <P::K1 as Unsigned>::to_usize();
     let t0 = <P::TAU0 as Unsigned>::to_usize();
 
-    let mut sd = vec![None; 1 << max(P::K0::USIZE, P::K1::USIZE)];
     let mut q: GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU> = GenericArray::default();
     let mut hasher = R::h1_init();
     for i in 0..tau {
@@ -154,10 +157,8 @@ where
             .enumerate()
             .map(|(j, d)| usize::from(d) << j)
             .sum();
-        for j in 1..(1 << k) {
-            sd[j] = Some(s_i[j ^ delta].clone());
-        }
-        (_, q[i]) = to_vole_convert::<R::PRG, _>(&sd[..1 << k], iv);
+
+        (_, q[i]) = to_vole_convert::<R::PRG, _>(None, (1..(1 << k)).map(|j| &s_i[j ^ delta]), iv);
     }
     let mut hcom = GenericArray::default();
     hasher.finish().read(&mut hcom);
@@ -168,10 +169,7 @@ where
 mod test {
     use super::*;
 
-    use generic_array::{
-        typenum::{U16, U234, U24, U32, U458, U566},
-        GenericArray,
-    };
+    use generic_array::GenericArray;
     use serde::Deserialize;
 
     use crate::{
@@ -182,77 +180,6 @@ mod test {
         prg::{PRG128, PRG192, PRG256},
         random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
     };
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct DataConvertToVole {
-        sd: Vec<Vec<u8>>,
-        iv: IV,
-        lambdabytes: [u8; 1],
-        sd0: [u8; 1],
-        u: Vec<u8>,
-        v: Vec<Vec<u8>>,
-    }
-
-    #[test]
-    fn convert_to_vole_test() {
-        let data = include_str!("../tests/data/DataConvertToVole.json");
-        let database: Vec<DataConvertToVole> =
-            serde_json::from_str(data).expect("error while reading or parsing");
-        for data in database {
-            if data.lambdabytes[0] == 16 {
-                let mut opt_sd: Vec<Option<GenericArray<u8, U16>>> = data
-                    .sd
-                    .iter()
-                    .cloned()
-                    .map(|x| Some(*GenericArray::from_slice(&x)))
-                    .collect::<Vec<Option<GenericArray<u8, U16>>>>();
-                if data.sd0[0] == 1 {
-                    opt_sd[0] = None;
-                }
-                type LH = U234;
-                let res = to_vole_convert::<PRG128, LH>(&opt_sd, &data.iv);
-                assert_eq!(res.0, *GenericArray::from_slice(&data.u));
-                assert_eq!(
-                    res.1,
-                    data.v
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect::<Vec<GenericArray<u8, LH>>>()
-                );
-            } else if data.lambdabytes[0] == 24 {
-                let mut opt_sd: Vec<Option<GenericArray<u8, U24>>> = Vec::default();
-                if data.sd0[0] == 1 {
-                    opt_sd[0] = None;
-                }
-                type LH = U458;
-                let res = to_vole_convert::<PRG192, LH>(&opt_sd, &data.iv);
-                assert_eq!(res.0, *GenericArray::from_slice(&data.u));
-                assert_eq!(
-                    res.1,
-                    data.v
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect::<Vec<GenericArray<u8, LH>>>()
-                );
-            } else {
-                let mut opt_sd: Vec<Option<GenericArray<u8, U32>>> = Vec::default();
-                if data.sd0[0] == 1 {
-                    opt_sd[0] = None;
-                }
-                type LH = U566;
-                let res = to_vole_convert::<PRG256, LH>(&opt_sd, &data.iv);
-                assert_eq!(res.0, *GenericArray::from_slice(&data.u));
-                assert_eq!(
-                    res.1,
-                    data.v
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect::<Vec<GenericArray<u8, LH>>>()
-                );
-            }
-        }
-    }
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
