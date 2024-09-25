@@ -883,30 +883,15 @@ pub(crate) trait PARAM {
         L = Self::L,
         LBYTES = Self::LBYTES,
     >;
-
     type Cypher: Variant<Self::OWF>;
-
-    type Tau: TauParameters<
-        Tau = Self::TAU,
-        TauMinus1 = Self::TAUMINUS,
-        K0 = Self::K0,
-        K1 = Self::K1,
-        Tau0 = Self::TAU0,
-        Tau1 = Self::TAU1,
-    >;
+    type Tau: TauParameters;
 
     type L: ArrayLength;
     type LBYTES: ArrayLength;
-    type TAU: ArrayLength;
-    type TAUMINUS: ArrayLength;
-    type K0: ArrayLength;
     type N0: ArrayLength;
-    type POWK0: ArrayLength;
-    type K1: ArrayLength;
     type N1: ArrayLength;
+    type POWK0: ArrayLength;
     type POWK1: ArrayLength;
-    type TAU0: ArrayLength;
-    type TAU1: ArrayLength;
     type B: ArrayLength;
     type BETA: ArrayLength;
     type LAMBDA: ArrayLength;
@@ -926,18 +911,6 @@ impl PARAM for PARAM128S {
     type L = <U1024 as Add<U576>>::Output;
 
     type LBYTES = U200;
-
-    type TAU = U11;
-
-    type TAUMINUS = Diff<Self::TAU, U1>;
-
-    type K0 = U12;
-
-    type K1 = U11;
-
-    type TAU0 = U7;
-
-    type TAU1 = U4;
 
     type B = U16;
 
@@ -973,18 +946,6 @@ impl PARAM for PARAM128F {
     type L = <U1024 as Add<U576>>::Output;
 
     type LBYTES = U200;
-
-    type TAU = U16;
-
-    type TAUMINUS = Diff<Self::TAU, U1>;
-
-    type K0 = U8;
-
-    type K1 = U8;
-
-    type TAU0 = U8;
-
-    type TAU1 = U8;
 
     type B = U16;
 
@@ -1022,18 +983,6 @@ impl PARAM for PARAM192S {
 
     type LBYTES = U408;
 
-    type TAU = U16;
-
-    type TAUMINUS = Diff<Self::TAU, U1>;
-
-    type K0 = U12;
-
-    type K1 = U12;
-
-    type TAU0 = U8;
-
-    type TAU1 = U8;
-
     type B = U16;
 
     type BETA = U2;
@@ -1069,18 +1018,6 @@ impl PARAM for PARAM192F {
     type L = <U4096 as Sub<U832>>::Output;
 
     type LBYTES = U408;
-
-    type TAU = U24;
-
-    type TAUMINUS = Diff<Self::TAU, U1>;
-
-    type K0 = U8;
-
-    type K1 = U8;
-
-    type TAU0 = U12;
-
-    type TAU1 = U12;
 
     type B = U16;
 
@@ -1118,18 +1055,6 @@ impl PARAM for PARAM256S {
 
     type LBYTES = U500;
 
-    type TAU = U22;
-
-    type TAUMINUS = Diff<Self::TAU, U1>;
-
-    type K0 = U12;
-
-    type K1 = U11;
-
-    type TAU0 = U14;
-
-    type TAU1 = U8;
-
     type B = U16;
 
     type BETA = U2;
@@ -1165,18 +1090,6 @@ impl PARAM for PARAM256F {
     type L = <U4096 as Sub<U96>>::Output;
 
     type LBYTES = U500;
-
-    type TAU = U32;
-
-    type TAUMINUS = Diff<Self::TAU, U1>;
-
-    type K0 = U8;
-
-    type K1 = U8;
-
-    type TAU0 = U16;
-
-    type TAU1 = U16;
 
     type B = U16;
 
@@ -1214,18 +1127,6 @@ impl PARAM for PARAM128SEM {
 
     type LBYTES = U160;
 
-    type TAU = U11;
-
-    type TAUMINUS = Diff<Self::TAU, U1>;
-
-    type K0 = U12;
-
-    type K1 = U11;
-
-    type TAU0 = U7;
-
-    type TAU1 = U4;
-
     type B = U16;
 
     type BETA = U1;
@@ -1261,18 +1162,6 @@ impl PARAM for PARAM128FEM {
     type L = <U1024 as Add<U256>>::Output;
 
     type LBYTES = U160;
-
-    type TAU = U16;
-
-    type TAUMINUS = Diff<Self::TAU, U1>;
-
-    type K0 = U8;
-
-    type K1 = U8;
-
-    type TAU0 = U8;
-
-    type TAU1 = U8;
 
     type B = U16;
 
@@ -1310,18 +1199,6 @@ impl PARAM for PARAM192SEM {
 
     type LBYTES = U288;
 
-    type TAU = U16;
-
-    type TAUMINUS = Diff<Self::TAU, U1>;
-
-    type K0 = U12;
-
-    type K1 = U12;
-
-    type TAU0 = U8;
-
-    type TAU1 = U8;
-
     type B = U16;
 
     type BETA = U2;
@@ -1357,18 +1234,6 @@ impl PARAM for PARAM192FEM {
     type L = <U2048 as Add<U256>>::Output;
 
     type LBYTES = U288;
-
-    type TAU = U24;
-
-    type TAUMINUS = Diff<Self::TAU, U1>;
-
-    type K0 = U8;
-
-    type K1 = U8;
-
-    type TAU0 = U12;
-
-    type TAU1 = U12;
 
     type B = U16;
 
@@ -1406,18 +1271,6 @@ impl PARAM for PARAM256SEM {
 
     type LBYTES = U448;
 
-    type TAU = U22;
-
-    type TAUMINUS = Diff<Self::TAU, U1>;
-
-    type K0 = U12;
-
-    type K1 = U11;
-
-    type TAU0 = U14;
-
-    type TAU1 = U8;
-
     type B = U16;
 
     type BETA = U2;
@@ -1453,18 +1306,6 @@ impl PARAM for PARAM256FEM {
     type L = Diff<U4096, U512>;
 
     type LBYTES = U448;
-
-    type TAU = U32;
-
-    type TAUMINUS = Diff<Self::TAU, U1>;
-
-    type K0 = U8;
-
-    type K1 = U8;
-
-    type TAU0 = U16;
-
-    type TAU1 = U16;
 
     type B = U16;
 

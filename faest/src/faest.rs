@@ -323,15 +323,17 @@ pub(crate) fn faest_sign<P, O>(
         (0..<P::Tau as TauParameters>::Tau::USIZE).map(|i| {
             let s = P::Tau::decode_challenge(&chall3, i);
             if i < <P::Tau as TauParameters>::Tau0::USIZE {
-                <O::BaseParams as BaseParameters>::VC::open::<P::POWK0, P::K0, P::N0>(
-                    &decom[i],
-                    GenericArray::from_slice(&s),
-                )
+                <O::BaseParams as BaseParameters>::VC::open::<
+                    P::POWK0,
+                    <P::Tau as TauParameters>::K0,
+                    P::N0,
+                >(&decom[i], GenericArray::from_slice(&s))
             } else {
-                <O::BaseParams as BaseParameters>::VC::open::<P::POWK1, P::K1, P::N1>(
-                    &decom[i],
-                    GenericArray::from_slice(&s),
-                )
+                <O::BaseParams as BaseParameters>::VC::open::<
+                    P::POWK1,
+                    <P::Tau as TauParameters>::K1,
+                    P::N1,
+                >(&decom[i], GenericArray::from_slice(&s))
             }
         }),
         &chall3,

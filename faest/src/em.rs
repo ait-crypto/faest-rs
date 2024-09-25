@@ -356,10 +356,6 @@ where
     O: PARAMOWF,
 {
     let lambda = <P::LAMBDA as Unsigned>::to_usize();
-    let k0 = <P::K0 as Unsigned>::to_usize();
-    let k1 = <P::K1 as Unsigned>::to_usize();
-    let t0 = <P::TAU0 as Unsigned>::to_usize();
-    let t1 = <P::TAU1 as Unsigned>::to_usize();
     let l = <O::L as Unsigned>::to_usize();
     let delta = O::Field::from(chall3);
     let nst = <O::NST as Unsigned>::to_u8();
@@ -367,22 +363,30 @@ where
     let r = <O::R as Unsigned>::to_u8();
 
     let mut new_gq: GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = gq.clone();
-    for i in 0..t0 {
+    for i in 0..<P::Tau as TauParameters>::Tau0::USIZE {
         let sdelta = P::Tau::decode_challenge(chall3, i);
-        for j in 0..k0 {
+        for j in 0..<P::Tau as TauParameters>::K0::USIZE {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate() {
-                    new_gq[k0 * i + j][k] = gq[k0 * i + j][k] ^ d[k];
+                    new_gq[<P::Tau as TauParameters>::K0::USIZE * i + j][k] =
+                        gq[<P::Tau as TauParameters>::K0::USIZE * i + j][k] ^ d[k];
                 }
             }
         }
     }
-    for i in 0..t1 {
-        let sdelta = P::Tau::decode_challenge(chall3, t0 + i);
-        for j in 0..k1 {
+    for i in 0..<P::Tau as TauParameters>::Tau1::USIZE {
+        let sdelta = P::Tau::decode_challenge(chall3, <P::Tau as TauParameters>::Tau0::USIZE + i);
+        for j in 0..<P::Tau as TauParameters>::K1::USIZE {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate().take(l / 8) {
-                    new_gq[t0 * k0 + k1 * i + j][k] = gq[t0 * k0 + k1 * i + j][k] ^ d[k];
+                    new_gq[<P::Tau as TauParameters>::Tau0::USIZE
+                        * <P::Tau as TauParameters>::K0::USIZE
+                        + <P::Tau as TauParameters>::K1::USIZE * i
+                        + j][k] = gq[<P::Tau as TauParameters>::Tau0::USIZE
+                        * <P::Tau as TauParameters>::K0::USIZE
+                        + <P::Tau as TauParameters>::K1::USIZE * i
+                        + j][k]
+                        ^ d[k];
                 }
             }
         }
