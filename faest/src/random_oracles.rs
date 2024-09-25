@@ -96,12 +96,6 @@ impl<const SEP: u8> Hasher for Hasher128<SEP> {
     }
 }
 
-pub(crate) struct RandomOracleShake192 {}
-
-impl RandomOracle for RandomOracleShake192 {
-    type Hasher<const SEP: u8> = Hasher256<SEP>;
-}
-
 impl<const SEP: u8> Hasher for Hasher256<SEP> {
     type Reader = Hasher256Reader;
 
@@ -205,13 +199,6 @@ mod test {
         for (lambda, input, output) in database {
             if lambda == 128 {
                 let mut hasher = RandomOracleShake128::h0_init();
-                hasher.update(&input);
-                let mut reader = hasher.finish();
-                let mut res = vec![0; output.len()];
-                reader.read(&mut res);
-                assert_eq!(res, output);
-            } else if lambda == 192 {
-                let mut hasher = RandomOracleShake192::h0_init();
                 hasher.update(&input);
                 let mut reader = hasher.finish();
                 let mut res = vec![0; output.len()];
@@ -505,13 +492,6 @@ mod test {
         for (lambda, input, output) in database {
             if lambda == 128 {
                 let mut hasher = RandomOracleShake128::h1_init();
-                hasher.update(&input);
-                let mut reader = hasher.finish();
-                let mut res = vec![0; output.len()];
-                reader.read(&mut res);
-                assert_eq!(res, output);
-            } else if lambda == 192 {
-                let mut hasher = RandomOracleShake192::h1_init();
                 hasher.update(&input);
                 let mut reader = hasher.finish();
                 let mut res = vec![0; output.len()];

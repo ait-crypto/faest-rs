@@ -193,7 +193,7 @@ mod test {
 
     use crate::{
         prg::{PRG128, PRG192, PRG256},
-        random_oracles::{RandomOracleShake128, RandomOracleShake192, RandomOracleShake256},
+        random_oracles::{RandomOracleShake128, RandomOracleShake256},
     };
 
     #[derive(Debug, Deserialize)]
@@ -269,7 +269,7 @@ mod test {
                 );
                 compare_expected_with_result(&data, res);
             } else if lamdabytes == 24 {
-                let res = VC::<PRG192, RandomOracleShake192>::commit(
+                let res = VC::<PRG192, RandomOracleShake256>::commit(
                     GenericArray::from_slice(&data.keyroot),
                     &data.iv,
                     1 << data.depth,
@@ -317,7 +317,7 @@ mod test {
                 type D = U4;
                 type Dpow = U31;
                 type N = U16;
-                let res = VC::<PRG192, RandomOracleShake192>::open::<Dpow, D, N>(
+                let res = VC::<PRG192, RandomOracleShake256>::open::<Dpow, D, N>(
                     &(
                         data.k
                             .iter()
@@ -413,7 +413,7 @@ mod test {
                 );
                 compare_expected_with_reconstruct_result(&data, res);
             } else if lambdabyte == 48 {
-                let res = VC::<PRG192, RandomOracleShake192>::reconstruct(
+                let res = VC::<PRG192, RandomOracleShake256>::reconstruct(
                     &[
                         &data.cop.iter().flatten().copied().collect::<Vec<u8>>()[..],
                         &data.com_j[..],

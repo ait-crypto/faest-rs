@@ -25,9 +25,7 @@ use crate::{
     faest::SecretKey,
     fields::{BigGaloisField, Field, GF128, GF192, GF256},
     prg::{PseudoRandomGenerator, PRG128, PRG192, PRG256},
-    random_oracles::{
-        RandomOracle, RandomOracleShake128, RandomOracleShake192, RandomOracleShake256,
-    },
+    random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake256},
     rijndael_32::{Rijndael192, Rijndael256},
     universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
     vc::{VectorCommitment, VC},
@@ -86,7 +84,7 @@ impl BaseParameters for BaseParams192 {
     type Field = GF192;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
-    type RandomOracle = RandomOracleShake192;
+    type RandomOracle = RandomOracleShake256;
     type PRG = PRG192;
     type VC = VC<Self::PRG, Self::RandomOracle>;
 
