@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
 use crate::{
@@ -144,11 +146,8 @@ where
     let k0 = <P::K0 as Unsigned>::to_usize();
     let k1 = <P::K1 as Unsigned>::to_usize();
     let t0 = <P::TAU0 as Unsigned>::to_usize();
-    let mut com: GenericArray<GenericArray<u8, R::PRODLAMBDA2>, P::TAU> = GenericArray::default();
-    let mut s: GenericArray<Vec<GenericArray<u8, R::LAMBDA>>, P::TAU> = GenericArray::default();
-    let mut sd: GenericArray<Vec<Option<GenericArray<u8, R::LAMBDA>>>, P::TAU> =
-        GenericArray::default();
-    let mut delta: GenericArray<u32, P::TAU> = GenericArray::default();
+
+    let mut sd = vec![None; 1 << max(k0, k1)];
     let mut q: GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU> = GenericArray::default();
     let mut hasher = R::h1_init();
     for i in 0..tau {
@@ -156,11 +155,13 @@ where
         let k = b * k0 + (1 - b) * k1;
         let pad = b * (k0 * i) + (1 - b) * (k0 * t0 + (i - t0 * (1 - b)) * k1);
         let delta_p: Vec<u8> = P::Tau::decode_challenge(chal, i);
-        #[allow(clippy::needless_range_loop)]
-        for j in 0..delta_p.len() {
-            delta[i] += u32::from(delta_p[j]) << j;
-        }
-        (com[i], s[i]) = reconstruct::<R>(
+        let delta: u32 = delta_p
+            .iter()
+            .enumerate()
+            .map(|(j, d)| u32::from(*d) << j)
+            .sum();
+
+        let (com_i, s_i) = reconstruct::<R>(
             &pdecom[pad * lambda + i * 2 * lambda
                 ..(b * (k0 * (i + 1)) + (1 - b) * (k0 * t0 + ((i + 1) - t0 * (1 - b)) * k1))
                     * lambda
@@ -168,15 +169,14 @@ where
             &delta_p,
             iv,
         );
-        hasher.update(&com[i]);
-        for j in 0..(1_u16 << (k)) as usize {
-            sd[i].push(Some(s[i][j ^ delta[i] as usize].clone()));
-        }
-        sd[i][0] = None;
+        hasher.update(&com_i);
 
-        (_, q[i]) = to_vole_convert::<R::PRG, P::LH>(&sd[i], iv);
+        for j in 1..(1 << k) {
+            sd[j] = Some(s_i[j ^ delta as usize].clone());
+        }
+        (_, q[i]) = to_vole_convert::<R::PRG, _>(&sd[..1 << k], iv);
     }
-    let mut hcom: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
+    let mut hcom = GenericArray::default();
     hasher.finish().read(&mut hcom);
     (hcom, q)
 }
