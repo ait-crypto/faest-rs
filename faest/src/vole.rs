@@ -76,50 +76,33 @@ where
     P: PARAM,
     R: RandomOracle,
 {
-    let tau = <P::TAU as Unsigned>::to_usize();
-    let k0 = <P::K0 as Unsigned>::to_u16();
-    let k1 = <P::K1 as Unsigned>::to_u16();
-
     let mut prg = R::PRG::new_prg(r, iv);
-
-    let mut r: GenericArray<GenericArray<u8, R::LAMBDA>, P::TAU> = GenericArray::default();
-    let mut com: GenericArray<GenericArray<u8, R::PRODLAMBDA2>, P::TAU> = GenericArray::default();
-    let mut decom: Box<
-        GenericArray<
-            (
-                Vec<GenericArray<u8, R::LAMBDA>>,
-                Vec<GenericArray<u8, R::PRODLAMBDA2>>,
-            ),
-            P::TAU,
-        >,
-    > = GenericArray::default_boxed();
-    let mut sd: GenericArray<Vec<Option<GenericArray<u8, R::LAMBDA>>>, P::TAU> =
-        GenericArray::default();
+    let mut decom = GenericArray::default_boxed();
     let mut u: GenericArray<GenericArray<u8, P::LH>, P::TAU> = GenericArray::default();
     let mut v: Box<GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU>> =
         GenericArray::default_boxed();
     let mut c: Box<GenericArray<GenericArray<u8, P::LH>, P::TAUMINUS>> =
         GenericArray::default_boxed();
-    for i in 0..tau {
-        prg.read(&mut r[i]);
-    }
-    let tau_0 = (R::LAMBDA::USIZE * 8) % tau;
+
     let mut hasher = R::h1_init();
-    for i in 0..tau {
-        let b = 1 - u16::from(i < tau_0);
-        let k = ((1 - b) * k0) + b * k1;
-        (com[i], decom[i], sd[i]) = commit::<R>(&r[i], iv, 1 << k);
-        hasher.update(&com[i]);
-        (u[i], v[i]) = to_vole_convert::<R::PRG, _>(&sd[i], iv);
+    for i in 0..P::TAU::USIZE {
+        let b = usize::from(i < P::TAU0::USIZE);
+        let k = b * P::K0::USIZE + (b - 1) * P::K1::USIZE;
+        let mut r_i = GenericArray::default();
+        prg.read(&mut r_i);
+        let (com_i, decom_i, sd_i) = commit::<R>(&r_i, iv, 1 << k);
+        decom[i] = decom_i;
+        hasher.update(&com_i);
+        (u[i], v[i]) = to_vole_convert::<R::PRG, _>(&sd_i, iv);
     }
-    for i in 1..tau {
+    for i in 1..P::TAU::USIZE {
         c[i - 1] = u[0]
             .iter()
             .zip(u[i].iter())
             .map(|(&x1, &x2)| x1 ^ x2)
             .collect();
     }
-    let mut hcom: GenericArray<u8, R::PRODLAMBDA2> = GenericArray::default();
+    let mut hcom = GenericArray::default();
     hasher.finish().read(&mut hcom);
     (hcom, decom, c, u[0].clone(), v)
 }
@@ -147,11 +130,11 @@ where
     let k1 = <P::K1 as Unsigned>::to_usize();
     let t0 = <P::TAU0 as Unsigned>::to_usize();
 
-    let mut sd = vec![None; 1 << max(k0, k1)];
+    let mut sd = vec![None; 1 << max(P::K0::USIZE, P::K1::USIZE)];
     let mut q: GenericArray<Vec<GenericArray<u8, P::LH>>, P::TAU> = GenericArray::default();
     let mut hasher = R::h1_init();
     for i in 0..tau {
-        let b: usize = (i < t0).into();
+        let b = usize::from(i < t0);
         let k = b * k0 + (1 - b) * k1;
         let pad = b * (k0 * i) + (1 - b) * (k0 * t0 + (i - t0 * (1 - b)) * k1);
         let delta_p: Vec<u8> = P::Tau::decode_challenge(chal, i);
