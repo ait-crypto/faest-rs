@@ -87,7 +87,7 @@ where
     let mut hasher = R::h1_init();
     for i in 0..P::TAU::USIZE {
         let b = usize::from(i < P::TAU0::USIZE);
-        let k = b * P::K0::USIZE + (b - 1) * P::K1::USIZE;
+        let k = b * P::K0::USIZE + (1 - b) * P::K1::USIZE;
         let mut r_i = GenericArray::default();
         prg.read(&mut r_i);
         let (com_i, decom_i, sd_i) = commit::<R>(&r_i, iv, 1 << k);
