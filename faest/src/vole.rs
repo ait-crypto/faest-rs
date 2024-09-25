@@ -1,5 +1,3 @@
-use std::cmp::max;
-
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
 use crate::{
@@ -11,9 +9,6 @@ use crate::{
 };
 
 #[allow(clippy::type_complexity)]
-///# Panics
-///
-///If sdi is an None Option
 fn to_vole_convert<'a, PRG, LH>(
     sd_0: Option<&GenericArray<u8, PRG::Lambda>>,
     sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, PRG::Lambda>>,
