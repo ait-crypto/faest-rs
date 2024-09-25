@@ -105,7 +105,7 @@ fn em_enc_fwd<O>(
 where
     O: PARAMOWF,
 {
-    let mut res: Box<GenericArray<O::Field, O::SENC>> = GenericArray::default_boxed();
+    let mut res = GenericArray::default_boxed();
     let mut index = 0;
     let nst = <O::NST as Unsigned>::to_usize();
     //Step 2-3
@@ -249,7 +249,7 @@ where
         }
         (a0, a1)
     } else {
-        let new_output = &convert_to_bit::<O::Field, O::LAMBDA>(output);
+        let new_output = convert_to_bit::<O::Field, O::LAMBDA>(output);
         let mut new_x: Box<GenericArray<O::Field, O::LAMBDAR1>> = GenericArray::default_boxed();
         let mut index = 0;
         for byte in x.iter().take(4 * nst * (r + 1)) {
@@ -260,7 +260,7 @@ where
         }
         let mut q_out: Box<GenericArray<O::Field, O::LAMBDA>> = GenericArray::default_boxed();
         for i in 0..lambda {
-            q_out[i] = O::Field::ONE * (&[new_output[i]])[0] * delta + q[i];
+            q_out[i] = new_output[i] * delta + q[i];
         }
         let qs = em_enc_fwd::<O>(q, &new_x);
         let qs_b = em_enc_bkwd::<P, O>(&new_x, q, &q_out, true, false, delta);
