@@ -1,6 +1,9 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Add};
 
-use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
+use generic_array::{
+    typenum::{Sum, Unsigned},
+    ArrayLength, GenericArray,
+};
 
 use crate::{
     prg::{PseudoRandomGenerator, IV},
@@ -53,11 +56,13 @@ where
 
 impl<PRG, R> VectorCommitment for VC<PRG, R>
 where
-    PRG: PseudoRandomGenerator<Lambda = R::LAMBDA>,
+    PRG: PseudoRandomGenerator,
+    PRG::Lambda: Add<PRG::Lambda>,
+    <PRG::Lambda as Add<PRG::Lambda>>::Output: ArrayLength,
     R: RandomOracle,
 {
     type Lambda = PRG::Lambda;
-    type LambdaTimes2 = R::PRODLAMBDA2;
+    type LambdaTimes2 = Sum<PRG::Lambda, PRG::Lambda>;
     type PRG = PRG;
     type RO = R;
 

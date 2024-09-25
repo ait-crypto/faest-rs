@@ -1,7 +1,3 @@
-use generic_array::{
-    typenum::{U16, U24, U32, U48, U64},
-    ArrayLength,
-};
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128, Shake128Reader, Shake256, Shake256Reader,
@@ -11,10 +7,6 @@ use crate::utils::Reader;
 
 pub(crate) trait RandomOracle {
     type Hasher<const SEP: u8>: Hasher + Default;
-    #[deprecated]
-    type LAMBDA: ArrayLength;
-    #[deprecated]
-    type PRODLAMBDA2: ArrayLength;
 
     /// Create hasher for `H0`
     fn h0_init() -> Self::Hasher<0> {
@@ -89,8 +81,6 @@ impl Reader for Hasher128Reader {
 
 impl RandomOracle for RandomOracleShake128 {
     type Hasher<const SEP: u8> = Hasher128<SEP>;
-    type LAMBDA = U16;
-    type PRODLAMBDA2 = U32;
 }
 
 impl<const SEP: u8> Hasher for Hasher128<SEP> {
@@ -110,8 +100,6 @@ pub(crate) struct RandomOracleShake192 {}
 
 impl RandomOracle for RandomOracleShake192 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
-    type LAMBDA = U24;
-    type PRODLAMBDA2 = U48;
 }
 
 impl<const SEP: u8> Hasher for Hasher256<SEP> {
@@ -145,8 +133,6 @@ impl Reader for Hasher256Reader {
 
 impl RandomOracle for RandomOracleShake256 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
-    type LAMBDA = U32;
-    type PRODLAMBDA2 = U64;
 }
 
 #[cfg(test)]

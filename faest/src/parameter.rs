@@ -46,10 +46,7 @@ pub(crate) trait BaseParameters {
         OutputLength = Sum<Self::LambdaBytes, B>,
     >;
     /// Associated random oracle
-    type RandomOracle: RandomOracle<
-        LAMBDA = Self::LambdaBytes,
-        PRODLAMBDA2 = Self::LambdaBytesTimes2,
-    >;
+    type RandomOracle: RandomOracle;
     /// Associated PRG
     type PRG: PseudoRandomGenerator<Lambda = Self::LambdaBytes>;
     type VC: VectorCommitment<Lambda = Self::LambdaBytes, LambdaTimes2 = Self::LambdaBytesTimes2>;
