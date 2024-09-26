@@ -454,7 +454,7 @@ where
 
     let a_t = &sigma[lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + lambda + 2 + l
         ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + 2 * lambda + 2 + l];
-    let b_t = P::Cypher::verify::<P>(
+    let b_t = P::Cypher::verify::<P::Tau>(
         GenericArray::from_slice(d),
         &gq.iter()
             .flat_map(|x| {

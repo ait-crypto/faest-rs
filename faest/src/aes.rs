@@ -7,7 +7,7 @@ use generic_array::{
 
 use crate::{
     fields::{BigGaloisField, ByteCombine, ByteCombineConstants, Field as _, SumPoly},
-    parameter::{BaseParameters, PARAM, PARAMOWF},
+    parameter::{BaseParameters, PARAMOWF},
     parameter::{QSProof, TauParameters},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
@@ -792,7 +792,7 @@ where
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn aes_verify<P, O>(
+pub(crate) fn aes_verify<O, Tau>(
     d: &GenericArray<u8, O::LBYTES>,
     gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     a_t: &GenericArray<u8, O::LAMBDABYTES>,
@@ -802,41 +802,34 @@ pub(crate) fn aes_verify<P, O>(
     owf_output: &GenericArray<u8, O::OutputSize>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
 where
-    P: PARAM<OWF = O>,
     O: PARAMOWF,
+    Tau: TauParameters,
 {
     let lambda = Field::<O>::LENGTH;
-    let l = <P::L as Unsigned>::to_usize();
+    let l = <O::L as Unsigned>::to_usize();
     let delta = Field::<O>::from(chall3);
     let lke = <O::LKE as Unsigned>::to_usize();
     let lenc = <O::LENC as Unsigned>::to_usize();
     let senc = <O::SENC as Unsigned>::to_usize();
 
     let mut new_gq: GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = gq.clone();
-    for i in 0..<P::Tau as TauParameters>::Tau0::USIZE {
-        let sdelta = P::Tau::decode_challenge(chall3, i);
-        for j in 0..<P::Tau as TauParameters>::K0::USIZE {
+    for i in 0..Tau::Tau0::USIZE {
+        let sdelta = Tau::decode_challenge(chall3, i);
+        for j in 0..Tau::K0::USIZE {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate().take(l / 8) {
-                    new_gq[<P::Tau as TauParameters>::K0::USIZE * i + j][k] =
-                        gq[<P::Tau as TauParameters>::K0::USIZE * i + j][k] ^ d[k];
+                    new_gq[Tau::K0::USIZE * i + j][k] = gq[Tau::K0::USIZE * i + j][k] ^ d[k];
                 }
             }
         }
     }
-    for i in 0..<P::Tau as TauParameters>::Tau1::USIZE {
-        let sdelta = P::Tau::decode_challenge(chall3, <P::Tau as TauParameters>::Tau0::USIZE + i);
-        for j in 0..<P::Tau as TauParameters>::K1::USIZE {
+    for i in 0..Tau::Tau1::USIZE {
+        let sdelta = Tau::decode_challenge(chall3, Tau::Tau0::USIZE + i);
+        for j in 0..Tau::K1::USIZE {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate().take(l / 8) {
-                    new_gq[<P::Tau as TauParameters>::Tau0::USIZE
-                        * <P::Tau as TauParameters>::K0::USIZE
-                        + <P::Tau as TauParameters>::K1::USIZE * i
-                        + j][k] = gq[<P::Tau as TauParameters>::Tau0::USIZE
-                        * <P::Tau as TauParameters>::K0::USIZE
-                        + <P::Tau as TauParameters>::K1::USIZE * i
-                        + j][k]
-                        ^ d[k];
+                    new_gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j][k] =
+                        gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j][k] ^ d[k];
                 }
             }
         }
@@ -914,7 +907,7 @@ mod test {
     use crate::{
         fields::{large_fields::NewFromU128, BigGaloisField, GF128, GF192, GF256},
         parameter::{
-            PARAM128S, PARAM192S, PARAM256S, PARAMOWF, PARAMOWF128, PARAMOWF192, PARAMOWF256,
+            PARAM, PARAM128S, PARAM192S, PARAM256S, PARAMOWF, PARAMOWF128, PARAMOWF192, PARAMOWF256,
         },
     };
 
@@ -2112,7 +2105,7 @@ mod test {
                 .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
-                let out = aes_verify::<PARAM128S, PARAMOWF128>(
+                let out = aes_verify::<PARAMOWF128, <PARAM128S as PARAM>::Tau>(
                     GenericArray::from_slice(&data.d[..]),
                     GenericArray::from_slice(
                         &data
@@ -2132,7 +2125,7 @@ mod test {
                     GF128::from(&out[..])
                 );
             } else if data.lambda == 192 {
-                let out = aes_verify::<PARAM192S, PARAMOWF192>(
+                let out = aes_verify::<PARAMOWF192, <PARAM192S as PARAM>::Tau>(
                     GenericArray::from_slice(&data.d[..]),
                     GenericArray::from_slice(
                         &data
@@ -2155,7 +2148,7 @@ mod test {
                     GF192::from(&out[..])
                 );
             } else {
-                let out = aes_verify::<PARAM256S, PARAMOWF256>(
+                let out = aes_verify::<PARAMOWF256, <PARAM256S as PARAM>::Tau>(
                     GenericArray::from_slice(&data.d[..]),
                     GenericArray::from_slice(
                         &data

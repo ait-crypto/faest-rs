@@ -6,7 +6,7 @@ use generic_array::{typenum::Unsigned, GenericArray};
 use crate::{
     aes::convert_to_bit,
     fields::{ByteCombine, ByteCombineConstants, Field as _, SumPoly},
-    parameter::{BaseParameters, QSProof, TauParameters, PARAM, PARAMOWF},
+    parameter::{BaseParameters, QSProof, TauParameters, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
@@ -429,7 +429,7 @@ where
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn em_verify<P, O>(
+pub(crate) fn em_verify<O, Tau>(
     d: &GenericArray<u8, O::LBYTES>,
     gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     a_t: &GenericArray<u8, O::LAMBDABYTES>,
@@ -439,8 +439,8 @@ pub(crate) fn em_verify<P, O>(
     owf_output: &GenericArray<u8, O::OutputSize>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
 where
-    P: PARAM<OWF = O>,
     O: PARAMOWF,
+    Tau: TauParameters,
 {
     let lambda = <O::LAMBDA as Unsigned>::to_usize();
     let l = <O::L as Unsigned>::to_usize();
@@ -450,30 +450,23 @@ where
     let r = <O::R as Unsigned>::to_u8();
 
     let mut new_gq: GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = gq.clone();
-    for i in 0..<P::Tau as TauParameters>::Tau0::USIZE {
-        let sdelta = P::Tau::decode_challenge(chall3, i);
-        for j in 0..<P::Tau as TauParameters>::K0::USIZE {
+    for i in 0..Tau::Tau0::USIZE {
+        let sdelta = Tau::decode_challenge(chall3, i);
+        for j in 0..Tau::K0::USIZE {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate() {
-                    new_gq[<P::Tau as TauParameters>::K0::USIZE * i + j][k] =
-                        gq[<P::Tau as TauParameters>::K0::USIZE * i + j][k] ^ d[k];
+                    new_gq[Tau::K0::USIZE * i + j][k] = gq[Tau::K0::USIZE * i + j][k] ^ d[k];
                 }
             }
         }
     }
-    for i in 0..<P::Tau as TauParameters>::Tau1::USIZE {
-        let sdelta = P::Tau::decode_challenge(chall3, <P::Tau as TauParameters>::Tau0::USIZE + i);
-        for j in 0..<P::Tau as TauParameters>::K1::USIZE {
+    for i in 0..Tau::Tau1::USIZE {
+        let sdelta = Tau::decode_challenge(chall3, Tau::Tau0::USIZE + i);
+        for j in 0..Tau::K1::USIZE {
             if sdelta[j] != 0 {
                 for (k, _) in d.iter().enumerate().take(l / 8) {
-                    new_gq[<P::Tau as TauParameters>::Tau0::USIZE
-                        * <P::Tau as TauParameters>::K0::USIZE
-                        + <P::Tau as TauParameters>::K1::USIZE * i
-                        + j][k] = gq[<P::Tau as TauParameters>::Tau0::USIZE
-                        * <P::Tau as TauParameters>::K0::USIZE
-                        + <P::Tau as TauParameters>::K1::USIZE * i
-                        + j][k]
-                        ^ d[k];
+                    new_gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j][k] =
+                        gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j][k] ^ d[k];
                 }
             }
         }
@@ -526,8 +519,8 @@ mod test {
         aes::convert_to_bit,
         fields::{large_fields::NewFromU128, GF128, GF192, GF256},
         parameter::{
-            PARAM128FEM, PARAM128SEM, PARAM192FEM, PARAM192SEM, PARAM256FEM, PARAM256SEM,
-            PARAMOWF128, PARAMOWF128EM, PARAMOWF192EM, PARAMOWF256EM,
+            PARAM, PARAM128FEM, PARAM128SEM, PARAM192FEM, PARAM192SEM, PARAM256FEM, PARAM256SEM,
+            PARAMOWF128EM, PARAMOWF192EM, PARAMOWF256EM,
         },
     };
 
@@ -754,7 +747,6 @@ mod test {
         delta: Field<O>,
     ) -> Box<GenericArray<Field<O>, O::SENC>>
     where
-        P: PARAM<OWF = O>,
         O: PARAMOWF,
     {
         match (mkey, mtag) {
@@ -977,7 +969,6 @@ mod test {
         delta: Field<O>,
     ) -> Reveal<O>
     where
-        P: PARAM<OWF = O>,
         O: PARAMOWF,
     {
         if mkey {
@@ -1215,7 +1206,7 @@ mod test {
         for data in database {
             if data.lambda == 128 {
                 let res = if data.tau == 11 {
-                    em_verify::<PARAM128SEM, PARAMOWF128EM>(
+                    em_verify::<PARAMOWF128EM, <PARAM128SEM as PARAM>::Tau>(
                         GenericArray::from_slice(&data.d),
                         GenericArray::from_slice(
                             &data
@@ -1231,7 +1222,7 @@ mod test {
                         GenericArray::from_slice(&data.output),
                     )
                 } else {
-                    em_verify::<PARAM128FEM, PARAMOWF128EM>(
+                    em_verify::<PARAMOWF128EM, <PARAM128FEM as PARAM>::Tau>(
                         GenericArray::from_slice(&data.d),
                         GenericArray::from_slice(
                             &data
@@ -1250,7 +1241,7 @@ mod test {
                 assert_eq!(res, *GenericArray::from_slice(&data.qt));
             } else if data.lambda == 192 {
                 let res = if data.tau == 16 {
-                    em_verify::<PARAM192SEM, PARAMOWF192EM>(
+                    em_verify::<PARAMOWF192EM, <PARAM192SEM as PARAM>::Tau>(
                         GenericArray::from_slice(&data.d),
                         GenericArray::from_slice(
                             &data
@@ -1266,7 +1257,7 @@ mod test {
                         GenericArray::from_slice(&data.output),
                     )
                 } else {
-                    em_verify::<PARAM192FEM, PARAMOWF192EM>(
+                    em_verify::<PARAMOWF192EM, <PARAM192FEM as PARAM>::Tau>(
                         GenericArray::from_slice(&data.d),
                         GenericArray::from_slice(
                             &data
@@ -1285,7 +1276,7 @@ mod test {
                 assert_eq!(res, *GenericArray::from_slice(&data.qt));
             } else {
                 let res = if data.tau == 22 {
-                    em_verify::<PARAM256SEM, PARAMOWF256EM>(
+                    em_verify::<PARAMOWF256EM, <PARAM256SEM as PARAM>::Tau>(
                         GenericArray::from_slice(&data.d),
                         GenericArray::from_slice(
                             &data
@@ -1301,7 +1292,7 @@ mod test {
                         GenericArray::from_slice(&data.output),
                     )
                 } else {
-                    em_verify::<PARAM256FEM, PARAMOWF256EM>(
+                    em_verify::<PARAMOWF256EM, <PARAM256FEM as PARAM>::Tau>(
                         GenericArray::from_slice(&data.d),
                         GenericArray::from_slice(
                             &data

@@ -139,7 +139,7 @@ pub(crate) trait Variant<O: PARAMOWF> {
 
     ///input : Masked witness (l bits), Vole Key ((l + lambda) * Lambda bits), hash of constrints values (lambda bits), chall2 (3*lambda + 64 bits), chall3 (lambda bits), public key
     ///output q_tilde - delta * a_tilde (lambda bytes)
-    fn verify<P>(
+    fn verify<Tau>(
         d: &GenericArray<u8, O::LBYTES>,
         gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         a_t: &GenericArray<u8, O::LAMBDABYTES>,
@@ -149,7 +149,7 @@ pub(crate) trait Variant<O: PARAMOWF> {
         owf_output: &GenericArray<u8, O::OutputSize>,
     ) -> GenericArray<u8, O::LAMBDABYTES>
     where
-        P: PARAM<OWF = O>;
+        Tau: TauParameters;
 
     ///input : a random number generator
     /// output = pk : input, output; sk : input, key
@@ -1287,7 +1287,7 @@ impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
         aes_prove::<OWF>(w, u, gv, owf_input, owf_output, chall)
     }
 
-    fn verify<P>(
+    fn verify<Tau>(
         d: &GenericArray<u8, OWF::LBYTES>,
         gq: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
         a_t: &GenericArray<u8, OWF::LAMBDABYTES>,
@@ -1297,9 +1297,9 @@ impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
         owf_output: &GenericArray<u8, OWF::OutputSize>,
     ) -> GenericArray<u8, OWF::LAMBDABYTES>
     where
-        P: PARAM<OWF = OWF>,
+        Tau: TauParameters,
     {
-        aes_verify::<P, OWF>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
+        aes_verify::<OWF, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
     }
 
     ///Input : the parameter of the faest protocol
@@ -1353,7 +1353,7 @@ impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
         em_prove::<OWF>(w, u, gv, owf_input, owf_output, chall)
     }
 
-    fn verify<P>(
+    fn verify<Tau>(
         d: &GenericArray<u8, OWF::LBYTES>,
         gq: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
         a_t: &GenericArray<u8, OWF::LAMBDABYTES>,
@@ -1363,9 +1363,9 @@ impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
         owf_output: &GenericArray<u8, OWF::OutputSize>,
     ) -> GenericArray<u8, OWF::LAMBDABYTES>
     where
-        P: PARAM<OWF = OWF>,
+        Tau: TauParameters,
     {
-        em_verify::<P, OWF>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
+        em_verify::<OWF, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
     }
 
     fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<OWF> {
