@@ -18,8 +18,8 @@ use crate::{
 
 type KeyCstrnts<O> = (
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::SKE>>,
-    Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::SKE>>,
-    Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::PRODRUN128>>,
+    Option<Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::SKE>>>,
+    Option<Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::PRODRUN128>>>,
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::PRODRUN128>>,
 );
 
@@ -451,7 +451,7 @@ where
                 iwd += 128;
             }
         }
-        (a.0, a.1, k, vk)
+        (a.0, Some(a.1), Some(k), vk)
     } else {
         let _kc = <O::SKE as Unsigned>::to_u8();
         let mut b: Box<GenericArray<O::Field, O::SKE>> = GenericArray::default_boxed();
@@ -487,12 +487,7 @@ where
                 dorotword = !dorotword;
             }
         }
-        (
-            b,
-            GenericArray::default_boxed(),
-            GenericArray::default_boxed(),
-            q_k,
-        )
+        (b, None, None, q_k)
     }
 }
 
@@ -717,6 +712,8 @@ where
         &GenericArray::default_boxed(),
         O::Field::default(),
     );
+    let a1 = a1.unwrap();
+    let k = k.unwrap();
 
     let a_01 = aes_enc_cstrnts::<O>(
         owf_input[..16].try_into().unwrap(),
@@ -729,7 +726,7 @@ where
                 .collect::<Vec<u8>>()[..],
         ),
         GenericArray::from_slice(&new_v[lke..lke + lenc]),
-        GenericArray::from_slice(&k),
+        &k,
         GenericArray::from_slice(&vk),
         false,
         &GenericArray::default_boxed(),
@@ -750,7 +747,7 @@ where
                     .collect::<Vec<u8>>()[..],
             ),
             GenericArray::from_slice(&new_v[(lke + lenc)..l]),
-            GenericArray::from_slice(&k),
+            &k,
             GenericArray::from_slice(&vk),
             false,
             &GenericArray::default_boxed(),
@@ -905,6 +902,8 @@ where
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::needless_range_loop)]
+
     use super::*;
 
     use crate::{
@@ -1293,7 +1292,7 @@ mod test {
                     .map(|res| GF128::new(res[0] + ((res[1]) << 64), 0))
                     .collect();
 
-                let mut res = aes_key_exp_cstrnts::<PARAMOWF128>(
+                let res = aes_key_exp_cstrnts::<PARAMOWF128>(
                     GenericArray::from_slice(
                         &(data
                             .w
@@ -1306,23 +1305,17 @@ mod test {
                     GenericArray::from_slice(fields_q),
                     delta,
                 );
-                if res.1 == GenericArray::default_boxed() {
-                    for i in 0..field_ab.len() {
-                        res.1[i] = GF128::default();
-                    }
-                }
-                if res.2 == GenericArray::default_boxed() {
-                    for i in 0..field_ab.len() {
-                        res.2[i] = GF128::default();
-                    }
-                }
-
-                #[allow(clippy::needless_range_loop)]
                 for i in 0..field_ab.len() {
                     assert_eq!(field_ab[i].0, res.0[i]);
-                    assert_eq!(field_ab[i].1, res.1[i]);
                 }
-                assert_eq!(fields_res_1, res.2);
+                if let Some(res_1) = res.1 {
+                    for i in 0..field_ab.len() {
+                        assert_eq!(field_ab[i].1, res_1[i]);
+                    }
+                }
+                if let Some(res_2) = res.2 {
+                    assert_eq!(fields_res_1, res_2);
+                }
                 assert_eq!(*GenericArray::from_slice(&fields_res_2), *res.3);
             } else if data.lambda == 192 {
                 let fields_v = &(data
@@ -1384,12 +1377,17 @@ mod test {
                     GenericArray::from_slice(fields_q),
                     delta,
                 );
-                #[allow(clippy::needless_range_loop)]
                 for i in 0..field_ab.len() {
                     assert_eq!(field_ab[i].0, res.0[i]);
-                    assert_eq!(field_ab[i].1, res.1[i]);
                 }
-                assert_eq!(fields_res_1, res.2);
+                if let Some(res_1) = res.1 {
+                    for i in 0..field_ab.len() {
+                        assert_eq!(field_ab[i].1, res_1[i]);
+                    }
+                }
+                if let Some(res_2) = res.2 {
+                    assert_eq!(fields_res_1, res_2);
+                }
                 assert_eq!(*GenericArray::from_slice(&fields_res_2), *res.3);
             } else {
                 let fields_v = &(data
@@ -1451,12 +1449,17 @@ mod test {
                     GenericArray::from_slice(fields_q),
                     delta,
                 );
-                #[allow(clippy::needless_range_loop)]
                 for i in 0..field_ab.len() {
                     assert_eq!(field_ab[i].0, res.0[i]);
-                    assert_eq!(field_ab[i].1, res.1[i]);
                 }
-                assert_eq!(fields_res_1, res.2);
+                if let Some(res_1) = res.1 {
+                    for i in 0..field_ab.len() {
+                        assert_eq!(field_ab[i].1, res_1[i]);
+                    }
+                }
+                if let Some(res_2) = res.2 {
+                    assert_eq!(fields_res_1, res_2);
+                }
                 assert_eq!(*GenericArray::from_slice(&fields_res_2), *res.3);
             }
         }
