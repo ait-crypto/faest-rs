@@ -14,6 +14,7 @@ use crate::{
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     },
     universal_hashing::{ZKHasherInit, ZKHasherProcess},
+    utils::convert_gq,
 };
 
 type Field<O> = <<O as PARAMOWF>::BaseParams as BaseParameters>::Field;
@@ -812,51 +813,9 @@ where
     let lenc = <O::LENC as Unsigned>::to_usize();
     let senc = <O::SENC as Unsigned>::to_usize();
 
-    let mut new_gq: GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = gq.clone();
-    for i in 0..Tau::Tau0::USIZE {
-        let sdelta = Tau::decode_challenge(chall3, i);
-        for j in 0..Tau::K0::USIZE {
-            if sdelta[j] != 0 {
-                for (gq_k, d_k) in zip(new_gq[Tau::K0::USIZE * i + j].iter_mut(), d).take(l / 8) {
-                    *gq_k ^= d_k;
-                }
-            }
-        }
-    }
-    for i in 0..Tau::Tau1::USIZE {
-        let sdelta = Tau::decode_challenge(chall3, Tau::Tau0::USIZE + i);
-        for j in 0..Tau::K1::USIZE {
-            if sdelta[j] != 0 {
-                for (gq_k, d_k) in zip(
-                    new_gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j].iter_mut(),
-                    d,
-                )
-                .take(l / 8)
-                {
-                    *gq_k ^= d_k;
-                }
-            }
-        }
-    }
-
-    let mut temp_q: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
-    for i in 0..(l + lambda) / 8 {
-        for k in 0..8 {
-            for j in 0..lambda / 8 {
-                let mut temp = 0;
-                for l in 0..8_usize {
-                    temp += ((new_gq[(j * 8) + l][i] >> k) & 1) << l;
-                }
-                temp_q[i * lambda + k * lambda / 8 + j] = temp;
-            }
-        }
-    }
-
+    let new_q = convert_gq::<O, Tau>(d, gq, chall3);
     let mut zk_hasher =
         <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
-    let new_q = GenericArray::<Field<O>, O::LAMBDAL>::from_iter(
-        temp_q.chunks(O::LAMBDABYTES::USIZE).map(Field::<O>::from),
-    );
 
     let (b1, _, _, qk) = aes_key_exp_cstrnts::<O>(
         &GenericArray::default_boxed(),

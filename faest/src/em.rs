@@ -12,6 +12,7 @@ use crate::{
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     },
     universal_hashing::{ZKHasherInit, ZKHasherProcess},
+    utils::convert_gq,
 };
 
 type Field<O> = <<O as PARAMOWF>::BaseParams as BaseParameters>::Field;
@@ -449,48 +450,7 @@ where
     let nk = <O::NK as Unsigned>::to_u8();
     let r = <O::R as Unsigned>::to_u8();
 
-    let mut new_gq: GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = gq.clone();
-    for i in 0..Tau::Tau0::USIZE {
-        let sdelta = Tau::decode_challenge(chall3, i);
-        for j in 0..Tau::K0::USIZE {
-            if sdelta[j] != 0 {
-                for (gq_k, d_k) in zip(new_gq[Tau::K0::USIZE * i + j].iter_mut(), d).take(l / 8) {
-                    *gq_k ^= d_k;
-                }
-            }
-        }
-    }
-    for i in 0..Tau::Tau1::USIZE {
-        let sdelta = Tau::decode_challenge(chall3, Tau::Tau0::USIZE + i);
-        for j in 0..Tau::K1::USIZE {
-            if sdelta[j] != 0 {
-                for (gq_k, d_k) in zip(
-                    new_gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j].iter_mut(),
-                    d,
-                )
-                .take(l / 8)
-                {
-                    *gq_k ^= d_k;
-                }
-            }
-        }
-    }
-
-    let mut temp_q: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
-    for i in 0..(l + lambda) / 8 {
-        for k in 0..8 {
-            for j in 0..lambda / 8 {
-                let mut temp = 0;
-                for l in 0..8_usize {
-                    temp += ((new_gq[(j * 8) + l][i] >> k) & 1) << l;
-                }
-                temp_q[j + k * (lambda / 8) + i * lambda] = temp;
-            }
-        }
-    }
-    let new_q = GenericArray::<Field<O>, O::LAMBDAL>::from_iter(
-        temp_q.chunks(O::LAMBDABYTES::USIZE).map(Field::<O>::from),
-    );
+    let new_q = convert_gq::<O, Tau>(d, gq, chall3);
     let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
     let b = em_enc_cstrnts_mkey1::<O>(
         owf_output,
