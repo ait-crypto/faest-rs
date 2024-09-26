@@ -15,7 +15,7 @@ use crate::{
 
 type Reveal<O> = (
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>,
-    Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>,
+    Option<Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>>,
 );
 
 pub(crate) fn em_extendedwitness<O>(
@@ -241,13 +241,12 @@ where
             true,
             O::Field::default(),
         );
-        let (mut a0, mut a1): Reveal<O> =
-            (GenericArray::default_boxed(), GenericArray::default_boxed());
+        let (mut a0, mut a1) = (GenericArray::default_boxed(), GenericArray::default_boxed());
         for j in 0..senc {
             a0[j] = v_s_b[j] * vs[j];
             a1[j] = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + O::Field::ONE + a0[j];
         }
-        (a0, a1)
+        (a0, Some(a1))
     } else {
         let new_output = convert_to_bit::<O::Field, O::LAMBDA>(output);
         let mut new_x: Box<GenericArray<O::Field, O::LAMBDAR1>> = GenericArray::default_boxed();
@@ -267,7 +266,7 @@ where
         let immut = delta * delta;
 
         let b = zip(qs, qs_b).map(|(q, qb)| (q * qb) + immut).collect();
-        (b, GenericArray::default_boxed())
+        (b, None)
     }
 }
 
@@ -323,6 +322,8 @@ where
         false,
         O::Field::default(),
     );
+    // FIXME
+    let a1 = a1.unwrap();
     let u_s = O::Field::from(&u[l / 8..]);
     let v_s = O::Field::sum_poly(&new_v[l..l + lambda]);
 
@@ -948,7 +949,7 @@ mod test {
                     .iter()
                     .map(|v| GF128::new(v[0] as u128 + ((v[1] as u128) << 64), 0))
                     .collect::<Vec<GF128>>()[..];
-                let res = em_enc_cstrnts::<PARAM128SEM, PARAMOWF128EM>(
+                let (res_0, res_1) = em_enc_cstrnts::<PARAM128SEM, PARAMOWF128EM>(
                     GenericArray::from_slice(&data.out),
                     GenericArray::from_slice(&data.x),
                     GenericArray::from_slice(&data.w),
@@ -968,8 +969,14 @@ mod test {
                         0,
                     ));
                 }
-                for i in 0..a0.len() {
-                    assert_eq!((res.0[i], res.1[i]), (a0[i], a1[i]));
+                if let Some(res_1) = res_1 {
+                    for i in 0..a0.len() {
+                        assert_eq!((res_0[i], res_1[i]), (a0[i], a1[i]));
+                    }
+                } else {
+                    for i in 0..a0.len() {
+                        assert_eq!((res_0[i], GF128::default()), (a0[i], a1[i]));
+                    }
                 }
             } else if data.lambda == 192 {
                 let vq = &data
@@ -977,7 +984,7 @@ mod test {
                     .iter()
                     .map(|v| GF192::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128))
                     .collect::<Vec<GF192>>()[..];
-                let res = em_enc_cstrnts::<PARAM192SEM, PARAMOWF192EM>(
+                let (res_0, res_1) = em_enc_cstrnts::<PARAM192SEM, PARAMOWF192EM>(
                     GenericArray::from_slice(&data.out),
                     GenericArray::from_slice(&data.x),
                     GenericArray::from_slice(&data.w),
@@ -997,8 +1004,14 @@ mod test {
                         data.ab[i][6] as u128,
                     ));
                 }
-                for i in 0..res.0.len() {
-                    assert_eq!((res.0[i], res.1[i]), (a0[i], a1[i]));
+                if let Some(res_1) = res_1 {
+                    for i in 0..a0.len() {
+                        assert_eq!((res_0[i], res_1[i]), (a0[i], a1[i]));
+                    }
+                } else {
+                    for i in 0..a0.len() {
+                        assert_eq!((res_0[i], GF192::default()), (a0[i], a1[i]));
+                    }
                 }
             } else {
                 let vq = &data
@@ -1011,7 +1024,7 @@ mod test {
                         )
                     })
                     .collect::<Vec<GF256>>()[..];
-                let res = em_enc_cstrnts::<PARAM256SEM, PARAMOWF256EM>(
+                let (res_0, res_1) = em_enc_cstrnts::<PARAM256SEM, PARAMOWF256EM>(
                     GenericArray::from_slice(&data.out),
                     GenericArray::from_slice(&data.x),
                     GenericArray::from_slice(&data.w),
@@ -1031,8 +1044,14 @@ mod test {
                         data.ab[i][6] as u128 + ((data.ab[i][7] as u128) << 64),
                     ));
                 }
-                for i in 0..res.0.len() {
-                    assert_eq!((res.0[i], res.1[i]), (a0[i], a1[i]));
+                if let Some(res_1) = res_1 {
+                    for i in 0..a0.len() {
+                        assert_eq!((res_0[i], res_1[i]), (a0[i], a1[i]));
+                    }
+                } else {
+                    for i in 0..a0.len() {
+                        assert_eq!((res_0[i], GF256::default()), (a0[i], a1[i]));
+                    }
                 }
             }
         }
