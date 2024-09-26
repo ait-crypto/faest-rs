@@ -107,17 +107,16 @@ where
 {
     let mut res = GenericArray::default_boxed();
     let mut index = 0;
-    let nst = <O::NST as Unsigned>::to_usize();
     //Step 2-3
-    for j in 0..4 * nst {
+    for j in 0..4 * O::NST::USIZE {
         res[index] = O::Field::byte_combine(z[8 * j..8 * (j + 1)].try_into().unwrap())
             + O::Field::byte_combine(x[8 * j..8 * (j + 1)].try_into().unwrap());
         index += 1;
     }
     //Step 4
-    for j in 1..<O::R as Unsigned>::to_usize() {
-        for c in 0..nst {
-            let i: usize = 32 * nst * j + 32 * c;
+    for j in 1..O::R::USIZE {
+        for c in 0..O::NST::USIZE {
+            let i: usize = 32 * O::NST::USIZE * j + 32 * c;
             let mut z_hat = [O::Field::default(); 4];
             let mut x_hat = [O::Field::default(); 4];
             for r in 0..4 {
