@@ -16,7 +16,7 @@ use crate::{
 
 type Reveal<O> = (
     Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>,
-    Option<Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>>,
+    Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>,
 );
 
 pub(crate) fn em_extendedwitness<O>(
@@ -219,14 +219,11 @@ where
     res
 }
 
-#[allow(clippy::too_many_arguments)]
-fn em_enc_cstrnts<P, O, const MKEY: bool>(
+fn em_enc_cstrnts_mkey0<P, O>(
     output: &GenericArray<u8, O::OutputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     w: &GenericArray<u8, O::LBYTES>,
     v: &GenericArray<O::Field, O::L>,
-    q: Option<&GenericArray<O::Field, O::L>>,
-    delta: O::Field,
 ) -> Reveal<O>
 where
     P: PARAM<OWF = O>,
@@ -236,55 +233,67 @@ where
     let senc = <O::SENC as Unsigned>::to_usize();
     let nst = <O::NST as Unsigned>::to_usize();
     let r = <O::R as Unsigned>::to_usize();
-    if !MKEY {
-        let new_w = convert_to_bit::<O::Field, O::L>(w);
-        let new_x = convert_to_bit::<O::Field, O::LAMBDAR1>(&x[..4 * nst * (r + 1)]);
-        let mut w_out: Box<GenericArray<O::Field, O::LAMBDA>> = GenericArray::default_boxed();
-        let mut index = 0;
-        for i in 0..lambda / 8 {
-            for j in 0..8 {
-                w_out[index] = O::Field::ONE * ((output[i] >> j) & 1) + new_w[i * 8 + j];
-                index += 1;
-            }
+    let new_w = convert_to_bit::<O::Field, O::L>(w);
+    let new_x = convert_to_bit::<O::Field, O::LAMBDAR1>(&x[..4 * nst * (r + 1)]);
+    let mut w_out: Box<GenericArray<O::Field, O::LAMBDA>> = GenericArray::default_boxed();
+    let mut index = 0;
+    for i in 0..lambda / 8 {
+        for j in 0..8 {
+            w_out[index] = O::Field::ONE * ((output[i] >> j) & 1) + new_w[i * 8 + j];
+            index += 1;
         }
-        let v_out = GenericArray::from_slice(&v[..lambda]);
-        let s = em_enc_fwd::<O>(Either::Left(w), Some(Either::Left(&x[..4 * nst * (r + 1)])));
-        let vs = em_enc_fwd::<O>(Either::Right(v), None);
-        let s_b = em_enc_bkwd::<P, O>(&new_x, &new_w, &w_out, false, false, O::Field::default());
-        let v_s_b = em_enc_bkwd::<P, O>(
-            &GenericArray::default_boxed(),
-            v,
-            v_out,
-            false,
-            true,
-            O::Field::default(),
-        );
-        let (mut a0, mut a1) = (GenericArray::default_boxed(), GenericArray::default_boxed());
-        for j in 0..senc {
-            a0[j] = v_s_b[j] * vs[j];
-            a1[j] = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + O::Field::ONE + a0[j];
-        }
-        (a0, Some(a1))
-    } else {
-        let mut new_x: Box<GenericArray<O::Field, O::LAMBDAR1>> = GenericArray::default_boxed();
-        let mut index = 0;
-        for byte in x.iter().take(4 * nst * (r + 1)) {
-            for j in 0..8 {
-                new_x[index] = delta * ((byte >> j) & 1);
-                index += 1;
-            }
-        }
-        let q = q.unwrap();
-        let q_out = Box::<GenericArray<O::Field, O::LAMBDA>>::from_iter(
-            (0..lambda).map(|idx| delta * ((output[idx / 8] >> (idx % 8)) & 1) + q[idx]),
-        );
-        let qs = em_enc_fwd::<O>(Either::Right(q), Some(Either::Right(new_x.as_slice())));
-        let qs_b = em_enc_bkwd::<P, O>(&new_x, q, &q_out, true, false, delta);
-        let immut = delta * delta;
-
-        let b = zip(qs, qs_b).map(|(q, qb)| (q * qb) + immut).collect();
-        (b, None)
     }
+    let v_out = GenericArray::from_slice(&v[..lambda]);
+    let s = em_enc_fwd::<O>(Either::Left(w), Some(Either::Left(&x[..4 * nst * (r + 1)])));
+    let vs = em_enc_fwd::<O>(Either::Right(v), None);
+    let s_b = em_enc_bkwd::<P, O>(&new_x, &new_w, &w_out, false, false, O::Field::default());
+    let v_s_b = em_enc_bkwd::<P, O>(
+        &GenericArray::default_boxed(),
+        v,
+        v_out,
+        false,
+        true,
+        O::Field::default(),
+    );
+    let (mut a0, mut a1) = (GenericArray::default_boxed(), GenericArray::default_boxed());
+    for j in 0..senc {
+        a0[j] = v_s_b[j] * vs[j];
+        a1[j] = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + O::Field::ONE + a0[j];
+    }
+    (a0, a1)
+}
+
+fn em_enc_cstrnts_mkey1<P, O>(
+    output: &GenericArray<u8, O::OutputSize>,
+    x: &GenericArray<u8, O::LAMBDAR1BYTE>,
+    q: &GenericArray<O::Field, O::L>,
+    delta: O::Field,
+) -> Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>
+where
+    P: PARAM<OWF = O>,
+    O: PARAMOWF,
+{
+    let lambda = <P::LAMBDA as Unsigned>::to_usize();
+    let nst = <O::NST as Unsigned>::to_usize();
+    let r = <O::R as Unsigned>::to_usize();
+
+    // let new_output = convert_to_bit::<O::Field, O::LAMBDA>(output);
+    let mut new_x: Box<GenericArray<O::Field, O::LAMBDAR1>> = GenericArray::default_boxed();
+    let mut index = 0;
+    for byte in x.iter().take(4 * nst * (r + 1)) {
+        for j in 0..8 {
+            new_x[index] = delta * ((byte >> j) & 1);
+            index += 1;
+        }
+    }
+    let q_out = Box::<GenericArray<O::Field, O::LAMBDA>>::from_iter(
+        (0..lambda).map(|idx| delta * ((output[idx / 8] >> (idx % 8)) & 1) + q[idx]),
+    );
+    let qs = em_enc_fwd::<O>(Either::Right(q), Some(Either::Right(new_x.as_slice())));
+    let qs_b = em_enc_bkwd::<P, O>(&new_x, q, &q_out, true, false, delta);
+    let immut = delta * delta;
+
+    zip(qs, qs_b).map(|(q, qb)| (q * qb) + immut).collect()
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
@@ -321,7 +330,7 @@ where
         temp_v.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
     );
     let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
-    let (a0, a1) = em_enc_cstrnts::<P, O, false>(
+    let (a0, a1) = em_enc_cstrnts_mkey0::<P, O>(
         owf_output,
         &x.0.chunks(8)
             .flat_map(|x| {
@@ -335,11 +344,7 @@ where
             .collect::<GenericArray<u8, _>>(),
         w,
         GenericArray::from_slice(&new_v[..l]),
-        None,
-        O::Field::default(),
     );
-    // FIXME
-    let a1 = a1.unwrap();
     let u_s = O::Field::from(&u[l / 8..]);
     let v_s = O::Field::sum_poly(&new_v[l..l + lambda]);
 
@@ -424,7 +429,7 @@ where
         temp_q.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
     );
     let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
-    let (b, _) = em_enc_cstrnts::<P, O, true>(
+    let b = em_enc_cstrnts_mkey1::<P, O>(
         owf_output,
         &x.0.chunks(8)
             .flat_map(|x| {
@@ -436,9 +441,7 @@ where
             })
             .take((lambda / 8) * (r as usize + 1))
             .collect::<GenericArray<u8, _>>(),
-        &GenericArray::default_boxed(),
-        &GenericArray::default_boxed(),
-        Some(GenericArray::from_slice(&new_q[..l])),
+        GenericArray::from_slice(&new_q[..l]),
         delta,
     );
 
@@ -936,19 +939,12 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct EmEncCstrnts {
         lambda: u16,
-
         mkey: u8,
-
         x: Vec<u8>,
-
         w: Vec<u8>,
-
         out: Vec<u8>,
-
         delta: Vec<u8>,
-
         vq: Vec<[u64; 4]>,
-
         ab: Vec<[u64; 8]>,
     }
 
@@ -966,9 +962,9 @@ mod test {
         O: PARAMOWF,
     {
         if mkey {
-            super::em_enc_cstrnts::<P, O, true>(output, x, w, v, Some(q), delta)
+            super::em_enc_cstrnts_mkey1::<P, O>(output, x, q, delta)
         } else {
-            super::em_enc_cstrnts::<P, O, false>(output, x, w, v, None, delta)
+            super::em_enc_cstrnts_mkey0::<P, O>(output, x, w, v)
         }
     }
 
