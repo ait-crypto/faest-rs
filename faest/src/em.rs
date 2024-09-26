@@ -743,7 +743,7 @@ mod test {
         res: Vec<[u64; 4]>,
     }
 
-    fn em_enc_bkwd<P, O>(
+    fn em_enc_bkwd<O>(
         x: &GenericArray<Field<O>, O::LAMBDAR1>,
         z: &GenericArray<Field<O>, O::L>,
         z_out: &GenericArray<Field<O>, O::LAMBDA>,
@@ -802,7 +802,7 @@ mod test {
                             .collect::<Vec<GF128>>(),
                     )
                 };
-                let res = em_enc_bkwd::<PARAM128SEM, PARAMOWF128EM>(
+                let res = em_enc_bkwd::<PARAMOWF128EM>(
                     GenericArray::from_slice(&x_in),
                     GenericArray::from_slice(&z_in),
                     GenericArray::from_slice(&z_out_in),
@@ -858,7 +858,7 @@ mod test {
                             .collect(),
                     )
                 };
-                let res = em_enc_bkwd::<PARAM192SEM, PARAMOWF192EM>(
+                let res = em_enc_bkwd::<PARAMOWF192EM>(
                     GenericArray::from_slice(&x_in),
                     GenericArray::from_slice(&z_in),
                     GenericArray::from_slice(&z_out_in),
@@ -926,7 +926,7 @@ mod test {
                             .collect(),
                     )
                 };
-                let res = em_enc_bkwd::<PARAM256SEM, PARAMOWF256EM>(
+                let res = em_enc_bkwd::<PARAMOWF256EM>(
                     GenericArray::from_slice(&x_in),
                     GenericArray::from_slice(&z_in),
                     GenericArray::from_slice(&z_out_in),
