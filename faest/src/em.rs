@@ -162,33 +162,106 @@ where
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
 ///
 ///One of the first path to optimize the code could be to do the distinction
-#[allow(clippy::too_many_arguments)]
-fn em_enc_bkwd<P, O>(
+fn em_enc_bkwd_mkey0_mtag0<O>(
     x: &GenericArray<Field<O>, O::LAMBDAR1>,
     z: &GenericArray<Field<O>, O::L>,
     z_out: &GenericArray<Field<O>, O::LAMBDA>,
-    mkey: bool,
-    mtag: bool,
-    delta: Field<O>,
 ) -> Box<GenericArray<Field<O>, O::SENC>>
 where
-    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
     let mut res: Box<GenericArray<Field<O>, O::SENC>> = GenericArray::default_boxed();
     let mut index = 0;
     let r = <O::R as Unsigned>::to_usize();
     let nst = <O::NST as Unsigned>::to_usize();
-    let lambda = <P::LAMBDA as Unsigned>::to_usize();
-    let immut = if !mtag {
-        if mkey {
-            delta
-        } else {
-            Field::<O>::ONE
+    let lambda = <O::LAMBDA as Unsigned>::to_usize();
+
+    //Step 2
+    for j in 0..r {
+        for c in 0..nst {
+            //Step 4
+            for k in 0..4 {
+                let mut icol = (c + nst - k) % nst;
+                if nst == 8 && k >= 2 {
+                    icol = (icol + nst - 1) % nst;
+                }
+                let ird = lambda + 32 * nst * j + 32 * icol + 8 * k;
+                let z_t = if j < r - 1 {
+                    z[ird..ird + 8].to_vec()
+                } else {
+                    let z_out_t = &z_out[ird - 32 * nst * (j + 1)..ird - 32 * nst * (j + 1) + 8];
+                    zip(z_out_t, &x[ird..ird + 8])
+                        .map(|(z, x)| *z + *x)
+                        .collect::<Vec<_>>()
+                };
+                let mut y_t = [Field::<O>::default(); 8];
+                for i in 0..8 {
+                    y_t[i] = z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]
+                }
+                y_t[0] += Field::<O>::ONE;
+                y_t[2] += Field::<O>::ONE;
+                res[index] = Field::<O>::byte_combine(&y_t);
+                index += 1;
+            }
         }
-    } else {
-        Field::<O>::default()
-    };
+    }
+    res
+}
+
+fn em_enc_bkwd_mkey0_mtag1<O>(
+    z: &GenericArray<Field<O>, O::L>,
+    z_out: &GenericArray<Field<O>, O::LAMBDA>,
+) -> Box<GenericArray<Field<O>, O::SENC>>
+where
+    O: PARAMOWF,
+{
+    let mut res: Box<GenericArray<Field<O>, O::SENC>> = GenericArray::default_boxed();
+    let mut index = 0;
+    let r = <O::R as Unsigned>::to_usize();
+    let nst = <O::NST as Unsigned>::to_usize();
+    let lambda = <O::LAMBDA as Unsigned>::to_usize();
+    //Step 2
+    for j in 0..r {
+        for c in 0..nst {
+            //Step 4
+            for k in 0..4 {
+                let mut icol = (c + nst - k) % nst;
+                if nst == 8 && k >= 2 {
+                    icol = (icol + nst - 1) % nst;
+                }
+                let ird = lambda + 32 * nst * j + 32 * icol + 8 * k;
+                let z_t = if j < r - 1 {
+                    &z[ird..ird + 8]
+                } else {
+                    &z_out[ird - 32 * nst * (j + 1)..ird - 32 * nst * (j + 1) + 8]
+                };
+                let mut y_t = [Field::<O>::default(); 8];
+                for i in 0..8 {
+                    y_t[i] = z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]
+                }
+                res[index] = Field::<O>::byte_combine(&y_t);
+                index += 1;
+            }
+        }
+    }
+    res
+}
+
+fn em_enc_bkwd_mkey1_mtag0<O>(
+    x: &GenericArray<Field<O>, O::LAMBDAR1>,
+    z: &GenericArray<Field<O>, O::L>,
+    z_out: &GenericArray<Field<O>, O::LAMBDA>,
+    delta: Field<O>,
+) -> Box<GenericArray<Field<O>, O::SENC>>
+where
+    O: PARAMOWF,
+{
+    let mut res: Box<GenericArray<Field<O>, O::SENC>> = GenericArray::default_boxed();
+    let mut index = 0;
+    let r = <O::R as Unsigned>::to_usize();
+    let nst = <O::NST as Unsigned>::to_usize();
+    let lambda = <O::LAMBDA as Unsigned>::to_usize();
+    let immut = delta;
     //Step 2
     for j in 0..r {
         for c in 0..nst {
@@ -221,17 +294,16 @@ where
     res
 }
 
-fn em_enc_cstrnts_mkey0<P, O>(
+fn em_enc_cstrnts_mkey0<O>(
     output: &GenericArray<u8, O::OutputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     w: &GenericArray<u8, O::LBYTES>,
     v: &GenericArray<Field<O>, O::L>,
 ) -> Reveal<O>
 where
-    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
-    let lambda = <P::LAMBDA as Unsigned>::to_usize();
+    let lambda = <O::LAMBDA as Unsigned>::to_usize();
     let senc = <O::SENC as Unsigned>::to_usize();
     let nst = <O::NST as Unsigned>::to_usize();
     let r = <O::R as Unsigned>::to_usize();
@@ -248,15 +320,8 @@ where
     let v_out = GenericArray::from_slice(&v[..lambda]);
     let s = em_enc_fwd::<O>(Either::Left(w), Some(Either::Left(&x[..4 * nst * (r + 1)])));
     let vs = em_enc_fwd::<O>(Either::Right(v), None);
-    let s_b = em_enc_bkwd::<P, O>(&new_x, &new_w, &w_out, false, false, Field::<O>::default());
-    let v_s_b = em_enc_bkwd::<P, O>(
-        &GenericArray::default_boxed(),
-        v,
-        v_out,
-        false,
-        true,
-        Field::<O>::default(),
-    );
+    let s_b = em_enc_bkwd_mkey0_mtag0::<O>(&new_x, &new_w, &w_out);
+    let v_s_b = em_enc_bkwd_mkey0_mtag1::<O>(v, v_out);
     let (mut a0, mut a1) = (GenericArray::default_boxed(), GenericArray::default_boxed());
     for j in 0..senc {
         a0[j] = v_s_b[j] * vs[j];
@@ -265,17 +330,16 @@ where
     (a0, a1)
 }
 
-fn em_enc_cstrnts_mkey1<P, O>(
+fn em_enc_cstrnts_mkey1<O>(
     output: &GenericArray<u8, O::OutputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     q: &GenericArray<Field<O>, O::L>,
     delta: Field<O>,
 ) -> Box<GenericArray<Field<O>, O::C>>
 where
-    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
-    let lambda = <P::LAMBDA as Unsigned>::to_usize();
+    let lambda = <O::LAMBDA as Unsigned>::to_usize();
     let nst = <O::NST as Unsigned>::to_usize();
     let r = <O::R as Unsigned>::to_usize();
 
@@ -292,14 +356,14 @@ where
         (0..lambda).map(|idx| delta * ((output[idx / 8] >> (idx % 8)) & 1) + q[idx]),
     );
     let qs = em_enc_fwd::<O>(Either::Right(q), Some(Either::Right(new_x.as_slice())));
-    let qs_b = em_enc_bkwd::<P, O>(&new_x, q, &q_out, true, false, delta);
+    let qs_b = em_enc_bkwd_mkey1_mtag0::<O>(&new_x, q, &q_out, delta);
     let immut = delta * delta;
 
     zip(qs, qs_b).map(|(q, qb)| (q * qb) + immut).collect()
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
-pub(crate) fn em_prove<P, O>(
+pub(crate) fn em_prove<O>(
     w: &GenericArray<u8, O::LBYTES>,
     u: &GenericArray<u8, O::LAMBDALBYTES>,
     gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
@@ -308,14 +372,13 @@ pub(crate) fn em_prove<P, O>(
     chall: &GenericArray<u8, O::CHALL>,
 ) -> QSProof<O>
 where
-    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
     let nst = <O::NST as Unsigned>::to_u8();
     let nk = <O::NK as Unsigned>::to_u8();
     let r = <O::R as Unsigned>::to_u8();
     let l = <O::L as Unsigned>::to_usize();
-    let lambda = <P::LAMBDA as Unsigned>::to_usize();
+    let lambda = <O::LAMBDA as Unsigned>::to_usize();
     let mut temp_v: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
     for i in 0..(l + lambda) / 8 {
         for k in 0..8 {
@@ -332,7 +395,7 @@ where
         temp_v.chunks(O::LAMBDABYTES::USIZE).map(Field::<O>::from),
     );
     let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
-    let (a0, a1) = em_enc_cstrnts_mkey0::<P, O>(
+    let (a0, a1) = em_enc_cstrnts_mkey0::<O>(
         owf_output,
         &x.0.chunks(8)
             .flat_map(|x| {
@@ -371,7 +434,7 @@ pub(crate) fn em_verify<P, O>(
     gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     a_t: &GenericArray<u8, O::LAMBDABYTES>,
     chall2: &GenericArray<u8, O::CHALL>,
-    chall3: &GenericArray<u8, P::LAMBDABYTES>,
+    chall3: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
     owf_output: &GenericArray<u8, O::OutputSize>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
@@ -379,7 +442,7 @@ where
     P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
-    let lambda = <P::LAMBDA as Unsigned>::to_usize();
+    let lambda = <O::LAMBDA as Unsigned>::to_usize();
     let l = <O::L as Unsigned>::to_usize();
     let delta = Field::<O>::from(chall3);
     let nst = <O::NST as Unsigned>::to_u8();
@@ -431,7 +494,7 @@ where
         temp_q.chunks(O::LAMBDABYTES::USIZE).map(Field::<O>::from),
     );
     let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
-    let b = em_enc_cstrnts_mkey1::<P, O>(
+    let b = em_enc_cstrnts_mkey1::<O>(
         owf_output,
         &x.0.chunks(8)
             .flat_map(|x| {
@@ -672,22 +735,36 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct EmEncBkwd {
         lambda: u16,
-
         m: u8,
-
         x: Vec<[u64; 4]>,
-
         z: Vec<[u64; 4]>,
-
         zout: Vec<[u64; 4]>,
-
         mtag: u8,
-
         mkey: u8,
-
         delta: Vec<u8>,
-
         res: Vec<[u64; 4]>,
+    }
+
+    fn em_enc_bkwd<P, O>(
+        x: &GenericArray<Field<O>, O::LAMBDAR1>,
+        z: &GenericArray<Field<O>, O::L>,
+        z_out: &GenericArray<Field<O>, O::LAMBDA>,
+        mkey: bool,
+        mtag: bool,
+        delta: Field<O>,
+    ) -> Box<GenericArray<Field<O>, O::SENC>>
+    where
+        P: PARAM<OWF = O>,
+        O: PARAMOWF,
+    {
+        match (mkey, mtag) {
+            (false, false) => em_enc_bkwd_mkey0_mtag0::<O>(x, z, z_out),
+            (true, false) => em_enc_bkwd_mkey1_mtag0::<O>(x, z, z_out, delta),
+            (false, true) => em_enc_bkwd_mkey0_mtag1::<O>(z, z_out),
+            _ => {
+                unreachable!();
+            }
+        }
     }
 
     #[test]
@@ -905,11 +982,11 @@ mod test {
     {
         if mkey {
             (
-                super::em_enc_cstrnts_mkey1::<P, O>(output, x, q, delta),
+                super::em_enc_cstrnts_mkey1::<O>(output, x, q, delta),
                 GenericArray::default_boxed(),
             )
         } else {
-            super::em_enc_cstrnts_mkey0::<P, O>(output, x, w, v)
+            super::em_enc_cstrnts_mkey0::<O>(output, x, w, v)
         }
     }
 
@@ -1036,7 +1113,7 @@ mod test {
                 .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
-                let res = em_prove::<PARAM128SEM, PARAMOWF128EM>(
+                let res = em_prove::<PARAMOWF128EM>(
                     GenericArray::from_slice(&data.w),
                     GenericArray::from_slice(&[[0u8; 160].to_vec(), data.u].concat()),
                     GenericArray::from_slice(
@@ -1059,7 +1136,7 @@ mod test {
                 );
                 break;
             } else if data.lambda == 192 {
-                let res = em_prove::<PARAM192SEM, PARAMOWF192EM>(
+                let res = em_prove::<PARAMOWF192EM>(
                     GenericArray::from_slice(&data.w),
                     GenericArray::from_slice(&[[0u8; 288].to_vec(), data.u].concat()),
                     GenericArray::from_slice(
@@ -1081,7 +1158,7 @@ mod test {
                     res
                 );
             } else {
-                let res = em_prove::<PARAM256SEM, PARAMOWF256EM>(
+                let res = em_prove::<PARAMOWF256EM>(
                     GenericArray::from_slice(&data.w),
                     GenericArray::from_slice(&([[0u8; 448].to_vec(), data.u].concat()).to_vec()),
                     GenericArray::from_slice(

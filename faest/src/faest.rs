@@ -480,7 +480,7 @@ where
     h2_hasher.update(&chall2);
     h2_hasher.update(a_t);
     h2_hasher.update(&b_t);
-    let mut chall3_p: GenericArray<u8, P::LAMBDABYTES> = GenericArray::default();
+    let mut chall3_p: GenericArray<u8, O::LAMBDABYTES> = GenericArray::default();
     h2_hasher.finish().read(&mut chall3_p);
     *chall3 == chall3_p
 }

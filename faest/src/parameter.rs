@@ -146,7 +146,7 @@ pub(crate) trait Variant<O: PARAMOWF> {
         gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         a_t: &GenericArray<u8, O::LAMBDABYTES>,
         chall2: &GenericArray<u8, O::CHALL>,
-        chall3: &GenericArray<u8, P::LAMBDABYTES>,
+        chall3: &GenericArray<u8, O::LAMBDABYTES>,
         owf_input: &GenericArray<u8, O::InputSize>,
         owf_output: &GenericArray<u8, O::OutputSize>,
     ) -> GenericArray<u8, O::LAMBDABYTES>
@@ -1297,7 +1297,7 @@ impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
         gq: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
         a_t: &GenericArray<u8, OWF::LAMBDABYTES>,
         chall2: &GenericArray<u8, OWF::CHALL>,
-        chall3: &GenericArray<u8, P::LAMBDABYTES>,
+        chall3: &GenericArray<u8, OWF::LAMBDABYTES>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
         owf_output: &GenericArray<u8, OWF::OutputSize>,
     ) -> GenericArray<u8, OWF::LAMBDABYTES>
@@ -1358,7 +1358,7 @@ impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
     where
         P: PARAM<OWF = OWF>,
     {
-        em_prove::<P, OWF>(w, u, gv, owf_input, owf_output, chall)
+        em_prove::<OWF>(w, u, gv, owf_input, owf_output, chall)
     }
 
     fn verify<P>(
@@ -1366,7 +1366,7 @@ impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
         gq: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
         a_t: &GenericArray<u8, OWF::LAMBDABYTES>,
         chall2: &GenericArray<u8, OWF::CHALL>,
-        chall3: &GenericArray<u8, P::LAMBDABYTES>,
+        chall3: &GenericArray<u8, OWF::LAMBDABYTES>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
         owf_output: &GenericArray<u8, OWF::OutputSize>,
     ) -> GenericArray<u8, OWF::LAMBDABYTES>

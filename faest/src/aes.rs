@@ -798,7 +798,7 @@ pub(crate) fn aes_verify<P, O>(
     gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     a_t: &GenericArray<u8, O::LAMBDABYTES>,
     chall2: &GenericArray<u8, O::CHALL>,
-    chall3: &GenericArray<u8, P::LAMBDABYTES>,
+    chall3: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
     owf_output: &GenericArray<u8, O::OutputSize>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
