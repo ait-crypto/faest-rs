@@ -305,8 +305,7 @@ pub(crate) fn faest_sign<P, O>(
             .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
     );
 
-    let (a_t, b_t) =
-        P::Cypher::prove::<P>(&w, new_u, &new_gv, &sk.owf_input, &sk.owf_output, &chall2);
+    let (a_t, b_t) = P::Cypher::prove(&w, new_u, &new_gv, &sk.owf_input, &sk.owf_output, &chall2);
 
     let mut h2_hasher = RO::<P>::h2_init();
     h2_hasher.update(&chall2);

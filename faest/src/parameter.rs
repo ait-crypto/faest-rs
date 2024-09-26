@@ -128,16 +128,14 @@ pub(crate) trait Variant<O: PARAMOWF> {
 
     ///input : witness of l bits, masking values (l+lambda in aes, lambda in em), Vole tag ((l + lambda) *lambda bits), public key, chall(3lambda + 64)
     ///Output : QuickSilver response (Lambda bytes)
-    fn prove<P>(
+    fn prove(
         w: &GenericArray<u8, O::LBYTES>,
         u: &GenericArray<u8, O::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         owf_input: &GenericArray<u8, O::InputSize>,
         owf_output: &GenericArray<u8, O::OutputSize>,
         chall: &GenericArray<u8, O::CHALL>,
-    ) -> QSProof<O>
-    where
-        P: PARAM<OWF = O>;
+    ) -> QSProof<O>;
 
     ///input : Masked witness (l bits), Vole Key ((l + lambda) * Lambda bits), hash of constrints values (lambda bits), chall2 (3*lambda + 64 bits), chall3 (lambda bits), public key
     ///output q_tilde - delta * a_tilde (lambda bytes)
@@ -1278,18 +1276,15 @@ impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
         aes_extendedwitness::<OWF>(owf_key, owf_input).0
     }
 
-    fn prove<P>(
+    fn prove(
         w: &GenericArray<u8, OWF::LBYTES>,
         u: &GenericArray<u8, OWF::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
         owf_output: &GenericArray<u8, OWF::OutputSize>,
         chall: &GenericArray<u8, OWF::CHALL>,
-    ) -> QSProof<OWF>
-    where
-        P: PARAM<OWF = OWF>,
-    {
-        aes_prove::<P, OWF>(w, u, gv, owf_input, owf_output, chall)
+    ) -> QSProof<OWF> {
+        aes_prove::<OWF>(w, u, gv, owf_input, owf_output, chall)
     }
 
     fn verify<P>(
@@ -1347,17 +1342,14 @@ impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
         em_extendedwitness::<OWF>(owf_key, owf_input).0
     }
 
-    fn prove<P>(
+    fn prove(
         w: &GenericArray<u8, OWF::LBYTES>,
         u: &GenericArray<u8, OWF::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
         owf_output: &GenericArray<u8, OWF::OutputSize>,
         chall: &GenericArray<u8, OWF::CHALL>,
-    ) -> QSProof<OWF>
-    where
-        P: PARAM<OWF = OWF>,
-    {
+    ) -> QSProof<OWF> {
         em_prove::<OWF>(w, u, gv, owf_input, owf_output, chall)
     }
 

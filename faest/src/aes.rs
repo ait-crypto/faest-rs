@@ -676,7 +676,7 @@ fn bit_to_byte(input: &[u8]) -> u8 {
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
-pub(crate) fn aes_prove<P, O>(
+pub(crate) fn aes_prove<O>(
     w: &GenericArray<u8, O::LBYTES>,
     u: &GenericArray<u8, O::LAMBDALBYTES>,
     gv: CstrntsVal<O>,
@@ -685,7 +685,6 @@ pub(crate) fn aes_prove<P, O>(
     chall: &GenericArray<u8, O::CHALL>,
 ) -> QSProof<O>
 where
-    P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
     let l = <O::L as Unsigned>::to_usize();
@@ -693,7 +692,7 @@ where
     let lke = <O::LKE as Unsigned>::to_usize();
     let lenc = <O::LENC as Unsigned>::to_usize();
     let senc = <O::SENC as Unsigned>::to_usize();
-    let lambda = <P::LAMBDA as Unsigned>::to_usize();
+    let lambda = <O::LAMBDA as Unsigned>::to_usize();
     let new_w: GenericArray<u8, O::L> = w.iter().flat_map(|x| byte_to_bit(*x)).collect();
     let mut temp_v: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
     for i in 0..(l + lambda) / 8 {
@@ -2025,7 +2024,7 @@ mod test {
                 .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
-                let res: (ZkHash128, ZkHash128) = aes_prove::<PARAM128S, PARAMOWF128>(
+                let res: (ZkHash128, ZkHash128) = aes_prove::<PARAMOWF128>(
                     GenericArray::from_slice(&data.w),
                     GenericArray::from_slice(&data.u),
                     GenericArray::from_slice(
@@ -2049,7 +2048,7 @@ mod test {
                         bitw[8 * i + j] = (data.w[i] >> j) & 1;
                     }
                 }
-                let res: (ZkHash192, ZkHash192) = aes_prove::<PARAM192S, PARAMOWF192>(
+                let res: (ZkHash192, ZkHash192) = aes_prove::<PARAMOWF192>(
                     GenericArray::from_slice(&data.w),
                     GenericArray::from_slice(&data.u),
                     GenericArray::from_slice(
@@ -2072,7 +2071,7 @@ mod test {
                         bitw[8 * i + j] = (data.w[i] >> j) & 1;
                     }
                 }
-                let res: (ZkHash256, ZkHash256) = aes_prove::<PARAM256S, PARAMOWF256>(
+                let res: (ZkHash256, ZkHash256) = aes_prove::<PARAMOWF256>(
                     GenericArray::from_slice(&data.w),
                     GenericArray::from_slice(&data.u),
                     GenericArray::from_slice(
