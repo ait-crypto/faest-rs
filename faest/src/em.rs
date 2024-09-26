@@ -5,7 +5,7 @@ use generic_array::{typenum::Unsigned, GenericArray};
 
 use crate::{
     aes::convert_to_bit,
-    fields::{ByteCombine, ByteCombineConstants, Field, SumPoly},
+    fields::{ByteCombine, ByteCombineConstants, Field as _, SumPoly},
     parameter::{BaseParameters, QSProof, TauParameters, PARAM, PARAMOWF},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
@@ -14,9 +14,11 @@ use crate::{
     universal_hashing::{ZKHasherInit, ZKHasherProcess},
 };
 
+type Field<O> = <<O as PARAMOWF>::BaseParams as BaseParameters>::Field;
+
 type Reveal<O> = (
-    Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>,
-    Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>,
+    Box<GenericArray<Field<O>, <O as PARAMOWF>::C>>,
+    Box<GenericArray<Field<O>, <O as PARAMOWF>::C>>,
 );
 
 pub(crate) fn em_extendedwitness<O>(
@@ -100,9 +102,9 @@ where
 ///
 ///One of the first path to optimize the code could be to do the distinction
 fn em_enc_fwd<O>(
-    z: Either<&[u8], &[O::Field]>,
-    x: Option<Either<&[u8], &[O::Field]>>,
-) -> Box<GenericArray<O::Field, O::SENC>>
+    z: Either<&[u8], &[Field<O>]>,
+    x: Option<Either<&[u8], &[Field<O>]>>,
+) -> Box<GenericArray<Field<O>, O::SENC>>
 where
     O: PARAMOWF,
 {
@@ -111,13 +113,13 @@ where
     //Step 2-3
     for j in 0..4 * O::NST::USIZE {
         res[index] = match z {
-            Either::Left(z) => O::Field::byte_combine_bits(z[j]),
-            Either::Right(z) => O::Field::byte_combine(z[8 * j..8 * (j + 1)].try_into().unwrap()),
+            Either::Left(z) => Field::<O>::byte_combine_bits(z[j]),
+            Either::Right(z) => Field::<O>::byte_combine(z[8 * j..8 * (j + 1)].try_into().unwrap()),
         } + match x {
-            None => O::Field::ZERO,
-            Some(Either::Left(x)) => O::Field::byte_combine_bits(x[j]),
+            None => Field::<O>::ZERO,
+            Some(Either::Left(x)) => Field::<O>::byte_combine_bits(x[j]),
             Some(Either::Right(x)) => {
-                O::Field::byte_combine(x[8 * j..8 * (j + 1)].try_into().unwrap())
+                Field::<O>::byte_combine(x[8 * j..8 * (j + 1)].try_into().unwrap())
             }
         };
         index += 1;
@@ -126,29 +128,29 @@ where
     for j in 1..O::R::USIZE {
         for c in 0..O::NST::USIZE {
             let i: usize = 32 * O::NST::USIZE * j + 32 * c;
-            let mut z_hat = [O::Field::default(); 4];
-            let mut x_hat = [O::Field::default(); 4];
+            let mut z_hat = [Field::<O>::default(); 4];
+            let mut x_hat = [Field::<O>::default(); 4];
             for r in 0..4 {
                 z_hat[r] = match z {
-                    Either::Left(z) => O::Field::byte_combine_bits(z[i / 8 + r]),
+                    Either::Left(z) => Field::<O>::byte_combine_bits(z[i / 8 + r]),
                     Either::Right(z) => {
-                        O::Field::byte_combine(z[i + 8 * r..i + 8 * r + 8].try_into().unwrap())
+                        Field::<O>::byte_combine(z[i + 8 * r..i + 8 * r + 8].try_into().unwrap())
                     }
                 };
                 x_hat[r] = match x {
-                    None => O::Field::ZERO,
-                    Some(Either::Left(x)) => O::Field::byte_combine_bits(x[i / 8 + r]),
+                    None => Field::<O>::ZERO,
+                    Some(Either::Left(x)) => Field::<O>::byte_combine_bits(x[i / 8 + r]),
                     Some(Either::Right(x)) => {
-                        O::Field::byte_combine(x[i + 8 * r..i + 8 * r + 8].try_into().unwrap())
+                        Field::<O>::byte_combine(x[i + 8 * r..i + 8 * r + 8].try_into().unwrap())
                     }
                 };
             }
 
             //Step 16
-            res[index] = z_hat[0] * O::Field::BYTE_COMBINE_2  + z_hat[1] * O::Field::BYTE_COMBINE_3  + z_hat[2] /* * a */ + z_hat[3] /* * a */ + x_hat[0];
-            res[index + 1] = z_hat[0] /* * a */ + z_hat[1] * O::Field::BYTE_COMBINE_2  + z_hat[2] * O::Field::BYTE_COMBINE_3  + z_hat[3] /* * a */ + x_hat[1];
-            res[index + 2] = z_hat[0] /* * a */ + z_hat[1] /* * a */ + z_hat[2] * O::Field::BYTE_COMBINE_2  + z_hat[3] * O::Field::BYTE_COMBINE_3  + x_hat[2];
-            res[index + 3] = z_hat[0] * O::Field::BYTE_COMBINE_3  + z_hat[1] /* * a */ + z_hat[2] /* * a */ + z_hat[3] * O::Field::BYTE_COMBINE_2  + x_hat[3];
+            res[index] = z_hat[0] * Field::<O>::BYTE_COMBINE_2  + z_hat[1] * Field::<O>::BYTE_COMBINE_3  + z_hat[2] /* * a */ + z_hat[3] /* * a */ + x_hat[0];
+            res[index + 1] = z_hat[0] /* * a */ + z_hat[1] * Field::<O>::BYTE_COMBINE_2  + z_hat[2] * Field::<O>::BYTE_COMBINE_3  + z_hat[3] /* * a */ + x_hat[1];
+            res[index + 2] = z_hat[0] /* * a */ + z_hat[1] /* * a */ + z_hat[2] * Field::<O>::BYTE_COMBINE_2  + z_hat[3] * Field::<O>::BYTE_COMBINE_3  + x_hat[2];
+            res[index + 3] = z_hat[0] * Field::<O>::BYTE_COMBINE_3  + z_hat[1] /* * a */ + z_hat[2] /* * a */ + z_hat[3] * Field::<O>::BYTE_COMBINE_2  + x_hat[3];
             index += 4;
         }
     }
@@ -162,18 +164,18 @@ where
 ///One of the first path to optimize the code could be to do the distinction
 #[allow(clippy::too_many_arguments)]
 fn em_enc_bkwd<P, O>(
-    x: &GenericArray<O::Field, O::LAMBDAR1>,
-    z: &GenericArray<O::Field, O::L>,
-    z_out: &GenericArray<O::Field, O::LAMBDA>,
+    x: &GenericArray<Field<O>, O::LAMBDAR1>,
+    z: &GenericArray<Field<O>, O::L>,
+    z_out: &GenericArray<Field<O>, O::LAMBDA>,
     mkey: bool,
     mtag: bool,
-    delta: O::Field,
-) -> Box<GenericArray<O::Field, O::SENC>>
+    delta: Field<O>,
+) -> Box<GenericArray<Field<O>, O::SENC>>
 where
     P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
-    let mut res: Box<GenericArray<O::Field, O::SENC>> = GenericArray::default_boxed();
+    let mut res: Box<GenericArray<Field<O>, O::SENC>> = GenericArray::default_boxed();
     let mut index = 0;
     let r = <O::R as Unsigned>::to_usize();
     let nst = <O::NST as Unsigned>::to_usize();
@@ -182,10 +184,10 @@ where
         if mkey {
             delta
         } else {
-            O::Field::ONE
+            Field::<O>::ONE
         }
     } else {
-        O::Field::default()
+        Field::<O>::default()
     };
     //Step 2
     for j in 0..r {
@@ -205,13 +207,13 @@ where
                         .map(|(z, x)| *z + *x)
                         .collect::<Vec<_>>()
                 };
-                let mut y_t = [O::Field::default(); 8];
+                let mut y_t = [Field::<O>::default(); 8];
                 for i in 0..8 {
                     y_t[i] = z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]
                 }
                 y_t[0] += immut;
                 y_t[2] += immut;
-                res[index] = O::Field::byte_combine(&y_t);
+                res[index] = Field::<O>::byte_combine(&y_t);
                 index += 1;
             }
         }
@@ -223,7 +225,7 @@ fn em_enc_cstrnts_mkey0<P, O>(
     output: &GenericArray<u8, O::OutputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     w: &GenericArray<u8, O::LBYTES>,
-    v: &GenericArray<O::Field, O::L>,
+    v: &GenericArray<Field<O>, O::L>,
 ) -> Reveal<O>
 where
     P: PARAM<OWF = O>,
@@ -233,32 +235,32 @@ where
     let senc = <O::SENC as Unsigned>::to_usize();
     let nst = <O::NST as Unsigned>::to_usize();
     let r = <O::R as Unsigned>::to_usize();
-    let new_w = convert_to_bit::<O::Field, O::L>(w);
-    let new_x = convert_to_bit::<O::Field, O::LAMBDAR1>(&x[..4 * nst * (r + 1)]);
-    let mut w_out: Box<GenericArray<O::Field, O::LAMBDA>> = GenericArray::default_boxed();
+    let new_w = convert_to_bit::<Field<O>, O::L>(w);
+    let new_x = convert_to_bit::<Field<O>, O::LAMBDAR1>(&x[..4 * nst * (r + 1)]);
+    let mut w_out: Box<GenericArray<Field<O>, O::LAMBDA>> = GenericArray::default_boxed();
     let mut index = 0;
     for i in 0..lambda / 8 {
         for j in 0..8 {
-            w_out[index] = O::Field::ONE * ((output[i] >> j) & 1) + new_w[i * 8 + j];
+            w_out[index] = Field::<O>::ONE * ((output[i] >> j) & 1) + new_w[i * 8 + j];
             index += 1;
         }
     }
     let v_out = GenericArray::from_slice(&v[..lambda]);
     let s = em_enc_fwd::<O>(Either::Left(w), Some(Either::Left(&x[..4 * nst * (r + 1)])));
     let vs = em_enc_fwd::<O>(Either::Right(v), None);
-    let s_b = em_enc_bkwd::<P, O>(&new_x, &new_w, &w_out, false, false, O::Field::default());
+    let s_b = em_enc_bkwd::<P, O>(&new_x, &new_w, &w_out, false, false, Field::<O>::default());
     let v_s_b = em_enc_bkwd::<P, O>(
         &GenericArray::default_boxed(),
         v,
         v_out,
         false,
         true,
-        O::Field::default(),
+        Field::<O>::default(),
     );
     let (mut a0, mut a1) = (GenericArray::default_boxed(), GenericArray::default_boxed());
     for j in 0..senc {
         a0[j] = v_s_b[j] * vs[j];
-        a1[j] = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + O::Field::ONE + a0[j];
+        a1[j] = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + Field::<O>::ONE + a0[j];
     }
     (a0, a1)
 }
@@ -266,9 +268,9 @@ where
 fn em_enc_cstrnts_mkey1<P, O>(
     output: &GenericArray<u8, O::OutputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
-    q: &GenericArray<O::Field, O::L>,
-    delta: O::Field,
-) -> Box<GenericArray<<O as PARAMOWF>::Field, <O as PARAMOWF>::C>>
+    q: &GenericArray<Field<O>, O::L>,
+    delta: Field<O>,
+) -> Box<GenericArray<Field<O>, O::C>>
 where
     P: PARAM<OWF = O>,
     O: PARAMOWF,
@@ -277,8 +279,8 @@ where
     let nst = <O::NST as Unsigned>::to_usize();
     let r = <O::R as Unsigned>::to_usize();
 
-    // let new_output = convert_to_bit::<O::Field, O::LAMBDA>(output);
-    let mut new_x: Box<GenericArray<O::Field, O::LAMBDAR1>> = GenericArray::default_boxed();
+    // let new_output = convert_to_bit::<Field<O>, O::LAMBDA>(output);
+    let mut new_x: Box<GenericArray<Field<O>, O::LAMBDAR1>> = GenericArray::default_boxed();
     let mut index = 0;
     for byte in x.iter().take(4 * nst * (r + 1)) {
         for j in 0..8 {
@@ -286,7 +288,7 @@ where
             index += 1;
         }
     }
-    let q_out = Box::<GenericArray<O::Field, O::LAMBDA>>::from_iter(
+    let q_out = Box::<GenericArray<Field<O>, O::LAMBDA>>::from_iter(
         (0..lambda).map(|idx| delta * ((output[idx / 8] >> (idx % 8)) & 1) + q[idx]),
     );
     let qs = em_enc_fwd::<O>(Either::Right(q), Some(Either::Right(new_x.as_slice())));
@@ -326,8 +328,8 @@ where
             }
         }
     }
-    let new_v = GenericArray::<O::Field, O::LAMBDAL>::from_iter(
-        temp_v.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
+    let new_v = GenericArray::<Field<O>, O::LAMBDAL>::from_iter(
+        temp_v.chunks(O::LAMBDABYTES::USIZE).map(Field::<O>::from),
     );
     let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
     let (a0, a1) = em_enc_cstrnts_mkey0::<P, O>(
@@ -345,8 +347,8 @@ where
         w,
         GenericArray::from_slice(&new_v[..l]),
     );
-    let u_s = O::Field::from(&u[l / 8..]);
-    let v_s = O::Field::sum_poly(&new_v[l..l + lambda]);
+    let u_s = Field::<O>::from(&u[l / 8..]);
+    let v_s = Field::<O>::sum_poly(&new_v[l..l + lambda]);
 
     let mut a_t_hasher =
         <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
@@ -379,7 +381,7 @@ where
 {
     let lambda = <P::LAMBDA as Unsigned>::to_usize();
     let l = <O::L as Unsigned>::to_usize();
-    let delta = O::Field::from(chall3);
+    let delta = Field::<O>::from(chall3);
     let nst = <O::NST as Unsigned>::to_u8();
     let nk = <O::NK as Unsigned>::to_u8();
     let r = <O::R as Unsigned>::to_u8();
@@ -425,8 +427,8 @@ where
             }
         }
     }
-    let new_q = GenericArray::<O::Field, O::LAMBDAL>::from_iter(
-        temp_q.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
+    let new_q = GenericArray::<Field<O>, O::LAMBDAL>::from_iter(
+        temp_q.chunks(O::LAMBDABYTES::USIZE).map(Field::<O>::from),
     );
     let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
     let b = em_enc_cstrnts_mkey1::<P, O>(
@@ -449,8 +451,8 @@ where
         <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
     b.into_iter().for_each(|value| zk_hasher.update(&value));
 
-    let q_s = O::Field::sum_poly(&new_q[l..l + lambda]);
-    (zk_hasher.finalize(&q_s) + O::Field::from(a_t) * delta).as_bytes()
+    let q_s = Field::<O>::sum_poly(&new_q[l..l + lambda]);
+    (zk_hasher.finalize(&q_s) + Field::<O>::from(a_t) * delta).as_bytes()
 }
 
 #[cfg(test)]
@@ -533,19 +535,11 @@ mod test {
                     (
                         data.x
                             .iter()
-                            .flat_map(|x| {
-                                convert_to_bit::<<PARAMOWF128 as PARAMOWF>::Field, U8>(
-                                    &x[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|x| convert_to_bit::<GF128, U8>(&x[0].to_le_bytes()[..1]))
                             .collect(),
                         data.z
                             .iter()
-                            .flat_map(|z| {
-                                convert_to_bit::<<PARAMOWF128 as PARAMOWF>::Field, U8>(
-                                    &z[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|z| convert_to_bit::<GF128, U8>(&z[0].to_le_bytes()[..1]))
                             .collect(),
                     )
                 } else {
@@ -579,19 +573,11 @@ mod test {
                     (
                         data.x
                             .iter()
-                            .flat_map(|x| {
-                                convert_to_bit::<<PARAMOWF192EM as PARAMOWF>::Field, U8>(
-                                    &x[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|x| convert_to_bit::<GF192, U8>(&x[0].to_le_bytes()[..1]))
                             .collect(),
                         data.z
                             .iter()
-                            .flat_map(|z| {
-                                convert_to_bit::<<PARAMOWF192EM as PARAMOWF>::Field, U8>(
-                                    &z[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|z| convert_to_bit::<GF192, U8>(&z[0].to_le_bytes()[..1]))
                             .collect(),
                     )
                 } else {
@@ -632,19 +618,11 @@ mod test {
                     (
                         data.x
                             .iter()
-                            .flat_map(|x| {
-                                convert_to_bit::<<PARAMOWF256EM as PARAMOWF>::Field, U8>(
-                                    &x[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|x| convert_to_bit::<GF256, U8>(&x[0].to_le_bytes()[..1]))
                             .collect(),
                         data.z
                             .iter()
-                            .flat_map(|z| {
-                                convert_to_bit::<<PARAMOWF256EM as PARAMOWF>::Field, U8>(
-                                    &z[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|z| convert_to_bit::<GF256, U8>(&z[0].to_le_bytes()[..1]))
                             .collect(),
                     )
                 } else {
@@ -719,31 +697,19 @@ mod test {
                 .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
-                let (x_in, z_in, z_out_in): (Vec<GF128>, Vec<GF128>, Vec<GF128>) = if data.m == 1 {
+                let (x_in, z_in, z_out_in) = if data.m == 1 {
                     (
                         data.x
                             .iter()
-                            .flat_map(|x| {
-                                convert_to_bit::<<PARAMOWF128 as PARAMOWF>::Field, U8>(
-                                    &x[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|x| convert_to_bit::<GF128, U8>(&x[0].to_le_bytes()[..1]))
                             .collect::<Vec<GF128>>(),
                         data.z
                             .iter()
-                            .flat_map(|z| {
-                                convert_to_bit::<<PARAMOWF128 as PARAMOWF>::Field, U8>(
-                                    &z[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|z| convert_to_bit::<GF128, U8>(&z[0].to_le_bytes()[..1]))
                             .collect::<Vec<GF128>>(),
                         data.zout
                             .iter()
-                            .flat_map(|z| {
-                                convert_to_bit::<<PARAMOWF128 as PARAMOWF>::Field, U8>(
-                                    &z[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|z| convert_to_bit::<GF128, U8>(&z[0].to_le_bytes()[..1]))
                             .collect::<Vec<GF128>>(),
                     )
                 } else {
@@ -785,27 +751,15 @@ mod test {
                     (
                         data.x
                             .iter()
-                            .flat_map(|x| {
-                                convert_to_bit::<<PARAMOWF192EM as PARAMOWF>::Field, U8>(
-                                    &x[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|x| convert_to_bit::<GF192, U8>(&x[0].to_le_bytes()[..1]))
                             .collect::<Vec<GF192>>(),
                         data.z
                             .iter()
-                            .flat_map(|z| {
-                                convert_to_bit::<<PARAMOWF192EM as PARAMOWF>::Field, U8>(
-                                    &z[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|z| convert_to_bit::<GF192, U8>(&z[0].to_le_bytes()[..1]))
                             .collect::<Vec<GF192>>(),
                         data.zout
                             .iter()
-                            .flat_map(|z| {
-                                convert_to_bit::<<PARAMOWF192EM as PARAMOWF>::Field, U8>(
-                                    &z[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|z| convert_to_bit::<GF192, U8>(&z[0].to_le_bytes()[..1]))
                             .collect::<Vec<GF192>>(),
                     )
                 } else {
@@ -856,27 +810,15 @@ mod test {
                     (
                         data.x
                             .iter()
-                            .flat_map(|x| {
-                                convert_to_bit::<<PARAMOWF256EM as PARAMOWF>::Field, U8>(
-                                    &x[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|x| convert_to_bit::<GF256, U8>(&x[0].to_le_bytes()[..1]))
                             .collect::<Vec<GF256>>(),
                         data.z
                             .iter()
-                            .flat_map(|z| {
-                                convert_to_bit::<<PARAMOWF256EM as PARAMOWF>::Field, U8>(
-                                    &z[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|z| convert_to_bit::<GF256, U8>(&z[0].to_le_bytes()[..1]))
                             .collect::<Vec<GF256>>(),
                         data.zout
                             .iter()
-                            .flat_map(|z| {
-                                convert_to_bit::<<PARAMOWF256EM as PARAMOWF>::Field, U8>(
-                                    &z[0].to_le_bytes()[..1],
-                                )
-                            })
+                            .flat_map(|z| convert_to_bit::<GF256, U8>(&z[0].to_le_bytes()[..1]))
                             .collect::<Vec<GF256>>(),
                     )
                 } else {
@@ -952,17 +894,20 @@ mod test {
         output: &GenericArray<u8, O::OutputSize>,
         x: &GenericArray<u8, O::LAMBDAR1BYTE>,
         w: &GenericArray<u8, O::LBYTES>,
-        v: &GenericArray<O::Field, O::L>,
-        q: &GenericArray<O::Field, O::L>,
+        v: &GenericArray<Field<O>, O::L>,
+        q: &GenericArray<Field<O>, O::L>,
         mkey: bool,
-        delta: O::Field,
+        delta: Field<O>,
     ) -> Reveal<O>
     where
         P: PARAM<OWF = O>,
         O: PARAMOWF,
     {
         if mkey {
-            super::em_enc_cstrnts_mkey1::<P, O>(output, x, q, delta)
+            (
+                super::em_enc_cstrnts_mkey1::<P, O>(output, x, q, delta),
+                GenericArray::default_boxed(),
+            )
         } else {
             super::em_enc_cstrnts_mkey0::<P, O>(output, x, w, v)
         }
@@ -1000,14 +945,8 @@ mod test {
                         0,
                     ));
                 }
-                if let Some(res_1) = res_1 {
-                    for i in 0..a0.len() {
-                        assert_eq!((res_0[i], res_1[i]), (a0[i], a1[i]));
-                    }
-                } else {
-                    for i in 0..a0.len() {
-                        assert_eq!((res_0[i], GF128::default()), (a0[i], a1[i]));
-                    }
+                for i in 0..a0.len() {
+                    assert_eq!((res_0[i], res_1[i]), (a0[i], a1[i]));
                 }
             } else if data.lambda == 192 {
                 let vq = &data
@@ -1035,14 +974,8 @@ mod test {
                         data.ab[i][6] as u128,
                     ));
                 }
-                if let Some(res_1) = res_1 {
-                    for i in 0..a0.len() {
-                        assert_eq!((res_0[i], res_1[i]), (a0[i], a1[i]));
-                    }
-                } else {
-                    for i in 0..a0.len() {
-                        assert_eq!((res_0[i], GF192::default()), (a0[i], a1[i]));
-                    }
+                for i in 0..a0.len() {
+                    assert_eq!((res_0[i], res_1[i]), (a0[i], a1[i]));
                 }
             } else {
                 let vq = &data
@@ -1075,14 +1008,8 @@ mod test {
                         data.ab[i][6] as u128 + ((data.ab[i][7] as u128) << 64),
                     ));
                 }
-                if let Some(res_1) = res_1 {
-                    for i in 0..a0.len() {
-                        assert_eq!((res_0[i], res_1[i]), (a0[i], a1[i]));
-                    }
-                } else {
-                    for i in 0..a0.len() {
-                        assert_eq!((res_0[i], GF256::default()), (a0[i], a1[i]));
-                    }
+                for i in 0..a0.len() {
+                    assert_eq!((res_0[i], res_1[i]), (a0[i], a1[i]));
                 }
             }
         }

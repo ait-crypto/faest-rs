@@ -23,7 +23,7 @@ use crate::{
     aes::{aes_extendedwitness, aes_prove, aes_verify},
     em::{em_extendedwitness, em_prove, em_verify},
     faest::SecretKey,
-    fields::{BigGaloisField, Field, GF128, GF192, GF256},
+    fields::{BigGaloisField, GF128, GF192, GF256},
     prg::{PseudoRandomGenerator, PRG128, PRG192, PRG256},
     random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake256},
     rijndael_32::{Rijndael192, Rijndael256},
@@ -162,18 +162,14 @@ pub(crate) trait PARAMOWF {
     type BaseParams: BaseParameters<
         Lambda = Self::LAMBDA,
         LambdaBytes = Self::LAMBDABYTES,
-        Field = Self::Field,
         VoleHasher = Self::VoleHasher,
         Chall = Self::CHALL,
         Chall1 = Self::CHALL1,
     >;
 
-    /// The field that is of size `2^λ` which is defined as [Self::LAMBDA]
-    // #[deprecated]
-    type Field: BigGaloisField + Field<Length = Self::LAMBDABYTES> + std::fmt::Debug;
     #[deprecated]
     type VoleHasher: VoleHasherInit<
-        Self::Field,
+        <Self::BaseParams as BaseParameters>::Field,
         SDLength = Self::CHALL1,
         OutputLength = Self::LAMBDAPLUS2,
     >;
@@ -225,9 +221,7 @@ pub(crate) struct PARAMOWF128;
 
 impl PARAMOWF for PARAMOWF128 {
     type BaseParams = BaseParams128;
-
-    type Field = GF128;
-    type VoleHasher = VoleHasher<Self::Field>;
+    type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
     type InputSize = U16;
     type OutputSize = U16;
@@ -316,9 +310,7 @@ pub(crate) struct PARAMOWF192;
 
 impl PARAMOWF for PARAMOWF192 {
     type BaseParams = BaseParams192;
-
-    type Field = GF192;
-    type VoleHasher = VoleHasher<Self::Field>;
+    type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
     type InputSize = U32;
     type OutputSize = U32;
@@ -411,9 +403,7 @@ pub(crate) struct PARAMOWF256;
 
 impl PARAMOWF for PARAMOWF256 {
     type BaseParams = BaseParams256;
-
-    type Field = GF256;
-    type VoleHasher = VoleHasher<Self::Field>;
+    type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
     type InputSize = U32;
     type OutputSize = U32;
@@ -506,9 +496,7 @@ pub(crate) struct PARAMOWF128EM;
 
 impl PARAMOWF for PARAMOWF128EM {
     type BaseParams = BaseParams128;
-
-    type Field = GF128;
-    type VoleHasher = VoleHasher<Self::Field>;
+    type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
     type InputSize = U16;
     type OutputSize = U16;
@@ -600,9 +588,7 @@ pub(crate) struct PARAMOWF192EM;
 
 impl PARAMOWF for PARAMOWF192EM {
     type BaseParams = BaseParams192;
-
-    type Field = GF192;
-    type VoleHasher = VoleHasher<Self::Field>;
+    type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
     type InputSize = U24;
     type OutputSize = U24;
@@ -694,9 +680,7 @@ pub(crate) struct PARAMOWF256EM;
 
 impl PARAMOWF for PARAMOWF256EM {
     type BaseParams = BaseParams256;
-
-    type Field = GF256;
-    type VoleHasher = VoleHasher<Self::Field>;
+    type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
     type InputSize = U32;
     type OutputSize = U32;
