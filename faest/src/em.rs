@@ -1,5 +1,6 @@
 use std::iter::zip;
 
+use either::Either;
 use generic_array::{typenum::Unsigned, GenericArray};
 
 use crate::{
@@ -99,8 +100,8 @@ where
 ///
 ///One of the first path to optimize the code could be to do the distinction
 fn em_enc_fwd<O>(
-    z: &GenericArray<O::Field, O::L>,
-    x: &GenericArray<O::Field, O::LAMBDAR1>,
+    z: Either<&[u8], &[O::Field]>,
+    x: Option<Either<&[u8], &[O::Field]>>,
 ) -> Box<GenericArray<O::Field, O::SENC>>
 where
     O: PARAMOWF,
@@ -109,8 +110,16 @@ where
     let mut index = 0;
     //Step 2-3
     for j in 0..4 * O::NST::USIZE {
-        res[index] = O::Field::byte_combine(z[8 * j..8 * (j + 1)].try_into().unwrap())
-            + O::Field::byte_combine(x[8 * j..8 * (j + 1)].try_into().unwrap());
+        res[index] = match z {
+            Either::Left(z) => O::Field::byte_combine_bits(z[j]),
+            Either::Right(z) => O::Field::byte_combine(z[8 * j..8 * (j + 1)].try_into().unwrap()),
+        } + match x {
+            None => O::Field::ZERO,
+            Some(Either::Left(x)) => O::Field::byte_combine_bits(x[j]),
+            Some(Either::Right(x)) => {
+                O::Field::byte_combine(x[8 * j..8 * (j + 1)].try_into().unwrap())
+            }
+        };
         index += 1;
     }
     //Step 4
@@ -120,8 +129,19 @@ where
             let mut z_hat = [O::Field::default(); 4];
             let mut x_hat = [O::Field::default(); 4];
             for r in 0..4 {
-                z_hat[r] = O::Field::byte_combine(z[i + 8 * r..i + 8 * r + 8].try_into().unwrap());
-                x_hat[r] = O::Field::byte_combine(x[i + 8 * r..i + 8 * r + 8].try_into().unwrap());
+                z_hat[r] = match z {
+                    Either::Left(z) => O::Field::byte_combine_bits(z[i / 8 + r]),
+                    Either::Right(z) => {
+                        O::Field::byte_combine(z[i + 8 * r..i + 8 * r + 8].try_into().unwrap())
+                    }
+                };
+                x_hat[r] = match x {
+                    None => O::Field::ZERO,
+                    Some(Either::Left(x)) => O::Field::byte_combine_bits(x[i / 8 + r]),
+                    Some(Either::Right(x)) => {
+                        O::Field::byte_combine(x[i + 8 * r..i + 8 * r + 8].try_into().unwrap())
+                    }
+                };
             }
 
             //Step 16
@@ -200,13 +220,12 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-fn em_enc_cstrnts<P, O>(
+fn em_enc_cstrnts<P, O, const MKEY: bool>(
     output: &GenericArray<u8, O::OutputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     w: &GenericArray<u8, O::LBYTES>,
     v: &GenericArray<O::Field, O::L>,
-    q: &GenericArray<O::Field, O::L>,
-    mkey: bool,
+    q: Option<&GenericArray<O::Field, O::L>>,
     delta: O::Field,
 ) -> Reveal<O>
 where
@@ -217,7 +236,7 @@ where
     let senc = <O::SENC as Unsigned>::to_usize();
     let nst = <O::NST as Unsigned>::to_usize();
     let r = <O::R as Unsigned>::to_usize();
-    if !mkey {
+    if !MKEY {
         let new_w = convert_to_bit::<O::Field, O::L>(w);
         let new_x = convert_to_bit::<O::Field, O::LAMBDAR1>(&x[..4 * nst * (r + 1)]);
         let mut w_out: Box<GenericArray<O::Field, O::LAMBDA>> = GenericArray::default_boxed();
@@ -229,8 +248,8 @@ where
             }
         }
         let v_out = GenericArray::from_slice(&v[..lambda]);
-        let s = em_enc_fwd::<O>(&new_w, &new_x);
-        let vs = em_enc_fwd::<O>(v, &GenericArray::default());
+        let s = em_enc_fwd::<O>(Either::Left(w), Some(Either::Left(&x[..4 * nst * (r + 1)])));
+        let vs = em_enc_fwd::<O>(Either::Right(v), None);
         let s_b = em_enc_bkwd::<P, O>(&new_x, &new_w, &w_out, false, false, O::Field::default());
         let v_s_b = em_enc_bkwd::<P, O>(
             &GenericArray::default_boxed(),
@@ -247,7 +266,6 @@ where
         }
         (a0, Some(a1))
     } else {
-        let new_output = convert_to_bit::<O::Field, O::LAMBDA>(output);
         let mut new_x: Box<GenericArray<O::Field, O::LAMBDAR1>> = GenericArray::default_boxed();
         let mut index = 0;
         for byte in x.iter().take(4 * nst * (r + 1)) {
@@ -256,11 +274,11 @@ where
                 index += 1;
             }
         }
-        let mut q_out: Box<GenericArray<O::Field, O::LAMBDA>> = GenericArray::default_boxed();
-        for i in 0..lambda {
-            q_out[i] = new_output[i] * delta + q[i];
-        }
-        let qs = em_enc_fwd::<O>(q, &new_x);
+        let q = q.unwrap();
+        let q_out = Box::<GenericArray<O::Field, O::LAMBDA>>::from_iter(
+            (0..lambda).map(|idx| delta * ((output[idx / 8] >> (idx % 8)) & 1) + q[idx]),
+        );
+        let qs = em_enc_fwd::<O>(Either::Right(q), Some(Either::Right(new_x.as_slice())));
         let qs_b = em_enc_bkwd::<P, O>(&new_x, q, &q_out, true, false, delta);
         let immut = delta * delta;
 
@@ -303,7 +321,7 @@ where
         temp_v.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
     );
     let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
-    let (a0, a1) = em_enc_cstrnts::<P, O>(
+    let (a0, a1) = em_enc_cstrnts::<P, O, false>(
         owf_output,
         &x.0.chunks(8)
             .flat_map(|x| {
@@ -317,8 +335,7 @@ where
             .collect::<GenericArray<u8, _>>(),
         w,
         GenericArray::from_slice(&new_v[..l]),
-        &GenericArray::default_boxed(),
-        false,
+        None,
         O::Field::default(),
     );
     // FIXME
@@ -407,7 +424,7 @@ where
         temp_q.chunks(O::LAMBDABYTES::USIZE).map(O::Field::from),
     );
     let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
-    let (b, _) = em_enc_cstrnts::<P, O>(
+    let (b, _) = em_enc_cstrnts::<P, O, true>(
         owf_output,
         &x.0.chunks(8)
             .flat_map(|x| {
@@ -421,8 +438,7 @@ where
             .collect::<GenericArray<u8, _>>(),
         &GenericArray::default_boxed(),
         &GenericArray::default_boxed(),
-        GenericArray::from_slice(&new_q[..l]),
-        true,
+        Some(GenericArray::from_slice(&new_q[..l])),
         delta,
     );
 
@@ -542,8 +558,8 @@ mod test {
                     )
                 };
                 let res = em_enc_fwd::<PARAMOWF128EM>(
-                    GenericArray::from_slice(&input_z),
-                    GenericArray::from_slice(&input_x),
+                    Either::Right(&input_z),
+                    Some(Either::Right(&input_x)),
                 );
                 assert_eq!(
                     res,
@@ -592,8 +608,8 @@ mod test {
                     )
                 };
                 let res = em_enc_fwd::<PARAMOWF192EM>(
-                    GenericArray::from_slice(&input_z),
-                    GenericArray::from_slice(&input_x),
+                    Either::Right(&input_z),
+                    Some(Either::Right(&input_x)),
                 );
                 assert_eq!(
                     res,
@@ -651,8 +667,8 @@ mod test {
                     )
                 };
                 let res = em_enc_fwd::<PARAMOWF256EM>(
-                    GenericArray::from_slice(&input_z),
-                    GenericArray::from_slice(&input_x),
+                    Either::Right(&input_z),
+                    Some(Either::Right(&input_x)),
                 );
                 assert_eq!(
                     res,
@@ -934,6 +950,26 @@ mod test {
         vq: Vec<[u64; 4]>,
 
         ab: Vec<[u64; 8]>,
+    }
+
+    fn em_enc_cstrnts<P, O>(
+        output: &GenericArray<u8, O::OutputSize>,
+        x: &GenericArray<u8, O::LAMBDAR1BYTE>,
+        w: &GenericArray<u8, O::LBYTES>,
+        v: &GenericArray<O::Field, O::L>,
+        q: &GenericArray<O::Field, O::L>,
+        mkey: bool,
+        delta: O::Field,
+    ) -> Reveal<O>
+    where
+        P: PARAM<OWF = O>,
+        O: PARAMOWF,
+    {
+        if mkey {
+            super::em_enc_cstrnts::<P, O, true>(output, x, w, v, Some(q), delta)
+        } else {
+            super::em_enc_cstrnts::<P, O, false>(output, x, w, v, None, delta)
+        }
     }
 
     #[test]
