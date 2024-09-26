@@ -454,8 +454,8 @@ where
         let sdelta = Tau::decode_challenge(chall3, i);
         for j in 0..Tau::K0::USIZE {
             if sdelta[j] != 0 {
-                for (k, _) in d.iter().enumerate() {
-                    new_gq[Tau::K0::USIZE * i + j][k] = gq[Tau::K0::USIZE * i + j][k] ^ d[k];
+                for (gq_k, d_k) in zip(new_gq[Tau::K0::USIZE * i + j].iter_mut(), d).take(l / 8) {
+                    *gq_k ^= d_k;
                 }
             }
         }
@@ -464,13 +464,18 @@ where
         let sdelta = Tau::decode_challenge(chall3, Tau::Tau0::USIZE + i);
         for j in 0..Tau::K1::USIZE {
             if sdelta[j] != 0 {
-                for (k, _) in d.iter().enumerate().take(l / 8) {
-                    new_gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j][k] =
-                        gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j][k] ^ d[k];
+                for (gq_k, d_k) in zip(
+                    new_gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j].iter_mut(),
+                    d,
+                )
+                .take(l / 8)
+                {
+                    *gq_k ^= d_k;
                 }
             }
         }
     }
+
     let mut temp_q: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
     for i in 0..(l + lambda) / 8 {
         for k in 0..8 {

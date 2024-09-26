@@ -817,8 +817,8 @@ where
         let sdelta = Tau::decode_challenge(chall3, i);
         for j in 0..Tau::K0::USIZE {
             if sdelta[j] != 0 {
-                for (k, _) in d.iter().enumerate().take(l / 8) {
-                    new_gq[Tau::K0::USIZE * i + j][k] = gq[Tau::K0::USIZE * i + j][k] ^ d[k];
+                for (gq_k, d_k) in zip(new_gq[Tau::K0::USIZE * i + j].iter_mut(), d).take(l / 8) {
+                    *gq_k ^= d_k;
                 }
             }
         }
@@ -827,9 +827,13 @@ where
         let sdelta = Tau::decode_challenge(chall3, Tau::Tau0::USIZE + i);
         for j in 0..Tau::K1::USIZE {
             if sdelta[j] != 0 {
-                for (k, _) in d.iter().enumerate().take(l / 8) {
-                    new_gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j][k] =
-                        gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j][k] ^ d[k];
+                for (gq_k, d_k) in zip(
+                    new_gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j].iter_mut(),
+                    d,
+                )
+                .take(l / 8)
+                {
+                    *gq_k ^= d_k;
                 }
             }
         }
@@ -894,7 +898,6 @@ where
     }
 
     let q_s = Field::<O>::sum_poly(&new_q[l..l + lambda]);
-
     (zk_hasher.finalize(&q_s) + Field::<O>::from(a_t) * delta).as_bytes()
 }
 
