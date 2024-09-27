@@ -134,37 +134,6 @@ where
     (w, valid)
 }
 
-///This function allow to get the directs antecedents of subbyte when calling extendwitness to check quicly if the key is valid or not
-/*pub fn aes_witness_has0<P, O>(k: &[u8], pk: &[u8]) -> Vec<u8>
-where
-    P: PARAM,
-    O: PARAMOWF,
-{
-    let beta = <P::BETA as Unsigned>::to_usize();
-    let bc = 4;
-    let r = <O::R as Unsigned>::to_u8();
-    let kc = <O::NK as Unsigned>::to_usize();
-    let mut input = [0u8; 32];
-    //step 0
-    input[..16 * beta].clone_from_slice(&pk[..16 * beta]);
-    let mut w: Vec<u8> = vec![];
-    //step 3
-    let kb = rijndael_key_schedule_has0(k, bc, kc as u8, r, <O::SKE as Unsigned>::to_u8(), &mut w);
-    //step 4
-
-    //step 5
-    for b in 0..beta {
-        round_with_save_has0(
-            input[16 * b..16 * (b + 1)].try_into().unwrap(),
-            [0; 16],
-            &kb,
-            r + 1,
-            &mut w,
-        );
-    }
-    w
-} */
-
 #[allow(clippy::too_many_arguments)]
 fn round_with_save(
     input1: &[u8; 16],
@@ -200,23 +169,6 @@ fn round_with_save(
         *valid &= *i != 0
     }
 }
-
-/* #[allow(clippy::too_many_arguments)]
-fn round_with_save_has0(input1: [u8; 16], input2: [u8; 16], kb: &[u32], r: u8, w: &mut Vec<u8>) {
-    let mut state = State::default();
-    bitslice(&mut state, &input1, &input2);
-    rijndael_add_round_key(&mut state, &kb[..8]);
-    for j in 1..r as usize {
-        w.append(&mut inv_bitslice(&state)[0][..].to_vec());
-        sub_bytes(&mut state);
-        sub_bytes_nots(&mut state);
-        rijndael_shift_rows_1(&mut state, 4);
-
-        mix_columns_0(&mut state);
-        rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
-    }
-}
- */
 
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///
