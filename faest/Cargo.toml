@@ -40,9 +40,15 @@ serde = ["dep:serde", "generic-array/serde"]
 [[bench]]
 name = "benchmark_faest_rs"
 harness = false
+test = false
 
 [profile.dev.package."*"]
 opt-level = 3
 
 [profile.bench]
+lto = "fat"
+
+[profile.profiling]
+inherits = "release"
 debug = true
+strip = false
