@@ -6,32 +6,38 @@ use faest::{
     FAEST256EMfSignature, FAEST256EMsKeyPair, FAEST256EMsSignature, FAEST256fKeyPair,
     FAEST256fSignature, FAEST256sKeyPair, FAEST256sSignature, KeypairGenerator,
 };
-use rand::RngCore;
+use signature::RandomizedSigner;
 use signature::{Signer, Verifier};
 
-type Message = [u8; 32];
-
-fn random_message(mut rng: impl RngCore) -> Message {
-    let mut ret = Message::default();
-    rng.fill_bytes(&mut ret);
-    ret
-}
-
+const MESSAGE: &str = "This is a message.";
 fn run_example<KP, S>(name: &str)
 where
-    KP: KeypairGenerator + Signer<S>,
+    KP: KeypairGenerator + Signer<S> + RandomizedSigner<S>,
     KP::VerifyingKey: Verifier<S>,
 {
     let mut rng = rand::thread_rng();
 
     println!("Generating {} key ...", name);
     let keypair = KP::generate(&mut rng);
-    println!("Signing message with {} ...", name);
-    let message = random_message(&mut rng);
-    let signature = keypair.sign(&message);
-    println!("Verifying signature with {} ...", name);
+    println!("Signing message '{}' with {} ...", MESSAGE, name);
+    let signature = keypair.sign(MESSAGE.as_bytes());
+    println!(
+        "Verifying signature on message '{}' with {} ...",
+        MESSAGE, name
+    );
     let verification_key = keypair.verifying_key();
-    assert!(verification_key.verify(&message, &signature).is_ok());
+    assert!(verification_key
+        .verify(MESSAGE.as_bytes(), &signature)
+        .is_ok());
+
+    println!(
+        "Signing message '{}' with {} (randomized)...",
+        MESSAGE, name
+    );
+    let signature = keypair.sign_with_rng(&mut rng, MESSAGE.as_bytes());
+    assert!(verification_key
+        .verify(MESSAGE.as_bytes(), &signature)
+        .is_ok());
 }
 
 fn main() {
