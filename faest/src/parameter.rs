@@ -846,17 +846,10 @@ impl TauParameters for Tau256Fast {
 }
 
 pub(crate) trait PARAM {
-    type OWF: PARAMOWF<
-        LAMBDA = Self::LAMBDA,
-        LAMBDABYTES = Self::LAMBDABYTES,
-        L = Self::L,
-        LBYTES = Self::LBYTES,
-    >;
+    type OWF: PARAMOWF<LAMBDA = Self::LAMBDA, LAMBDABYTES = Self::LAMBDABYTES>;
     type Cypher: Variant<Self::OWF>;
     type Tau: TauParameters;
 
-    type L: ArrayLength;
-    type LBYTES: ArrayLength;
     type N0: ArrayLength;
     type N1: ArrayLength;
     type POWK0: ArrayLength;
@@ -874,10 +867,6 @@ impl PARAM for PARAM128S {
     type OWF = PARAMOWF128;
 
     type Tau = Tau128Small;
-
-    type L = <U1024 as Add<U576>>::Output;
-
-    type LBYTES = U200;
 
     type BETA = U1;
 
@@ -905,10 +894,6 @@ pub(crate) struct PARAM128F;
 impl PARAM for PARAM128F {
     type OWF = PARAMOWF128;
     type Tau = Tau128Fast;
-
-    type L = <U1024 as Add<U576>>::Output;
-
-    type LBYTES = U200;
 
     type BETA = U1;
 
@@ -938,10 +923,6 @@ impl PARAM for PARAM192S {
 
     type Tau = Tau192Small;
 
-    type L = <U4096 as Sub<U832>>::Output;
-
-    type LBYTES = U408;
-
     type BETA = U2;
 
     type LAMBDA = U192;
@@ -969,10 +950,6 @@ impl PARAM for PARAM192F {
     type OWF = PARAMOWF192;
 
     type Tau = Tau192Fast;
-
-    type L = <U4096 as Sub<U832>>::Output;
-
-    type LBYTES = U408;
 
     type BETA = U2;
 
@@ -1002,10 +979,6 @@ impl PARAM for PARAM256S {
 
     type Tau = Tau256Small;
 
-    type L = <U4096 as Sub<U96>>::Output;
-
-    type LBYTES = U500;
-
     type BETA = U2;
 
     type LAMBDA = U256;
@@ -1033,10 +1006,6 @@ impl PARAM for PARAM256F {
     type OWF = PARAMOWF256;
 
     type Tau = Tau256Fast;
-
-    type L = <U4096 as Sub<U96>>::Output;
-
-    type LBYTES = U500;
 
     type BETA = U2;
 
@@ -1066,10 +1035,6 @@ impl PARAM for PARAM128SEM {
 
     type Tau = Tau128Small;
 
-    type L = <U1024 as Add<U256>>::Output;
-
-    type LBYTES = U160;
-
     type BETA = U1;
 
     type LAMBDA = U128;
@@ -1097,10 +1062,6 @@ impl PARAM for PARAM128FEM {
     type OWF = PARAMOWF128EM;
 
     type Tau = Tau128Fast;
-
-    type L = <U1024 as Add<U256>>::Output;
-
-    type LBYTES = U160;
 
     type BETA = U1;
 
@@ -1130,10 +1091,6 @@ impl PARAM for PARAM192SEM {
 
     type Tau = Tau192Small;
 
-    type L = <U2048 as Add<U256>>::Output;
-
-    type LBYTES = U288;
-
     type BETA = U2;
 
     type LAMBDA = U192;
@@ -1161,10 +1118,6 @@ impl PARAM for PARAM192FEM {
     type OWF = PARAMOWF192EM;
 
     type Tau = Tau192Fast;
-
-    type L = <U2048 as Add<U256>>::Output;
-
-    type LBYTES = U288;
 
     type BETA = U2;
 
@@ -1194,10 +1147,6 @@ impl PARAM for PARAM256SEM {
 
     type Tau = Tau256Small;
 
-    type L = Diff<U4096, U512>;
-
-    type LBYTES = U448;
-
     type BETA = U2;
 
     type LAMBDA = U256;
@@ -1225,10 +1174,6 @@ impl PARAM for PARAM256FEM {
     type OWF = PARAMOWF256EM;
 
     type Tau = Tau256Fast;
-
-    type L = Diff<U4096, U512>;
-
-    type LBYTES = U448;
 
     type BETA = U2;
 

@@ -205,6 +205,54 @@ where
 
 type RO<P> = <<<P as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::RandomOracle;
 
+fn hash_mu<R>(mu: &mut [u8], input: &[u8], output: &[u8], msg: &[u8])
+where
+    R: RandomOracle,
+{
+    let mut h1_hasher = R::h1_init();
+    h1_hasher.update(input);
+    h1_hasher.update(output);
+    h1_hasher.update(msg);
+    h1_hasher.finish().read(mu);
+}
+
+fn hash_r_iv<R>(r: &mut [u8], iv: &mut IV, key: &[u8], mu: &[u8], rho: &[u8])
+where
+    R: RandomOracle,
+{
+    let mut h3_hasher = R::h3_init();
+    h3_hasher.update(key);
+    h3_hasher.update(mu);
+    h3_hasher.update(rho);
+
+    let mut h3_reader = h3_hasher.finish();
+    h3_reader.read(r);
+    h3_reader.read(iv);
+}
+
+fn hash_challange_2<R>(chall2: &mut [u8], chall1: &[u8], u_t: &[u8], hv: &[u8], d: &[u8])
+where
+    R: RandomOracle,
+{
+    let mut h2_hasher = R::h2_init();
+    h2_hasher.update(chall1);
+    h2_hasher.update(u_t);
+    h2_hasher.update(hv);
+    h2_hasher.update(d);
+    h2_hasher.finish().read(chall2);
+}
+
+fn hash_challenge_3<R>(chall3: &mut [u8], chall2: &[u8], a_t: &[u8], b_t: &[u8])
+where
+    R: RandomOracle,
+{
+    let mut h2_hasher = R::h2_init();
+    h2_hasher.update(chall2);
+    h2_hasher.update(a_t);
+    h2_hasher.update(b_t);
+    h2_hasher.finish().read(chall3);
+}
+
 #[inline]
 pub(crate) fn faest_keygen<P, R>(rng: R) -> SecretKey<P::OWF>
 where
@@ -221,9 +269,7 @@ where
 /// Quicksilver proof (Lambda), Partial decommitment (Tau * (t0 * k0*lambda + t1 * k1*lambda  +  2Lambda) bits),
 ///
 ///last challenge (lambda bits), initialisation vector
-#[allow(clippy::needless_range_loop)]
 #[allow(clippy::type_complexity)]
-#[allow(clippy::unnecessary_to_owned)]
 pub(crate) fn faest_sign<P, O>(
     msg: &[u8],
     sk: &SecretKey<O>,
@@ -233,27 +279,13 @@ pub(crate) fn faest_sign<P, O>(
     P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
-    let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
-    let l = <P::L as Unsigned>::to_usize() / 8;
-
-    let mut h1_hasher = RO::<P>::h1_init();
-    h1_hasher.update(&sk.owf_input);
-    h1_hasher.update(&sk.owf_output);
-    h1_hasher.update(msg);
-    let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
-        GenericArray::default();
-    h1_hasher.finish().read(&mut mu);
-
-    let mut h3_hasher = RO::<P>::h3_init();
-    h3_hasher.update(&sk.owf_key);
-    h3_hasher.update(&mu);
-    h3_hasher.update(rho);
+    let mut mu =
+        GenericArray::<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2>::default();
+    hash_mu::<RO<P>>(&mut mu, &sk.owf_input, &sk.owf_output, msg);
 
     let mut r = GenericArray::<u8, O::LAMBDABYTES>::default();
     let mut iv = IV::default();
-    let mut h3_reader = h3_hasher.finish();
-    h3_reader.read(&mut r);
-    h3_reader.read(&mut iv);
+    hash_r_iv::<RO<P>>(&mut r, &mut iv, &sk.owf_key, &mu, rho);
 
     let (hcom, decom, c, u, gv) =
         volecommit::<<O::BaseParams as BaseParameters>::VC, P::Tau, P::LH>(&r, &iv);
@@ -278,25 +310,21 @@ pub(crate) fn faest_sign<P, O>(
     h1_hasher.finish().read(&mut hv);
 
     let w = P::Cypher::witness(&sk.owf_key, &sk.owf_input);
-    let d = GenericArray::<u8, O::LBYTES>::from_iter(zip(w.iter(), &u[..l]).map(|(w, u)| w ^ *u));
+    let d = GenericArray::<u8, O::LBYTES>::from_iter(
+        zip(w.iter(), &u[..O::LBYTES::USIZE]).map(|(w, u)| w ^ *u),
+    );
 
-    let mut h2_hasher = RO::<P>::h2_init();
-    h2_hasher.update(&chall1);
-    h2_hasher.update(&u_t);
-    h2_hasher.update(&hv);
-    h2_hasher.update(&d);
-    // why is this boxed?
     let mut chall2: GenericArray<u8, O::CHALL> = GenericArray::default();
-    h2_hasher.finish().read(&mut chall2);
+    hash_challange_2::<RO<P>>(&mut chall2, &chall1, &u_t, &hv, &d);
 
-    let new_u = GenericArray::from_slice(&u[..l + lambda]);
+    let new_u = GenericArray::from_slice(&u[..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE]);
     let new_gv = Box::new(
         gv.iter()
             .flat_map(|x| {
                 x.iter()
                     .map(|y| {
                         y.iter()
-                            .take(l + lambda)
+                            .take(O::LBYTES::USIZE + O::LAMBDABYTES::USIZE)
                             .copied()
                             .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
                     })
@@ -307,12 +335,8 @@ pub(crate) fn faest_sign<P, O>(
 
     let (a_t, b_t) = P::Cypher::prove(&w, new_u, &new_gv, &sk.owf_input, &sk.owf_output, &chall2);
 
-    let mut h2_hasher = RO::<P>::h2_init();
-    h2_hasher.update(&chall2);
-    h2_hasher.update(&a_t);
-    h2_hasher.update(&b_t);
     let mut chall3 = GenericArray::<u8, P::LAMBDABYTES>::default();
-    h2_hasher.finish().read(&mut chall3);
+    hash_challenge_3::<RO<P>>(&mut chall3, &chall2, &a_t, &b_t);
 
     sigma_to_signature(
         c.iter().map(|value| value.as_ref()),
@@ -341,7 +365,6 @@ pub(crate) fn faest_sign<P, O>(
     )
 }
 
-#[allow(unused_assignments)]
 #[allow(clippy::type_complexity)]
 pub(crate) fn faest_verify<P, O>(msg: &[u8], pk: &PublicKey<O>, sigma: &[u8]) -> bool
 where
@@ -349,23 +372,23 @@ where
     O: PARAMOWF,
 {
     let lhat = <O::LHATBYTES as Unsigned>::to_usize();
-    let sig = <P::SIG as Unsigned>::to_usize();
-    let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
-    let l = <P::L as Unsigned>::to_usize() / 8;
 
-    let chall3 = GenericArray::from_slice(&sigma[sig - (16 + lambda)..sig - 16]);
-    let mut h1_hasher = RO::<P>::h1_init();
-    h1_hasher.update(&pk.owf_input);
-    h1_hasher.update(&pk.owf_output);
-    h1_hasher.update(msg);
+    let chall3 = GenericArray::from_slice(
+        &sigma[P::SIG::USIZE - (16 + O::LAMBDABYTES::USIZE)..P::SIG::USIZE - 16],
+    );
+    let iv = &sigma[P::SIG::USIZE - 16..];
+
     let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
         GenericArray::default();
-    h1_hasher.finish().read(&mut mu);
+    hash_mu::<RO<P>>(&mut mu, &pk.owf_input, &pk.owf_output, msg);
+
     let (hcom, gq_p) = volereconstruct::<<O::BaseParams as BaseParameters>::VC, P::Tau, P::LH>(
         chall3,
-        &sigma[(lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)) + (2 * lambda) + l + 2
-            ..sig - (16 + lambda)],
-        &sigma[sig - 16..].try_into().unwrap(),
+        &sigma[(lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1))
+            + (2 * O::LAMBDABYTES::USIZE)
+            + O::LBYTES::USIZE
+            + 2..P::SIG::USIZE - (16 + O::LAMBDABYTES::USIZE)],
+        &iv.try_into().unwrap(),
     );
 
     let mut chall1: Box<GenericArray<u8, O::CHALL1>> = GenericArray::default_boxed();
@@ -375,7 +398,7 @@ where
     let c = &sigma[..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)];
 
     h2_hasher.update(c);
-    h2_hasher.update(&sigma[sig - 16..]);
+    h2_hasher.update(iv);
     let mut reader = h2_hasher.finish();
     reader.read(&mut chall1);
 
@@ -390,7 +413,7 @@ where
     gq[0] = gq_p[0].clone();
     let delta0 = P::Tau::decode_challenge(chall3, 0);
     let u_t = &sigma[lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)
-        ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + lambda + 2];
+        ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + O::LAMBDABYTES::USIZE + 2];
     gd_t[0] = delta0
         .iter()
         .map(|d| {
@@ -442,25 +465,29 @@ where
         GenericArray::default();
     h1_hasher.finish().read(&mut hv);
 
-    let d = &sigma[lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + lambda + 2
-        ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + lambda + 2 + l];
+    let d = &sigma[lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + O::LAMBDABYTES::USIZE + 2
+        ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+            + O::LAMBDABYTES::USIZE
+            + 2
+            + O::LBYTES::USIZE];
     let mut chall2 = GenericArray::<u8, O::CHALL>::default();
-    let mut h2_hasher = RO::<P>::h2_init();
-    h2_hasher.update(&chall1);
-    h2_hasher.update(u_t);
-    h2_hasher.update(&hv);
-    h2_hasher.update(d);
-    h2_hasher.finish().read(&mut chall2);
+    hash_challange_2::<RO<P>>(&mut chall2, &chall1, u_t, &hv, d);
 
-    let a_t = &sigma[lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + lambda + 2 + l
-        ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + 2 * lambda + 2 + l];
+    let a_t = &sigma[lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+        + O::LAMBDABYTES::USIZE
+        + 2
+        + O::LBYTES::USIZE
+        ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+            + 2 * O::LAMBDABYTES::USIZE
+            + 2
+            + O::LBYTES::USIZE];
     let b_t = P::Cypher::verify::<P::Tau>(
         GenericArray::from_slice(d),
         Box::<GenericArray<_, _>>::from_iter(gq.iter().flat_map(|x| {
             x.iter()
                 .map(|y| {
                     y.into_iter()
-                        .take(l + lambda)
+                        .take(O::LBYTES::USIZE + O::LAMBDABYTES::USIZE)
                         .copied()
                         .collect::<GenericArray<u8, _>>()
                 })
@@ -473,12 +500,8 @@ where
         &pk.owf_output,
     );
 
-    let mut h2_hasher = RO::<P>::h2_init();
-    h2_hasher.update(&chall2);
-    h2_hasher.update(a_t);
-    h2_hasher.update(&b_t);
-    let mut chall3_p: GenericArray<u8, O::LAMBDABYTES> = GenericArray::default();
-    h2_hasher.finish().read(&mut chall3_p);
+    let mut chall3_p = GenericArray::default();
+    hash_challenge_3::<RO<P>>(&mut chall3_p, &chall2, a_t, &b_t);
     *chall3 == chall3_p
 }
 
