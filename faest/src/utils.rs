@@ -12,20 +12,19 @@ pub(crate) trait Reader {
 
 pub(crate) fn convert_gq<O, Tau>(
     d: &GenericArray<u8, O::LBYTES>,
-    gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
+    mut gq: Box<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>,
     chall3: &GenericArray<u8, O::LAMBDABYTES>,
 ) -> Box<GenericArray<<O::BaseParams as BaseParameters>::Field, O::LAMBDAL>>
 where
     O: PARAMOWF,
     Tau: TauParameters,
 {
-    let mut new_gq: GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA> = gq.clone();
     for i in 0..Tau::Tau0::USIZE {
         let sdelta = Tau::decode_challenge(chall3, i);
         for j in 0..Tau::K0::USIZE {
             if sdelta[j] != 0 {
                 for (gq_k, d_k) in
-                    zip(new_gq[Tau::K0::USIZE * i + j].iter_mut(), d).take(O::L::USIZE / 8)
+                    zip(gq[Tau::K0::USIZE * i + j].iter_mut(), d).take(O::L::USIZE / 8)
                 {
                     *gq_k ^= d_k;
                 }
@@ -37,7 +36,7 @@ where
         for j in 0..Tau::K1::USIZE {
             if sdelta[j] != 0 {
                 for (gq_k, d_k) in zip(
-                    new_gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j].iter_mut(),
+                    gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j].iter_mut(),
                     d,
                 )
                 .take(O::L::USIZE / 8)
@@ -52,11 +51,8 @@ where
     for i in 0..(O::L::USIZE + O::LAMBDA::USIZE) / 8 {
         for k in 0..8 {
             for j in 0..O::LAMBDABYTES::USIZE {
-                let mut temp = 0;
-                for l in 0..8_usize {
-                    temp += ((new_gq[(j * 8) + l][i] >> k) & 1) << l;
-                }
-                temp_q[i * O::LAMBDA::USIZE + k * O::LAMBDA::USIZE / 8 + j] = temp;
+                temp_q[i * O::LAMBDA::USIZE + k * O::LAMBDA::USIZE / 8 + j] =
+                    (0..8).map(|l| ((gq[(j * 8) + l][i] >> k) & 1) << l).sum();
             }
         }
     }

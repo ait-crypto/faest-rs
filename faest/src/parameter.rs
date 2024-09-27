@@ -141,7 +141,7 @@ pub(crate) trait Variant<O: PARAMOWF> {
     ///output q_tilde - delta * a_tilde (lambda bytes)
     fn verify<Tau>(
         d: &GenericArray<u8, O::LBYTES>,
-        gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
+        gq: Box<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>,
         a_t: &GenericArray<u8, O::LAMBDABYTES>,
         chall2: &GenericArray<u8, O::CHALL>,
         chall3: &GenericArray<u8, O::LAMBDABYTES>,
@@ -1289,7 +1289,7 @@ impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
 
     fn verify<Tau>(
         d: &GenericArray<u8, OWF::LBYTES>,
-        gq: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
+        gq: Box<GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>>,
         a_t: &GenericArray<u8, OWF::LAMBDABYTES>,
         chall2: &GenericArray<u8, OWF::CHALL>,
         chall3: &GenericArray<u8, OWF::LAMBDABYTES>,
@@ -1355,7 +1355,7 @@ impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
 
     fn verify<Tau>(
         d: &GenericArray<u8, OWF::LBYTES>,
-        gq: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
+        gq: Box<GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>>,
         a_t: &GenericArray<u8, OWF::LAMBDABYTES>,
         chall2: &GenericArray<u8, OWF::CHALL>,
         chall3: &GenericArray<u8, OWF::LAMBDABYTES>,

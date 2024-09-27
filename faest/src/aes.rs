@@ -795,7 +795,7 @@ where
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn aes_verify<O, Tau>(
     d: &GenericArray<u8, O::LBYTES>,
-    gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
+    gq: Box<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>,
     a_t: &GenericArray<u8, O::LAMBDABYTES>,
     chall2: &GenericArray<u8, O::CHALL>,
     chall3: &GenericArray<u8, O::LAMBDABYTES>,
@@ -2058,6 +2058,30 @@ mod test {
         input: Vec<u8>,
         output: Vec<u8>,
         res: Vec<u64>,
+    }
+
+    fn aes_verify<O, Tau>(
+        d: &GenericArray<u8, O::LBYTES>,
+        gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
+        a_t: &GenericArray<u8, O::LAMBDABYTES>,
+        chall2: &GenericArray<u8, O::CHALL>,
+        chall3: &GenericArray<u8, O::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, O::InputSize>,
+        owf_output: &GenericArray<u8, O::OutputSize>,
+    ) -> GenericArray<u8, O::LAMBDABYTES>
+    where
+        O: PARAMOWF,
+        Tau: TauParameters,
+    {
+        super::aes_verify::<O, Tau>(
+            d,
+            Box::<GenericArray<_, _>>::from_iter(gq.iter().cloned()),
+            a_t,
+            chall2,
+            chall3,
+            owf_input,
+            owf_output,
+        )
     }
 
     #[test]

@@ -456,18 +456,16 @@ where
         ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + 2 * lambda + 2 + l];
     let b_t = P::Cypher::verify::<P::Tau>(
         GenericArray::from_slice(d),
-        &gq.iter()
-            .flat_map(|x| {
-                x.iter()
-                    .map(|y| {
-                        y.into_iter()
-                            .take(l + lambda)
-                            .copied()
-                            .collect::<GenericArray<u8, _>>()
-                    })
-                    .collect::<Vec<GenericArray<u8, _>>>()
-            })
-            .collect::<GenericArray<GenericArray<u8, _>, _>>(),
+        Box::<GenericArray<_, _>>::from_iter(gq.iter().flat_map(|x| {
+            x.iter()
+                .map(|y| {
+                    y.into_iter()
+                        .take(l + lambda)
+                        .copied()
+                        .collect::<GenericArray<u8, _>>()
+                })
+                .collect::<Vec<GenericArray<u8, _>>>()
+        })),
         GenericArray::from_slice(a_t),
         &chall2,
         chall3,
