@@ -296,12 +296,13 @@ where
 }
 
 fn em_enc_cstrnts_mkey0<O>(
+    a_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
+    b_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
     output: &GenericArray<u8, O::OutputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     w: &GenericArray<u8, O::LBYTES>,
     v: &GenericArray<Field<O>, O::L>,
-) -> Reveal<O>
-where
+) where
     O: PARAMOWF,
 {
     let lambda = <O::LAMBDA as Unsigned>::to_usize();
@@ -323,21 +324,21 @@ where
     let vs = em_enc_fwd::<O>(Either::Right(v), None);
     let s_b = em_enc_bkwd_mkey0_mtag0::<O>(&new_x, &new_w, &w_out);
     let v_s_b = em_enc_bkwd_mkey0_mtag1::<O>(v, v_out);
-    let (mut a0, mut a1) = (GenericArray::default_boxed(), GenericArray::default_boxed());
     for j in 0..senc {
-        a0[j] = v_s_b[j] * vs[j];
-        a1[j] = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + Field::<O>::ONE + a0[j];
+        let a0 = v_s_b[j] * vs[j];
+        let a1 = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + Field::<O>::ONE + a0;
+        a_t_hasher.update(&a1);
+        b_t_hasher.update(&a0);
     }
-    (a0, a1)
 }
 
 fn em_enc_cstrnts_mkey1<O>(
+    b_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
     output: &GenericArray<u8, O::OutputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     q: &GenericArray<Field<O>, O::L>,
     delta: Field<O>,
-) -> Box<GenericArray<Field<O>, O::C>>
-where
+) where
     O: PARAMOWF,
 {
     let lambda = <O::LAMBDA as Unsigned>::to_usize();
@@ -354,7 +355,10 @@ where
     let qs_b = em_enc_bkwd_mkey1_mtag0::<O>(&new_x, q, &q_out, delta);
     let immut = delta * delta;
 
-    zip(qs, qs_b).map(|(q, qb)| (q * qb) + immut).collect()
+    zip(qs, qs_b).for_each(|(q, qb)| {
+        let b = (q * qb) + immut;
+        b_t_hasher.update(&b);
+    });
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
@@ -389,8 +393,16 @@ where
     let new_v = GenericArray::<Field<O>, O::LAMBDAL>::from_iter(
         temp_v.chunks(O::LAMBDABYTES::USIZE).map(Field::<O>::from),
     );
+
+    let mut a_t_hasher =
+        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
+    let mut b_t_hasher =
+        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
+
     let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
-    let (a0, a1) = em_enc_cstrnts_mkey0::<O>(
+    em_enc_cstrnts_mkey0::<O>(
+        &mut a_t_hasher,
+        &mut b_t_hasher,
         owf_output,
         &x.0.chunks(8)
             .flat_map(|x| {
@@ -407,15 +419,6 @@ where
     );
     let u_s = Field::<O>::from(&u[l / 8..]);
     let v_s = Field::<O>::sum_poly(&new_v[l..l + lambda]);
-
-    let mut a_t_hasher =
-        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
-    let mut b_t_hasher =
-        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
-
-    a1.into_iter().for_each(|value| a_t_hasher.update(&value));
-    a0.into_iter().for_each(|value| b_t_hasher.update(&value));
-
     let a_t = a_t_hasher.finalize(&u_s);
     let b_t = b_t_hasher.finalize(&v_s);
 
@@ -445,8 +448,11 @@ where
     let r = <O::R as Unsigned>::to_u8();
 
     let new_q = convert_gq::<O, Tau>(d, gq, chall3);
+    let mut zk_hasher =
+        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
     let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
-    let b = em_enc_cstrnts_mkey1::<O>(
+    em_enc_cstrnts_mkey1::<O>(
+        &mut zk_hasher,
         owf_output,
         &x.0.chunks(8)
             .flat_map(|x| {
@@ -461,10 +467,6 @@ where
         GenericArray::from_slice(&new_q[..l]),
         delta,
     );
-
-    let mut zk_hasher =
-        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
-    b.into_iter().for_each(|value| zk_hasher.update(&value));
 
     let q_s = Field::<O>::sum_poly(&new_q[l..l + lambda]);
     (zk_hasher.finalize(&q_s) + Field::<O>::from(a_t) * delta).as_bytes()
@@ -901,143 +903,6 @@ mod test {
                             .collect::<Vec<GF256>>()
                     ))
                 )
-            }
-        }
-    }
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct EmEncCstrnts {
-        lambda: u16,
-        mkey: u8,
-        x: Vec<u8>,
-        w: Vec<u8>,
-        out: Vec<u8>,
-        delta: Vec<u8>,
-        vq: Vec<[u64; 4]>,
-        ab: Vec<[u64; 8]>,
-    }
-
-    fn em_enc_cstrnts<P, O>(
-        output: &GenericArray<u8, O::OutputSize>,
-        x: &GenericArray<u8, O::LAMBDAR1BYTE>,
-        w: &GenericArray<u8, O::LBYTES>,
-        v: &GenericArray<Field<O>, O::L>,
-        q: &GenericArray<Field<O>, O::L>,
-        mkey: bool,
-        delta: Field<O>,
-    ) -> Reveal<O>
-    where
-        O: PARAMOWF,
-    {
-        if mkey {
-            (
-                super::em_enc_cstrnts_mkey1::<O>(output, x, q, delta),
-                GenericArray::default_boxed(),
-            )
-        } else {
-            super::em_enc_cstrnts_mkey0::<O>(output, x, w, v)
-        }
-    }
-
-    #[test]
-    fn em_enc_cstrnts_test() {
-        let database: Vec<EmEncCstrnts> =
-            serde_json::from_str(include_str!("../tests/data/EmEncCstrnts.json"))
-                .expect("error while reading or parsing");
-        for data in database {
-            if data.lambda == 128 {
-                let vq = &data
-                    .vq
-                    .iter()
-                    .map(|v| GF128::new(v[0] as u128 + ((v[1] as u128) << 64), 0))
-                    .collect::<Vec<GF128>>()[..];
-                let (res_0, res_1) = em_enc_cstrnts::<PARAM128SEM, PARAMOWF128EM>(
-                    GenericArray::from_slice(&data.out),
-                    GenericArray::from_slice(&data.x),
-                    GenericArray::from_slice(&data.w),
-                    GenericArray::from_slice(vq),
-                    GenericArray::from_slice(vq),
-                    data.mkey != 0,
-                    GF128::from(data.delta.as_slice()),
-                );
-                let (mut a0, mut a1) = (vec![], vec![]);
-                for i in 0..data.ab.len() {
-                    a0.push(GF128::new(
-                        data.ab[i][0] as u128 + ((data.ab[i][1] as u128) << 64),
-                        0,
-                    ));
-                    a1.push(GF128::new(
-                        data.ab[i][4] as u128 + ((data.ab[i][5] as u128) << 64),
-                        0,
-                    ));
-                }
-                for i in 0..a0.len() {
-                    assert_eq!((res_0[i], res_1[i]), (a0[i], a1[i]));
-                }
-            } else if data.lambda == 192 {
-                let vq = &data
-                    .vq
-                    .iter()
-                    .map(|v| GF192::new(v[0] as u128 + ((v[1] as u128) << 64), v[2] as u128))
-                    .collect::<Vec<GF192>>()[..];
-                let (res_0, res_1) = em_enc_cstrnts::<PARAM192SEM, PARAMOWF192EM>(
-                    GenericArray::from_slice(&data.out),
-                    GenericArray::from_slice(&data.x),
-                    GenericArray::from_slice(&data.w),
-                    GenericArray::from_slice(vq),
-                    GenericArray::from_slice(vq),
-                    data.mkey != 0,
-                    GF192::from(data.delta.as_slice()),
-                );
-                let (mut a0, mut a1) = (vec![], vec![]);
-                for i in 0..data.ab.len() {
-                    a0.push(GF192::new(
-                        data.ab[i][0] as u128 + ((data.ab[i][1] as u128) << 64),
-                        data.ab[i][2] as u128,
-                    ));
-                    a1.push(GF192::new(
-                        data.ab[i][4] as u128 + ((data.ab[i][5] as u128) << 64),
-                        data.ab[i][6] as u128,
-                    ));
-                }
-                for i in 0..a0.len() {
-                    assert_eq!((res_0[i], res_1[i]), (a0[i], a1[i]));
-                }
-            } else {
-                let vq = &data
-                    .vq
-                    .iter()
-                    .map(|v| {
-                        GF256::new(
-                            v[0] as u128 + ((v[1] as u128) << 64),
-                            v[2] as u128 + ((v[3] as u128) << 64),
-                        )
-                    })
-                    .collect::<Vec<GF256>>()[..];
-                let (res_0, res_1) = em_enc_cstrnts::<PARAM256SEM, PARAMOWF256EM>(
-                    GenericArray::from_slice(&data.out),
-                    GenericArray::from_slice(&data.x),
-                    GenericArray::from_slice(&data.w),
-                    GenericArray::from_slice(vq),
-                    GenericArray::from_slice(vq),
-                    data.mkey != 0,
-                    GF256::from(data.delta.as_slice()),
-                );
-                let (mut a0, mut a1) = (vec![], vec![]);
-                for i in 0..data.ab.len() {
-                    a0.push(GF256::new(
-                        data.ab[i][0] as u128 + ((data.ab[i][1] as u128) << 64),
-                        data.ab[i][2] as u128 + ((data.ab[i][3] as u128) << 64),
-                    ));
-                    a1.push(GF256::new(
-                        data.ab[i][4] as u128 + ((data.ab[i][5] as u128) << 64),
-                        data.ab[i][6] as u128 + ((data.ab[i][7] as u128) << 64),
-                    ));
-                }
-                for i in 0..a0.len() {
-                    assert_eq!((res_0[i], res_1[i]), (a0[i], a1[i]));
-                }
             }
         }
     }
