@@ -17,11 +17,6 @@ use crate::{
 
 type Field<O> = <<O as PARAMOWF>::BaseParams as BaseParameters>::Field;
 
-type Reveal<O> = (
-    Box<GenericArray<Field<O>, <O as PARAMOWF>::C>>,
-    Box<GenericArray<Field<O>, <O as PARAMOWF>::C>>,
-);
-
 pub(crate) fn em_extendedwitness<O>(
     owf_key: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
@@ -30,51 +25,38 @@ where
     O: PARAMOWF,
 {
     let mut valid = true;
-    let lambda = <O::LAMBDA as Unsigned>::to_usize() / 8;
-    let nst = <O::NST as Unsigned>::to_usize();
-    let r = <O::R as Unsigned>::to_usize();
-    let kc = <O::NK as Unsigned>::to_u8();
     let mut res: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
-    let mut index = 0;
+    let mut index = O::LAMBDABYTES::USIZE;
     let x = rijndael_key_schedule(
-        &owf_input[..lambda],
-        nst as u8,
-        kc,
-        r as u8,
-        (4 * (((r + 1) * nst) / kc as usize)) as u8,
+        owf_input,
+        O::NST::U8,
+        O::NK::U8,
+        O::R::U8,
+        (4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE)) as u8,
     );
-    for i in owf_key.iter() {
-        res[index] = *i;
-        index += 1;
-    }
+    res[..O::LAMBDABYTES::USIZE].copy_from_slice(owf_key);
     let mut state = State::default();
-    bitslice(
-        &mut state,
-        &owf_key[..16],
-        &[owf_key[16..].to_vec(), vec![0u8; 32 - lambda]].concat(),
-    );
+    bitslice(&mut state, &owf_key[..16], &owf_key[16..]);
     rijndael_add_round_key(&mut state, &x.0[..8]);
-    for j in 1..r {
+    for j in 1..O::R::USIZE {
         for i in inv_bitslice(&state)[0][..].iter() {
             valid &= *i != 0;
         }
-        if nst == 6 {
+        if O::NST::USIZE == 6 {
             for i in inv_bitslice(&state)[1][..8].iter() {
                 valid &= *i != 0;
             }
-        } else if nst == 8 {
+        } else if O::NST::USIZE == 8 {
             for i in inv_bitslice(&state)[1][..].iter() {
                 valid &= *i != 0;
             }
         }
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
-        rijndael_shift_rows_1(&mut state, nst as u8);
-        for i in convert_from_batchblocks(inv_bitslice(&state))[..kc as usize][..kc as usize]
-            .to_vec()
+        rijndael_shift_rows_1(&mut state, O::NST::U8);
+        for i in convert_from_batchblocks(inv_bitslice(&state))[..O::NK::USIZE][..O::NK::USIZE]
             .iter()
             .flat_map(|x| x.to_le_bytes())
-            .collect::<Vec<u8>>()
         {
             res[index] = i;
             index += 1;
@@ -85,11 +67,11 @@ where
     for i in inv_bitslice(&state)[0][..].iter() {
         valid &= *i != 0;
     }
-    if nst == 6 {
+    if O::NST::USIZE == 6 {
         for i in inv_bitslice(&state)[1][..8].iter() {
             valid &= *i != 0;
         }
-    } else if nst == 8 {
+    } else if O::NST::USIZE == 8 {
         for i in inv_bitslice(&state)[1][..].iter() {
             valid &= *i != 0;
         }
@@ -173,24 +155,22 @@ where
 {
     let mut res: Box<GenericArray<Field<O>, O::SENC>> = GenericArray::default_boxed();
     let mut index = 0;
-    let r = <O::R as Unsigned>::to_usize();
-    let nst = <O::NST as Unsigned>::to_usize();
-    let lambda = <O::LAMBDA as Unsigned>::to_usize();
 
     //Step 2
-    for j in 0..r {
-        for c in 0..nst {
+    for j in 0..O::R::USIZE {
+        for c in 0..O::NST::USIZE {
             //Step 4
             for k in 0..4 {
-                let mut icol = (c + nst - k) % nst;
-                if nst == 8 && k >= 2 {
-                    icol = (icol + nst - 1) % nst;
+                let mut icol = (c + O::NST::USIZE - k) % O::NST::USIZE;
+                if O::NST::USIZE == 8 && k >= 2 {
+                    icol = (icol + O::NST::USIZE - 1) % O::NST::USIZE;
                 }
-                let ird = lambda + 32 * nst * j + 32 * icol + 8 * k;
-                let z_t = if j < r - 1 {
+                let ird = O::LAMBDA::USIZE + 32 * O::NST::USIZE * j + 32 * icol + 8 * k;
+                let z_t = if j < O::R::USIZE - 1 {
                     z[ird..ird + 8].to_vec()
                 } else {
-                    let z_out_t = &z_out[ird - 32 * nst * (j + 1)..ird - 32 * nst * (j + 1) + 8];
+                    let z_out_t = &z_out[ird - 32 * O::NST::USIZE * (j + 1)
+                        ..ird - 32 * O::NST::USIZE * (j + 1) + 8];
                     zip(z_out_t, &x[ird..ird + 8])
                         .map(|(z, x)| *z + *x)
                         .collect::<Vec<_>>()
@@ -218,23 +198,21 @@ where
 {
     let mut res: Box<GenericArray<Field<O>, O::SENC>> = GenericArray::default_boxed();
     let mut index = 0;
-    let r = <O::R as Unsigned>::to_usize();
-    let nst = <O::NST as Unsigned>::to_usize();
-    let lambda = <O::LAMBDA as Unsigned>::to_usize();
     //Step 2
-    for j in 0..r {
-        for c in 0..nst {
+    for j in 0..O::R::USIZE {
+        for c in 0..O::NST::USIZE {
             //Step 4
             for k in 0..4 {
-                let mut icol = (c + nst - k) % nst;
-                if nst == 8 && k >= 2 {
-                    icol = (icol + nst - 1) % nst;
+                let mut icol = (c + O::NST::USIZE - k) % O::NST::USIZE;
+                if O::NST::USIZE == 8 && k >= 2 {
+                    icol = (icol + O::NST::USIZE - 1) % O::NST::USIZE;
                 }
-                let ird = lambda + 32 * nst * j + 32 * icol + 8 * k;
-                let z_t = if j < r - 1 {
+                let ird = O::LAMBDA::USIZE + 32 * O::NST::USIZE * j + 32 * icol + 8 * k;
+                let z_t = if j < O::R::USIZE - 1 {
                     &z[ird..ird + 8]
                 } else {
-                    &z_out[ird - 32 * nst * (j + 1)..ird - 32 * nst * (j + 1) + 8]
+                    &z_out
+                        [ird - 32 * O::NST::USIZE * (j + 1)..ird - 32 * O::NST::USIZE * (j + 1) + 8]
                 };
                 let mut y_t = [Field::<O>::default(); 8];
                 for i in 0..8 {
@@ -259,24 +237,21 @@ where
 {
     let mut res: Box<GenericArray<Field<O>, O::SENC>> = GenericArray::default_boxed();
     let mut index = 0;
-    let r = <O::R as Unsigned>::to_usize();
-    let nst = <O::NST as Unsigned>::to_usize();
-    let lambda = <O::LAMBDA as Unsigned>::to_usize();
-    let immut = delta;
     //Step 2
-    for j in 0..r {
-        for c in 0..nst {
+    for j in 0..O::R::USIZE {
+        for c in 0..O::NST::USIZE {
             //Step 4
             for k in 0..4 {
-                let mut icol = (c + nst - k) % nst;
-                if nst == 8 && k >= 2 {
-                    icol = (icol + nst - 1) % nst;
+                let mut icol = (c + O::NST::USIZE - k) % O::NST::USIZE;
+                if O::NST::USIZE == 8 && k >= 2 {
+                    icol = (icol + O::NST::USIZE - 1) % O::NST::USIZE;
                 }
-                let ird = lambda + 32 * nst * j + 32 * icol + 8 * k;
-                let z_t = if j < r - 1 {
+                let ird = O::LAMBDA::USIZE + 32 * O::NST::USIZE * j + 32 * icol + 8 * k;
+                let z_t = if j < O::R::USIZE - 1 {
                     z[ird..ird + 8].to_vec()
                 } else {
-                    let z_out_t = &z_out[ird - 32 * nst * (j + 1)..ird - 32 * nst * (j + 1) + 8];
+                    let z_out_t = &z_out[ird - 32 * O::NST::USIZE * (j + 1)
+                        ..ird - 32 * O::NST::USIZE * (j + 1) + 8];
                     zip(z_out_t, &x[ird..ird + 8])
                         .map(|(z, x)| *z + *x)
                         .collect::<Vec<_>>()
@@ -285,8 +260,8 @@ where
                 for i in 0..8 {
                     y_t[i] = z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]
                 }
-                y_t[0] += immut;
-                y_t[2] += immut;
+                y_t[0] += delta;
+                y_t[2] += delta;
                 res[index] = Field::<O>::byte_combine(&y_t);
                 index += 1;
             }
