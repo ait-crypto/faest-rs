@@ -846,7 +846,7 @@ impl TauParameters for Tau256Fast {
 }
 
 pub(crate) trait PARAM {
-    type OWF: PARAMOWF<LAMBDA = Self::LAMBDA, LAMBDABYTES = Self::LAMBDABYTES>;
+    type OWF: PARAMOWF;
     type Cypher: Variant<Self::OWF>;
     type Tau: TauParameters;
 
@@ -855,8 +855,6 @@ pub(crate) trait PARAM {
     type POWK0: ArrayLength;
     type POWK1: ArrayLength;
     type BETA: ArrayLength;
-    type LAMBDA: ArrayLength;
-    type LAMBDABYTES: ArrayLength;
     type LH: ArrayLength;
     type SIG: ArrayLength;
 }
@@ -865,12 +863,9 @@ pub(crate) struct PARAM128S;
 
 impl PARAM for PARAM128S {
     type OWF = PARAMOWF128;
-
     type Tau = Tau128Small;
 
     type BETA = U1;
-
-    type LAMBDA = U128;
 
     type N0 = U4096;
 
@@ -884,8 +879,6 @@ impl PARAM for PARAM128S {
 
     type SIG = Sum<U142, Sum<U256, Sum<U512, U4096>>>;
 
-    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
     type Cypher = AesCypher<Self::OWF>;
 }
 
@@ -896,8 +889,6 @@ impl PARAM for PARAM128F {
     type Tau = Tau128Fast;
 
     type BETA = U1;
-
-    type LAMBDA = U128;
 
     type N0 = U256;
 
@@ -911,8 +902,6 @@ impl PARAM for PARAM128F {
 
     type SIG = Sum<U192, Sum<U2048, U4096>>;
 
-    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
     type Cypher = AesCypher<Self::OWF>;
 }
 
@@ -920,12 +909,9 @@ pub(crate) struct PARAM192S;
 
 impl PARAM for PARAM192S {
     type OWF = PARAMOWF192;
-
     type Tau = Tau192Small;
 
     type BETA = U2;
-
-    type LAMBDA = U192;
 
     type N0 = U4096;
 
@@ -939,8 +925,6 @@ impl PARAM for PARAM192S {
 
     type SIG = Sum<U200, Sum<U256, Sum<U8192, U4096>>>;
 
-    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
     type Cypher = AesCypher<Self::OWF>;
 }
 
@@ -948,12 +932,9 @@ pub(crate) struct PARAM192F;
 
 impl PARAM for PARAM192F {
     type OWF = PARAMOWF192;
-
     type Tau = Tau192Fast;
 
     type BETA = U2;
-
-    type LAMBDA = U192;
 
     type N0 = U256;
 
@@ -967,8 +948,6 @@ impl PARAM for PARAM192F {
 
     type SIG = Sum<U152, Sum<U256, U16384>>;
 
-    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
     type Cypher = AesCypher<Self::OWF>;
 }
 
@@ -976,12 +955,9 @@ pub(crate) struct PARAM256S;
 
 impl PARAM for PARAM256S {
     type OWF = PARAMOWF256;
-
     type Tau = Tau256Small;
 
     type BETA = U2;
-
-    type LAMBDA = U256;
 
     type N0 = U4096;
 
@@ -995,8 +971,6 @@ impl PARAM for PARAM256S {
 
     type SIG = Sum<U596, Sum<U1024, Sum<U4096, U16384>>>;
 
-    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
     type Cypher = AesCypher<Self::OWF>;
 }
 
@@ -1004,12 +978,9 @@ pub(crate) struct PARAM256F;
 
 impl PARAM for PARAM256F {
     type OWF = PARAMOWF256;
-
     type Tau = Tau256Fast;
 
     type BETA = U2;
-
-    type LAMBDA = U256;
 
     type N0 = U256;
 
@@ -1023,8 +994,6 @@ impl PARAM for PARAM256F {
 
     type SIG = Sum<U752, Sum<U1024, Sum<U2048, Sum<U8192, U16384>>>>;
 
-    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
     type Cypher = AesCypher<Self::OWF>;
 }
 
@@ -1032,12 +1001,9 @@ pub(crate) struct PARAM128SEM;
 
 impl PARAM for PARAM128SEM {
     type OWF = PARAMOWF128EM;
-
     type Tau = Tau128Small;
 
     type BETA = U1;
-
-    type LAMBDA = U128;
 
     type N0 = U4096;
 
@@ -1051,8 +1017,6 @@ impl PARAM for PARAM128SEM {
 
     type SIG = Sum<U470, U4096>;
 
-    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
     type Cypher = EmCypher<Self::OWF>;
 }
 
@@ -1060,12 +1024,9 @@ pub(crate) struct PARAM128FEM;
 
 impl PARAM for PARAM128FEM {
     type OWF = PARAMOWF128EM;
-
     type Tau = Tau128Fast;
 
     type BETA = U1;
-
-    type LAMBDA = U128;
 
     type N0 = U256;
 
@@ -1079,8 +1040,6 @@ impl PARAM for PARAM128FEM {
 
     type SIG = Sum<U576, Sum<U1024, U4096>>;
 
-    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
     type Cypher = EmCypher<Self::OWF>;
 }
 
@@ -1088,12 +1047,9 @@ pub(crate) struct PARAM192SEM;
 
 impl PARAM for PARAM192SEM {
     type OWF = PARAMOWF192EM;
-
     type Tau = Tau192Small;
 
     type BETA = U2;
-
-    type LAMBDA = U192;
 
     type N0 = U4096;
 
@@ -1107,8 +1063,6 @@ impl PARAM for PARAM192SEM {
 
     type SIG = Sum<U584, Sum<U2048, U8192>>;
 
-    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
     type Cypher = EmCypher<Self::OWF>;
 }
 
@@ -1120,8 +1074,6 @@ impl PARAM for PARAM192FEM {
     type Tau = Tau192Fast;
 
     type BETA = U2;
-
-    type LAMBDA = U192;
 
     type N0 = U256;
 
@@ -1135,8 +1087,6 @@ impl PARAM for PARAM192FEM {
 
     type SIG = Sum<U600, Sum<U1024, Sum<U4096, U8192>>>;
 
-    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
     type Cypher = EmCypher<Self::OWF>;
 }
 
@@ -1148,8 +1098,6 @@ impl PARAM for PARAM256SEM {
     type Tau = Tau256Small;
 
     type BETA = U2;
-
-    type LAMBDA = U256;
 
     type N0 = U4096;
 
@@ -1163,8 +1111,6 @@ impl PARAM for PARAM256SEM {
 
     type SIG = Sum<U476, Sum<U4096, U16384>>;
 
-    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
-
     type Cypher = EmCypher<Self::OWF>;
 }
 
@@ -1177,8 +1123,6 @@ impl PARAM for PARAM256FEM {
 
     type BETA = U2;
 
-    type LAMBDA = U256;
-
     type N0 = U256;
 
     type POWK0 = U511;
@@ -1190,8 +1134,6 @@ impl PARAM for PARAM256FEM {
     type LH = U514;
 
     type SIG = Sum<U112, Sum<U2048, Sum<U8192, U16384>>>;
-
-    type LAMBDABYTES = Quot<Self::LAMBDA, U8>;
 
     type Cypher = EmCypher<Self::OWF>;
 }

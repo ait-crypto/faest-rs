@@ -28,7 +28,7 @@ use crate::{
     faest::{faest_keygen, faest_sign, faest_verify, PublicKey, SecretKey},
     parameter::{
         PARAM, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
-        PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM,
+        PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF,
     },
 };
 
@@ -144,7 +144,9 @@ macro_rules! define_impl {
                 rng: &mut impl CryptoRngCore,
                 msg: &[u8],
             ) -> Result<$sig, Error> {
-                let mut rho = GenericArray::<u8, <$param as PARAM>::LAMBDABYTES>::default();
+                let mut rho =
+                    GenericArray::<u8, <<$param as PARAM>::OWF as PARAMOWF>::LAMBDABYTES>::default(
+                    );
                 rng.fill_bytes(&mut rho);
                 let mut signature = GenericArray::default();
                 faest_sign::<$param, <$param as PARAM>::OWF>(msg, &self.0, &rho, &mut signature);
@@ -159,7 +161,9 @@ macro_rules! define_impl {
                 rng: &mut impl CryptoRngCore,
                 msg: &[u8],
             ) -> Result<Box<$sig>, Error> {
-                let mut rho = GenericArray::<u8, <$param as PARAM>::LAMBDABYTES>::default();
+                let mut rho =
+                    GenericArray::<u8, <<$param as PARAM>::OWF as PARAMOWF>::LAMBDABYTES>::default(
+                    );
                 rng.fill_bytes(&mut rho);
                 let mut signature = Box::new($sig(GenericArray::default()));
                 faest_sign::<$param, <$param as PARAM>::OWF>(msg, &self.0, &rho, &mut signature.0);

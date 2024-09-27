@@ -335,7 +335,7 @@ pub(crate) fn faest_sign<P, O>(
 
     let (a_t, b_t) = P::Cypher::prove(&w, new_u, &new_gv, &sk.owf_input, &sk.owf_output, &chall2);
 
-    let mut chall3 = GenericArray::<u8, P::LAMBDABYTES>::default();
+    let mut chall3 = GenericArray::<u8, O::LAMBDABYTES>::default();
     hash_challenge_3::<RO<P>>(&mut chall3, &chall2, &a_t, &b_t);
 
     sigma_to_signature(
