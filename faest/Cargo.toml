@@ -29,6 +29,7 @@ criterion = "0.5.1"
 rand = { version = "0.8", features = ["small_rng"] }
 nist-pqc-seeded-rng = "0.2"
 hex = "0.4.3"
+rand_chacha = { version = "0.3" }
 
 [features]
 default = ["zeroize", "randomized-signer", "serde"]

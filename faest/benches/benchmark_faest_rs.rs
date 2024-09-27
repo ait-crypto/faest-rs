@@ -7,15 +7,13 @@ use faest::{
     FAEST256EMfSignature, FAEST256EMsKeyPair, FAEST256EMsSignature, FAEST256fKeyPair,
     FAEST256fSignature, FAEST256sKeyPair, FAEST256sSignature, KeypairGenerator,
 };
-use rand::RngCore;
+use rand::{RngCore, SeedableRng};
 use signature::{Signer, Verifier};
 
-fn random_message(mut rng: impl RngCore) -> Vec<u8> {
-    let mut length = [0];
-    while length[0] == 0 {
-        rng.fill_bytes(&mut length);
-    }
-    let mut ret = vec![0; length[0] as usize];
+type Message = [u8; 32];
+
+fn random_message(mut rng: impl RngCore) -> Message {
+    let mut ret = Message::default();
     rng.fill_bytes(&mut ret);
     ret
 }
@@ -25,7 +23,7 @@ where
     KP: KeypairGenerator + Signer<S>,
     KP::VerifyingKey: Verifier<S>,
 {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
     let mut c = c.benchmark_group(name);
 
     c.bench_function("keygen", |b| b.iter(|| black_box(KP::generate(&mut rng))));
