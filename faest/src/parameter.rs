@@ -206,7 +206,6 @@ pub(crate) trait PARAMOWF {
     type KBLENGTH: ArrayLength;
     type PRODRUN128: ArrayLength;
     type PRODSKE8: ArrayLength;
-    type SENC2: ArrayLength;
     type LAMBDALBYTESLAMBDA: ArrayLength;
     type LAMBDAR1: ArrayLength;
     type LAMBDAR1BYTE: ArrayLength;
@@ -281,8 +280,6 @@ impl PARAMOWF for PARAMOWF128 {
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
 
     type PRODSKE8 = Prod<Self::SKE, U8>;
-
-    type SENC2 = Prod<Self::SENC, U2>;
 
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
 
@@ -370,8 +367,6 @@ impl PARAMOWF for PARAMOWF192 {
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
 
     type PRODSKE8 = Prod<Self::SKE, U8>;
-
-    type SENC2 = Prod<Self::SENC, U2>;
 
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
 
@@ -464,8 +459,6 @@ impl PARAMOWF for PARAMOWF256 {
 
     type PRODSKE8 = Prod<Self::SKE, U8>;
 
-    type SENC2 = Prod<Self::SENC, U2>;
-
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
 
     type QUOTLENC8 = Quot<Self::LENC, U8>;
@@ -557,8 +550,6 @@ impl PARAMOWF for PARAMOWF128EM {
 
     type PRODSKE8 = Prod<Self::SKE, U8>;
 
-    type SENC2 = Prod<Self::SENC, U2>;
-
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
 
     type QUOTLENC8 = Quot<Self::LENC, U8>;
@@ -649,8 +640,6 @@ impl PARAMOWF for PARAMOWF192EM {
 
     type PRODSKE8 = Prod<Self::SKE, U8>;
 
-    type SENC2 = Prod<Self::SENC, U2>;
-
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
 
     type QUOTLENC8 = Quot<Self::LENC, U8>;
@@ -740,8 +729,6 @@ impl PARAMOWF for PARAMOWF256EM {
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
 
     type PRODSKE8 = Prod<Self::SKE, U8>;
-
-    type SENC2 = Prod<Self::SENC, U2>;
 
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
 

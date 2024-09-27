@@ -721,7 +721,10 @@ fn aes_enc_cstrnts_mkey0<O>(
     v: &GenericArray<Field<O>, O::LENC>,
     k: &GenericArray<Field<O>, O::PRODRUN128>,
     vk: &GenericArray<Field<O>, O::PRODRUN128>,
-) -> Box<GenericArray<Field<O>, O::SENC2>>
+) -> (
+    Box<GenericArray<Field<O>, O::SENC>>,
+    Box<GenericArray<Field<O>, O::SENC>>,
+)
 where
     O: PARAMOWF,
 {
@@ -737,13 +740,14 @@ where
     let vs = aes_enc_fwd::<O>(v, vk, false, true, input, Field::<O>::default());
     let s_b = aes_enc_bkwd::<O>(&field_w, k, false, false, output, Field::<O>::default());
     let v_s_b = aes_enc_bkwd::<O>(v, vk, false, true, output, Field::<O>::default());
-    let mut a0 = Box::<GenericArray<Field<O>, O::SENC2>>::new(GenericArray::default());
+    let mut a0 = GenericArray::default_boxed();
+    let mut a1 = GenericArray::default_boxed();
     for j in 0..senc {
         a0[j] = vs[j] * v_s_b[j];
-        a0[senc + j] = (s[j] + vs[j]) * (s_b[j] + v_s_b[j]) + Field::<O>::ONE + a0[j];
+        a1[j] = (s[j] + vs[j]) * (s_b[j] + v_s_b[j]) + Field::<O>::ONE + a0[j];
     }
 
-    a0
+    (a0, a1)
 }
 
 fn aes_enc_cstrnts_mkey1<O>(
@@ -752,7 +756,7 @@ fn aes_enc_cstrnts_mkey1<O>(
     q: &GenericArray<Field<O>, O::LENC>,
     qk: &GenericArray<Field<O>, O::PRODRUN128>,
     delta: Field<O>,
-) -> Box<GenericArray<Field<O>, O::SENC2>>
+) -> Box<GenericArray<Field<O>, O::SENC>>
 where
     O: PARAMOWF,
 {
@@ -791,7 +795,6 @@ where
     let _c = <O::C as Unsigned>::to_usize();
     let lke = <O::LKE as Unsigned>::to_usize();
     let lenc = <O::LENC as Unsigned>::to_usize();
-    let senc = <O::SENC as Unsigned>::to_usize();
     let lambda = <O::LAMBDA as Unsigned>::to_usize();
     let new_w: GenericArray<u8, O::L> = w.iter().flat_map(|x| byte_to_bit(*x)).collect();
     let mut temp_v: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
@@ -809,6 +812,10 @@ where
     let new_v = GenericArray::<Field<O>, O::LAMBDAL>::from_iter(
         temp_v.chunks(O::LAMBDABYTES::USIZE).map(Field::<O>::from),
     );
+    let mut a_t_hasher =
+        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
+    let mut b_t_hasher =
+        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
 
     let (a0, a1, k, vk) = aes_key_exp_cstrnts_mkey0::<O>(
         GenericArray::from_slice(&new_w[..lke]),
@@ -817,7 +824,10 @@ where
     let a1 = a1.unwrap();
     let k = k.unwrap();
 
-    let a_01 = aes_enc_cstrnts_mkey0::<O>(
+    a0.into_iter().for_each(|a0| b_t_hasher.update(&a0));
+    a1.into_iter().for_each(|a1| a_t_hasher.update(&a1));
+
+    let (a0, a1) = aes_enc_cstrnts_mkey0::<O>(
         owf_input[..16].try_into().unwrap(),
         owf_output[..16].try_into().unwrap(),
         //building a T out of w
@@ -831,11 +841,11 @@ where
         &k,
         GenericArray::from_slice(&vk),
     );
+    a0.into_iter().for_each(|a0| b_t_hasher.update(&a0));
+    a1.into_iter().for_each(|a1| a_t_hasher.update(&a1));
 
-    let mut a_01_bis: Box<GenericArray<Field<O>, O::SENC2>> = GenericArray::default_boxed();
-
-    if lambda > 128 {
-        a_01_bis = aes_enc_cstrnts_mkey0::<O>(
+    if O::LAMBDA::USIZE > 128 {
+        let (a0, a1) = aes_enc_cstrnts_mkey0::<O>(
             owf_input[16..].try_into().unwrap(),
             owf_output[16..].try_into().unwrap(),
             GenericArray::from_slice(
@@ -848,31 +858,12 @@ where
             &k,
             GenericArray::from_slice(&vk),
         );
+        a0.into_iter().for_each(|a0| b_t_hasher.update(&a0));
+        a1.into_iter().for_each(|a1| a_t_hasher.update(&a1));
     }
-    let a0_array: GenericArray<Field<O>, O::C> = if lambda == 128 {
-        (GenericArray::from_slice(&[&a0[..], &a_01[..senc]].concat())).clone()
-    } else {
-        (GenericArray::from_slice(&[&a0[..], &a_01[..senc], &a_01_bis[..senc]].concat())).clone()
-    };
-    let a1_array: GenericArray<Field<O>, O::C> = if lambda == 128 {
-        (GenericArray::from_slice(&[&a1[..], &a_01[senc..]].concat())).clone()
-    } else {
-        (GenericArray::from_slice(&[&a1[..], &a_01[senc..], &a_01_bis[senc..]].concat())).clone()
-    };
 
     let u_s = Field::<O>::from(&u[l / 8..]);
     let v_s = Field::<O>::sum_poly(&new_v[l..l + lambda]);
-
-    let mut a_t_hasher =
-        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
-    let mut b_t_hasher =
-        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
-
-    for i in 0..a1_array.len() {
-        a_t_hasher.update(&a1_array[i]);
-        b_t_hasher.update(&a0_array[i]);
-    }
-
     let a_t = a_t_hasher.finalize(&u_s);
     let b_t = b_t_hasher.finalize(&v_s);
 
@@ -899,34 +890,33 @@ where
     let delta = Field::<O>::from(chall3);
     let lke = <O::LKE as Unsigned>::to_usize();
     let lenc = <O::LENC as Unsigned>::to_usize();
-    let senc = <O::SENC as Unsigned>::to_usize();
 
     let new_q = convert_gq::<O, Tau>(d, gq, chall3);
     let mut zk_hasher =
         <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
 
-    let (b1, _, _, qk) =
+    let (b, _, _, qk) =
         aes_key_exp_cstrnts_mkey1::<O>(GenericArray::from_slice(&new_q[0..lke]), delta);
-    b1.into_iter().for_each(|value| zk_hasher.update(&value));
+    b.into_iter().for_each(|value| zk_hasher.update(&value));
 
-    let b2 = aes_enc_cstrnts_mkey1::<O>(
+    let b = aes_enc_cstrnts_mkey1::<O>(
         owf_input[..16].try_into().unwrap(),
         owf_output[..16].try_into().unwrap(),
         GenericArray::from_slice(&new_q[lke..(lke + lenc)]),
         GenericArray::from_slice(&qk[..]),
         delta,
     );
+    b.into_iter().for_each(|value| zk_hasher.update(&value));
 
-    b2[..senc].iter().for_each(|value| zk_hasher.update(value));
-    if lambda > 128 {
-        let b3 = aes_enc_cstrnts_mkey1::<O>(
+    if O::LAMBDA::USIZE > 128 {
+        let b = aes_enc_cstrnts_mkey1::<O>(
             owf_input[16..].try_into().unwrap(),
             owf_output[16..].try_into().unwrap(),
             GenericArray::from_slice(&new_q[lke + lenc..l]),
             GenericArray::from_slice(&qk[..]),
             delta,
         );
-        b3[..senc].iter().for_each(|value| zk_hasher.update(value));
+        b.into_iter().for_each(|value| zk_hasher.update(&value));
     }
 
     let q_s = Field::<O>::sum_poly(&new_q[l..l + lambda]);
@@ -1909,14 +1899,21 @@ mod test {
         q: &GenericArray<Field<O>, O::LENC>,
         qk: &GenericArray<Field<O>, O::PRODRUN128>,
         delta: Field<O>,
-    ) -> Box<GenericArray<Field<O>, O::SENC2>>
+    ) -> (
+        Box<GenericArray<Field<O>, O::SENC>>,
+        Option<Box<GenericArray<Field<O>, O::SENC>>>,
+    )
     where
         O: PARAMOWF,
     {
         if !mkey {
-            aes_enc_cstrnts_mkey0::<O>(&input, &output, w, v, k, vk)
+            let (a0, a1) = aes_enc_cstrnts_mkey0::<O>(&input, &output, w, v, k, vk);
+            (a0, Some(a1))
         } else {
-            aes_enc_cstrnts_mkey1::<O>(&input, &output, q, qk, delta)
+            (
+                aes_enc_cstrnts_mkey1::<O>(&input, &output, q, qk, delta),
+                None,
+            )
         }
     }
 
@@ -1969,13 +1966,14 @@ mod test {
                     delta,
                 );
                 if !mkey {
+                    let res_1 = res.1.unwrap();
                     for i in 0..senc {
-                        assert_eq!(res[i], ab[i].0);
-                        assert_eq!(res[senc + i], ab[i].1);
+                        assert_eq!(res.0[i], ab[i].0);
+                        assert_eq!(res_1[i], ab[i].1);
                     }
                 } else {
                     for i in 0..senc {
-                        assert_eq!(res[i], ab[i].0);
+                        assert_eq!(res.0[i], ab[i].0);
                     }
                 }
             } else if data.lambda == 192 {
@@ -2021,14 +2019,15 @@ mod test {
                     GenericArray::from_slice(&vqk),
                     delta,
                 );
-                if res.len() == senc * 2 {
+                if !mkey {
+                    let res_1 = res.1.unwrap();
                     for i in 0..senc {
-                        assert_eq!(res[i], ab[i].0);
-                        assert_eq!(res[senc + i], ab[i].1);
+                        assert_eq!(res.0[i], ab[i].0);
+                        assert_eq!(res_1[i], ab[i].1);
                     }
                 } else {
                     for i in 0..senc {
-                        assert_eq!(res[i], ab[i].0);
+                        assert_eq!(res.0[i], ab[i].0);
                     }
                 }
             } else {
@@ -2076,14 +2075,15 @@ mod test {
                     GenericArray::from_slice(&vqk),
                     delta,
                 );
-                if res.len() == senc * 2 {
+                if !mkey {
+                    let res_1 = res.1.unwrap();
                     for i in 0..senc {
-                        assert_eq!(res[i], ab[i].0);
-                        assert_eq!(res[senc + i], ab[i].1);
+                        assert_eq!(res.0[i], ab[i].0);
+                        assert_eq!(res_1[i], ab[i].1);
                     }
                 } else {
                     for i in 0..senc {
-                        assert_eq!(res[i], ab[i].0);
+                        assert_eq!(res.0[i], ab[i].0);
                     }
                 }
             }
