@@ -341,18 +341,12 @@ where
     O: PARAMOWF,
 {
     let lambda = <O::LAMBDA as Unsigned>::to_usize();
-    let nst = <O::NST as Unsigned>::to_usize();
-    let r = <O::R as Unsigned>::to_usize();
 
-    // let new_output = convert_to_bit::<Field<O>, O::LAMBDA>(output);
-    let mut new_x: Box<GenericArray<Field<O>, O::LAMBDAR1>> = GenericArray::default_boxed();
-    let mut index = 0;
-    for byte in x.iter().take(4 * nst * (r + 1)) {
-        for j in 0..8 {
-            new_x[index] = delta * ((byte >> j) & 1);
-            index += 1;
-        }
-    }
+    let new_x = Box::<GenericArray<Field<O>, O::LAMBDAR1>>::from_iter(
+        (0..4 * O::NST::USIZE * (O::R::USIZE + 1) * 8)
+            .map(|index| delta * ((x[index / 8] >> (index % 8)) & 1)),
+    );
+
     let q_out = Box::<GenericArray<Field<O>, O::LAMBDA>>::from_iter(
         (0..lambda).map(|idx| delta * ((output[idx / 8] >> (idx % 8)) & 1) + q[idx]),
     );
