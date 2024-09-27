@@ -415,17 +415,18 @@ where
     O: PARAMOWF,
     Tau: TauParameters,
 {
-    let lambda = <O::LAMBDA as Unsigned>::to_usize();
-    let l = <O::L as Unsigned>::to_usize();
     let delta = Field::<O>::from(chall3);
-    let nst = <O::NST as Unsigned>::to_u8();
-    let nk = <O::NK as Unsigned>::to_u8();
-    let r = <O::R as Unsigned>::to_u8();
 
     let new_q = convert_gq::<O, Tau>(d, gq, chall3);
     let mut zk_hasher =
         <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
-    let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
+    let x = rijndael_key_schedule(
+        owf_input,
+        O::NST::U8,
+        O::NK::U8,
+        O::R::U8,
+        4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE) as u8,
+    );
     em_enc_cstrnts_mkey1::<O>(
         &mut zk_hasher,
         owf_output,
@@ -434,16 +435,16 @@ where
                 convert_from_batchblocks(inv_bitslice(x))
                     .iter()
                     .flat_map(|x| u32::to_le_bytes(*x))
-                    .take(lambda / 8)
-                    .collect::<Vec<u8>>()
+                    .take(O::LAMBDABYTES::USIZE)
+                    .collect::<Vec<_>>()
             })
-            .take((lambda / 8) * (r as usize + 1))
+            .take(O::LAMBDABYTES::USIZE * (O::R::USIZE + 1))
             .collect::<GenericArray<u8, _>>(),
-        GenericArray::from_slice(&new_q[..l]),
+        GenericArray::from_slice(&new_q[..O::L::USIZE]),
         delta,
     );
 
-    let q_s = Field::<O>::sum_poly(&new_q[l..l + lambda]);
+    let q_s = Field::<O>::sum_poly(&new_q[O::L::USIZE..O::L::USIZE + O::LAMBDA::USIZE]);
     (zk_hasher.finalize(&q_s) + Field::<O>::from(a_t) * delta).as_bytes()
 }
 
