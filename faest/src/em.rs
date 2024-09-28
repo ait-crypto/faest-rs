@@ -166,19 +166,15 @@ where
                     icol = (icol + O::NST::USIZE - 1) % O::NST::USIZE;
                 }
                 let ird = O::LAMBDA::USIZE + 32 * O::NST::USIZE * j + 32 * icol + 8 * k;
-                let z_t = if j < O::R::USIZE - 1 {
-                    z[ird..ird + 8].to_vec()
+                let z_t: [_; 8] = if j < O::R::USIZE - 1 {
+                    array::from_fn(|idx| z[ird + idx])
                 } else {
                     let z_out_t = &z_out[ird - 32 * O::NST::USIZE * (j + 1)
                         ..ird - 32 * O::NST::USIZE * (j + 1) + 8];
-                    zip(z_out_t, &x[ird..ird + 8])
-                        .map(|(z, x)| *z + *x)
-                        .collect::<Vec<_>>()
+                    array::from_fn(|idx| z_out_t[idx] + x[ird + idx])
                 };
-                let mut y_t = [Field::<O>::default(); 8];
-                for i in 0..8 {
-                    y_t[i] = z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]
-                }
+                let mut y_t =
+                    array::from_fn(|i| z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]);
                 y_t[0] += Field::<O>::ONE;
                 y_t[2] += Field::<O>::ONE;
                 res[index] = Field::<O>::byte_combine(&y_t);
@@ -214,10 +210,8 @@ where
                     &z_out
                         [ird - 32 * O::NST::USIZE * (j + 1)..ird - 32 * O::NST::USIZE * (j + 1) + 8]
                 };
-                let mut y_t = [Field::<O>::default(); 8];
-                for i in 0..8 {
-                    y_t[i] = z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]
-                }
+                let y_t =
+                    array::from_fn(|i| z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]);
                 res[index] = Field::<O>::byte_combine(&y_t);
                 index += 1;
             }
@@ -247,14 +241,12 @@ where
                     icol = (icol + O::NST::USIZE - 1) % O::NST::USIZE;
                 }
                 let ird = O::LAMBDA::USIZE + 32 * O::NST::USIZE * j + 32 * icol + 8 * k;
-                let z_t = if j < O::R::USIZE - 1 {
-                    z[ird..ird + 8].to_vec()
+                let z_t: [_; 8] = if j < O::R::USIZE - 1 {
+                    array::from_fn(|idx| z[ird + idx])
                 } else {
                     let z_out_t = &z_out[ird - 32 * O::NST::USIZE * (j + 1)
                         ..ird - 32 * O::NST::USIZE * (j + 1) + 8];
-                    zip(z_out_t, &x[ird..ird + 8])
-                        .map(|(z, x)| *z + *x)
-                        .collect::<Vec<_>>()
+                    array::from_fn(|idx| z_out_t[idx] + x[ird + idx])
                 };
                 let mut y_t =
                     array::from_fn(|i| z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]);
