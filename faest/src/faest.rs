@@ -330,7 +330,7 @@ pub(crate) fn faest_sign<P, O>(
     h1_hasher.finish().read(&mut hv);
 
     let w = P::Cypher::witness(&sk.owf_key, &sk.owf_input);
-    let d = GenericArray::<u8, O::LBYTES>::from_iter(
+    let d = Box::<GenericArray<u8, O::LBYTES>>::from_iter(
         zip(w.iter(), &u[..O::LBYTES::USIZE]).map(|(w, u)| w ^ *u),
     );
 
