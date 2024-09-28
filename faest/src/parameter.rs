@@ -9,11 +9,11 @@ use aes::{
 };
 use generic_array::{
     typenum::{
-        Diff, Double, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1024, U11, U112, U12, U128, U14,
-        U142, U152, U16, U160, U16384, U192, U194, U2, U200, U2048, U22, U224, U234, U24, U256,
-        U288, U3, U32, U338, U384, U4, U40, U408, U4096, U416, U448, U458, U470, U476, U48, U5,
-        U500, U511, U512, U514, U52, U56, U566, U576, U584, U596, U6, U600, U64, U640, U672, U7,
-        U752, U8, U8192, U832, U96,
+        Diff, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1024, U11, U112, U12, U128, U14, U142, U152,
+        U16, U160, U16384, U192, U194, U2, U200, U2048, U22, U224, U234, U24, U256, U288, U3, U32,
+        U338, U384, U4, U40, U408, U4096, U448, U458, U470, U476, U48, U5, U500, U511, U512, U514,
+        U52, U56, U566, U576, U584, U596, U6, U600, U64, U640, U672, U7, U752, U8, U8192, U832,
+        U96,
     },
     ArrayLength, GenericArray,
 };
@@ -187,7 +187,6 @@ pub(crate) trait OWFParameters {
     type LENC: ArrayLength;
     type QUOTLENC8: ArrayLength;
     type BETA: ArrayLength;
-    type C: ArrayLength;
     type NST: ArrayLength;
     type LAMBDALBYTES: ArrayLength;
     type LAMBDAL: ArrayLength;
@@ -197,11 +196,6 @@ pub(crate) trait OWFParameters {
     type CHALL1: ArrayLength;
     type LHATBYTES: ArrayLength;
     type LAMBDAPLUS2: ArrayLength;
-    type LAMBDADOUBLE: ArrayLength;
-    type LAMBDATRIPLE: ArrayLength;
-    type LAMBDAPLUS16: ArrayLength;
-    type LAMBDAPLUS4: ArrayLength;
-    type LBYTESPLUS4: ArrayLength;
     type LPRIMEBYTE: ArrayLength;
     type KBLENGTH: ArrayLength;
     type PRODRUN128: ArrayLength;
@@ -247,8 +241,6 @@ impl OWFParameters for OWF128 {
 
     type BETA = U1;
 
-    type C = U200;
-
     type NST = U0;
 
     type PK = U32;
@@ -263,17 +255,7 @@ impl OWFParameters for OWF128 {
 
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
 
-    type LAMBDADOUBLE = Double<Self::LAMBDABYTES>;
-
-    type LAMBDAPLUS16 = Sum<Self::LAMBDABYTES, U16>;
-
-    type LAMBDAPLUS4 = Sum<Self::LAMBDABYTES, U4>;
-
-    type LBYTESPLUS4 = Sum<Self::LBYTES, U4>;
-
     type LPRIMEBYTE = U256;
-
-    type LAMBDATRIPLE = Prod<U3, Self::LAMBDABYTES>;
 
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
 
@@ -334,8 +316,6 @@ impl OWFParameters for OWF192 {
 
     type BETA = U2;
 
-    type C = U416;
-
     type NST = U0;
 
     type PK = U64;
@@ -350,17 +330,7 @@ impl OWFParameters for OWF192 {
 
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
 
-    type LAMBDADOUBLE = Double<Self::LAMBDABYTES>;
-
-    type LAMBDAPLUS16 = Sum<Self::LAMBDABYTES, U16>;
-
-    type LAMBDAPLUS4 = Sum<Self::LAMBDABYTES, U4>;
-
-    type LBYTESPLUS4 = Sum<Self::LBYTES, U4>;
-
     type LPRIMEBYTE = U384;
-
-    type LAMBDATRIPLE = Prod<U3, Self::LAMBDABYTES>;
 
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
 
@@ -425,8 +395,6 @@ impl OWFParameters for OWF256 {
 
     type BETA = U2;
 
-    type C = U500;
-
     type NST = U0;
 
     type PK = U64;
@@ -441,17 +409,7 @@ impl OWFParameters for OWF256 {
 
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
 
-    type LAMBDADOUBLE = Double<Self::LAMBDABYTES>;
-
-    type LAMBDAPLUS16 = Sum<Self::LAMBDABYTES, U16>;
-
-    type LAMBDAPLUS4 = Sum<Self::LAMBDABYTES, U4>;
-
-    type LBYTESPLUS4 = Sum<Self::LBYTES, U4>;
-
     type LPRIMEBYTE = U512;
-
-    type LAMBDATRIPLE = Prod<U3, Self::LAMBDABYTES>;
 
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
 
@@ -516,8 +474,6 @@ impl OWFParameters for OWF128EM {
 
     type BETA = U1;
 
-    type C = U160;
-
     type NST = U4;
 
     type PK = U32;
@@ -532,17 +488,7 @@ impl OWFParameters for OWF128EM {
 
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
 
-    type LAMBDADOUBLE = Double<Self::LAMBDABYTES>;
-
-    type LAMBDAPLUS16 = Sum<Self::LAMBDABYTES, U16>;
-
-    type LAMBDAPLUS4 = Sum<Self::LAMBDABYTES, U4>;
-
-    type LBYTESPLUS4 = Sum<Self::LBYTES, U4>;
-
     type LPRIMEBYTE = U256;
-
-    type LAMBDATRIPLE = Prod<U3, Self::LAMBDABYTES>;
 
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
 
@@ -606,8 +552,6 @@ impl OWFParameters for OWF192EM {
 
     type BETA = U2;
 
-    type C = U288;
-
     type NST = U6;
 
     type PK = U48;
@@ -622,17 +566,7 @@ impl OWFParameters for OWF192EM {
 
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
 
-    type LAMBDADOUBLE = Double<Self::LAMBDABYTES>;
-
-    type LAMBDAPLUS16 = Sum<Self::LAMBDABYTES, U16>;
-
-    type LAMBDAPLUS4 = Sum<Self::LAMBDABYTES, U4>;
-
-    type LBYTESPLUS4 = Sum<Self::LBYTES, U4>;
-
     type LPRIMEBYTE = U384;
-
-    type LAMBDATRIPLE = Prod<U3, Self::LAMBDABYTES>;
 
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
 
@@ -696,8 +630,6 @@ impl OWFParameters for OWF256EM {
 
     type BETA = U2;
 
-    type C = U448;
-
     type NST = U8;
 
     type PK = U64;
@@ -712,17 +644,7 @@ impl OWFParameters for OWF256EM {
 
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
 
-    type LAMBDADOUBLE = Double<Self::LAMBDABYTES>;
-
-    type LAMBDAPLUS16 = Sum<Self::LAMBDABYTES, U16>;
-
-    type LAMBDAPLUS4 = Sum<Self::LAMBDABYTES, U4>;
-
-    type LBYTESPLUS4 = Sum<Self::LBYTES, U4>;
-
     type LPRIMEBYTE = U512;
-
-    type LAMBDATRIPLE = Prod<U3, Self::LAMBDABYTES>;
 
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
 
@@ -854,7 +776,6 @@ pub(crate) trait PARAM {
     type N1: ArrayLength;
     type POWK0: ArrayLength;
     type POWK1: ArrayLength;
-    type BETA: ArrayLength;
     type LH: ArrayLength;
     type SIG: ArrayLength;
 }
@@ -864,8 +785,6 @@ pub(crate) struct PARAM128S;
 impl PARAM for PARAM128S {
     type OWF = OWF128;
     type Tau = Tau128Small;
-
-    type BETA = U1;
 
     type N0 = U4096;
 
@@ -888,8 +807,6 @@ impl PARAM for PARAM128F {
     type OWF = OWF128;
     type Tau = Tau128Fast;
 
-    type BETA = U1;
-
     type N0 = U256;
 
     type POWK0 = U511;
@@ -910,8 +827,6 @@ pub(crate) struct PARAM192S;
 impl PARAM for PARAM192S {
     type OWF = OWF192;
     type Tau = Tau192Small;
-
-    type BETA = U2;
 
     type N0 = U4096;
 
@@ -934,8 +849,6 @@ impl PARAM for PARAM192F {
     type OWF = OWF192;
     type Tau = Tau192Fast;
 
-    type BETA = U2;
-
     type N0 = U256;
 
     type POWK0 = U511;
@@ -956,8 +869,6 @@ pub(crate) struct PARAM256S;
 impl PARAM for PARAM256S {
     type OWF = OWF256;
     type Tau = Tau256Small;
-
-    type BETA = U2;
 
     type N0 = U4096;
 
@@ -980,8 +891,6 @@ impl PARAM for PARAM256F {
     type OWF = OWF256;
     type Tau = Tau256Fast;
 
-    type BETA = U2;
-
     type N0 = U256;
 
     type POWK0 = U511;
@@ -1002,8 +911,6 @@ pub(crate) struct PARAM128SEM;
 impl PARAM for PARAM128SEM {
     type OWF = OWF128EM;
     type Tau = Tau128Small;
-
-    type BETA = U1;
 
     type N0 = U4096;
 
@@ -1026,8 +933,6 @@ impl PARAM for PARAM128FEM {
     type OWF = OWF128EM;
     type Tau = Tau128Fast;
 
-    type BETA = U1;
-
     type N0 = U256;
 
     type POWK0 = U511;
@@ -1048,8 +953,6 @@ pub(crate) struct PARAM192SEM;
 impl PARAM for PARAM192SEM {
     type OWF = OWF192EM;
     type Tau = Tau192Small;
-
-    type BETA = U2;
 
     type N0 = U4096;
 
@@ -1073,8 +976,6 @@ impl PARAM for PARAM192FEM {
 
     type Tau = Tau192Fast;
 
-    type BETA = U2;
-
     type N0 = U256;
 
     type POWK0 = U511;
@@ -1097,8 +998,6 @@ impl PARAM for PARAM256SEM {
 
     type Tau = Tau256Small;
 
-    type BETA = U2;
-
     type N0 = U4096;
 
     type POWK0 = Diff<U8192, U1>;
@@ -1120,8 +1019,6 @@ impl PARAM for PARAM256FEM {
     type OWF = OWF256EM;
 
     type Tau = Tau256Fast;
-
-    type BETA = U2;
 
     type N0 = U256;
 

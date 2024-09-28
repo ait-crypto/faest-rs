@@ -876,7 +876,6 @@ where
     O: OWFParameters,
 {
     let l = <O::L as Unsigned>::to_usize();
-    let _c = <O::C as Unsigned>::to_usize();
     let lke = <O::LKE as Unsigned>::to_usize();
     let lenc = <O::LENC as Unsigned>::to_usize();
     let lambda = <O::LAMBDA as Unsigned>::to_usize();
