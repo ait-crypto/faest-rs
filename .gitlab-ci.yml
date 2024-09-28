@@ -16,8 +16,8 @@ build-all-features:
     - cd $CI_PROJECT_DIR/faest
     - cargo build --release --all-features
 
-build:
-  stage: build-bench
+build-bench:
+  stage: build
   script:
     - cd $CI_PROJECT_DIR/faest
     - cargo build --bench benchmark_faest_rs
