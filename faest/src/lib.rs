@@ -40,6 +40,22 @@ pub trait KeypairGenerator: Keypair {
         R: CryptoRngCore;
 }
 
+/// Workaround to verify signatures available as slice
+///
+/// [Verifier] requires its generic argument to be [Sized], but `[u8]` is not.
+/// Hence, this struct simply wraps a slice.
+#[derive(Debug)]
+pub struct SignatureRef<'a>(&'a [u8]);
+
+impl<'a, 'b> From<&'b [u8]> for SignatureRef<'a>
+where
+    'b: 'a,
+{
+    fn from(value: &'b [u8]) -> Self {
+        Self(value)
+    }
+}
+
 macro_rules! define_impl {
     ($param:ident, $sk:ident, $vk:ident, $kp:ident, $sig:ident) => {
         #[derive(Debug, Clone)]
@@ -126,6 +142,16 @@ macro_rules! define_impl {
         impl Verifier<$sig> for $vk {
             fn verify(&self, msg: &[u8], signature: &$sig) -> Result<(), Error> {
                 faest_verify::<$param, <$param as PARAM>::OWF>(msg, &self.0, &signature.0)
+            }
+        }
+
+        impl Verifier<SignatureRef<'_>> for $vk {
+            fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
+                GenericArray::try_from_slice(signature.0)
+                    .map_err(|_| Error::new())
+                    .and_then(|sig| {
+                        faest_verify::<$param, <$param as PARAM>::OWF>(msg, &self.0, sig)
+                    })
             }
         }
 
