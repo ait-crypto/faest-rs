@@ -526,7 +526,7 @@ where
     *chall3 == chall3_p
 }
 
-fn sigma_to_signature<'a, Lambda>(
+fn sigma_to_signature<Lambda>(
     u_t: &[u8],
     d: &[u8],
     a_t: &[u8],
