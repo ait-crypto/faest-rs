@@ -137,7 +137,7 @@ pub(crate) trait Variant<O: OWFParameters> {
         u: &GenericArray<u8, O::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::OutputSize>,
+        owf_output: &GenericArray<u8, O::InputSize>,
         chall: &GenericArray<u8, O::CHALL>,
     ) -> QSProof<O>;
 
@@ -150,7 +150,7 @@ pub(crate) trait Variant<O: OWFParameters> {
         chall2: &GenericArray<u8, O::CHALL>,
         chall3: &GenericArray<u8, O::LAMBDABYTES>,
         owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::OutputSize>,
+        owf_output: &GenericArray<u8, O::InputSize>,
     ) -> GenericArray<u8, O::LAMBDABYTES>
     where
         Tau: TauParameters;
@@ -161,15 +161,15 @@ pub(crate) trait Variant<O: OWFParameters> {
 }
 
 pub(crate) trait OWFParameters {
+    // Base parameters of the OWF
     type BaseParams: BaseParameters<
         Lambda = Self::LAMBDA,
         LambdaBytes = Self::LAMBDABYTES,
         Chall = Self::CHALL,
         Chall1 = Self::CHALL1,
     >;
-
+    /// The input (= output) size of the OWF (in bytes)
     type InputSize: ArrayLength;
-    type OutputSize: ArrayLength;
 
     type LAMBDA: ArrayLength;
     type LAMBDABYTES: ArrayLength;
@@ -208,9 +208,7 @@ pub(crate) struct OWF128;
 
 impl OWFParameters for OWF128 {
     type BaseParams = BaseParams128;
-
     type InputSize = U16;
-    type OutputSize = U16;
 
     type LAMBDA = U128;
 
@@ -282,9 +280,7 @@ pub(crate) struct OWF192;
 
 impl OWFParameters for OWF192 {
     type BaseParams = BaseParams192;
-
     type InputSize = U32;
-    type OutputSize = U32;
 
     type LAMBDA = U192;
 
@@ -360,9 +356,7 @@ pub(crate) struct OWF256;
 
 impl OWFParameters for OWF256 {
     type BaseParams = BaseParams256;
-
     type InputSize = U32;
-    type OutputSize = U32;
 
     type LAMBDA = U256;
 
@@ -438,9 +432,7 @@ pub(crate) struct OWF128EM;
 
 impl OWFParameters for OWF128EM {
     type BaseParams = BaseParams128;
-
     type InputSize = U16;
-    type OutputSize = U16;
 
     type LAMBDA = U128;
 
@@ -515,9 +507,7 @@ pub(crate) struct OWF192EM;
 
 impl OWFParameters for OWF192EM {
     type BaseParams = BaseParams192;
-
     type InputSize = U24;
-    type OutputSize = U24;
 
     type LAMBDA = U192;
 
@@ -592,9 +582,7 @@ pub(crate) struct OWF256EM;
 
 impl OWFParameters for OWF256EM {
     type BaseParams = BaseParams256;
-
     type InputSize = U32;
-    type OutputSize = U32;
 
     type LAMBDA = U256;
 
@@ -1042,7 +1030,7 @@ impl<OWF: OWFParameters> Variant<OWF> for AesCypher<OWF> {
         u: &GenericArray<u8, OWF::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
-        owf_output: &GenericArray<u8, OWF::OutputSize>,
+        owf_output: &GenericArray<u8, OWF::InputSize>,
         chall: &GenericArray<u8, OWF::CHALL>,
     ) -> QSProof<OWF> {
         aes_prove::<OWF>(w, u, gv, owf_input, owf_output, chall)
@@ -1055,7 +1043,7 @@ impl<OWF: OWFParameters> Variant<OWF> for AesCypher<OWF> {
         chall2: &GenericArray<u8, OWF::CHALL>,
         chall3: &GenericArray<u8, OWF::LAMBDABYTES>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
-        owf_output: &GenericArray<u8, OWF::OutputSize>,
+        owf_output: &GenericArray<u8, OWF::InputSize>,
     ) -> GenericArray<u8, OWF::LAMBDABYTES>
     where
         Tau: TauParameters,
@@ -1108,7 +1096,7 @@ impl<OWF: OWFParameters> Variant<OWF> for EmCypher<OWF> {
         u: &GenericArray<u8, OWF::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
-        owf_output: &GenericArray<u8, OWF::OutputSize>,
+        owf_output: &GenericArray<u8, OWF::InputSize>,
         chall: &GenericArray<u8, OWF::CHALL>,
     ) -> QSProof<OWF> {
         em_prove::<OWF>(w, u, gv, owf_input, owf_output, chall)
@@ -1121,7 +1109,7 @@ impl<OWF: OWFParameters> Variant<OWF> for EmCypher<OWF> {
         chall2: &GenericArray<u8, OWF::CHALL>,
         chall3: &GenericArray<u8, OWF::LAMBDABYTES>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
-        owf_output: &GenericArray<u8, OWF::OutputSize>,
+        owf_output: &GenericArray<u8, OWF::InputSize>,
     ) -> GenericArray<u8, OWF::LAMBDABYTES>
     where
         Tau: TauParameters,
@@ -1204,7 +1192,7 @@ mod test {
 
     fn test_parameters_owf<O: OWFParameters>() {
         assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LAMBDABYTES::USIZE);
-        assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::OutputSize::USIZE);
+        assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::InputSize::USIZE);
     }
 
     #[test]

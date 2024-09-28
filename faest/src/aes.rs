@@ -869,7 +869,7 @@ pub(crate) fn aes_prove<O>(
     u: &GenericArray<u8, O::LAMBDALBYTES>,
     gv: CstrntsVal<O>,
     owf_input: &GenericArray<u8, O::InputSize>,
-    owf_output: &GenericArray<u8, O::OutputSize>,
+    owf_output: &GenericArray<u8, O::InputSize>,
     chall: &GenericArray<u8, O::CHALL>,
 ) -> QSProof<O>
 where
@@ -959,7 +959,7 @@ pub(crate) fn aes_verify<O, Tau>(
     chall2: &GenericArray<u8, O::CHALL>,
     chall3: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
-    owf_output: &GenericArray<u8, O::OutputSize>,
+    owf_output: &GenericArray<u8, O::InputSize>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
 where
     O: OWFParameters,
@@ -1858,7 +1858,7 @@ mod test {
         chall2: &GenericArray<u8, O::CHALL>,
         chall3: &GenericArray<u8, O::LAMBDABYTES>,
         owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::OutputSize>,
+        owf_output: &GenericArray<u8, O::InputSize>,
     ) -> GenericArray<u8, O::LAMBDABYTES>
     where
         O: OWFParameters,

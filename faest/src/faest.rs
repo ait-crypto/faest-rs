@@ -25,7 +25,7 @@ where
 {
     pub(crate) owf_key: GenericArray<u8, O::LAMBDABYTES>,
     pub(crate) owf_input: GenericArray<u8, O::InputSize>,
-    pub(crate) owf_output: GenericArray<u8, O::OutputSize>,
+    pub(crate) owf_output: GenericArray<u8, O::InputSize>,
 }
 
 impl<O> SecretKey<O>
@@ -122,7 +122,7 @@ where
     O: OWFParameters,
 {
     pub(crate) owf_input: GenericArray<u8, O::InputSize>,
-    pub(crate) owf_output: GenericArray<u8, O::OutputSize>,
+    pub(crate) owf_output: GenericArray<u8, O::InputSize>,
 }
 
 impl<O> PublicKey<O>

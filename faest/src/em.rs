@@ -263,7 +263,7 @@ where
 fn em_enc_cstrnts_mkey0<O>(
     a_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
     b_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
-    output: &GenericArray<u8, O::OutputSize>,
+    output: &GenericArray<u8, O::InputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     w: &GenericArray<u8, O::LBYTES>,
     v: &GenericArray<Field<O>, O::L>,
@@ -299,7 +299,7 @@ fn em_enc_cstrnts_mkey0<O>(
 
 fn em_enc_cstrnts_mkey1<O>(
     b_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
-    output: &GenericArray<u8, O::OutputSize>,
+    output: &GenericArray<u8, O::InputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     q: &GenericArray<Field<O>, O::L>,
     delta: Field<O>,
@@ -330,7 +330,7 @@ pub(crate) fn em_prove<O>(
     u: &GenericArray<u8, O::LAMBDALBYTES>,
     gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     owf_input: &GenericArray<u8, O::InputSize>,
-    owf_output: &GenericArray<u8, O::OutputSize>,
+    owf_output: &GenericArray<u8, O::InputSize>,
     chall: &GenericArray<u8, O::CHALL>,
 ) -> QSProof<O>
 where
@@ -398,7 +398,7 @@ pub(crate) fn em_verify<O, Tau>(
     chall2: &GenericArray<u8, O::CHALL>,
     chall3: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
-    owf_output: &GenericArray<u8, O::OutputSize>,
+    owf_output: &GenericArray<u8, O::InputSize>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
 where
     O: OWFParameters,
@@ -988,7 +988,7 @@ mod test {
         chall2: &GenericArray<u8, O::CHALL>,
         chall3: &GenericArray<u8, O::LAMBDABYTES>,
         owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::OutputSize>,
+        owf_output: &GenericArray<u8, O::InputSize>,
     ) -> GenericArray<u8, O::LAMBDABYTES>
     where
         O: OWFParameters,
