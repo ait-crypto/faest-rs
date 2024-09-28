@@ -813,7 +813,7 @@ mod test {
     }
 
     #[test]
-    fn test_nist_faest192f_em() {
+    fn test_nist_faest_192f_em() {
         test_nist::<FAESTEM192fParameters>(include_str!(
             "../tests/data/PQCsignKAT_faest_em_192f.rsp"
         ));

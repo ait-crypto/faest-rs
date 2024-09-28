@@ -58,8 +58,6 @@ where
     Self: for<'a> MulAssign<&'a Self>,
     Self: for<'a> Mul<&'a Self, Output = Self>,
 {
-    // Length of the field (in bits)
-    const LENGTH: usize;
 }
 
 /// Trait providing methods for "byte combination"
@@ -677,9 +675,7 @@ impl From<&[u8]> for BigGF<u128, 1, 128> {
     }
 }
 
-impl BigGaloisField for BigGF<u128, 1, 128> {
-    const LENGTH: usize = 128;
-}
+impl BigGaloisField for BigGF<u128, 1, 128> {}
 
 #[cfg(test)]
 impl serde::Serialize for BigGF<u128, 1, 128> {
@@ -790,9 +786,7 @@ impl From<&[u8]> for BigGF<u128, 2, 192> {
     }
 }
 
-impl BigGaloisField for BigGF<u128, 2, 192> {
-    const LENGTH: usize = 192;
-}
+impl BigGaloisField for BigGF<u128, 2, 192> {}
 
 #[cfg(test)]
 impl serde::Serialize for BigGF<u128, 2, 192> {
@@ -907,9 +901,7 @@ impl From<&[u8]> for BigGF<u128, 2, 256> {
     }
 }
 
-impl BigGaloisField for BigGF<u128, 2, 256> {
-    const LENGTH: usize = 256;
-}
+impl BigGaloisField for BigGF<u128, 2, 256> {}
 
 #[cfg(test)]
 impl serde::Serialize for BigGF<u128, 2, 256> {
