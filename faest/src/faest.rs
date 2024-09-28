@@ -204,6 +204,8 @@ where
 }
 
 type RO<P> = <<<P as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle;
+type VoleHasher<P> =
+    <<<P as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VoleHasher;
 
 fn hash_mu<R>(mu: &mut [u8], input: &[u8], output: &[u8], msg: &[u8])
 where
@@ -317,7 +319,7 @@ pub(crate) fn faest_sign<P, O>(
         signature.write_all(&x).unwrap();
     });
 
-    let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
+    let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
     let u_t = vole_hasher.process(&u);
 
     let mut h1_hasher = RO::<P>::h1_init();
@@ -411,7 +413,7 @@ where
     let c = &sigma[..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)];
     hash_challenge_1::<RO<P>, _>(&mut chall1, &mu, &hcom, [c].into_iter(), iv);
 
-    let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
+    let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
     let def = GenericArray::default();
     let def2 = GenericArray::default();
     let mut gq: Box<

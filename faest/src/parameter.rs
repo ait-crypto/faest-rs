@@ -41,7 +41,7 @@ pub(crate) trait BaseParameters {
     type VoleHasher: VoleHasherInit<
         Self::Field,
         SDLength = Self::Chall1,
-        OutputLength = Sum<Self::LambdaBytes, B>,
+        OutputLength = Self::VoleHasherOutputLength,
     >;
     /// Associated random oracle
     type RandomOracle: RandomOracle;
@@ -52,10 +52,11 @@ pub(crate) trait BaseParameters {
     /// Security parameter (in bits)
     type Lambda: ArrayLength;
     /// Security parameter (in bytes)
-    type LambdaBytes: ArrayLength + Add<B>;
+    type LambdaBytes: ArrayLength;
     type LambdaBytesTimes2: ArrayLength;
     type Chall: ArrayLength;
     type Chall1: ArrayLength;
+    type VoleHasherOutputLength: ArrayLength;
 }
 
 #[derive(Debug, Clone)]
@@ -75,6 +76,7 @@ impl BaseParameters for BaseParams128 {
 
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
+    type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
 }
 
 #[derive(Debug, Clone)]
@@ -94,6 +96,7 @@ impl BaseParameters for BaseParams192 {
 
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
+    type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
 }
 
 #[derive(Debug, Clone)]
@@ -113,6 +116,7 @@ impl BaseParameters for BaseParams256 {
 
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
+    type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
 }
 
 pub(crate) type QSProof<O> = (
@@ -160,16 +164,8 @@ pub(crate) trait OWFParameters {
     type BaseParams: BaseParameters<
         Lambda = Self::LAMBDA,
         LambdaBytes = Self::LAMBDABYTES,
-        VoleHasher = Self::VoleHasher,
         Chall = Self::CHALL,
         Chall1 = Self::CHALL1,
-    >;
-
-    #[deprecated]
-    type VoleHasher: VoleHasherInit<
-        <Self::BaseParams as BaseParameters>::Field,
-        SDLength = Self::CHALL1,
-        OutputLength = Self::LAMBDAPLUS2,
     >;
 
     type InputSize: ArrayLength;
@@ -212,7 +208,6 @@ pub(crate) struct OWF128;
 
 impl OWFParameters for OWF128 {
     type BaseParams = BaseParams128;
-    type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
     type InputSize = U16;
     type OutputSize = U16;
@@ -287,7 +282,6 @@ pub(crate) struct OWF192;
 
 impl OWFParameters for OWF192 {
     type BaseParams = BaseParams192;
-    type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
     type InputSize = U32;
     type OutputSize = U32;
@@ -366,7 +360,6 @@ pub(crate) struct OWF256;
 
 impl OWFParameters for OWF256 {
     type BaseParams = BaseParams256;
-    type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
     type InputSize = U32;
     type OutputSize = U32;
@@ -445,7 +438,6 @@ pub(crate) struct OWF128EM;
 
 impl OWFParameters for OWF128EM {
     type BaseParams = BaseParams128;
-    type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
     type InputSize = U16;
     type OutputSize = U16;
@@ -523,7 +515,6 @@ pub(crate) struct OWF192EM;
 
 impl OWFParameters for OWF192EM {
     type BaseParams = BaseParams192;
-    type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
     type InputSize = U24;
     type OutputSize = U24;
@@ -601,7 +592,6 @@ pub(crate) struct OWF256EM;
 
 impl OWFParameters for OWF256EM {
     type BaseParams = BaseParams256;
-    type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
     type InputSize = U32;
     type OutputSize = U32;
