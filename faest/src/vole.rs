@@ -65,7 +65,7 @@ pub fn volecommit<VC, Tau, LH>(
         >,
     >,
     Box<GenericArray<GenericArray<u8, LH>, Tau::TauMinus1>>,
-    GenericArray<u8, LH>,
+    Box<GenericArray<u8, LH>>,
     Box<GenericArray<Vec<GenericArray<u8, LH>>, Tau::Tau>>,
 )
 where
@@ -75,7 +75,7 @@ where
 {
     let mut prg = VC::PRG::new_prg(r, iv);
     let mut decom = GenericArray::default_boxed();
-    let mut u: GenericArray<GenericArray<u8, LH>, Tau::Tau> = GenericArray::default();
+    let mut u = GenericArray::<GenericArray<u8, LH>, Tau::Tau>::default_boxed();
     let mut v: Box<GenericArray<Vec<GenericArray<u8, LH>>, Tau::Tau>> =
         GenericArray::default_boxed();
     let mut c: Box<GenericArray<GenericArray<u8, LH>, Tau::TauMinus1>> =
@@ -101,7 +101,7 @@ where
     }
     let mut hcom = GenericArray::default();
     hasher.finish().read(&mut hcom);
-    (hcom, decom, c, u[0].clone(), v)
+    (hcom, decom, c, Box::new(u[0].clone()), v)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -115,14 +115,14 @@ pub fn volereconstruct<VC, Tau, LH>(
     iv: &IV,
 ) -> (
     GenericArray<u8, VC::LambdaTimes2>,
-    GenericArray<Vec<GenericArray<u8, LH>>, Tau::Tau>,
+    Box<GenericArray<Vec<GenericArray<u8, LH>>, Tau::Tau>>,
 )
 where
     Tau: TauParameters,
     VC: VectorCommitment,
     LH: ArrayLength,
 {
-    let mut q: GenericArray<Vec<GenericArray<u8, LH>>, Tau::Tau> = GenericArray::default();
+    let mut q = GenericArray::default_boxed();
     let mut hasher = VC::RO::h1_init();
     for i in 0..Tau::Tau::USIZE {
         let b = usize::from(i < Tau::Tau0::USIZE);
