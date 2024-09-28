@@ -727,9 +727,9 @@ pub(crate) trait PARAM {
     type SIG: ArrayLength;
 }
 
-pub(crate) struct PARAM128S;
+pub(crate) struct FAEST128SParameters;
 
-impl PARAM for PARAM128S {
+impl PARAM for FAEST128SParameters {
     type OWF = OWF128;
     type Tau = Tau128Small;
 
@@ -748,9 +748,9 @@ impl PARAM for PARAM128S {
     type Cypher = AesCypher<Self::OWF>;
 }
 
-pub(crate) struct PARAM128F;
+pub(crate) struct FAEST128FParameters;
 
-impl PARAM for PARAM128F {
+impl PARAM for FAEST128FParameters {
     type OWF = OWF128;
     type Tau = Tau128Fast;
 
@@ -769,9 +769,9 @@ impl PARAM for PARAM128F {
     type Cypher = AesCypher<Self::OWF>;
 }
 
-pub(crate) struct PARAM192S;
+pub(crate) struct FAEST192SParameters;
 
-impl PARAM for PARAM192S {
+impl PARAM for FAEST192SParameters {
     type OWF = OWF192;
     type Tau = Tau192Small;
 
@@ -790,9 +790,9 @@ impl PARAM for PARAM192S {
     type Cypher = AesCypher<Self::OWF>;
 }
 
-pub(crate) struct PARAM192F;
+pub(crate) struct FAEST192FParameters;
 
-impl PARAM for PARAM192F {
+impl PARAM for FAEST192FParameters {
     type OWF = OWF192;
     type Tau = Tau192Fast;
 
@@ -811,9 +811,9 @@ impl PARAM for PARAM192F {
     type Cypher = AesCypher<Self::OWF>;
 }
 
-pub(crate) struct PARAM256S;
+pub(crate) struct FAEST256SParameters;
 
-impl PARAM for PARAM256S {
+impl PARAM for FAEST256SParameters {
     type OWF = OWF256;
     type Tau = Tau256Small;
 
@@ -832,9 +832,9 @@ impl PARAM for PARAM256S {
     type Cypher = AesCypher<Self::OWF>;
 }
 
-pub(crate) struct PARAM256F;
+pub(crate) struct FAEST256FParameters;
 
-impl PARAM for PARAM256F {
+impl PARAM for FAEST256FParameters {
     type OWF = OWF256;
     type Tau = Tau256Fast;
 
@@ -853,9 +853,9 @@ impl PARAM for PARAM256F {
     type Cypher = AesCypher<Self::OWF>;
 }
 
-pub(crate) struct PARAM128SEM;
+pub(crate) struct FAESTEM128SParameters;
 
-impl PARAM for PARAM128SEM {
+impl PARAM for FAESTEM128SParameters {
     type OWF = OWF128EM;
     type Tau = Tau128Small;
 
@@ -874,9 +874,9 @@ impl PARAM for PARAM128SEM {
     type Cypher = EmCypher<Self::OWF>;
 }
 
-pub(crate) struct PARAM128FEM;
+pub(crate) struct FAESTEM128FParameters;
 
-impl PARAM for PARAM128FEM {
+impl PARAM for FAESTEM128FParameters {
     type OWF = OWF128EM;
     type Tau = Tau128Fast;
 
@@ -895,9 +895,9 @@ impl PARAM for PARAM128FEM {
     type Cypher = EmCypher<Self::OWF>;
 }
 
-pub(crate) struct PARAM192SEM;
+pub(crate) struct FAESTEM192SParameters;
 
-impl PARAM for PARAM192SEM {
+impl PARAM for FAESTEM192SParameters {
     type OWF = OWF192EM;
     type Tau = Tau192Small;
 
@@ -916,9 +916,9 @@ impl PARAM for PARAM192SEM {
     type Cypher = EmCypher<Self::OWF>;
 }
 
-pub(crate) struct PARAM192FEM;
+pub(crate) struct FAESTEM192FParameters;
 
-impl PARAM for PARAM192FEM {
+impl PARAM for FAESTEM192FParameters {
     type OWF = OWF192EM;
 
     type Tau = Tau192Fast;
@@ -938,9 +938,9 @@ impl PARAM for PARAM192FEM {
     type Cypher = EmCypher<Self::OWF>;
 }
 
-pub(crate) struct PARAM256SEM;
+pub(crate) struct FAESTEM256SParameters;
 
-impl PARAM for PARAM256SEM {
+impl PARAM for FAESTEM256SParameters {
     type OWF = OWF256EM;
 
     type Tau = Tau256Small;
@@ -960,9 +960,9 @@ impl PARAM for PARAM256SEM {
     type Cypher = EmCypher<Self::OWF>;
 }
 
-pub(crate) struct PARAM256FEM;
+pub(crate) struct FAESTEM256FParameters;
 
-impl PARAM for PARAM256FEM {
+impl PARAM for FAESTEM256FParameters {
     type OWF = OWF256EM;
 
     type Tau = Tau256Fast;

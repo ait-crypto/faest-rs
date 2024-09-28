@@ -28,8 +28,10 @@ mod vole;
 use crate::{
     faest::{faest_keygen, faest_sign, faest_verify, PublicKey, SecretKey},
     parameter::{
-        OWFParameters, PARAM, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F,
-        PARAM192FEM, PARAM192S, PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM,
+        FAEST128FParameters, FAEST128SParameters, FAEST192FParameters, FAEST192SParameters,
+        FAEST256FParameters, FAEST256SParameters, FAESTEM128FParameters, FAESTEM128SParameters,
+        FAESTEM192FParameters, FAESTEM192SParameters, FAESTEM256FParameters, FAESTEM256SParameters,
+        OWFParameters, PARAM,
     },
 };
 
@@ -276,7 +278,7 @@ macro_rules! define_impl {
 }
 
 define_impl!(
-    PARAM128F,
+    FAEST128FParameters,
     FAEST128fSigningKey,
     FAEST128fVerificationKey,
     FAEST128fKeyPair,
@@ -284,7 +286,7 @@ define_impl!(
 );
 
 define_impl!(
-    PARAM128S,
+    FAEST128SParameters,
     FAEST128sSigningKey,
     FAEST128sVerificationKey,
     FAEST128sKeyPair,
@@ -292,7 +294,7 @@ define_impl!(
 );
 
 define_impl!(
-    PARAM192F,
+    FAEST192FParameters,
     FAEST192fSigningKey,
     FAEST192fVerificationKey,
     FAEST192fKeyPair,
@@ -300,7 +302,7 @@ define_impl!(
 );
 
 define_impl!(
-    PARAM192S,
+    FAEST192SParameters,
     FAEST192sSigningKey,
     FAEST192sVerificationKey,
     FAEST192sKeyPair,
@@ -308,7 +310,7 @@ define_impl!(
 );
 
 define_impl!(
-    PARAM256F,
+    FAEST256FParameters,
     FAEST256fSigningKey,
     FAEST256fVerificationKey,
     FAEST256fKeyPair,
@@ -316,7 +318,7 @@ define_impl!(
 );
 
 define_impl!(
-    PARAM256S,
+    FAEST256SParameters,
     FAEST256sSigningKey,
     FAEST256sVerificationKey,
     FAEST256sKeyPair,
@@ -324,7 +326,7 @@ define_impl!(
 );
 
 define_impl!(
-    PARAM128FEM,
+    FAESTEM128FParameters,
     FAEST128EMfSigningKey,
     FAEST128EMfVerificationKey,
     FAEST128EMfKeyPair,
@@ -332,7 +334,7 @@ define_impl!(
 );
 
 define_impl!(
-    PARAM128SEM,
+    FAESTEM128SParameters,
     FAEST128EMsSigningKey,
     FAEST128EMsVerificationKey,
     FAEST128EMsKeyPair,
@@ -340,7 +342,7 @@ define_impl!(
 );
 
 define_impl!(
-    PARAM192FEM,
+    FAESTEM192FParameters,
     FAEST192EMfSigningKey,
     FAEST192EMfVerificationKey,
     FAEST192EMfKeyPair,
@@ -348,7 +350,7 @@ define_impl!(
 );
 
 define_impl!(
-    PARAM192SEM,
+    FAESTEM192SParameters,
     FAEST192EMsSigningKey,
     FAEST192EMsVerificationKey,
     FAEST192EMsKeyPair,
@@ -356,7 +358,7 @@ define_impl!(
 );
 
 define_impl!(
-    PARAM256FEM,
+    FAESTEM256FParameters,
     FAEST256EMfSigningKey,
     FAEST256EMfVerificationKey,
     FAEST256EMfKeyPair,
@@ -364,7 +366,7 @@ define_impl!(
 );
 
 define_impl!(
-    PARAM256SEM,
+    FAESTEM256SParameters,
     FAEST256EMsSigningKey,
     FAEST256EMsVerificationKey,
     FAEST256EMsKeyPair,
