@@ -331,7 +331,7 @@ pub(crate) fn em_prove<O>(
     gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
     owf_input: &GenericArray<u8, O::InputSize>,
     owf_output: &GenericArray<u8, O::InputSize>,
-    chall: &GenericArray<u8, O::CHALL>,
+    chall: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
 ) -> QSProof<O>
 where
     O: OWFParameters,
@@ -395,7 +395,7 @@ pub(crate) fn em_verify<O, Tau>(
     d: &GenericArray<u8, O::LBYTES>,
     gq: Box<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>,
     a_t: &GenericArray<u8, O::LAMBDABYTES>,
-    chall2: &GenericArray<u8, O::CHALL>,
+    chall2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
     chall3: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
     owf_output: &GenericArray<u8, O::InputSize>,
@@ -985,7 +985,7 @@ mod test {
         d: &GenericArray<u8, O::LBYTES>,
         gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         a_t: &GenericArray<u8, O::LAMBDABYTES>,
-        chall2: &GenericArray<u8, O::CHALL>,
+        chall2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
         chall3: &GenericArray<u8, O::LAMBDABYTES>,
         owf_input: &GenericArray<u8, O::InputSize>,
         owf_output: &GenericArray<u8, O::InputSize>,

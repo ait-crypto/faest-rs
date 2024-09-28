@@ -304,7 +304,8 @@ pub(crate) fn faest_sign<P, O>(
 
     let (hcom, decom, c, u, gv) =
         volecommit::<<O::BaseParams as BaseParameters>::VC, P::Tau, P::LH>(&r, &iv);
-    let mut chall1 = GenericArray::<u8, O::CHALL1>::default();
+    let mut chall1 =
+        GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
     hash_challenge_1::<RO<P>, _>(
         &mut chall1,
         &mu,
@@ -336,7 +337,8 @@ pub(crate) fn faest_sign<P, O>(
         zip(w.iter(), &u[..O::LBYTES::USIZE]).map(|(w, u)| w ^ *u),
     );
 
-    let mut chall2: GenericArray<u8, O::CHALL> = GenericArray::default();
+    let mut chall2 =
+        GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>::default();
     hash_challenge_2::<RO<P>>(&mut chall2, &chall1, &u_t, &hv, &d);
 
     let new_u = GenericArray::from_slice(&u[..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE]);
@@ -409,7 +411,8 @@ where
         &iv.try_into().unwrap(),
     );
 
-    let mut chall1 = GenericArray::<u8, O::CHALL1>::default();
+    let mut chall1 =
+        GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
     let c = &sigma[..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)];
     hash_challenge_1::<RO<P>, _>(&mut chall1, &mu, &hcom, [c].into_iter(), iv);
 
@@ -487,7 +490,8 @@ where
             + O::LAMBDABYTES::USIZE
             + 2
             + O::LBYTES::USIZE];
-    let mut chall2 = GenericArray::<u8, O::CHALL>::default();
+    let mut chall2 =
+        GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>::default();
     hash_challenge_2::<RO<P>>(&mut chall2, &chall1, u_t, &hv, d);
 
     let a_t = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)

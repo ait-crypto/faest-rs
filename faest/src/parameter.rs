@@ -138,7 +138,7 @@ pub(crate) trait Variant<O: OWFParameters> {
         gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         owf_input: &GenericArray<u8, O::InputSize>,
         owf_output: &GenericArray<u8, O::InputSize>,
-        chall: &GenericArray<u8, O::CHALL>,
+        chall: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<O>;
 
     ///input : Masked witness (l bits), Vole Key ((l + lambda) * Lambda bits), hash of constrints values (lambda bits), chall2 (3*lambda + 64 bits), chall3 (lambda bits), public key
@@ -147,7 +147,7 @@ pub(crate) trait Variant<O: OWFParameters> {
         d: &GenericArray<u8, O::LBYTES>,
         gq: Box<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>,
         a_t: &GenericArray<u8, O::LAMBDABYTES>,
-        chall2: &GenericArray<u8, O::CHALL>,
+        chall2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
         chall3: &GenericArray<u8, O::LAMBDABYTES>,
         owf_input: &GenericArray<u8, O::InputSize>,
         owf_output: &GenericArray<u8, O::InputSize>,
@@ -162,12 +162,7 @@ pub(crate) trait Variant<O: OWFParameters> {
 
 pub(crate) trait OWFParameters {
     // Base parameters of the OWF
-    type BaseParams: BaseParameters<
-        Lambda = Self::LAMBDA,
-        LambdaBytes = Self::LAMBDABYTES,
-        Chall = Self::CHALL,
-        Chall1 = Self::CHALL1,
-    >;
+    type BaseParams: BaseParameters<Lambda = Self::LAMBDA, LambdaBytes = Self::LAMBDABYTES>;
     /// The input (= output) size of the OWF (in bytes)
     type InputSize: ArrayLength;
 
@@ -188,8 +183,6 @@ pub(crate) trait OWFParameters {
     type LAMBDAL: ArrayLength;
     type PK: ArrayLength;
     type SK: ArrayLength;
-    type CHALL: ArrayLength;
-    type CHALL1: ArrayLength;
     type LHATBYTES: ArrayLength;
     type LAMBDAPLUS2: ArrayLength;
     type LPRIMEBYTE: ArrayLength;
@@ -239,10 +232,6 @@ impl OWFParameters for OWF128 {
     type PK = U32;
 
     type SK = U32;
-
-    type CHALL = Sum<U8, Prod<U3, Self::LAMBDABYTES>>;
-
-    type CHALL1 = Sum<U8, Prod<U5, Self::LAMBDABYTES>>;
 
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
 
@@ -311,10 +300,6 @@ impl OWFParameters for OWF192 {
     type PK = U64;
 
     type SK = U56;
-
-    type CHALL = Sum<U8, Prod<U3, Self::LAMBDABYTES>>;
-
-    type CHALL1 = Sum<U8, Prod<U5, Self::LAMBDABYTES>>;
 
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
 
@@ -388,10 +373,6 @@ impl OWFParameters for OWF256 {
 
     type SK = U64;
 
-    type CHALL = Sum<U8, Prod<U3, Self::LAMBDABYTES>>;
-
-    type CHALL1 = Sum<U8, Prod<U5, Self::LAMBDABYTES>>;
-
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
 
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
@@ -464,10 +445,6 @@ impl OWFParameters for OWF128EM {
 
     type SK = U32;
 
-    type CHALL = Sum<U8, Prod<U3, Self::LAMBDABYTES>>;
-
-    type CHALL1 = Sum<U8, Prod<U5, Self::LAMBDABYTES>>;
-
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
 
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
@@ -539,10 +516,6 @@ impl OWFParameters for OWF192EM {
 
     type SK = U48;
 
-    type CHALL = Sum<U8, Prod<U3, Self::LAMBDABYTES>>;
-
-    type CHALL1 = Sum<U8, Prod<U5, Self::LAMBDABYTES>>;
-
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
 
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
@@ -613,10 +586,6 @@ impl OWFParameters for OWF256EM {
     type PK = U64;
 
     type SK = U64;
-
-    type CHALL = Sum<U8, Prod<U3, Self::LAMBDABYTES>>;
-
-    type CHALL1 = Sum<U8, Prod<U5, Self::LAMBDABYTES>>;
 
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
 
@@ -1031,7 +1000,7 @@ impl<OWF: OWFParameters> Variant<OWF> for AesCypher<OWF> {
         gv: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
         owf_output: &GenericArray<u8, OWF::InputSize>,
-        chall: &GenericArray<u8, OWF::CHALL>,
+        chall: &GenericArray<u8, <<OWF as OWFParameters>::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<OWF> {
         aes_prove::<OWF>(w, u, gv, owf_input, owf_output, chall)
     }
@@ -1040,7 +1009,7 @@ impl<OWF: OWFParameters> Variant<OWF> for AesCypher<OWF> {
         d: &GenericArray<u8, OWF::LBYTES>,
         gq: Box<GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>>,
         a_t: &GenericArray<u8, OWF::LAMBDABYTES>,
-        chall2: &GenericArray<u8, OWF::CHALL>,
+        chall2: &GenericArray<u8, <<OWF as OWFParameters>::BaseParams as BaseParameters>::Chall>,
         chall3: &GenericArray<u8, OWF::LAMBDABYTES>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
         owf_output: &GenericArray<u8, OWF::InputSize>,
@@ -1097,7 +1066,7 @@ impl<OWF: OWFParameters> Variant<OWF> for EmCypher<OWF> {
         gv: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
         owf_output: &GenericArray<u8, OWF::InputSize>,
-        chall: &GenericArray<u8, OWF::CHALL>,
+        chall: &GenericArray<u8, <<OWF as OWFParameters>::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<OWF> {
         em_prove::<OWF>(w, u, gv, owf_input, owf_output, chall)
     }
@@ -1106,7 +1075,7 @@ impl<OWF: OWFParameters> Variant<OWF> for EmCypher<OWF> {
         d: &GenericArray<u8, OWF::LBYTES>,
         gq: Box<GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>>,
         a_t: &GenericArray<u8, OWF::LAMBDABYTES>,
-        chall2: &GenericArray<u8, OWF::CHALL>,
+        chall2: &GenericArray<u8, <<OWF as OWFParameters>::BaseParams as BaseParameters>::Chall>,
         chall3: &GenericArray<u8, OWF::LAMBDABYTES>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
         owf_output: &GenericArray<u8, OWF::InputSize>,
