@@ -371,8 +371,6 @@ where
     P: PARAM<OWF = O>,
     O: PARAMOWF,
 {
-    let lhat = <O::LHATBYTES as Unsigned>::to_usize();
-
     let chall3 = GenericArray::from_slice(
         &sigma[P::SIG::USIZE - (16 + O::LAMBDABYTES::USIZE)..P::SIG::USIZE - 16],
     );
@@ -384,7 +382,7 @@ where
 
     let (hcom, gq_p) = volereconstruct::<<O::BaseParams as BaseParameters>::VC, P::Tau, P::LH>(
         chall3,
-        &sigma[(lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1))
+        &sigma[(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1))
             + (2 * O::LAMBDABYTES::USIZE)
             + O::LBYTES::USIZE
             + 2..P::SIG::USIZE - (16 + O::LAMBDABYTES::USIZE)],
@@ -395,7 +393,7 @@ where
     let mut h2_hasher = RO::<P>::h2_init();
     h2_hasher.update(&mu);
     h2_hasher.update(&hcom);
-    let c = &sigma[..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)];
+    let c = &sigma[..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)];
 
     h2_hasher.update(c);
     h2_hasher.update(iv);
@@ -412,8 +410,10 @@ where
         GenericArray::default_boxed();
     gq[0] = gq_p[0].clone();
     let delta0 = P::Tau::decode_challenge(chall3, 0);
-    let u_t = &sigma[lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)
-        ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + O::LAMBDABYTES::USIZE + 2];
+    let u_t = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+        ..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+            + O::LAMBDABYTES::USIZE
+            + 2];
     gd_t[0] = delta0
         .iter()
         .map(|d| {
@@ -441,7 +441,9 @@ where
             .iter()
             .zip(delta.iter().map(|d| {
                 if *d == 1 {
-                    GenericArray::<u8, P::LH>::from_slice(&c[lhat * (i - 1)..lhat * i])
+                    GenericArray::<u8, P::LH>::from_slice(
+                        &c[O::LHATBYTES::USIZE * (i - 1)..O::LHATBYTES::USIZE * i],
+                    )
                 } else {
                     &def2
                 }
@@ -465,19 +467,21 @@ where
         GenericArray::default();
     h1_hasher.finish().read(&mut hv);
 
-    let d = &sigma[lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1) + O::LAMBDABYTES::USIZE + 2
-        ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+    let d = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+        + O::LAMBDABYTES::USIZE
+        + 2
+        ..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
             + O::LAMBDABYTES::USIZE
             + 2
             + O::LBYTES::USIZE];
     let mut chall2 = GenericArray::<u8, O::CHALL>::default();
     hash_challange_2::<RO<P>>(&mut chall2, &chall1, u_t, &hv, d);
 
-    let a_t = &sigma[lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+    let a_t = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
         + O::LAMBDABYTES::USIZE
         + 2
         + O::LBYTES::USIZE
-        ..lhat * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+        ..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
             + 2 * O::LAMBDABYTES::USIZE
             + 2
             + O::LBYTES::USIZE];
