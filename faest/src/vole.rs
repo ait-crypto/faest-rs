@@ -246,7 +246,7 @@ mod test {
                                 .map(|x| *GenericArray::from_slice(x))
                                 .collect()
                         );
-                        assert_eq!(res.3, *GenericArray::from_slice(&data.u));
+                        assert_eq!(res.3.as_slice(), &data.u);
                         assert_eq!(
                             res.4,
                             data.v
@@ -303,7 +303,7 @@ mod test {
                                 .map(|x| *GenericArray::from_slice(x))
                                 .collect()
                         );
-                        assert_eq!(res.3, *GenericArray::from_slice(&data.u));
+                        assert_eq!(res.3.as_slice(), &data.u);
                         assert_eq!(
                             res.4,
                             data.v
@@ -361,7 +361,7 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect()
                     );
-                    assert_eq!(res.3, *GenericArray::from_slice(&data.u));
+                    assert_eq!(res.3.as_slice(), &data.u);
                     assert_eq!(
                         res.4,
                         data.v
@@ -414,7 +414,7 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect()
                     );
-                    assert_eq!(res.3, *GenericArray::from_slice(&data.u));
+                    assert_eq!(res.3.as_slice(), &data.u);
                     assert_eq!(
                         res.4,
                         data.v
@@ -470,7 +470,7 @@ mod test {
                                 .map(|x| *GenericArray::from_slice(x))
                                 .collect()
                         );
-                        assert_eq!(res.3, *GenericArray::from_slice(&data.u));
+                        assert_eq!(res.3.as_slice(), &data.u);
                         assert_eq!(
                             res.4,
                             data.v
@@ -523,7 +523,7 @@ mod test {
                                 .map(|x| *GenericArray::from_slice(x))
                                 .collect()
                         );
-                        assert_eq!(res.3, *GenericArray::from_slice(&data.u));
+                        assert_eq!(res.3.as_slice(), &data.u);
                         assert_eq!(
                             res.4,
                             data.v
@@ -577,7 +577,7 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect()
                     );
-                    assert_eq!(res.3, *GenericArray::from_slice(&data.u));
+                    assert_eq!(res.3.as_slice(), &data.u);
                     assert_eq!(
                         res.4,
                         data.v
@@ -630,7 +630,7 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect()
                     );
-                    assert_eq!(res.3, *GenericArray::from_slice(&data.u));
+                    assert_eq!(res.3.as_slice(), &data.u);
                     assert_eq!(
                         res.4,
                         data.v
@@ -688,7 +688,7 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect()
                     );
-                    assert_eq!(res.3, *GenericArray::from_slice(&data.u));
+                    assert_eq!(res.3.as_slice(), &data.u);
                     assert_eq!(
                         res.4,
                         data.v
@@ -744,7 +744,7 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect()
                     );
-                    assert_eq!(res.3, *GenericArray::from_slice(&data.u));
+                    assert_eq!(res.3.as_slice(), &data.u);
                     assert_eq!(
                         res.4,
                         data.v
@@ -801,7 +801,7 @@ mod test {
                         .map(|x| *GenericArray::from_slice(x))
                         .collect()
                 );
-                assert_eq!(res.3, *GenericArray::from_slice(&data.u));
+                assert_eq!(res.3.as_slice(), &data.u);
                 assert_eq!(
                     res.4,
                     data.v
@@ -857,7 +857,7 @@ mod test {
                         .map(|x| *GenericArray::from_slice(x))
                         .collect()
                 );
-                assert_eq!(res.3, *GenericArray::from_slice(&data.u));
+                assert_eq!(res.3.as_slice(), &data.u);
                 assert_eq!(
                     res.4,
                     data.v
