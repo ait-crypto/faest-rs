@@ -389,7 +389,11 @@ pub(crate) fn faest_sign<P, O>(
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn faest_verify<P, O>(msg: &[u8], pk: &PublicKey<O>, sigma: &[u8]) -> Result<(), Error>
+pub(crate) fn faest_verify<P, O>(
+    msg: &[u8],
+    pk: &PublicKey<O>,
+    sigma: &GenericArray<u8, P::SIG>,
+) -> Result<(), Error>
 where
     P: PARAM<OWF = O>,
     O: OWFParameters,
