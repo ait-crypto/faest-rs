@@ -1,4 +1,4 @@
-use std::iter::zip;
+use std::{array, iter::zip};
 
 use either::Either;
 use generic_array::{typenum::Unsigned, GenericArray};
@@ -256,10 +256,8 @@ where
                         .map(|(z, x)| *z + *x)
                         .collect::<Vec<_>>()
                 };
-                let mut y_t = [Field::<O>::default(); 8];
-                for i in 0..8 {
-                    y_t[i] = z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]
-                }
+                let mut y_t =
+                    array::from_fn(|i| z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]);
                 y_t[0] += delta;
                 y_t[2] += delta;
                 res[index] = Field::<O>::byte_combine(&y_t);
@@ -280,26 +278,26 @@ fn em_enc_cstrnts_mkey0<O>(
 ) where
     O: PARAMOWF,
 {
-    let lambda = <O::LAMBDA as Unsigned>::to_usize();
-    let senc = <O::SENC as Unsigned>::to_usize();
-    let nst = <O::NST as Unsigned>::to_usize();
-    let r = <O::R as Unsigned>::to_usize();
     let new_w = convert_to_bit::<Field<O>, O::L>(w);
-    let new_x = convert_to_bit::<Field<O>, O::LAMBDAR1>(&x[..4 * nst * (r + 1)]);
+    let new_x =
+        convert_to_bit::<Field<O>, O::LAMBDAR1>(&x[..4 * O::NST::USIZE * (O::R::USIZE + 1)]);
     let mut w_out: Box<GenericArray<Field<O>, O::LAMBDA>> = GenericArray::default_boxed();
     let mut index = 0;
-    for i in 0..lambda / 8 {
+    for i in 0..O::LAMBDABYTES::USIZE {
         for j in 0..8 {
             w_out[index] = Field::<O>::ONE * ((output[i] >> j) & 1) + new_w[i * 8 + j];
             index += 1;
         }
     }
-    let v_out = GenericArray::from_slice(&v[..lambda]);
-    let s = em_enc_fwd::<O>(Either::Left(w), Some(Either::Left(&x[..4 * nst * (r + 1)])));
+    let v_out = GenericArray::from_slice(&v[..O::LAMBDA::USIZE]);
+    let s = em_enc_fwd::<O>(
+        Either::Left(w),
+        Some(Either::Left(&x[..4 * O::NST::USIZE * (O::R::USIZE + 1)])),
+    );
     let vs = em_enc_fwd::<O>(Either::Right(v), None);
     let s_b = em_enc_bkwd_mkey0_mtag0::<O>(&new_x, &new_w, &w_out);
     let v_s_b = em_enc_bkwd_mkey0_mtag1::<O>(v, v_out);
-    for j in 0..senc {
+    for j in 0..O::SENC::USIZE {
         let a0 = v_s_b[j] * vs[j];
         let a1 = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + Field::<O>::ONE + a0;
         a_t_hasher.update(&a1);
@@ -316,15 +314,13 @@ fn em_enc_cstrnts_mkey1<O>(
 ) where
     O: PARAMOWF,
 {
-    let lambda = <O::LAMBDA as Unsigned>::to_usize();
-
     let new_x = Box::<GenericArray<Field<O>, O::LAMBDAR1>>::from_iter(
         (0..4 * O::NST::USIZE * (O::R::USIZE + 1) * 8)
             .map(|index| delta * ((x[index / 8] >> (index % 8)) & 1)),
     );
 
     let q_out = Box::<GenericArray<Field<O>, O::LAMBDA>>::from_iter(
-        (0..lambda).map(|idx| delta * ((output[idx / 8] >> (idx % 8)) & 1) + q[idx]),
+        (0..O::LAMBDA::USIZE).map(|idx| delta * ((output[idx / 8] >> (idx % 8)) & 1) + q[idx]),
     );
     let qs = em_enc_fwd::<O>(Either::Right(q), Some(Either::Right(new_x.as_slice())));
     let qs_b = em_enc_bkwd_mkey1_mtag0::<O>(&new_x, q, &q_out, delta);
@@ -348,20 +344,15 @@ pub(crate) fn em_prove<O>(
 where
     O: PARAMOWF,
 {
-    let nst = <O::NST as Unsigned>::to_u8();
-    let nk = <O::NK as Unsigned>::to_u8();
-    let r = <O::R as Unsigned>::to_u8();
-    let l = <O::L as Unsigned>::to_usize();
-    let lambda = <O::LAMBDA as Unsigned>::to_usize();
     let mut temp_v: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
-    for i in 0..(l + lambda) / 8 {
+    for i in 0..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE {
         for k in 0..8 {
-            for j in 0..lambda / 8 {
+            for j in 0..O::LAMBDABYTES::USIZE {
                 let mut temp = 0;
                 for m in 0..8 {
                     temp += ((gv[(j * 8) + m][i] >> k) & 1) << m;
                 }
-                temp_v[j + k * lambda / 8 + i * lambda] = temp;
+                temp_v[j + k * O::LAMBDABYTES::USIZE + i * O::LAMBDA::USIZE] = temp;
             }
         }
     }
@@ -374,7 +365,13 @@ where
     let mut b_t_hasher =
         <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
 
-    let x = rijndael_key_schedule(owf_input, nst, nk, r, 4 * (((r + 1) * nst) / nk));
+    let x = rijndael_key_schedule(
+        owf_input,
+        O::NST::U8,
+        O::NK::U8,
+        O::R::U8,
+        4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE) as u8,
+    );
     em_enc_cstrnts_mkey0::<O>(
         &mut a_t_hasher,
         &mut b_t_hasher,
@@ -384,16 +381,16 @@ where
                 convert_from_batchblocks(inv_bitslice(x))
                     .iter()
                     .flat_map(|x| u32::to_le_bytes(*x))
-                    .take(lambda / 8)
+                    .take(O::LAMBDABYTES::USIZE)
                     .collect::<Vec<u8>>()
             })
-            .take((lambda / 8) * (r as usize + 1))
+            .take(O::LAMBDABYTES::USIZE * (O::R::USIZE + 1))
             .collect::<GenericArray<u8, _>>(),
         w,
-        GenericArray::from_slice(&new_v[..l]),
+        GenericArray::from_slice(&new_v[..O::L::USIZE]),
     );
-    let u_s = Field::<O>::from(&u[l / 8..]);
-    let v_s = Field::<O>::sum_poly(&new_v[l..l + lambda]);
+    let u_s = Field::<O>::from(&u[O::LBYTES::USIZE..]);
+    let v_s = Field::<O>::sum_poly(&new_v[O::L::USIZE..O::L::USIZE + O::LAMBDA::USIZE]);
     let a_t = a_t_hasher.finalize(&u_s);
     let b_t = b_t_hasher.finalize(&v_s);
 
