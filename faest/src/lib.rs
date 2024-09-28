@@ -1,4 +1,5 @@
-//! FAEST digital signature scheme
+#![doc = include_str!("../README.md")]
+#![forbid(unsafe_code)]
 
 use generic_array::{typenum::Unsigned, GenericArray};
 use rand_core::CryptoRngCore;
