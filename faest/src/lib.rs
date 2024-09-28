@@ -125,15 +125,7 @@ macro_rules! define_impl {
 
         impl Verifier<$sig> for $vk {
             fn verify(&self, msg: &[u8], signature: &$sig) -> Result<(), Error> {
-                if faest_verify::<$param, <$param as PARAM>::OWF>(
-                    msg,
-                    &self.0,
-                    signature.0.as_slice(),
-                ) {
-                    Ok(())
-                } else {
-                    Err(Error::new())
-                }
+                faest_verify::<$param, <$param as PARAM>::OWF>(msg, &self.0, signature.0.as_slice())
             }
         }
 

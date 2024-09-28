@@ -14,6 +14,7 @@ use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
+use signature::Error;
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
@@ -388,7 +389,7 @@ pub(crate) fn faest_sign<P, O>(
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn faest_verify<P, O>(msg: &[u8], pk: &PublicKey<O>, sigma: &[u8]) -> bool
+pub(crate) fn faest_verify<P, O>(msg: &[u8], pk: &PublicKey<O>, sigma: &[u8]) -> Result<(), Error>
 where
     P: PARAM<OWF = O>,
     O: OWFParameters,
@@ -523,7 +524,11 @@ where
 
     let mut chall3_p = GenericArray::default();
     hash_challenge_3::<RO<P>>(&mut chall3_p, &chall2, a_t, &b_t);
-    *chall3 == chall3_p
+    if *chall3 == chall3_p {
+        Ok(())
+    } else {
+        Err(Error::new())
+    }
 }
 
 fn sigma_to_signature<Lambda>(
@@ -583,8 +588,8 @@ mod test {
             let mut sigma = GenericArray::default_boxed();
             faest_sign::<P, P::OWF>(&msg, &sk, &[], &mut sigma);
             let pk = sk.as_public_key();
-            let res_true = faest_verify::<P, P::OWF>(&msg, &pk, &sigma);
-            assert!(res_true);
+            let res = faest_verify::<P, P::OWF>(&msg, &pk, &sigma);
+            assert!(res.is_ok());
         }
     }
 
@@ -726,7 +731,7 @@ mod test {
             faest_sign::<P, P::OWF>(&msg, &sk, &rho, &mut signature);
             assert_eq!(&sig[..sig.len() - signature.len()], &msg);
             assert_eq!(&sig[sig.len() - signature.len()..], signature.as_slice());
-            assert!(faest_verify::<P, P::OWF>(&msg, &pk, &signature));
+            assert!(faest_verify::<P, P::OWF>(&msg, &pk, &signature).is_ok());
         }
     }
 
