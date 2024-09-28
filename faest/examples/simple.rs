@@ -12,7 +12,7 @@ use signature::{Signer, Verifier};
 const MESSAGE: &str = "This is a message.";
 fn run_example<KP, S>(name: &str)
 where
-    KP: KeypairGenerator + Signer<S> + RandomizedSigner<S>,
+    KP: KeypairGenerator + Signer<Box<S>> + RandomizedSigner<S>,
     KP::VerifyingKey: Verifier<S>,
 {
     let mut rng = rand::thread_rng();
@@ -35,6 +35,10 @@ where
         MESSAGE, name
     );
     let signature = keypair.sign_with_rng(&mut rng, MESSAGE.as_bytes());
+    println!(
+        "Verifying signature on message '{}' with {} ...",
+        MESSAGE, name
+    );
     assert!(verification_key
         .verify(MESSAGE.as_bytes(), &signature)
         .is_ok());
