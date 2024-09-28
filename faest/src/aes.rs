@@ -7,7 +7,7 @@ use generic_array::{
 
 use crate::{
     fields::{BigGaloisField, ByteCombine, ByteCombineConstants, Field as _, SumPoly},
-    parameter::{BaseParameters, PARAMOWF},
+    parameter::{BaseParameters, OWFParameters},
     parameter::{QSProof, TauParameters},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
@@ -17,15 +17,17 @@ use crate::{
     utils::convert_gq,
 };
 
-type Field<O> = <<O as PARAMOWF>::BaseParams as BaseParameters>::Field;
+type Field<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
 
 type KeyCstrnts<O> = (
-    Box<GenericArray<Field<O>, <O as PARAMOWF>::PRODRUN128>>,
-    Box<GenericArray<Field<O>, <O as PARAMOWF>::PRODRUN128>>,
+    Box<GenericArray<Field<O>, <O as OWFParameters>::PRODRUN128>>,
+    Box<GenericArray<Field<O>, <O as OWFParameters>::PRODRUN128>>,
 );
 
-type CstrntsVal<'a, O> =
-    &'a GenericArray<GenericArray<u8, <O as PARAMOWF>::LAMBDALBYTES>, <O as PARAMOWF>::LAMBDA>;
+type CstrntsVal<'a, O> = &'a GenericArray<
+    GenericArray<u8, <O as OWFParameters>::LAMBDALBYTES>,
+    <O as OWFParameters>::LAMBDA,
+>;
 
 pub(crate) fn byte_to_bit(input: u8) -> Vec<u8> {
     (0..8).map(|i| (input >> i) & 1).collect()
@@ -52,7 +54,7 @@ pub(crate) fn aes_extendedwitness<O>(
     owf_input: &GenericArray<u8, O::InputSize>,
 ) -> (Box<GenericArray<u8, O::LBYTES>>, bool)
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let beta = <O::BETA as Unsigned>::to_usize();
     let kblen = <O::KBLENGTH as Unsigned>::to_usize();
@@ -172,7 +174,7 @@ fn aes_key_exp_fwd<O>(
     x: &GenericArray<Field<O>, O::LKE>,
 ) -> Box<GenericArray<Field<O>, O::PRODRUN128>>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     //Step 1 is ok by construction
     let r = <O::R as Unsigned>::to_usize();
@@ -214,7 +216,7 @@ fn aes_key_exp_bwd_mtag0_mkey0<O>(
     xk: &GenericArray<Field<O>, O::PRODRUN128>,
 ) -> Box<GenericArray<Field<O>, O::PRODSKE8>>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let rcon_table = [
         1, 2, 4, 8, 16, 32, 64, 128, 27, 54, 108, 216, 171, 77, 154, 47, 94, 188, 99, 198, 151, 53,
@@ -282,7 +284,7 @@ fn aes_key_exp_bwd_mtag1_mkey0<O>(
     xk: &GenericArray<Field<O>, O::PRODRUN128>,
 ) -> Box<GenericArray<Field<O>, O::PRODSKE8>>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let ske = <O::SKE as Unsigned>::to_usize();
     let mut out: Box<GenericArray<Field<O>, O::PRODSKE8>> = GenericArray::default_boxed();
@@ -334,7 +336,7 @@ fn aes_key_exp_bwd_mtag0_mkey1<O>(
     delta: Field<O>,
 ) -> Box<GenericArray<Field<O>, O::PRODSKE8>>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let rcon_table = [
         1, 2, 4, 8, 16, 32, 64, 128, 27, 54, 108, 216, 171, 77, 154, 47, 94, 188, 99, 198, 151, 53,
@@ -419,7 +421,7 @@ fn aes_key_exp_cstrnts_mkey0<O>(
     v: &GenericArray<Field<O>, O::LKE>,
 ) -> KeyCstrnts<O>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let lambda = Field::<O>::LENGTH;
     let kc = <O::NK as Unsigned>::to_u8();
@@ -496,9 +498,9 @@ fn aes_key_exp_cstrnts_mkey1<O>(
     b_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
     q: &GenericArray<Field<O>, O::LKE>,
     delta: Field<O>,
-) -> Box<GenericArray<Field<O>, <O as PARAMOWF>::PRODRUN128>>
+) -> Box<GenericArray<Field<O>, <O as OWFParameters>::PRODRUN128>>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let lambda = Field::<O>::LENGTH;
     let kc = <O::NK as Unsigned>::to_u8();
@@ -550,7 +552,7 @@ fn aes_enc_fwd_mkey0_mtag0<O>(
     input: &[u8; 16],
 ) -> Box<GenericArray<Field<O>, O::SENC>>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let mut index = 0;
     let mut res = GenericArray::default_boxed();
@@ -593,7 +595,7 @@ fn aes_enc_fwd_mkey1_mtag0<O>(
     delta: Field<O>,
 ) -> Box<GenericArray<Field<O>, O::SENC>>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let mut index = 0;
     let mut res = GenericArray::default_boxed();
@@ -639,7 +641,7 @@ fn aes_enc_fwd_mkey0_mtag1<O>(
     xk: &GenericArray<Field<O>, O::PRODRUN128>,
 ) -> Box<GenericArray<Field<O>, O::SENC>>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let mut index = 0;
     let mut res = GenericArray::default_boxed();
@@ -685,7 +687,7 @@ fn aes_enc_bkwd_mkey0_mtag0<O>(
     out: &[u8; 16],
 ) -> Box<GenericArray<Field<O>, O::SENC>>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let mut res = GenericArray::default_boxed();
     let r = <O::R as Unsigned>::to_usize();
@@ -731,7 +733,7 @@ fn aes_enc_bkwd_mkey1_mtag0<O>(
     delta: Field<O>,
 ) -> Box<GenericArray<Field<O>, O::SENC>>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let mut res = GenericArray::default_boxed();
     let r = <O::R as Unsigned>::to_usize();
@@ -775,7 +777,7 @@ fn aes_enc_bkwd_mkey0_mtag1<O>(
     xk: &GenericArray<Field<O>, O::PRODRUN128>,
 ) -> Box<GenericArray<Field<O>, O::SENC>>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let mut res = GenericArray::default_boxed();
     let r = <O::R as Unsigned>::to_usize();
@@ -811,7 +813,7 @@ fn aes_enc_cstrnts_mkey0<O>(
     k: &GenericArray<Field<O>, O::PRODRUN128>,
     vk: &GenericArray<Field<O>, O::PRODRUN128>,
 ) where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let senc = <O::SENC as Unsigned>::to_usize();
     let mut field_w: Box<GenericArray<Field<O>, O::LENC>> = GenericArray::default_boxed();
@@ -841,7 +843,7 @@ fn aes_enc_cstrnts_mkey1<O>(
     qk: &GenericArray<Field<O>, O::PRODRUN128>,
     delta: Field<O>,
 ) where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let senc = <O::SENC as Unsigned>::to_usize();
     let qs = aes_enc_fwd_mkey1_mtag0::<O>(q, qk, input, delta);
@@ -871,7 +873,7 @@ pub(crate) fn aes_prove<O>(
     chall: &GenericArray<u8, O::CHALL>,
 ) -> QSProof<O>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let l = <O::L as Unsigned>::to_usize();
     let _c = <O::C as Unsigned>::to_usize();
@@ -895,9 +897,9 @@ where
         temp_v.chunks(O::LAMBDABYTES::USIZE).map(Field::<O>::from),
     );
     let mut a_t_hasher =
-        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
+        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
     let mut b_t_hasher =
-        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
+        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
 
     let (k, vk) = aes_key_exp_cstrnts_mkey0::<O>(
         &mut a_t_hasher,
@@ -961,7 +963,7 @@ pub(crate) fn aes_verify<O, Tau>(
     owf_output: &GenericArray<u8, O::OutputSize>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
     Tau: TauParameters,
 {
     let lambda = Field::<O>::LENGTH;
@@ -972,7 +974,7 @@ where
 
     let new_q = convert_gq::<O, Tau>(d, gq, chall3);
     let mut zk_hasher =
-        <<O as PARAMOWF>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
+        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
 
     let qk = aes_key_exp_cstrnts_mkey1::<O>(
         &mut zk_hasher,
@@ -1012,16 +1014,16 @@ mod test {
     use crate::{
         fields::{large_fields::NewFromU128, BigGaloisField, GF128, GF192, GF256},
         parameter::{
-            PARAM, PARAM128S, PARAM192S, PARAM256S, PARAMOWF, PARAMOWF128, PARAMOWF192, PARAMOWF256,
+            OWFParameters, OWF128, OWF192, OWF256, PARAM, PARAM128S, PARAM192S, PARAM256S,
         },
     };
 
     use generic_array::{typenum::U8, GenericArray};
     use serde::Deserialize;
 
-    type ZkHash256 = GenericArray<u8, <PARAMOWF256 as PARAMOWF>::LAMBDABYTES>;
-    type ZkHash192 = GenericArray<u8, <PARAMOWF192 as PARAMOWF>::LAMBDABYTES>;
-    type ZkHash128 = GenericArray<u8, <PARAMOWF128 as PARAMOWF>::LAMBDABYTES>;
+    type ZkHash256 = GenericArray<u8, <OWF256 as OWFParameters>::LAMBDABYTES>;
+    type ZkHash192 = GenericArray<u8, <OWF192 as OWFParameters>::LAMBDABYTES>;
+    type ZkHash128 = GenericArray<u8, <OWF128 as OWFParameters>::LAMBDABYTES>;
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -1039,26 +1041,26 @@ mod test {
                 .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
-                let res = aes_extendedwitness::<PARAMOWF128>(
+                let res = aes_extendedwitness::<OWF128>(
                     GenericArray::from_slice(&data.key),
                     GenericArray::from_slice(
-                        &data.input[..<PARAMOWF128 as PARAMOWF>::InputSize::USIZE],
+                        &data.input[..<OWF128 as OWFParameters>::InputSize::USIZE],
                     ),
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
             } else if data.lambda == 192 {
-                let res = aes_extendedwitness::<PARAMOWF192>(
+                let res = aes_extendedwitness::<OWF192>(
                     GenericArray::from_slice(&data.key),
                     GenericArray::from_slice(
-                        &data.input[..<PARAMOWF192 as PARAMOWF>::InputSize::USIZE],
+                        &data.input[..<OWF192 as OWFParameters>::InputSize::USIZE],
                     ),
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
             } else {
-                let res = aes_extendedwitness::<PARAMOWF256>(
+                let res = aes_extendedwitness::<OWF256>(
                     GenericArray::from_slice(&data.key),
                     GenericArray::from_slice(
-                        &data.input[..<PARAMOWF256 as PARAMOWF>::InputSize::USIZE],
+                        &data.input[..<OWF256 as OWFParameters>::InputSize::USIZE],
                     ),
                 );
                 assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
@@ -1111,8 +1113,8 @@ mod test {
                             .collect(),
                     )
                 };
-                let res: GenericArray<GF128, <PARAMOWF128 as PARAMOWF>::PRODRUN128> =
-                    *aes_key_exp_fwd::<PARAMOWF128>(GenericArray::from_slice(&input));
+                let res: GenericArray<GF128, <OWF128 as OWFParameters>::PRODRUN128> =
+                    *aes_key_exp_fwd::<OWF128>(GenericArray::from_slice(&input));
                 assert_eq!(res, *GenericArray::from_slice(&out));
             } else if data.lambda == 192 {
                 let (out, input): (Vec<GF192>, Vec<GF192>) = if data.x.len() >= 448 {
@@ -1135,8 +1137,8 @@ mod test {
                         data.x.iter().flat_map(|x| convtobit(x[0] as u8)).collect(),
                     )
                 };
-                let res: GenericArray<GF192, <PARAMOWF192 as PARAMOWF>::PRODRUN128> =
-                    *aes_key_exp_fwd::<PARAMOWF192>(GenericArray::from_slice(&input));
+                let res: GenericArray<GF192, <OWF192 as OWFParameters>::PRODRUN128> =
+                    *aes_key_exp_fwd::<OWF192>(GenericArray::from_slice(&input));
                 assert_eq!(res, *GenericArray::from_slice(&out));
             } else {
                 let (out, input): (Vec<GF256>, Vec<GF256>) = if data.x.len() >= 448 {
@@ -1159,8 +1161,8 @@ mod test {
                         data.x.iter().flat_map(|x| convtobit(x[0] as u8)).collect(),
                     )
                 };
-                let res: GenericArray<GF256, <PARAMOWF256 as PARAMOWF>::PRODRUN128> =
-                    *aes_key_exp_fwd::<PARAMOWF256>(GenericArray::from_slice(&input));
+                let res: GenericArray<GF256, <OWF256 as OWFParameters>::PRODRUN128> =
+                    *aes_key_exp_fwd::<OWF256>(GenericArray::from_slice(&input));
                 assert_eq!(res, *GenericArray::from_slice(&out));
             }
         }
@@ -1186,7 +1188,7 @@ mod test {
         delta: Field<O>,
     ) -> Box<GenericArray<Field<O>, O::PRODSKE8>>
     where
-        O: PARAMOWF,
+        O: OWFParameters,
     {
         if !mkey && !mtag {
             aes_key_exp_bwd_mtag0_mkey0::<O>(x, xk)
@@ -1241,7 +1243,7 @@ mod test {
                     )
                 };
 
-                let res = aes_key_exp_bwd::<PARAMOWF128>(
+                let res = aes_key_exp_bwd::<OWF128>(
                     GenericArray::from_slice(&x[..448]),
                     GenericArray::from_slice(
                         &[&xk[..], &vec![GF128::default(); 224][..]].concat()[..1408],
@@ -1288,7 +1290,7 @@ mod test {
                             .collect(),
                     )
                 };
-                let res = aes_key_exp_bwd::<PARAMOWF192>(
+                let res = aes_key_exp_bwd::<OWF192>(
                     GenericArray::from_slice(&x[..448]),
                     GenericArray::from_slice(
                         &[&xk[..], &vec![GF192::default(); 288][..]].concat()[..1664],
@@ -1338,7 +1340,7 @@ mod test {
                             .collect(),
                     )
                 };
-                let res = aes_key_exp_bwd::<PARAMOWF256>(
+                let res = aes_key_exp_bwd::<OWF256>(
                     GenericArray::from_slice(&x[..672]),
                     GenericArray::from_slice(
                         &[&xk[..], &vec![GF256::default(); 352][..]].concat()[..1920],
@@ -1376,7 +1378,7 @@ mod test {
         delta: Field<O>,
     ) -> Box<GenericArray<Field<O>, O::SENC>>
     where
-        O: PARAMOWF,
+        O: OWFParameters,
     {
         if !mkey && !mtag {
             aes_enc_fwd_mkey0_mtag0::<O>(x, xk, input)
@@ -1425,7 +1427,7 @@ mod test {
                             .collect::<Vec<GF128>>()),
                     )
                 };
-                let res = aes_enc_fwd::<PARAMOWF128>(
+                let res = aes_enc_fwd::<OWF128>(
                     GenericArray::from_slice(&x[..]),
                     GenericArray::from_slice(&xk[..]),
                     data.mkey != 0,
@@ -1475,7 +1477,7 @@ mod test {
                             .collect::<Vec<GF192>>()),
                     )
                 };
-                let res = aes_enc_fwd::<PARAMOWF192>(
+                let res = aes_enc_fwd::<OWF192>(
                     GenericArray::from_slice(&x[..]),
                     GenericArray::from_slice(&xk[..]),
                     data.mkey != 0,
@@ -1534,7 +1536,7 @@ mod test {
                             .collect::<Vec<GF256>>()),
                     )
                 };
-                let res = aes_enc_fwd::<PARAMOWF256>(
+                let res = aes_enc_fwd::<OWF256>(
                     GenericArray::from_slice(&x[..]),
                     GenericArray::from_slice(&xk[..]),
                     data.mkey != 0,
@@ -1584,7 +1586,7 @@ mod test {
         delta: Field<O>,
     ) -> Box<GenericArray<Field<O>, O::SENC>>
     where
-        O: PARAMOWF,
+        O: OWFParameters,
     {
         if !mkey && !mtag {
             aes_enc_bkwd_mkey0_mtag0::<O>(x, xk, out)
@@ -1633,7 +1635,7 @@ mod test {
                             .collect::<Vec<GF128>>()),
                     )
                 };
-                let res = aes_enc_bkwd::<PARAMOWF128>(
+                let res = aes_enc_bkwd::<OWF128>(
                     GenericArray::from_slice(&x[..]),
                     GenericArray::from_slice(&xk[..]),
                     data.mkey != 0,
@@ -1679,7 +1681,7 @@ mod test {
                             .collect::<Vec<GF192>>()),
                     )
                 };
-                let res = aes_enc_bkwd::<PARAMOWF192>(
+                let res = aes_enc_bkwd::<OWF192>(
                     GenericArray::from_slice(&x[..]),
                     GenericArray::from_slice(&xk[..]),
                     data.mkey != 0,
@@ -1725,7 +1727,7 @@ mod test {
                             .collect::<Vec<GF256>>()),
                     )
                 };
-                let res = aes_enc_bkwd::<PARAMOWF256>(
+                let res = aes_enc_bkwd::<OWF256>(
                     GenericArray::from_slice(&x[..]),
                     GenericArray::from_slice(&xk[..]),
                     data.mkey != 0,
@@ -1769,7 +1771,7 @@ mod test {
                 .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
-                let res: (ZkHash128, ZkHash128) = aes_prove::<PARAMOWF128>(
+                let res: (ZkHash128, ZkHash128) = aes_prove::<OWF128>(
                     GenericArray::from_slice(&data.w),
                     GenericArray::from_slice(&data.u),
                     GenericArray::from_slice(
@@ -1793,7 +1795,7 @@ mod test {
                         bitw[8 * i + j] = (data.w[i] >> j) & 1;
                     }
                 }
-                let res: (ZkHash192, ZkHash192) = aes_prove::<PARAMOWF192>(
+                let res: (ZkHash192, ZkHash192) = aes_prove::<OWF192>(
                     GenericArray::from_slice(&data.w),
                     GenericArray::from_slice(&data.u),
                     GenericArray::from_slice(
@@ -1816,7 +1818,7 @@ mod test {
                         bitw[8 * i + j] = (data.w[i] >> j) & 1;
                     }
                 }
-                let res: (ZkHash256, ZkHash256) = aes_prove::<PARAMOWF256>(
+                let res: (ZkHash256, ZkHash256) = aes_prove::<OWF256>(
                     GenericArray::from_slice(&data.w),
                     GenericArray::from_slice(&data.u),
                     GenericArray::from_slice(
@@ -1860,7 +1862,7 @@ mod test {
         owf_output: &GenericArray<u8, O::OutputSize>,
     ) -> GenericArray<u8, O::LAMBDABYTES>
     where
-        O: PARAMOWF,
+        O: OWFParameters,
         Tau: TauParameters,
     {
         super::aes_verify::<O, Tau>(
@@ -1881,7 +1883,7 @@ mod test {
                 .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
-                let out = aes_verify::<PARAMOWF128, <PARAM128S as PARAM>::Tau>(
+                let out = aes_verify::<OWF128, <PARAM128S as PARAM>::Tau>(
                     GenericArray::from_slice(&data.d[..]),
                     GenericArray::from_slice(
                         &data
@@ -1901,7 +1903,7 @@ mod test {
                     GF128::from(&out[..])
                 );
             } else if data.lambda == 192 {
-                let out = aes_verify::<PARAMOWF192, <PARAM192S as PARAM>::Tau>(
+                let out = aes_verify::<OWF192, <PARAM192S as PARAM>::Tau>(
                     GenericArray::from_slice(&data.d[..]),
                     GenericArray::from_slice(
                         &data
@@ -1924,7 +1926,7 @@ mod test {
                     GF192::from(&out[..])
                 );
             } else {
-                let out = aes_verify::<PARAMOWF256, <PARAM256S as PARAM>::Tau>(
+                let out = aes_verify::<OWF256, <PARAM256S as PARAM>::Tau>(
                     GenericArray::from_slice(&data.d[..]),
                     GenericArray::from_slice(
                         &data

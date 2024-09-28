@@ -1,7 +1,7 @@
 use std::{fmt, io::Write, iter::zip, marker::PhantomData};
 
 use crate::{
-    parameter::{BaseParameters, TauParameters, Variant, PARAM, PARAMOWF},
+    parameter::{BaseParameters, OWFParameters, TauParameters, Variant, PARAM},
     prg::IV,
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
@@ -21,7 +21,7 @@ use zeroize::ZeroizeOnDrop;
 #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
 pub(crate) struct SecretKey<O>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     pub(crate) owf_key: GenericArray<u8, O::LAMBDABYTES>,
     pub(crate) owf_input: GenericArray<u8, O::InputSize>,
@@ -30,7 +30,7 @@ where
 
 impl<O> SecretKey<O>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     fn as_bytes(&self) -> GenericArray<u8, O::SK> {
         let mut buf = GenericArray::default();
@@ -70,7 +70,7 @@ where
 #[cfg(feature = "serde")]
 impl<O> Serialize for SecretKey<O>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -83,7 +83,7 @@ where
 #[cfg(feature = "serde")]
 impl<'de, O> Deserialize<'de> for SecretKey<O>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -91,11 +91,11 @@ where
     {
         struct BytesVisitor<O>(PhantomData<O>)
         where
-            O: PARAMOWF;
+            O: OWFParameters;
 
         impl<'de, O> Visitor<'de> for BytesVisitor<O>
         where
-            O: PARAMOWF,
+            O: OWFParameters,
         {
             type Value = SecretKey<O>;
 
@@ -119,7 +119,7 @@ where
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PublicKey<O>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     pub(crate) owf_input: GenericArray<u8, O::InputSize>,
     pub(crate) owf_output: GenericArray<u8, O::OutputSize>,
@@ -127,7 +127,7 @@ where
 
 impl<O> PublicKey<O>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     fn as_bytes(&self) -> GenericArray<u8, O::PK> {
         let mut buf = GenericArray::default();
@@ -157,7 +157,7 @@ where
 #[cfg(feature = "serde")]
 impl<O> Serialize for PublicKey<O>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -170,7 +170,7 @@ where
 #[cfg(feature = "serde")]
 impl<'de, O> Deserialize<'de> for PublicKey<O>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -178,11 +178,11 @@ where
     {
         struct BytesVisitor<O>(PhantomData<O>)
         where
-            O: PARAMOWF;
+            O: OWFParameters;
 
         impl<'de, O> Visitor<'de> for BytesVisitor<O>
         where
-            O: PARAMOWF,
+            O: OWFParameters,
         {
             type Value = PublicKey<O>;
 
@@ -203,7 +203,7 @@ where
     }
 }
 
-type RO<P> = <<<P as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::RandomOracle;
+type RO<P> = <<<P as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle;
 
 fn hash_mu<R>(mu: &mut [u8], input: &[u8], output: &[u8], msg: &[u8])
 where
@@ -290,7 +290,7 @@ pub(crate) fn faest_sign<P, O>(
     signature: &mut GenericArray<u8, P::SIG>,
 ) where
     P: PARAM<OWF = O>,
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let mut mu =
         GenericArray::<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2>::default();
@@ -383,7 +383,7 @@ pub(crate) fn faest_sign<P, O>(
 pub(crate) fn faest_verify<P, O>(msg: &[u8], pk: &PublicKey<O>, sigma: &[u8]) -> bool
 where
     P: PARAM<OWF = O>,
-    O: PARAMOWF,
+    O: OWFParameters,
 {
     let chall3 = GenericArray::from_slice(
         &sigma[P::SIG::USIZE - (16 + O::LAMBDABYTES::USIZE)..P::SIG::USIZE - 16],
@@ -553,8 +553,8 @@ mod test {
     use rand::RngCore;
 
     use crate::parameter::{
-        PARAM, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F, PARAM192FEM, PARAM192S,
-        PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM, PARAMOWF,
+        OWFParameters, PARAM, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F,
+        PARAM192FEM, PARAM192S, PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM,
     };
 
     const RUNS: usize = 10;
@@ -713,7 +713,7 @@ mod test {
             assert_eq!(data.pk.as_slice(), pk.as_bytes().as_slice());
             assert_eq!(data.sk.as_slice(), sk.as_bytes().as_slice());
 
-            let mut rho = GenericArray::<u8, <P::OWF as PARAMOWF>::LAMBDABYTES>::default();
+            let mut rho = GenericArray::<u8, <P::OWF as OWFParameters>::LAMBDABYTES>::default();
             rng.fill_bytes(&mut rho);
 
             let mut signature = GenericArray::default_boxed();

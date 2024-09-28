@@ -2,7 +2,7 @@ use std::iter::zip;
 
 use generic_array::{typenum::Unsigned, GenericArray};
 
-use crate::parameter::{BaseParameters, TauParameters, PARAMOWF};
+use crate::parameter::{BaseParameters, OWFParameters, TauParameters};
 
 /// Reader interface for PRGs and random oracles
 pub(crate) trait Reader {
@@ -16,7 +16,7 @@ pub(crate) fn convert_gq<O, Tau>(
     chall3: &GenericArray<u8, O::LAMBDABYTES>,
 ) -> Box<GenericArray<<O::BaseParams as BaseParameters>::Field, O::LAMBDAL>>
 where
-    O: PARAMOWF,
+    O: OWFParameters,
     Tau: TauParameters,
 {
     for i in 0..Tau::Tau0::USIZE {

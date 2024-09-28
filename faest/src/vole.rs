@@ -167,9 +167,9 @@ mod test {
     use serde::Deserialize;
 
     use crate::parameter::{
-        BaseParameters, PARAM, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM, PARAM192F,
-        PARAM192FEM, PARAM192S, PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S, PARAM256SEM,
-        PARAMOWF,
+        BaseParameters, OWFParameters, PARAM, PARAM128F, PARAM128FEM, PARAM128S, PARAM128SEM,
+        PARAM192F, PARAM192FEM, PARAM192S, PARAM192SEM, PARAM256F, PARAM256FEM, PARAM256S,
+        PARAM256SEM,
     };
 
     #[derive(Debug, Deserialize)]
@@ -197,7 +197,7 @@ mod test {
                 if data.u.len() == 234 {
                     if data.k0[0] == 12 {
                         let res = volecommit::<
-                            <<<PARAM128S as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                            <<<PARAM128S as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
                             <PARAM128S as PARAM>::Tau,
                             <PARAM128S as PARAM>::LH,
                         >(
@@ -254,7 +254,7 @@ mod test {
                                 .collect()
                         );
                     } else {
-                        let res = volecommit::<<<<PARAM128F as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                        let res = volecommit::<<<<PARAM128F as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
                             <PARAM128F as PARAM>::Tau,
                             <PARAM128F as PARAM>::LH>(
                             GenericArray::from_slice(&data.r),
@@ -312,7 +312,7 @@ mod test {
                         );
                     }
                 } else if data.k0[0] == 12 {
-                    let res = volecommit::<<<<PARAM128SEM as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                    let res = volecommit::<<<<PARAM128SEM as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
                             <PARAM128SEM as PARAM>::Tau,
                             <PARAM128SEM as PARAM>::LH>(
                         GenericArray::from_slice(&data.r),
@@ -370,7 +370,7 @@ mod test {
                     );
                 } else {
                     let res =
-                        volecommit::<<<<PARAM128FEM as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC, <PARAM128FEM as PARAM>::Tau, <PARAM128FEM as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
+                        volecommit::<<<<PARAM128FEM as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <PARAM128FEM as PARAM>::Tau, <PARAM128FEM as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(
@@ -426,7 +426,7 @@ mod test {
                 if data.u.len() == 458 {
                     if data.k0[0] == 12 {
                         let res =
-                            volecommit::<<<<PARAM192S as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC, <PARAM192S as PARAM>::Tau, <PARAM192S as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
+                            volecommit::<<<<PARAM192S as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <PARAM192S as PARAM>::Tau, <PARAM192S as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                         assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                         for i in 0..res.1.len() {
                             assert_eq!(
@@ -479,7 +479,7 @@ mod test {
                         );
                     } else {
                         let res =
-                            volecommit::<<<<PARAM192F as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC, <PARAM192F as PARAM>::Tau, <PARAM192F as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
+                            volecommit::<<<<PARAM192F as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <PARAM192F as PARAM>::Tau, <PARAM192F as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                         assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                         for i in 0..res.1.len() {
                             assert_eq!(
@@ -533,7 +533,7 @@ mod test {
                     }
                 } else if data.k0[0] == 12 {
                     let res =
-                        volecommit::<<<<PARAM192SEM as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC, <PARAM192SEM as PARAM>::Tau, <PARAM192SEM as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
+                        volecommit::<<<<PARAM192SEM as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <PARAM192SEM as PARAM>::Tau, <PARAM192SEM as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(
@@ -586,7 +586,7 @@ mod test {
                     );
                 } else {
                     let res =
-                        volecommit::<<<<PARAM192FEM as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC, <PARAM192FEM as PARAM>::Tau, <PARAM192FEM as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
+                        volecommit::<<<<PARAM192FEM as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <PARAM192FEM as PARAM>::Tau, <PARAM192FEM as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(
@@ -641,7 +641,7 @@ mod test {
             } else if data.u.len() == 566 {
                 if data.k0[0] == 12 {
                     let res = volecommit::<
-                        <<<PARAM256S as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                        <<<PARAM256S as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
                         <PARAM256S as PARAM>::Tau,
                         <PARAM256S as PARAM>::LH,
                     >(GenericArray::from_slice(&data.r), &data.iv);
@@ -697,7 +697,7 @@ mod test {
                     );
                 } else {
                     let res = volecommit::<
-                        <<<PARAM256F as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                        <<<PARAM256F as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
                         <PARAM256F as PARAM>::Tau,
                         <PARAM256F as PARAM>::LH,
                     >(GenericArray::from_slice(&data.r), &data.iv);
@@ -754,7 +754,7 @@ mod test {
                 }
             } else if data.k0[0] == 12 {
                 let res = volecommit::<
-                    <<<PARAM256SEM as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                    <<<PARAM256SEM as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
                     <PARAM256SEM as PARAM>::Tau,
                     <PARAM256SEM as PARAM>::LH,
                 >(GenericArray::from_slice(&data.r), &data.iv);
@@ -810,7 +810,7 @@ mod test {
                 );
             } else {
                 let res = volecommit::<
-                    <<<PARAM256FEM as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                    <<<PARAM256FEM as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
                     <PARAM256FEM as PARAM>::Tau,
                     <PARAM256FEM as PARAM>::LH,
                 >(GenericArray::from_slice(&data.r), &data.iv);
@@ -896,7 +896,7 @@ mod test {
                         })
                         .collect::<Vec<u8>>();
                     let res = volereconstruct::<
-                        <<<PARAM128F as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                        <<<PARAM128F as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
                         <PARAM128F as PARAM>::Tau,
                         <PARAM128F as PARAM>::LH,
                     >(&data.chal, pdecom, &data.iv);
@@ -914,7 +914,7 @@ mod test {
                         })
                         .collect::<Vec<u8>>();
                     let res = volereconstruct::<
-                        <<<PARAM128S as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                        <<<PARAM128S as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
                         <PARAM128S as PARAM>::Tau,
                         <PARAM128S as PARAM>::LH,
                     >(&data.chal, pdecom, &data.iv);
@@ -934,7 +934,7 @@ mod test {
                         })
                         .collect::<Vec<u8>>();
                     let res = volereconstruct::<
-                        <<<PARAM192F as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                        <<<PARAM192F as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
                         <PARAM192F as PARAM>::Tau,
                         <PARAM192F as PARAM>::LH,
                     >(&data.chal, pdecom, &data.iv);
@@ -952,7 +952,7 @@ mod test {
                         })
                         .collect::<Vec<u8>>();
                     let res = volereconstruct::<
-                        <<<PARAM192S as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                        <<<PARAM192S as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
                         <PARAM192S as PARAM>::Tau,
                         <PARAM192S as PARAM>::LH,
                     >(&data.chal, pdecom, &data.iv);
@@ -971,7 +971,7 @@ mod test {
                     })
                     .collect::<Vec<u8>>();
                 let res = volereconstruct::<
-                    <<<PARAM256F as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                    <<<PARAM256F as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
                     <PARAM256F as PARAM>::Tau,
                     <PARAM256F as PARAM>::LH,
                 >(&data.chal, pdecom, &data.iv);
@@ -989,7 +989,7 @@ mod test {
                     })
                     .collect::<Vec<u8>>();
                 let res = volereconstruct::<
-                    <<<PARAM256S as PARAM>::OWF as PARAMOWF>::BaseParams as BaseParameters>::VC,
+                    <<<PARAM256S as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
                     <PARAM256S as PARAM>::Tau,
                     <PARAM256S as PARAM>::LH,
                 >(&data.chal, pdecom, &data.iv);

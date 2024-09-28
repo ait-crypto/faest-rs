@@ -116,11 +116,11 @@ impl BaseParameters for BaseParams256 {
 }
 
 pub(crate) type QSProof<O> = (
-    GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>,
-    GenericArray<u8, <O as PARAMOWF>::LAMBDABYTES>,
+    GenericArray<u8, <O as OWFParameters>::LAMBDABYTES>,
+    GenericArray<u8, <O as OWFParameters>::LAMBDABYTES>,
 );
 
-pub(crate) trait Variant<O: PARAMOWF> {
+pub(crate) trait Variant<O: OWFParameters> {
     fn witness(
         owf_key: &GenericArray<u8, O::LAMBDABYTES>,
         owf_input: &GenericArray<u8, O::InputSize>,
@@ -156,7 +156,7 @@ pub(crate) trait Variant<O: PARAMOWF> {
     fn keygen_with_rng(rng: impl RngCore) -> SecretKey<O>;
 }
 
-pub(crate) trait PARAMOWF {
+pub(crate) trait OWFParameters {
     type BaseParams: BaseParameters<
         Lambda = Self::LAMBDA,
         LambdaBytes = Self::LAMBDABYTES,
@@ -214,9 +214,9 @@ pub(crate) trait PARAMOWF {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PARAMOWF128;
+pub(crate) struct OWF128;
 
-impl PARAMOWF for PARAMOWF128 {
+impl OWFParameters for OWF128 {
     type BaseParams = BaseParams128;
     type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
@@ -301,9 +301,9 @@ impl PARAMOWF for PARAMOWF128 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PARAMOWF192;
+pub(crate) struct OWF192;
 
-impl PARAMOWF for PARAMOWF192 {
+impl OWFParameters for OWF192 {
     type BaseParams = BaseParams192;
     type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
@@ -392,9 +392,9 @@ impl PARAMOWF for PARAMOWF192 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PARAMOWF256;
+pub(crate) struct OWF256;
 
-impl PARAMOWF for PARAMOWF256 {
+impl OWFParameters for OWF256 {
     type BaseParams = BaseParams256;
     type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
@@ -483,9 +483,9 @@ impl PARAMOWF for PARAMOWF256 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PARAMOWF128EM;
+pub(crate) struct OWF128EM;
 
-impl PARAMOWF for PARAMOWF128EM {
+impl OWFParameters for OWF128EM {
     type BaseParams = BaseParams128;
     type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
@@ -573,9 +573,9 @@ impl PARAMOWF for PARAMOWF128EM {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PARAMOWF192EM;
+pub(crate) struct OWF192EM;
 
-impl PARAMOWF for PARAMOWF192EM {
+impl OWFParameters for OWF192EM {
     type BaseParams = BaseParams192;
     type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
@@ -663,9 +663,9 @@ impl PARAMOWF for PARAMOWF192EM {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PARAMOWF256EM;
+pub(crate) struct OWF256EM;
 
-impl PARAMOWF for PARAMOWF256EM {
+impl OWFParameters for OWF256EM {
     type BaseParams = BaseParams256;
     type VoleHasher = VoleHasher<<Self::BaseParams as BaseParameters>::Field>;
 
@@ -846,7 +846,7 @@ impl TauParameters for Tau256Fast {
 }
 
 pub(crate) trait PARAM {
-    type OWF: PARAMOWF;
+    type OWF: OWFParameters;
     type Cypher: Variant<Self::OWF>;
     type Tau: TauParameters;
 
@@ -862,7 +862,7 @@ pub(crate) trait PARAM {
 pub(crate) struct PARAM128S;
 
 impl PARAM for PARAM128S {
-    type OWF = PARAMOWF128;
+    type OWF = OWF128;
     type Tau = Tau128Small;
 
     type BETA = U1;
@@ -885,7 +885,7 @@ impl PARAM for PARAM128S {
 pub(crate) struct PARAM128F;
 
 impl PARAM for PARAM128F {
-    type OWF = PARAMOWF128;
+    type OWF = OWF128;
     type Tau = Tau128Fast;
 
     type BETA = U1;
@@ -908,7 +908,7 @@ impl PARAM for PARAM128F {
 pub(crate) struct PARAM192S;
 
 impl PARAM for PARAM192S {
-    type OWF = PARAMOWF192;
+    type OWF = OWF192;
     type Tau = Tau192Small;
 
     type BETA = U2;
@@ -931,7 +931,7 @@ impl PARAM for PARAM192S {
 pub(crate) struct PARAM192F;
 
 impl PARAM for PARAM192F {
-    type OWF = PARAMOWF192;
+    type OWF = OWF192;
     type Tau = Tau192Fast;
 
     type BETA = U2;
@@ -954,7 +954,7 @@ impl PARAM for PARAM192F {
 pub(crate) struct PARAM256S;
 
 impl PARAM for PARAM256S {
-    type OWF = PARAMOWF256;
+    type OWF = OWF256;
     type Tau = Tau256Small;
 
     type BETA = U2;
@@ -977,7 +977,7 @@ impl PARAM for PARAM256S {
 pub(crate) struct PARAM256F;
 
 impl PARAM for PARAM256F {
-    type OWF = PARAMOWF256;
+    type OWF = OWF256;
     type Tau = Tau256Fast;
 
     type BETA = U2;
@@ -1000,7 +1000,7 @@ impl PARAM for PARAM256F {
 pub(crate) struct PARAM128SEM;
 
 impl PARAM for PARAM128SEM {
-    type OWF = PARAMOWF128EM;
+    type OWF = OWF128EM;
     type Tau = Tau128Small;
 
     type BETA = U1;
@@ -1023,7 +1023,7 @@ impl PARAM for PARAM128SEM {
 pub(crate) struct PARAM128FEM;
 
 impl PARAM for PARAM128FEM {
-    type OWF = PARAMOWF128EM;
+    type OWF = OWF128EM;
     type Tau = Tau128Fast;
 
     type BETA = U1;
@@ -1046,7 +1046,7 @@ impl PARAM for PARAM128FEM {
 pub(crate) struct PARAM192SEM;
 
 impl PARAM for PARAM192SEM {
-    type OWF = PARAMOWF192EM;
+    type OWF = OWF192EM;
     type Tau = Tau192Small;
 
     type BETA = U2;
@@ -1069,7 +1069,7 @@ impl PARAM for PARAM192SEM {
 pub(crate) struct PARAM192FEM;
 
 impl PARAM for PARAM192FEM {
-    type OWF = PARAMOWF192EM;
+    type OWF = OWF192EM;
 
     type Tau = Tau192Fast;
 
@@ -1093,7 +1093,7 @@ impl PARAM for PARAM192FEM {
 pub(crate) struct PARAM256SEM;
 
 impl PARAM for PARAM256SEM {
-    type OWF = PARAMOWF256EM;
+    type OWF = OWF256EM;
 
     type Tau = Tau256Small;
 
@@ -1117,7 +1117,7 @@ impl PARAM for PARAM256SEM {
 pub(crate) struct PARAM256FEM;
 
 impl PARAM for PARAM256FEM {
-    type OWF = PARAMOWF256EM;
+    type OWF = OWF256EM;
 
     type Tau = Tau256Fast;
 
@@ -1140,9 +1140,9 @@ impl PARAM for PARAM256FEM {
 
 pub(crate) struct AesCypher<OWF>(PhantomData<OWF>)
 where
-    OWF: PARAMOWF;
+    OWF: OWFParameters;
 
-impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
+impl<OWF: OWFParameters> Variant<OWF> for AesCypher<OWF> {
     fn witness(
         owf_key: &GenericArray<u8, OWF::LAMBDABYTES>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
@@ -1206,9 +1206,9 @@ impl<OWF: PARAMOWF> Variant<OWF> for AesCypher<OWF> {
 
 pub(crate) struct EmCypher<OWF>(PhantomData<OWF>)
 where
-    OWF: PARAMOWF;
+    OWF: OWFParameters;
 
-impl<OWF: PARAMOWF> Variant<OWF> for EmCypher<OWF> {
+impl<OWF: OWFParameters> Variant<OWF> for EmCypher<OWF> {
     fn witness(
         owf_key: &GenericArray<u8, OWF::LAMBDABYTES>,
         owf_input: &GenericArray<u8, OWF::InputSize>,
@@ -1315,38 +1315,38 @@ mod test {
         }
     }
 
-    fn test_parameters_owf<O: PARAMOWF>() {
+    fn test_parameters_owf<O: OWFParameters>() {
         assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LAMBDABYTES::USIZE);
         assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::OutputSize::USIZE);
     }
 
     #[test]
     fn test_parameters_owf_128() {
-        test_parameters_owf::<PARAMOWF128>();
+        test_parameters_owf::<OWF128>();
     }
 
     #[test]
     fn test_parameters_owf_192() {
-        test_parameters_owf::<PARAMOWF192>();
+        test_parameters_owf::<OWF192>();
     }
 
     #[test]
     fn test_parameters_owf_256() {
-        test_parameters_owf::<PARAMOWF256>();
+        test_parameters_owf::<OWF256>();
     }
 
     #[test]
     fn test_parameters_owf_128em() {
-        test_parameters_owf::<PARAMOWF128EM>();
+        test_parameters_owf::<OWF128EM>();
     }
 
     #[test]
     fn test_parameters_owf_192em() {
-        test_parameters_owf::<PARAMOWF192EM>();
+        test_parameters_owf::<OWF192EM>();
     }
 
     #[test]
     fn test_parameters_owf_256em() {
-        test_parameters_owf::<PARAMOWF256EM>();
+        test_parameters_owf::<OWF256EM>();
     }
 }
