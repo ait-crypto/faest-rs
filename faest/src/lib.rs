@@ -1,13 +1,13 @@
 //! FAEST digital signature scheme
 
-use generic_array::GenericArray;
+use generic_array::{typenum::Unsigned, GenericArray};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "randomized-signer")]
 use signature::RandomizedSigner;
 pub use signature::{self, Error};
-use signature::{Keypair, Signer, Verifier};
+use signature::{Keypair, SignatureEncoding, Signer, Verifier};
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
@@ -202,6 +202,47 @@ macro_rules! define_impl {
                 msg: &[u8],
             ) -> Result<Box<$sig>, Error> {
                 self.0.try_sign_with_rng(rng, msg)
+            }
+        }
+
+        impl AsRef<[u8]> for $sig {
+            fn as_ref(&self) -> &[u8] {
+                &self.0
+            }
+        }
+
+        impl TryFrom<&[u8]> for $sig {
+            type Error = Error;
+
+            fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+                GenericArray::try_from_slice(value)
+                    .map_err(|_| Error::new())
+                    .map(|arr| Self(arr.clone()))
+            }
+        }
+
+        impl From<$sig> for [u8; <$param as PARAM>::SIG::USIZE] {
+            fn from(value: $sig) -> Self {
+                value.to_bytes()
+            }
+        }
+
+        impl SignatureEncoding for $sig {
+            type Repr = [u8; <$param as PARAM>::SIG::USIZE];
+
+            fn to_bytes(&self) -> Self::Repr {
+                // NOTE: this could be done with Into if it would be supported
+                let mut ret = [0; <$param as PARAM>::SIG::USIZE];
+                ret.copy_from_slice(self.0.as_slice());
+                ret
+            }
+
+            fn to_vec(&self) -> Vec<u8> {
+                self.0.to_vec()
+            }
+
+            fn encoded_len(&self) -> usize {
+                <$param as PARAM>::SIG::USIZE
             }
         }
     };
