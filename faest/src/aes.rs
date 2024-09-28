@@ -1013,7 +1013,7 @@ mod test {
     use crate::{
         fields::{large_fields::NewFromU128, BigGaloisField, GF128, GF192, GF256},
         parameter::{
-            FAEST128SParameters, FAEST192SParameters, FAEST256SParameters, OWFParameters, OWF128,
+            FAEST128sParameters, FAEST192sParameters, FAEST256sParameters, OWFParameters, OWF128,
             OWF192, OWF256, PARAM,
         },
     };
@@ -1883,7 +1883,7 @@ mod test {
                 .expect("error while reading or parsing");
         for data in database {
             if data.lambda == 128 {
-                let out = aes_verify::<OWF128, <FAEST128SParameters as PARAM>::Tau>(
+                let out = aes_verify::<OWF128, <FAEST128sParameters as PARAM>::Tau>(
                     GenericArray::from_slice(&data.d[..]),
                     GenericArray::from_slice(
                         &data
@@ -1903,7 +1903,7 @@ mod test {
                     GF128::from(&out[..])
                 );
             } else if data.lambda == 192 {
-                let out = aes_verify::<OWF192, <FAEST192SParameters as PARAM>::Tau>(
+                let out = aes_verify::<OWF192, <FAEST192sParameters as PARAM>::Tau>(
                     GenericArray::from_slice(&data.d[..]),
                     GenericArray::from_slice(
                         &data
@@ -1926,7 +1926,7 @@ mod test {
                     GF192::from(&out[..])
                 );
             } else {
-                let out = aes_verify::<OWF256, <FAEST256SParameters as PARAM>::Tau>(
+                let out = aes_verify::<OWF256, <FAEST256sParameters as PARAM>::Tau>(
                     GenericArray::from_slice(&data.d[..]),
                     GenericArray::from_slice(
                         &data

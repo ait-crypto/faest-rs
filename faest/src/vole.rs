@@ -167,10 +167,10 @@ mod test {
     use serde::Deserialize;
 
     use crate::parameter::{
-        BaseParameters, FAEST128FParameters, FAEST128SParameters, FAEST192FParameters,
-        FAEST192SParameters, FAEST256FParameters, FAEST256SParameters, FAESTEM128FParameters,
-        FAESTEM128SParameters, FAESTEM192FParameters, FAESTEM192SParameters, FAESTEM256FParameters,
-        FAESTEM256SParameters, OWFParameters, PARAM,
+        BaseParameters, FAEST128fParameters, FAEST128sParameters, FAEST192fParameters,
+        FAEST192sParameters, FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters,
+        FAESTEM128sParameters, FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters,
+        FAESTEM256sParameters, OWFParameters, PARAM,
     };
 
     #[derive(Debug, Deserialize)]
@@ -198,9 +198,9 @@ mod test {
                 if data.u.len() == 234 {
                     if data.k0[0] == 12 {
                         let res = volecommit::<
-                            <<<FAEST128SParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
-                            <FAEST128SParameters as PARAM>::Tau,
-                            <FAEST128SParameters as PARAM>::LH,
+                            <<<FAEST128sParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
+                            <FAEST128sParameters as PARAM>::Tau,
+                            <FAEST128sParameters as PARAM>::LH,
                         >(
                             GenericArray::from_slice(&data.r), &data.iv
                         );
@@ -255,9 +255,9 @@ mod test {
                                 .collect()
                         );
                     } else {
-                        let res = volecommit::<<<<FAEST128FParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
-                            <FAEST128FParameters as PARAM>::Tau,
-                            <FAEST128FParameters as PARAM>::LH>(
+                        let res = volecommit::<<<<FAEST128fParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
+                            <FAEST128fParameters as PARAM>::Tau,
+                            <FAEST128fParameters as PARAM>::LH>(
                             GenericArray::from_slice(&data.r),
                             &data.iv,
                         );
@@ -313,9 +313,9 @@ mod test {
                         );
                     }
                 } else if data.k0[0] == 12 {
-                    let res = volecommit::<<<<FAESTEM128SParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
-                            <FAESTEM128SParameters as PARAM>::Tau,
-                            <FAESTEM128SParameters as PARAM>::LH>(
+                    let res = volecommit::<<<<FAESTEM128sParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
+                            <FAESTEM128sParameters as PARAM>::Tau,
+                            <FAESTEM128sParameters as PARAM>::LH>(
                         GenericArray::from_slice(&data.r),
                         &data.iv,
                     );
@@ -371,7 +371,7 @@ mod test {
                     );
                 } else {
                     let res =
-                        volecommit::<<<<FAESTEM128FParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <FAESTEM128FParameters as PARAM>::Tau, <FAESTEM128FParameters as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
+                        volecommit::<<<<FAESTEM128fParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <FAESTEM128fParameters as PARAM>::Tau, <FAESTEM128fParameters as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(
@@ -427,7 +427,7 @@ mod test {
                 if data.u.len() == 458 {
                     if data.k0[0] == 12 {
                         let res =
-                            volecommit::<<<<FAEST192SParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <FAEST192SParameters as PARAM>::Tau, <FAEST192SParameters as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
+                            volecommit::<<<<FAEST192sParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <FAEST192sParameters as PARAM>::Tau, <FAEST192sParameters as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                         assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                         for i in 0..res.1.len() {
                             assert_eq!(
@@ -480,7 +480,7 @@ mod test {
                         );
                     } else {
                         let res =
-                            volecommit::<<<<FAEST192FParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <FAEST192FParameters as PARAM>::Tau, <FAEST192FParameters as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
+                            volecommit::<<<<FAEST192fParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <FAEST192fParameters as PARAM>::Tau, <FAEST192fParameters as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                         assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                         for i in 0..res.1.len() {
                             assert_eq!(
@@ -534,7 +534,7 @@ mod test {
                     }
                 } else if data.k0[0] == 12 {
                     let res =
-                        volecommit::<<<<FAESTEM192SParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <FAESTEM192SParameters as PARAM>::Tau, <FAESTEM192SParameters as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
+                        volecommit::<<<<FAESTEM192sParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <FAESTEM192sParameters as PARAM>::Tau, <FAESTEM192sParameters as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(
@@ -587,7 +587,7 @@ mod test {
                     );
                 } else {
                     let res =
-                        volecommit::<<<<FAESTEM192FParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <FAESTEM192FParameters as PARAM>::Tau, <FAESTEM192FParameters as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
+                        volecommit::<<<<FAESTEM192fParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC, <FAESTEM192fParameters as PARAM>::Tau, <FAESTEM192fParameters as PARAM>::LH>(GenericArray::from_slice(&data.r), &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(
@@ -642,9 +642,9 @@ mod test {
             } else if data.u.len() == 566 {
                 if data.k0[0] == 12 {
                     let res = volecommit::<
-                        <<<FAEST256SParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
-                        <FAEST256SParameters as PARAM>::Tau,
-                        <FAEST256SParameters as PARAM>::LH,
+                        <<<FAEST256sParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
+                        <FAEST256sParameters as PARAM>::Tau,
+                        <FAEST256sParameters as PARAM>::LH,
                     >(GenericArray::from_slice(&data.r), &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
@@ -698,9 +698,9 @@ mod test {
                     );
                 } else {
                     let res = volecommit::<
-                        <<<FAEST256FParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
-                        <FAEST256FParameters as PARAM>::Tau,
-                        <FAEST256FParameters as PARAM>::LH,
+                        <<<FAEST256fParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
+                        <FAEST256fParameters as PARAM>::Tau,
+                        <FAEST256fParameters as PARAM>::LH,
                     >(GenericArray::from_slice(&data.r), &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
@@ -755,9 +755,9 @@ mod test {
                 }
             } else if data.k0[0] == 12 {
                 let res = volecommit::<
-                    <<<FAESTEM256SParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
-                    <FAESTEM256SParameters as PARAM>::Tau,
-                    <FAESTEM256SParameters as PARAM>::LH,
+                    <<<FAESTEM256sParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
+                    <FAESTEM256sParameters as PARAM>::Tau,
+                    <FAESTEM256sParameters as PARAM>::LH,
                 >(GenericArray::from_slice(&data.r), &data.iv);
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
@@ -811,9 +811,9 @@ mod test {
                 );
             } else {
                 let res = volecommit::<
-                    <<<FAESTEM256FParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
-                    <FAESTEM256FParameters as PARAM>::Tau,
-                    <FAESTEM256FParameters as PARAM>::LH,
+                    <<<FAESTEM256fParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
+                    <FAESTEM256fParameters as PARAM>::Tau,
+                    <FAESTEM256fParameters as PARAM>::LH,
                 >(GenericArray::from_slice(&data.r), &data.iv);
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
@@ -897,9 +897,9 @@ mod test {
                         })
                         .collect::<Vec<u8>>();
                     let res = volereconstruct::<
-                        <<<FAEST128FParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
-                        <FAEST128FParameters as PARAM>::Tau,
-                        <FAEST128FParameters as PARAM>::LH,
+                        <<<FAEST128fParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
+                        <FAEST128fParameters as PARAM>::Tau,
+                        <FAEST128fParameters as PARAM>::LH,
                     >(&data.chal, pdecom, &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
@@ -915,9 +915,9 @@ mod test {
                         })
                         .collect::<Vec<u8>>();
                     let res = volereconstruct::<
-                        <<<FAEST128SParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
-                        <FAEST128SParameters as PARAM>::Tau,
-                        <FAEST128SParameters as PARAM>::LH,
+                        <<<FAEST128sParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
+                        <FAEST128sParameters as PARAM>::Tau,
+                        <FAEST128sParameters as PARAM>::LH,
                     >(&data.chal, pdecom, &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
@@ -935,9 +935,9 @@ mod test {
                         })
                         .collect::<Vec<u8>>();
                     let res = volereconstruct::<
-                        <<<FAEST192FParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
-                        <FAEST192FParameters as PARAM>::Tau,
-                        <FAEST192FParameters as PARAM>::LH,
+                        <<<FAEST192fParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
+                        <FAEST192fParameters as PARAM>::Tau,
+                        <FAEST192fParameters as PARAM>::LH,
                     >(&data.chal, pdecom, &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
@@ -953,9 +953,9 @@ mod test {
                         })
                         .collect::<Vec<u8>>();
                     let res = volereconstruct::<
-                        <<<FAEST192SParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
-                        <FAEST192SParameters as PARAM>::Tau,
-                        <FAEST192SParameters as PARAM>::LH,
+                        <<<FAEST192sParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
+                        <FAEST192sParameters as PARAM>::Tau,
+                        <FAEST192sParameters as PARAM>::LH,
                     >(&data.chal, pdecom, &data.iv);
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
@@ -972,9 +972,9 @@ mod test {
                     })
                     .collect::<Vec<u8>>();
                 let res = volereconstruct::<
-                    <<<FAEST256FParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
-                    <FAEST256FParameters as PARAM>::Tau,
-                    <FAEST256FParameters as PARAM>::LH,
+                    <<<FAEST256fParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
+                    <FAEST256fParameters as PARAM>::Tau,
+                    <FAEST256fParameters as PARAM>::LH,
                 >(&data.chal, pdecom, &data.iv);
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
@@ -990,9 +990,9 @@ mod test {
                     })
                     .collect::<Vec<u8>>();
                 let res = volereconstruct::<
-                    <<<FAEST256SParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
-                    <FAEST256SParameters as PARAM>::Tau,
-                    <FAEST256SParameters as PARAM>::LH,
+                    <<<FAEST256sParameters as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC,
+                    <FAEST256sParameters as PARAM>::Tau,
+                    <FAEST256sParameters as PARAM>::LH,
                 >(&data.chal, pdecom, &data.iv);
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {

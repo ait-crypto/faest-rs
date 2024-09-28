@@ -1,7 +1,9 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
 use generic_array::{typenum::Unsigned, GenericArray};
+use paste::paste;
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -28,9 +30,9 @@ mod vole;
 use crate::{
     faest::{faest_keygen, faest_sign, faest_verify, PublicKey, SecretKey},
     parameter::{
-        FAEST128FParameters, FAEST128SParameters, FAEST192FParameters, FAEST192SParameters,
-        FAEST256FParameters, FAEST256SParameters, FAESTEM128FParameters, FAESTEM128SParameters,
-        FAESTEM192FParameters, FAESTEM192SParameters, FAESTEM256FParameters, FAESTEM256SParameters,
+        FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
+        FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters, FAESTEM128sParameters,
+        FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters, FAESTEM256sParameters,
         OWFParameters, PARAM,
     },
 };
@@ -60,313 +62,236 @@ where
 }
 
 macro_rules! define_impl {
-    ($param:ident, $sk:ident, $vk:ident, $kp:ident, $sig:ident) => {
-        #[derive(Debug, Clone)]
-        #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
-        #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-        pub struct $sk(SecretKey<<$param as PARAM>::OWF>);
+    ($param:ident) => {
+        paste! {
+            #[doc = "Signing key for " $param]
+            #[derive(Debug, Clone)]
+            #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
+            #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+            pub struct [<$param SigningKey>](SecretKey<<[<$param Parameters>] as PARAM>::OWF>);
 
-        #[derive(Debug, Clone, PartialEq, Eq)]
-        #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-        pub struct $vk(PublicKey<<$param as PARAM>::OWF>);
+            #[doc = "Verification key for " $param]
+            #[derive(Debug, Clone, PartialEq, Eq)]
+            #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+            pub struct [<$param VerificationKey>](PublicKey<<[<$param Parameters>] as PARAM>::OWF>);
 
-        #[derive(Debug, Clone)]
-        #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
-        pub struct $kp($sk, #[cfg_attr(feature = "zeroize", zeroize(skip))] $vk);
+            #[doc = "Keypair for " $param]
+            #[derive(Debug, Clone)]
+            #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
+            pub struct [<$param KeyPair>]([<$param SigningKey>], #[cfg_attr(feature = "zeroize", zeroize(skip))] [<$param VerificationKey>]);
 
-        impl Keypair for $sk {
-            type VerifyingKey = $vk;
+            impl Keypair for [<$param SigningKey>] {
+                type VerifyingKey = [<$param VerificationKey>];
 
-            fn verifying_key(&self) -> Self::VerifyingKey {
-                $vk(self.0.as_public_key())
-            }
-        }
-
-        impl Keypair for $kp {
-            type VerifyingKey = $vk;
-
-            fn verifying_key(&self) -> Self::VerifyingKey {
-                self.1.clone()
-            }
-        }
-
-        impl AsRef<$sk> for $kp {
-            fn as_ref(&self) -> &$sk {
-                &self.0
-            }
-        }
-
-        impl AsRef<$vk> for $kp {
-            fn as_ref(&self) -> &$vk {
-                &self.1
-            }
-        }
-
-        impl KeypairGenerator for $sk {
-            fn generate<R>(rng: R) -> Self
-            where
-                R: CryptoRngCore,
-            {
-                Self(faest_keygen::<$param, R>(rng))
-            }
-        }
-
-        impl KeypairGenerator for $kp {
-            fn generate<R>(rng: R) -> Self
-            where
-                R: CryptoRngCore,
-            {
-                let sk = faest_keygen::<$param, R>(rng);
-                let pk = sk.as_public_key();
-                Self($sk(sk), $vk(pk))
-            }
-        }
-
-        #[derive(Debug, Clone, PartialEq, Eq)]
-        #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-        pub struct $sig(GenericArray<u8, <$param as PARAM>::SIG>);
-
-        impl Signer<$sig> for $sk {
-            fn try_sign(&self, msg: &[u8]) -> Result<$sig, Error> {
-                let mut signature = GenericArray::default();
-                faest_sign::<$param>(msg, &self.0, &[], &mut signature);
-                Ok($sig(signature))
-            }
-        }
-
-        impl Signer<Box<$sig>> for $sk {
-            fn try_sign(&self, msg: &[u8]) -> Result<Box<$sig>, Error> {
-                let mut signature = Box::new($sig(GenericArray::default()));
-                faest_sign::<$param>(msg, &self.0, &[], &mut signature.0);
-                Ok(signature)
-            }
-        }
-
-        impl Verifier<$sig> for $vk {
-            fn verify(&self, msg: &[u8], signature: &$sig) -> Result<(), Error> {
-                faest_verify::<$param>(msg, &self.0, &signature.0)
-            }
-        }
-
-        impl Verifier<SignatureRef<'_>> for $vk {
-            fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
-                GenericArray::try_from_slice(signature.0)
-                    .map_err(|_| Error::new())
-                    .and_then(|sig| faest_verify::<$param>(msg, &self.0, sig))
-            }
-        }
-
-        #[cfg(feature = "randomized-signer")]
-        impl RandomizedSigner<$sig> for $sk {
-            fn try_sign_with_rng(
-                &self,
-                rng: &mut impl CryptoRngCore,
-                msg: &[u8],
-            ) -> Result<$sig, Error> {
-                let mut rho = GenericArray::<
-                    u8,
-                    <<$param as PARAM>::OWF as OWFParameters>::LAMBDABYTES,
-                >::default();
-                rng.fill_bytes(&mut rho);
-                let mut signature = GenericArray::default();
-                faest_sign::<$param>(msg, &self.0, &rho, &mut signature);
-                Ok($sig(signature))
-            }
-        }
-
-        #[cfg(feature = "randomized-signer")]
-        impl RandomizedSigner<Box<$sig>> for $sk {
-            fn try_sign_with_rng(
-                &self,
-                rng: &mut impl CryptoRngCore,
-                msg: &[u8],
-            ) -> Result<Box<$sig>, Error> {
-                let mut rho = GenericArray::<
-                    u8,
-                    <<$param as PARAM>::OWF as OWFParameters>::LAMBDABYTES,
-                >::default();
-                rng.fill_bytes(&mut rho);
-                let mut signature = Box::new($sig(GenericArray::default()));
-                faest_sign::<$param>(msg, &self.0, &rho, &mut signature.0);
-                Ok(signature)
-            }
-        }
-
-        impl Signer<$sig> for $kp {
-            fn try_sign(&self, msg: &[u8]) -> Result<$sig, Error> {
-                self.0.try_sign(msg)
-            }
-        }
-
-        impl Signer<Box<$sig>> for $kp {
-            fn try_sign(&self, msg: &[u8]) -> Result<Box<$sig>, Error> {
-                self.0.try_sign(msg)
-            }
-        }
-
-        impl Verifier<$sig> for $kp {
-            fn verify(&self, msg: &[u8], signature: &$sig) -> Result<(), Error> {
-                self.1.verify(msg, signature)
-            }
-        }
-
-        #[cfg(feature = "randomized-signer")]
-        impl RandomizedSigner<$sig> for $kp {
-            fn try_sign_with_rng(
-                &self,
-                rng: &mut impl CryptoRngCore,
-                msg: &[u8],
-            ) -> Result<$sig, Error> {
-                self.0.try_sign_with_rng(rng, msg)
-            }
-        }
-
-        #[cfg(feature = "randomized-signer")]
-        impl RandomizedSigner<Box<$sig>> for $kp {
-            fn try_sign_with_rng(
-                &self,
-                rng: &mut impl CryptoRngCore,
-                msg: &[u8],
-            ) -> Result<Box<$sig>, Error> {
-                self.0.try_sign_with_rng(rng, msg)
-            }
-        }
-
-        impl AsRef<[u8]> for $sig {
-            fn as_ref(&self) -> &[u8] {
-                &self.0
-            }
-        }
-
-        impl TryFrom<&[u8]> for $sig {
-            type Error = Error;
-
-            fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-                GenericArray::try_from_slice(value)
-                    .map_err(|_| Error::new())
-                    .map(|arr| Self(arr.clone()))
-            }
-        }
-
-        impl From<$sig> for [u8; <$param as PARAM>::SIG::USIZE] {
-            fn from(value: $sig) -> Self {
-                value.to_bytes()
-            }
-        }
-
-        impl SignatureEncoding for $sig {
-            type Repr = [u8; <$param as PARAM>::SIG::USIZE];
-
-            fn to_bytes(&self) -> Self::Repr {
-                // NOTE: this could be done with Into if it would be supported
-                let mut ret = [0; <$param as PARAM>::SIG::USIZE];
-                ret.copy_from_slice(self.0.as_slice());
-                ret
+                fn verifying_key(&self) -> Self::VerifyingKey {
+                    [<$param VerificationKey>](self.0.as_public_key())
+                }
             }
 
-            fn to_vec(&self) -> Vec<u8> {
-                self.0.to_vec()
+            impl Keypair for [<$param KeyPair>] {
+                type VerifyingKey = [<$param VerificationKey>];
+
+                fn verifying_key(&self) -> Self::VerifyingKey {
+                    self.1.clone()
+                }
             }
 
-            fn encoded_len(&self) -> usize {
-                <$param as PARAM>::SIG::USIZE
+            impl AsRef<[<$param SigningKey>]> for [<$param KeyPair>] {
+                fn as_ref(&self) -> &[<$param SigningKey>] {
+                    &self.0
+                }
+            }
+
+            impl AsRef<[<$param VerificationKey>]> for [<$param KeyPair>] {
+                fn as_ref(&self) -> &[<$param VerificationKey>] {
+                    &self.1
+                }
+            }
+
+            impl KeypairGenerator for [<$param SigningKey>] {
+                fn generate<R>(rng: R) -> Self
+                where
+                    R: CryptoRngCore,
+                {
+                    Self(faest_keygen::<[<$param Parameters>], R>(rng))
+                }
+            }
+
+            impl KeypairGenerator for [<$param KeyPair>] {
+                fn generate<R>(rng: R) -> Self
+                where
+                    R: CryptoRngCore,
+                {
+                    let sk = faest_keygen::<[<$param Parameters>], R>(rng);
+                    let pk = sk.as_public_key();
+                    Self([<$param SigningKey>](sk), [<$param VerificationKey>](pk))
+                }
+            }
+
+            #[doc = "Signature for " $param]
+            #[derive(Debug, Clone, PartialEq, Eq)]
+            #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+            pub struct [<$param Signature>](GenericArray<u8, <[<$param Parameters>] as PARAM>::SIG>);
+
+            impl Signer<[<$param Signature>]> for [<$param SigningKey>] {
+                fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
+                    let mut signature = GenericArray::default();
+                    faest_sign::<[<$param Parameters>]>(msg, &self.0, &[], &mut signature);
+                    Ok([<$param Signature>](signature))
+                }
+            }
+
+            impl Signer<Box<[<$param Signature>]>> for [<$param SigningKey>] {
+                fn try_sign(&self, msg: &[u8]) -> Result<Box<[<$param Signature>]>, Error> {
+                    let mut signature = Box::new([<$param Signature>](GenericArray::default()));
+                    faest_sign::<[<$param Parameters>]>(msg, &self.0, &[], &mut signature.0);
+                    Ok(signature)
+                }
+            }
+
+            impl Verifier<[<$param Signature>]> for [<$param VerificationKey>] {
+                fn verify(&self, msg: &[u8], signature: &[<$param Signature>]) -> Result<(), Error> {
+                    faest_verify::<[<$param Parameters>]>(msg, &self.0, &signature.0)
+                }
+            }
+
+            impl Verifier<SignatureRef<'_>> for [<$param VerificationKey>] {
+                fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
+                    GenericArray::try_from_slice(signature.0)
+                        .map_err(|_| Error::new())
+                        .and_then(|sig| faest_verify::<[<$param Parameters>]>(msg, &self.0, sig))
+                }
+            }
+
+            #[cfg(feature = "randomized-signer")]
+            impl RandomizedSigner<[<$param Signature>]> for [<$param SigningKey>] {
+                fn try_sign_with_rng(
+                    &self,
+                    rng: &mut impl CryptoRngCore,
+                    msg: &[u8],
+                ) -> Result<[<$param Signature>], Error> {
+                    let mut rho = GenericArray::<
+                        u8,
+                        <<[<$param Parameters>] as PARAM>::OWF as OWFParameters>::LAMBDABYTES,
+                    >::default();
+                    rng.fill_bytes(&mut rho);
+                    let mut signature = GenericArray::default();
+                    faest_sign::<[<$param Parameters>]>(msg, &self.0, &rho, &mut signature);
+                    Ok([<$param Signature>](signature))
+                }
+            }
+
+            #[cfg(feature = "randomized-signer")]
+            impl RandomizedSigner<Box<[<$param Signature>]>> for [<$param SigningKey>] {
+                fn try_sign_with_rng(
+                    &self,
+                    rng: &mut impl CryptoRngCore,
+                    msg: &[u8],
+                ) -> Result<Box<[<$param Signature>]>, Error> {
+                    let mut rho = GenericArray::<
+                        u8,
+                        <<[<$param Parameters>] as PARAM>::OWF as OWFParameters>::LAMBDABYTES,
+                    >::default();
+                    rng.fill_bytes(&mut rho);
+                    let mut signature = Box::new([<$param Signature>](GenericArray::default()));
+                    faest_sign::<[<$param Parameters>]>(msg, &self.0, &rho, &mut signature.0);
+                    Ok(signature)
+                }
+            }
+
+            impl Signer<[<$param Signature>]> for [<$param KeyPair>] {
+                fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
+                    self.0.try_sign(msg)
+                }
+            }
+
+            impl Signer<Box<[<$param Signature>]>> for [<$param KeyPair>] {
+                fn try_sign(&self, msg: &[u8]) -> Result<Box<[<$param Signature>]>, Error> {
+                    self.0.try_sign(msg)
+                }
+            }
+
+            impl Verifier<[<$param Signature>]> for [<$param KeyPair>] {
+                fn verify(&self, msg: &[u8], signature: &[<$param Signature>]) -> Result<(), Error> {
+                    self.1.verify(msg, signature)
+                }
+            }
+
+            #[cfg(feature = "randomized-signer")]
+            impl RandomizedSigner<[<$param Signature>]> for [<$param KeyPair>] {
+                fn try_sign_with_rng(
+                    &self,
+                    rng: &mut impl CryptoRngCore,
+                    msg: &[u8],
+                ) -> Result<[<$param Signature>], Error> {
+                    self.0.try_sign_with_rng(rng, msg)
+                }
+            }
+
+            #[cfg(feature = "randomized-signer")]
+            impl RandomizedSigner<Box<[<$param Signature>]>> for [<$param KeyPair>] {
+                fn try_sign_with_rng(
+                    &self,
+                    rng: &mut impl CryptoRngCore,
+                    msg: &[u8],
+                ) -> Result<Box<[<$param Signature>]>, Error> {
+                    self.0.try_sign_with_rng(rng, msg)
+                }
+            }
+
+            impl AsRef<[u8]> for [<$param Signature>] {
+                fn as_ref(&self) -> &[u8] {
+                    &self.0
+                }
+            }
+
+            impl TryFrom<&[u8]> for [<$param Signature>] {
+                type Error = Error;
+
+                fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+                    GenericArray::try_from_slice(value)
+                        .map_err(|_| Error::new())
+                        .map(|arr| Self(arr.clone()))
+                }
+            }
+
+            impl From<[<$param Signature>]> for [u8; <[<$param Parameters>] as PARAM>::SIG::USIZE] {
+                fn from(value: [<$param Signature>]) -> Self {
+                    value.to_bytes()
+                }
+            }
+
+            impl SignatureEncoding for [<$param Signature>] {
+                type Repr = [u8; <[<$param Parameters>] as PARAM>::SIG::USIZE];
+
+                fn to_bytes(&self) -> Self::Repr {
+                    // NOTE: this could be done with Into if it would be supported
+                    let mut ret = [0; <[<$param Parameters>] as PARAM>::SIG::USIZE];
+                    ret.copy_from_slice(self.0.as_slice());
+                    ret
+                }
+
+                fn to_vec(&self) -> Vec<u8> {
+                    self.0.to_vec()
+                }
+
+                fn encoded_len(&self) -> usize {
+                    <[<$param Parameters>] as PARAM>::SIG::USIZE
+                }
             }
         }
     };
 }
 
-define_impl!(
-    FAEST128FParameters,
-    FAEST128fSigningKey,
-    FAEST128fVerificationKey,
-    FAEST128fKeyPair,
-    FAEST128fSignature
-);
-
-define_impl!(
-    FAEST128SParameters,
-    FAEST128sSigningKey,
-    FAEST128sVerificationKey,
-    FAEST128sKeyPair,
-    FAEST128sSignature
-);
-
-define_impl!(
-    FAEST192FParameters,
-    FAEST192fSigningKey,
-    FAEST192fVerificationKey,
-    FAEST192fKeyPair,
-    FAEST192fSignature
-);
-
-define_impl!(
-    FAEST192SParameters,
-    FAEST192sSigningKey,
-    FAEST192sVerificationKey,
-    FAEST192sKeyPair,
-    FAEST192sSignature
-);
-
-define_impl!(
-    FAEST256FParameters,
-    FAEST256fSigningKey,
-    FAEST256fVerificationKey,
-    FAEST256fKeyPair,
-    FAEST256fSignature
-);
-
-define_impl!(
-    FAEST256SParameters,
-    FAEST256sSigningKey,
-    FAEST256sVerificationKey,
-    FAEST256sKeyPair,
-    FAEST256sSignature
-);
-
-define_impl!(
-    FAESTEM128FParameters,
-    FAEST128EMfSigningKey,
-    FAEST128EMfVerificationKey,
-    FAEST128EMfKeyPair,
-    FAEST128EMfSignature
-);
-
-define_impl!(
-    FAESTEM128SParameters,
-    FAEST128EMsSigningKey,
-    FAEST128EMsVerificationKey,
-    FAEST128EMsKeyPair,
-    FAEST128EMsSignature
-);
-
-define_impl!(
-    FAESTEM192FParameters,
-    FAEST192EMfSigningKey,
-    FAEST192EMfVerificationKey,
-    FAEST192EMfKeyPair,
-    FAEST192EMfSignature
-);
-
-define_impl!(
-    FAESTEM192SParameters,
-    FAEST192EMsSigningKey,
-    FAEST192EMsVerificationKey,
-    FAEST192EMsKeyPair,
-    FAEST192EMsSignature
-);
-
-define_impl!(
-    FAESTEM256FParameters,
-    FAEST256EMfSigningKey,
-    FAEST256EMfVerificationKey,
-    FAEST256EMfKeyPair,
-    FAEST256EMfSignature
-);
-
-define_impl!(
-    FAESTEM256SParameters,
-    FAEST256EMsSigningKey,
-    FAEST256EMsVerificationKey,
-    FAEST256EMsKeyPair,
-    FAEST256EMsSignature
-);
+define_impl!(FAEST128f);
+define_impl!(FAEST128s);
+define_impl!(FAEST192f);
+define_impl!(FAEST192s);
+define_impl!(FAEST256f);
+define_impl!(FAEST256s);
+define_impl!(FAESTEM128f);
+define_impl!(FAESTEM128s);
+define_impl!(FAESTEM192f);
+define_impl!(FAESTEM192s);
+define_impl!(FAESTEM256f);
+define_impl!(FAESTEM256s);

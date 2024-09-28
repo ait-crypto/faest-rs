@@ -1,12 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use faest::{
-    FAEST128EMfKeyPair, FAEST128EMfSignature, FAEST128EMsKeyPair, FAEST128EMsSignature,
-    FAEST128fKeyPair, FAEST128fSignature, FAEST128sKeyPair, FAEST128sSignature, FAEST192EMfKeyPair,
-    FAEST192EMfSignature, FAEST192EMsKeyPair, FAEST192EMsSignature, FAEST192fKeyPair,
-    FAEST192fSignature, FAEST192sKeyPair, FAEST192sSignature, FAEST256EMfKeyPair,
-    FAEST256EMfSignature, FAEST256EMsKeyPair, FAEST256EMsSignature, FAEST256fKeyPair,
-    FAEST256fSignature, FAEST256sKeyPair, FAEST256sSignature, KeypairGenerator,
-};
+use faest::*;
 use rand::{RngCore, SeedableRng};
 use signature::{Signer, Verifier};
 
@@ -48,12 +41,12 @@ fn faest_benchmark(c: &mut Criterion) {
     benchmark::<FAEST192sKeyPair, FAEST192sSignature>(c, "FAEST-192s");
     benchmark::<FAEST256fKeyPair, FAEST256fSignature>(c, "FAEST-256f");
     benchmark::<FAEST256sKeyPair, FAEST256sSignature>(c, "FAEST-256s");
-    benchmark::<FAEST128EMfKeyPair, FAEST128EMfSignature>(c, "FAEST-EM-128f");
-    benchmark::<FAEST128EMsKeyPair, FAEST128EMsSignature>(c, "FAEST-EM-128s");
-    benchmark::<FAEST192EMfKeyPair, FAEST192EMfSignature>(c, "FAEST-EM-192f");
-    benchmark::<FAEST192EMsKeyPair, FAEST192EMsSignature>(c, "FAEST-EM-192s");
-    benchmark::<FAEST256EMfKeyPair, FAEST256EMfSignature>(c, "FAEST-EM-256f");
-    benchmark::<FAEST256EMsKeyPair, FAEST256EMsSignature>(c, "FAEST-EM-256s");
+    benchmark::<FAESTEM128fKeyPair, FAESTEM128fSignature>(c, "FAEST-EM-128f");
+    benchmark::<FAESTEM128sKeyPair, FAESTEM128sSignature>(c, "FAEST-EM-128s");
+    benchmark::<FAESTEM192fKeyPair, FAESTEM192fSignature>(c, "FAEST-EM-192f");
+    benchmark::<FAESTEM192sKeyPair, FAESTEM192sSignature>(c, "FAEST-EM-192s");
+    benchmark::<FAESTEM256fKeyPair, FAESTEM256fSignature>(c, "FAEST-EM-256f");
+    benchmark::<FAESTEM256sKeyPair, FAESTEM256sSignature>(c, "FAEST-EM-256s");
 }
 
 criterion_group!(benches, faest_benchmark);

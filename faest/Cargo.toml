@@ -22,6 +22,7 @@ zeroize = { version = "1", optional = true, default-features = false, features =
   "derive",
 ] }
 either = { version = "1", default-features = false }
+paste = "1"
 
 [dev-dependencies]
 serde_derive = "1.0.200"

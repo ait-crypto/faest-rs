@@ -588,9 +588,9 @@ mod test {
     use rand::RngCore;
 
     use crate::parameter::{
-        FAEST128FParameters, FAEST128SParameters, FAEST192FParameters, FAEST192SParameters,
-        FAEST256FParameters, FAEST256SParameters, FAESTEM128FParameters, FAESTEM128SParameters,
-        FAESTEM192FParameters, FAESTEM192SParameters, FAESTEM256FParameters, FAESTEM256SParameters,
+        FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
+        FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters, FAESTEM128sParameters,
+        FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters, FAESTEM256sParameters,
         OWFParameters, PARAM,
     };
 
@@ -621,62 +621,62 @@ mod test {
 
     #[test]
     fn faest_aes_test_128f() {
-        run_faest_test::<FAEST128FParameters>();
+        run_faest_test::<FAEST128fParameters>();
     }
 
     #[test]
     fn faest_aes_test_128s() {
-        run_faest_test::<FAEST128SParameters>();
+        run_faest_test::<FAEST128sParameters>();
     }
 
     #[test]
     fn faest_aes_test_192f() {
-        run_faest_test::<FAEST192FParameters>();
+        run_faest_test::<FAEST192fParameters>();
     }
 
     #[test]
     fn faest_aes_test_192s() {
-        run_faest_test::<FAEST192SParameters>();
+        run_faest_test::<FAEST192sParameters>();
     }
 
     #[test]
     fn faest_aes_test_256s() {
-        run_faest_test::<FAEST256SParameters>();
+        run_faest_test::<FAEST256sParameters>();
     }
 
     #[test]
     fn faest_aes_test_256f() {
-        run_faest_test::<FAEST256FParameters>();
+        run_faest_test::<FAEST256fParameters>();
     }
 
     #[test]
     fn faest_em_test_128s() {
-        run_faest_test::<FAESTEM128SParameters>();
+        run_faest_test::<FAESTEM128sParameters>();
     }
 
     #[test]
     fn faest_em_test_128f() {
-        run_faest_test::<FAESTEM128FParameters>();
+        run_faest_test::<FAESTEM128fParameters>();
     }
 
     #[test]
     fn faest_em_test_192f() {
-        run_faest_test::<FAESTEM192FParameters>();
+        run_faest_test::<FAESTEM192fParameters>();
     }
 
     #[test]
     fn faest_em_test_192s() {
-        run_faest_test::<FAESTEM192SParameters>();
+        run_faest_test::<FAESTEM192sParameters>();
     }
 
     #[test]
     fn faest_em_test_256s() {
-        run_faest_test::<FAESTEM256SParameters>();
+        run_faest_test::<FAESTEM256sParameters>();
     }
 
     #[test]
     fn faest_em_test_256f() {
-        run_faest_test::<FAESTEM256FParameters>();
+        run_faest_test::<FAESTEM256fParameters>();
     }
 
     ///NIST tests
@@ -763,72 +763,72 @@ mod test {
 
     #[test]
     fn test_nist_faest_128s_aes() {
-        test_nist::<FAEST128SParameters>(include_str!("../tests/data/PQCsignKAT_faest_128s.rsp"));
+        test_nist::<FAEST128sParameters>(include_str!("../tests/data/PQCsignKAT_faest_128s.rsp"));
     }
 
     #[test]
     fn test_nist_faest_128f_aes() {
-        test_nist::<FAEST128FParameters>(include_str!("../tests/data/PQCsignKAT_faest_128f.rsp"));
+        test_nist::<FAEST128fParameters>(include_str!("../tests/data/PQCsignKAT_faest_128f.rsp"));
     }
 
     #[test]
     fn test_nist_faest_192s_aes() {
-        test_nist::<FAEST192SParameters>(include_str!("../tests/data/PQCsignKAT_faest_192s.rsp"));
+        test_nist::<FAEST192sParameters>(include_str!("../tests/data/PQCsignKAT_faest_192s.rsp"));
     }
 
     #[test]
     fn test_nist_faest_192f_aes() {
-        test_nist::<FAEST192FParameters>(include_str!("../tests/data/PQCsignKAT_faest_192f.rsp"));
+        test_nist::<FAEST192fParameters>(include_str!("../tests/data/PQCsignKAT_faest_192f.rsp"));
     }
 
     #[test]
     fn test_nist_faest_256s_aes() {
-        test_nist::<FAEST256SParameters>(include_str!("../tests/data/PQCsignKAT_faest_256s.rsp"));
+        test_nist::<FAEST256sParameters>(include_str!("../tests/data/PQCsignKAT_faest_256s.rsp"));
     }
 
     #[test]
     fn test_nist_faest_256f_aes() {
-        test_nist::<FAEST256FParameters>(include_str!("../tests/data/PQCsignKAT_faest_256f.rsp"));
+        test_nist::<FAEST256fParameters>(include_str!("../tests/data/PQCsignKAT_faest_256f.rsp"));
     }
 
     #[test]
     fn test_nist_faest_128s_em() {
-        test_nist::<FAESTEM128SParameters>(include_str!(
+        test_nist::<FAESTEM128sParameters>(include_str!(
             "../tests/data/PQCsignKAT_faest_em_128s.rsp"
         ));
     }
 
     #[test]
     fn test_nist_faest_128f_em() {
-        test_nist::<FAESTEM128FParameters>(include_str!(
+        test_nist::<FAESTEM128fParameters>(include_str!(
             "../tests/data/PQCsignKAT_faest_em_128f.rsp"
         ));
     }
 
     #[test]
     fn test_nist_faest_192s_em() {
-        test_nist::<FAESTEM192SParameters>(include_str!(
+        test_nist::<FAESTEM192sParameters>(include_str!(
             "../tests/data/PQCsignKAT_faest_em_192s.rsp"
         ));
     }
 
     #[test]
     fn test_nist_faest192f_em() {
-        test_nist::<FAESTEM192FParameters>(include_str!(
+        test_nist::<FAESTEM192fParameters>(include_str!(
             "../tests/data/PQCsignKAT_faest_em_192f.rsp"
         ));
     }
 
     #[test]
     fn test_nist_faest_256s_em() {
-        test_nist::<FAESTEM256SParameters>(include_str!(
+        test_nist::<FAESTEM256sParameters>(include_str!(
             "../tests/data/PQCsignKAT_faest_em_256s.rsp"
         ));
     }
 
     #[test]
     fn test_nist_faest_256f_em() {
-        test_nist::<FAESTEM256FParameters>(include_str!(
+        test_nist::<FAESTEM256fParameters>(include_str!(
             "../tests/data/PQCsignKAT_faest_em_256f.rsp"
         ));
     }
