@@ -311,6 +311,12 @@ pub(crate) fn faest_sign<P, O>(
         &iv,
     );
 
+    // write c and drop it
+    let mut signature = signature.as_mut_slice();
+    c.into_iter().for_each(|x| {
+        signature.write_all(&x).unwrap();
+    });
+
     let vole_hasher = O::VoleHasher::new_vole_hasher(&chall1);
     let u_t = vole_hasher.process(&u);
 
@@ -353,7 +359,6 @@ pub(crate) fn faest_sign<P, O>(
     hash_challenge_3::<RO<P>>(&mut chall3, &chall2, &a_t, &b_t);
 
     sigma_to_signature(
-        c.iter().map(|value| value.as_ref()),
         &u_t,
         &d,
         a_t.as_slice(),
@@ -517,7 +522,6 @@ where
 }
 
 fn sigma_to_signature<'a, Lambda>(
-    c: impl Iterator<Item = &'a [u8]>,
     u_t: &[u8],
     d: &[u8],
     a_t: &[u8],
@@ -528,9 +532,6 @@ fn sigma_to_signature<'a, Lambda>(
 ) where
     Lambda: ArrayLength,
 {
-    c.for_each(|x| {
-        signature.write_all(x).unwrap();
-    });
     signature.write_all(u_t).unwrap();
     signature.write_all(d).unwrap();
     signature.write_all(a_t).unwrap();
