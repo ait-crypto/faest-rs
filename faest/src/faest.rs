@@ -338,19 +338,18 @@ pub(crate) fn faest_sign<P, O>(
     hash_challenge_2::<RO<P>>(&mut chall2, &chall1, &u_t, &hv, &d);
 
     let new_u = GenericArray::from_slice(&u[..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE]);
-    let new_gv = Box::new(
-        gv.iter()
-            .flat_map(|x| {
-                x.iter()
-                    .map(|y| {
-                        y.iter()
-                            .take(O::LBYTES::USIZE + O::LAMBDABYTES::USIZE)
-                            .copied()
-                            .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
-                    })
-                    .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
-            })
-            .collect::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>(),
+    let new_gv = Box::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>::from_iter(
+        // FIXME: this requires quite a bunch of memory on the stack
+        gv.iter().flat_map(|x| {
+            x.iter()
+                .map(|y| {
+                    y.iter()
+                        .take(O::LBYTES::USIZE + O::LAMBDABYTES::USIZE)
+                        .copied()
+                        .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
+                })
+                .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
+        }),
     );
 
     let (a_t, b_t) = P::Cypher::prove(&w, new_u, &new_gv, &sk.owf_input, &sk.owf_output, &chall2);
