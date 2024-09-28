@@ -129,7 +129,7 @@ macro_rules! define_impl {
         impl Signer<$sig> for $sk {
             fn try_sign(&self, msg: &[u8]) -> Result<$sig, Error> {
                 let mut signature = GenericArray::default();
-                faest_sign::<$param, <$param as PARAM>::OWF>(msg, &self.0, &[], &mut signature);
+                faest_sign::<$param>(msg, &self.0, &[], &mut signature);
                 Ok($sig(signature))
             }
         }
@@ -137,14 +137,14 @@ macro_rules! define_impl {
         impl Signer<Box<$sig>> for $sk {
             fn try_sign(&self, msg: &[u8]) -> Result<Box<$sig>, Error> {
                 let mut signature = Box::new($sig(GenericArray::default()));
-                faest_sign::<$param, <$param as PARAM>::OWF>(msg, &self.0, &[], &mut signature.0);
+                faest_sign::<$param>(msg, &self.0, &[], &mut signature.0);
                 Ok(signature)
             }
         }
 
         impl Verifier<$sig> for $vk {
             fn verify(&self, msg: &[u8], signature: &$sig) -> Result<(), Error> {
-                faest_verify::<$param, <$param as PARAM>::OWF>(msg, &self.0, &signature.0)
+                faest_verify::<$param>(msg, &self.0, &signature.0)
             }
         }
 
@@ -152,9 +152,7 @@ macro_rules! define_impl {
             fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
                 GenericArray::try_from_slice(signature.0)
                     .map_err(|_| Error::new())
-                    .and_then(|sig| {
-                        faest_verify::<$param, <$param as PARAM>::OWF>(msg, &self.0, sig)
-                    })
+                    .and_then(|sig| faest_verify::<$param>(msg, &self.0, sig))
             }
         }
 
@@ -171,7 +169,7 @@ macro_rules! define_impl {
                 >::default();
                 rng.fill_bytes(&mut rho);
                 let mut signature = GenericArray::default();
-                faest_sign::<$param, <$param as PARAM>::OWF>(msg, &self.0, &rho, &mut signature);
+                faest_sign::<$param>(msg, &self.0, &rho, &mut signature);
                 Ok($sig(signature))
             }
         }
@@ -189,7 +187,7 @@ macro_rules! define_impl {
                 >::default();
                 rng.fill_bytes(&mut rho);
                 let mut signature = Box::new($sig(GenericArray::default()));
-                faest_sign::<$param, <$param as PARAM>::OWF>(msg, &self.0, &rho, &mut signature.0);
+                faest_sign::<$param>(msg, &self.0, &rho, &mut signature.0);
                 Ok(signature)
             }
         }

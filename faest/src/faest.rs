@@ -285,13 +285,21 @@ where
 /// Quicksilver proof (Lambda), Partial decommitment (Tau * (t0 * k0*lambda + t1 * k1*lambda  +  2Lambda) bits),
 ///
 ///last challenge (lambda bits), initialisation vector
-#[allow(clippy::type_complexity)]
-pub(crate) fn faest_sign<P, O>(
+#[inline(always)]
+pub(crate) fn faest_sign<P>(
     msg: &[u8],
-    sk: &SecretKey<O>,
+    sk: &SecretKey<P::OWF>,
     rho: &[u8],
     signature: &mut GenericArray<u8, P::SIG>,
 ) where
+    P: PARAM,
+{
+    sign::<P, P::OWF>(msg, sk, rho, signature)
+}
+
+#[allow(clippy::type_complexity)]
+fn sign<P, O>(msg: &[u8], sk: &SecretKey<O>, rho: &[u8], signature: &mut GenericArray<u8, P::SIG>)
+where
     P: PARAM<OWF = O>,
     O: OWFParameters,
 {
@@ -388,8 +396,20 @@ pub(crate) fn faest_sign<P, O>(
     )
 }
 
+#[inline(always)]
+pub(crate) fn faest_verify<P>(
+    msg: &[u8],
+    pk: &PublicKey<P::OWF>,
+    sigma: &GenericArray<u8, P::SIG>,
+) -> Result<(), Error>
+where
+    P: PARAM,
+{
+    verify::<P, P::OWF>(msg, pk, sigma)
+}
+
 #[allow(clippy::type_complexity)]
-pub(crate) fn faest_verify<P, O>(
+fn verify<P, O>(
     msg: &[u8],
     pk: &PublicKey<O>,
     sigma: &GenericArray<u8, P::SIG>,
@@ -592,9 +612,9 @@ mod test {
             let sk = P::Cypher::keygen_with_rng(&mut rng);
             let msg = random_message(&mut rng);
             let mut sigma = GenericArray::default_boxed();
-            faest_sign::<P, P::OWF>(&msg, &sk, &[], &mut sigma);
+            faest_sign::<P>(&msg, &sk, &[], &mut sigma);
             let pk = sk.as_public_key();
-            let res = faest_verify::<P, P::OWF>(&msg, &pk, &sigma);
+            let res = faest_verify::<P>(&msg, &pk, &sigma);
             assert!(res.is_ok());
         }
     }
@@ -734,10 +754,10 @@ mod test {
             rng.fill_bytes(&mut rho);
 
             let mut signature = GenericArray::default_boxed();
-            faest_sign::<P, P::OWF>(&msg, &sk, &rho, &mut signature);
+            faest_sign::<P>(&msg, &sk, &rho, &mut signature);
             assert_eq!(&sig[..sig.len() - signature.len()], &msg);
             assert_eq!(&sig[sig.len() - signature.len()..], signature.as_slice());
-            assert!(faest_verify::<P, P::OWF>(&msg, &pk, &signature).is_ok());
+            assert!(faest_verify::<P>(&msg, &pk, &signature).is_ok());
         }
     }
 
