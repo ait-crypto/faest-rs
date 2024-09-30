@@ -7,47 +7,39 @@ stages:
 build:
   stage: build
   script:
-    - cd $CI_PROJECT_DIR/faest
     - cargo build --release
 
 build-all-features:
   stage: build
   script:
-    - cd $CI_PROJECT_DIR/faest
     - cargo build --release --all-features
 
 build-bench:
   stage: build
   script:
-    - cd $CI_PROJECT_DIR/faest
     - cargo build --bench benchmark_faest_rs
 
 clippy:
   stage: test
   script:
-    - cd $CI_PROJECT_DIR/faest
     - cargo clippy -- -D warnings
 
 fmt:
   stage: test
   script:
-    - cd $CI_PROJECT_DIR/faest
     - cargo fmt -- --check
 
 test:
   stage: test
   script:
-    - cd $CI_PROJECT_DIR/faest
     - cargo test --release
 
 test-all-features:
   stage: test
   script:
-    - cd $CI_PROJECT_DIR/faest
     - cargo test --release --all-features
 
 test-example-simple:
   stage: test
   script:
-    - cd $CI_PROJECT_DIR/faest
     - cargo run --release --example simple
