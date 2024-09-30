@@ -714,7 +714,7 @@ impl TauParameters for Tau256Fast {
     type Tau1 = U16;
 }
 
-pub(crate) trait PARAM {
+pub(crate) trait FAESTParameters {
     type OWF: OWFParameters;
     type Cypher: Variant<Self::OWF>;
     type Tau: TauParameters;
@@ -729,7 +729,7 @@ pub(crate) trait PARAM {
 
 pub(crate) struct FAEST128sParameters;
 
-impl PARAM for FAEST128sParameters {
+impl FAESTParameters for FAEST128sParameters {
     type OWF = OWF128;
     type Tau = Tau128Small;
 
@@ -750,7 +750,7 @@ impl PARAM for FAEST128sParameters {
 
 pub(crate) struct FAEST128fParameters;
 
-impl PARAM for FAEST128fParameters {
+impl FAESTParameters for FAEST128fParameters {
     type OWF = OWF128;
     type Tau = Tau128Fast;
 
@@ -771,7 +771,7 @@ impl PARAM for FAEST128fParameters {
 
 pub(crate) struct FAEST192sParameters;
 
-impl PARAM for FAEST192sParameters {
+impl FAESTParameters for FAEST192sParameters {
     type OWF = OWF192;
     type Tau = Tau192Small;
 
@@ -792,7 +792,7 @@ impl PARAM for FAEST192sParameters {
 
 pub(crate) struct FAEST192fParameters;
 
-impl PARAM for FAEST192fParameters {
+impl FAESTParameters for FAEST192fParameters {
     type OWF = OWF192;
     type Tau = Tau192Fast;
 
@@ -813,7 +813,7 @@ impl PARAM for FAEST192fParameters {
 
 pub(crate) struct FAEST256sParameters;
 
-impl PARAM for FAEST256sParameters {
+impl FAESTParameters for FAEST256sParameters {
     type OWF = OWF256;
     type Tau = Tau256Small;
 
@@ -834,7 +834,7 @@ impl PARAM for FAEST256sParameters {
 
 pub(crate) struct FAEST256fParameters;
 
-impl PARAM for FAEST256fParameters {
+impl FAESTParameters for FAEST256fParameters {
     type OWF = OWF256;
     type Tau = Tau256Fast;
 
@@ -855,7 +855,7 @@ impl PARAM for FAEST256fParameters {
 
 pub(crate) struct FAESTEM128sParameters;
 
-impl PARAM for FAESTEM128sParameters {
+impl FAESTParameters for FAESTEM128sParameters {
     type OWF = OWF128EM;
     type Tau = Tau128Small;
 
@@ -876,7 +876,7 @@ impl PARAM for FAESTEM128sParameters {
 
 pub(crate) struct FAESTEM128fParameters;
 
-impl PARAM for FAESTEM128fParameters {
+impl FAESTParameters for FAESTEM128fParameters {
     type OWF = OWF128EM;
     type Tau = Tau128Fast;
 
@@ -897,7 +897,7 @@ impl PARAM for FAESTEM128fParameters {
 
 pub(crate) struct FAESTEM192sParameters;
 
-impl PARAM for FAESTEM192sParameters {
+impl FAESTParameters for FAESTEM192sParameters {
     type OWF = OWF192EM;
     type Tau = Tau192Small;
 
@@ -918,7 +918,7 @@ impl PARAM for FAESTEM192sParameters {
 
 pub(crate) struct FAESTEM192fParameters;
 
-impl PARAM for FAESTEM192fParameters {
+impl FAESTParameters for FAESTEM192fParameters {
     type OWF = OWF192EM;
 
     type Tau = Tau192Fast;
@@ -940,7 +940,7 @@ impl PARAM for FAESTEM192fParameters {
 
 pub(crate) struct FAESTEM256sParameters;
 
-impl PARAM for FAESTEM256sParameters {
+impl FAESTParameters for FAESTEM256sParameters {
     type OWF = OWF256EM;
 
     type Tau = Tau256Small;
@@ -962,7 +962,7 @@ impl PARAM for FAESTEM256sParameters {
 
 pub(crate) struct FAESTEM256fParameters;
 
-impl PARAM for FAESTEM256fParameters {
+impl FAESTParameters for FAESTEM256fParameters {
     type OWF = OWF256EM;
 
     type Tau = Tau256Fast;

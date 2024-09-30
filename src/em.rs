@@ -446,8 +446,8 @@ mod test {
         fields::{large_fields::NewFromU128, GF128, GF192, GF256},
         parameter::{
             FAESTEM128fParameters, FAESTEM128sParameters, FAESTEM192fParameters,
-            FAESTEM192sParameters, FAESTEM256fParameters, FAESTEM256sParameters, OWF128EM,
-            OWF192EM, OWF256EM, PARAM,
+            FAESTEM192sParameters, FAESTEM256fParameters, FAESTEM256sParameters, FAESTParameters,
+            OWF128EM, OWF192EM, OWF256EM,
         },
     };
 
@@ -1014,7 +1014,7 @@ mod test {
         for data in database {
             if data.lambda == 128 {
                 let res = if data.tau == 11 {
-                    em_verify::<OWF128EM, <FAESTEM128sParameters as PARAM>::Tau>(
+                    em_verify::<OWF128EM, <FAESTEM128sParameters as FAESTParameters>::Tau>(
                         GenericArray::from_slice(&data.d),
                         GenericArray::from_slice(
                             &data
@@ -1030,7 +1030,7 @@ mod test {
                         GenericArray::from_slice(&data.output),
                     )
                 } else {
-                    em_verify::<OWF128EM, <FAESTEM128fParameters as PARAM>::Tau>(
+                    em_verify::<OWF128EM, <FAESTEM128fParameters as FAESTParameters>::Tau>(
                         GenericArray::from_slice(&data.d),
                         GenericArray::from_slice(
                             &data
@@ -1049,7 +1049,7 @@ mod test {
                 assert_eq!(res, *GenericArray::from_slice(&data.qt));
             } else if data.lambda == 192 {
                 let res = if data.tau == 16 {
-                    em_verify::<OWF192EM, <FAESTEM192sParameters as PARAM>::Tau>(
+                    em_verify::<OWF192EM, <FAESTEM192sParameters as FAESTParameters>::Tau>(
                         GenericArray::from_slice(&data.d),
                         GenericArray::from_slice(
                             &data
@@ -1065,7 +1065,7 @@ mod test {
                         GenericArray::from_slice(&data.output),
                     )
                 } else {
-                    em_verify::<OWF192EM, <FAESTEM192fParameters as PARAM>::Tau>(
+                    em_verify::<OWF192EM, <FAESTEM192fParameters as FAESTParameters>::Tau>(
                         GenericArray::from_slice(&data.d),
                         GenericArray::from_slice(
                             &data
@@ -1084,7 +1084,7 @@ mod test {
                 assert_eq!(res, *GenericArray::from_slice(&data.qt));
             } else {
                 let res = if data.tau == 22 {
-                    em_verify::<OWF256EM, <FAESTEM256sParameters as PARAM>::Tau>(
+                    em_verify::<OWF256EM, <FAESTEM256sParameters as FAESTParameters>::Tau>(
                         GenericArray::from_slice(&data.d),
                         GenericArray::from_slice(
                             &data
@@ -1100,7 +1100,7 @@ mod test {
                         GenericArray::from_slice(&data.output),
                     )
                 } else {
-                    em_verify::<OWF256EM, <FAESTEM256fParameters as PARAM>::Tau>(
+                    em_verify::<OWF256EM, <FAESTEM256fParameters as FAESTParameters>::Tau>(
                         GenericArray::from_slice(&data.d),
                         GenericArray::from_slice(
                             &data

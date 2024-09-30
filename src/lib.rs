@@ -33,7 +33,7 @@ use crate::{
         FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
         FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters, FAESTEM128sParameters,
         FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters, FAESTEM256sParameters,
-        OWFParameters, PARAM,
+        FAESTParameters, OWFParameters,
     },
 };
 
@@ -68,12 +68,12 @@ macro_rules! define_impl {
             #[derive(Debug, Clone)]
             #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-            pub struct [<$param SigningKey>](SecretKey<<[<$param Parameters>] as PARAM>::OWF>);
+            pub struct [<$param SigningKey>](SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>);
 
             #[doc = "Verification key for " $param]
             #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-            pub struct [<$param VerificationKey>](PublicKey<<[<$param Parameters>] as PARAM>::OWF>);
+            pub struct [<$param VerificationKey>](PublicKey<<[<$param Parameters>] as FAESTParameters>::OWF>);
 
             #[doc = "Keypair for " $param]
             #[derive(Debug, Clone)]
@@ -131,7 +131,7 @@ macro_rules! define_impl {
             #[doc = "Signature for " $param]
             #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-            pub struct [<$param Signature>](GenericArray<u8, <[<$param Parameters>] as PARAM>::SIG>);
+            pub struct [<$param Signature>](GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SIG>);
 
             impl Signer<[<$param Signature>]> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
@@ -172,7 +172,7 @@ macro_rules! define_impl {
                 ) -> Result<[<$param Signature>], Error> {
                     let mut rho = GenericArray::<
                         u8,
-                        <<[<$param Parameters>] as PARAM>::OWF as OWFParameters>::LAMBDABYTES,
+                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES,
                     >::default();
                     rng.fill_bytes(&mut rho);
                     let mut signature = GenericArray::default();
@@ -190,7 +190,7 @@ macro_rules! define_impl {
                 ) -> Result<Box<[<$param Signature>]>, Error> {
                     let mut rho = GenericArray::<
                         u8,
-                        <<[<$param Parameters>] as PARAM>::OWF as OWFParameters>::LAMBDABYTES,
+                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES,
                     >::default();
                     rng.fill_bytes(&mut rho);
                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));
@@ -255,18 +255,18 @@ macro_rules! define_impl {
                 }
             }
 
-            impl From<[<$param Signature>]> for [u8; <[<$param Parameters>] as PARAM>::SIG::USIZE] {
+            impl From<[<$param Signature>]> for [u8; <[<$param Parameters>] as FAESTParameters>::SIG::USIZE] {
                 fn from(value: [<$param Signature>]) -> Self {
                     value.to_bytes()
                 }
             }
 
             impl SignatureEncoding for [<$param Signature>] {
-                type Repr = [u8; <[<$param Parameters>] as PARAM>::SIG::USIZE];
+                type Repr = [u8; <[<$param Parameters>] as FAESTParameters>::SIG::USIZE];
 
                 fn to_bytes(&self) -> Self::Repr {
                     // NOTE: this could be done with Into if it would be supported
-                    let mut ret = [0; <[<$param Parameters>] as PARAM>::SIG::USIZE];
+                    let mut ret = [0; <[<$param Parameters>] as FAESTParameters>::SIG::USIZE];
                     ret.copy_from_slice(self.0.as_slice());
                     ret
                 }
@@ -276,7 +276,7 @@ macro_rules! define_impl {
                 }
 
                 fn encoded_len(&self) -> usize {
-                    <[<$param Parameters>] as PARAM>::SIG::USIZE
+                    <[<$param Parameters>] as FAESTParameters>::SIG::USIZE
                 }
             }
         }

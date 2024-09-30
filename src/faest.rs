@@ -1,7 +1,7 @@
 use std::{fmt, io::Write, iter::zip, marker::PhantomData};
 
 use crate::{
-    parameter::{BaseParameters, OWFParameters, TauParameters, Variant, PARAM},
+    parameter::{BaseParameters, FAESTParameters, OWFParameters, TauParameters, Variant},
     prg::IV,
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
@@ -204,9 +204,10 @@ where
     }
 }
 
-type RO<P> = <<<P as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle;
+type RO<P> =
+    <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle;
 type VoleHasher<P> =
-    <<<P as PARAM>::OWF as OWFParameters>::BaseParams as BaseParameters>::VoleHasher;
+    <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::VoleHasher;
 
 fn hash_mu<R>(mu: &mut [u8], input: &[u8], output: &[u8], msg: &[u8])
 where
@@ -272,7 +273,7 @@ where
 #[inline]
 pub(crate) fn faest_keygen<P, R>(rng: R) -> SecretKey<P::OWF>
 where
-    P: PARAM,
+    P: FAESTParameters,
     R: CryptoRngCore,
 {
     P::Cypher::keygen_with_rng(rng)
@@ -292,7 +293,7 @@ pub(crate) fn faest_sign<P>(
     rho: &[u8],
     signature: &mut GenericArray<u8, P::SIG>,
 ) where
-    P: PARAM,
+    P: FAESTParameters,
 {
     sign::<P, P::OWF>(msg, sk, rho, signature)
 }
@@ -300,7 +301,7 @@ pub(crate) fn faest_sign<P>(
 #[allow(clippy::type_complexity)]
 fn sign<P, O>(msg: &[u8], sk: &SecretKey<O>, rho: &[u8], signature: &mut GenericArray<u8, P::SIG>)
 where
-    P: PARAM<OWF = O>,
+    P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
     let mut mu =
@@ -403,7 +404,7 @@ pub(crate) fn faest_verify<P>(
     sigma: &GenericArray<u8, P::SIG>,
 ) -> Result<(), Error>
 where
-    P: PARAM,
+    P: FAESTParameters,
 {
     verify::<P, P::OWF>(msg, pk, sigma)
 }
@@ -415,7 +416,7 @@ fn verify<P, O>(
     sigma: &GenericArray<u8, P::SIG>,
 ) -> Result<(), Error>
 where
-    P: PARAM<OWF = O>,
+    P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
     let chall3 = GenericArray::from_slice(
@@ -445,7 +446,10 @@ where
     let def = GenericArray::default();
     let def2 = GenericArray::default();
     let mut gq: Box<
-        GenericArray<Vec<GenericArray<u8, <P as PARAM>::LH>>, <P::Tau as TauParameters>::Tau>,
+        GenericArray<
+            Vec<GenericArray<u8, <P as FAESTParameters>::LH>>,
+            <P::Tau as TauParameters>::Tau,
+        >,
     > = GenericArray::default_boxed();
     let mut gd_t: Box<GenericArray<Vec<&GenericArray<u8, O::LAMBDAPLUS2>>, O::LAMBDALBYTES>> =
         GenericArray::default_boxed();
@@ -477,7 +481,7 @@ where
                     &def
                 }
             })
-            .collect::<Vec<_>>();
+            .collect();
         gq[i] = gq_p[i]
             .iter()
             .zip(delta.iter().map(|d| {
@@ -494,7 +498,7 @@ where
                     .map(|(q, d)| (q ^ d))
                     .collect::<GenericArray<u8, P::LH>>()
             })
-            .collect::<Vec<GenericArray<u8, <P as PARAM>::LH>>>();
+            .collect::<Vec<GenericArray<u8, <P as FAESTParameters>::LH>>>();
     }
     let gq_t = gq
         .iter()
@@ -504,8 +508,8 @@ where
     zip(gq_t, gd_t.into_iter().flatten())
         .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d))
         .for_each(|v| h1_hasher.update(&[v]));
-    let mut hv: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
-        GenericArray::default();
+    let mut hv =
+        GenericArray::<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2>::default();
     h1_hasher.finish().read(&mut hv);
 
     let d = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
@@ -591,7 +595,7 @@ mod test {
         FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
         FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters, FAESTEM128sParameters,
         FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters, FAESTEM256sParameters,
-        OWFParameters, PARAM,
+        FAESTParameters, OWFParameters,
     };
 
     const RUNS: usize = 10;
@@ -606,7 +610,7 @@ mod test {
         ret
     }
 
-    fn run_faest_test<P: PARAM>() {
+    fn run_faest_test<P: FAESTParameters>() {
         let mut rng = rand::thread_rng();
         for _i in 0..RUNS {
             let sk = P::Cypher::keygen_with_rng(&mut rng);
@@ -738,7 +742,7 @@ mod test {
         ret
     }
 
-    fn test_nist<P: PARAM>(test_data: &str) {
+    fn test_nist<P: FAESTParameters>(test_data: &str) {
         let datas = read_kats(test_data);
         for data in datas {
             let mut rng = NistPqcAes256CtrRng::try_from(data.seed.as_slice()).unwrap();

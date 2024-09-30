@@ -3,6 +3,7 @@ use signature::RandomizedSigner;
 use signature::{Signer, Verifier};
 
 const MESSAGE: &str = "This is a message.";
+
 fn run_example<KP, S>(name: &str)
 where
     KP: KeypairGenerator + Signer<Box<S>> + RandomizedSigner<S>,
