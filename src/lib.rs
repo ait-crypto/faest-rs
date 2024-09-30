@@ -1,6 +1,12 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+// TODO: fix those
+#![allow(
+    clippy::type_complexity,
+    clippy::boxed_local,
+    clippy::too_many_arguments
+)]
 
 use generic_array::{typenum::Unsigned, GenericArray};
 use paste::paste;

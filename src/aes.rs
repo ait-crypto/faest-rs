@@ -62,7 +62,7 @@ where
     let nk = <O::NK as Unsigned>::to_usize();
     let mut input = [0u8; 32];
     //step 0
-    input[..O::InputSize::USIZE].clone_from_slice(&owf_input);
+    input[..O::InputSize::USIZE].clone_from_slice(owf_input);
     let mut w: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
     let mut index = 0;
     //step 3
