@@ -1,9 +1,6 @@
-use std::iter::zip;
+use std::{array, iter::zip};
 
-use generic_array::{
-    typenum::{Unsigned, U8},
-    ArrayLength, GenericArray,
-};
+use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
 use crate::{
     fields::{BigGaloisField, ByteCombine, ByteCombineConstants, Field as _, SumPoly},
@@ -56,62 +53,46 @@ pub(crate) fn aes_extendedwitness<O>(
 where
     O: OWFParameters,
 {
-    let kblen = <O::KBLENGTH as Unsigned>::to_usize();
-    let bc = 4;
-    let r = <O::R as Unsigned>::to_u8();
-    let nk = <O::NK as Unsigned>::to_usize();
     let mut input = [0u8; 32];
     //step 0
     input[..O::InputSize::USIZE].clone_from_slice(owf_input);
     let mut w: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
     let mut index = 0;
     //step 3
-    let (temp_kb, temp_val) =
-        rijndael_key_schedule(owf_key, bc, nk as u8, r, <O::SKE as Unsigned>::to_u8());
-    let (kb, mut valid): (&GenericArray<u32, O::KBLENGTH>, bool) =
-        (GenericArray::from_slice(&temp_kb[..kblen]), temp_val);
+    let (temp_kb, mut valid) = rijndael_key_schedule(owf_key, 4, O::NK::U8, O::R::U8, O::SKE::U8);
+    let kb = GenericArray::<u32, O::KBLENGTH>::from_slice(&temp_kb[..O::KBLENGTH::USIZE]);
     //step 4
     for i in convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4]
-        .to_vec()
         .iter()
-        .flat_map(|x| x.to_le_bytes())
-        .collect::<Vec<u8>>()
+        .map(|x| x.to_le_bytes())
     {
-        w[index] = i;
-        index += 1;
+        w[index..index + size_of::<u32>()].copy_from_slice(&i);
+        index += size_of::<u32>();
     }
-    for i in convert_from_batchblocks(inv_bitslice(&kb[8..16]))[..nk / 2 - (4 - (nk / 2))]
-        .to_vec()
+    for i in convert_from_batchblocks(inv_bitslice(&kb[8..16]))
+        [..O::NK::USIZE / 2 - (4 - (O::NK::USIZE / 2))]
         .iter()
-        .flat_map(|x| x.to_le_bytes())
-        .collect::<Vec<u8>>()
+        .map(|x| x.to_le_bytes())
     {
-        w[index] = i;
-        index += 1;
+        w[index..index + size_of::<u32>()].copy_from_slice(&i);
+        index += size_of::<u32>();
     }
-    for j in 1 + (nk / 8)
-        ..1 + (nk / 8)
-            + ((<O::SKE as Unsigned>::to_usize()) * ((2 - (nk % 4)) * 2 + (nk % 4) * 3)) / 16
+    for j in 1 + (O::NK::USIZE / 8)
+        ..1 + (O::NK::USIZE / 8)
+            + (O::SKE::USIZE * ((2 - (O::NK::USIZE % 4)) * 2 + (O::NK::USIZE % 4) * 3)) / 16
     {
-        let inside = &convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]));
-        let key: &GenericArray<u32, U8> = GenericArray::from_slice(inside);
-        if nk == 6 {
+        let inside = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]));
+        if O::NK::USIZE == 6 {
             if j % 3 == 1 {
-                for i in key[2].to_le_bytes() {
-                    w[index] = i;
-                    index += 1;
-                }
+                w[index..index + size_of::<u32>()].copy_from_slice(&inside[2].to_le_bytes());
+                index += size_of::<u32>();
             } else if j % 3 == 0 {
-                for i in key[0].to_le_bytes() {
-                    w[index] = i;
-                    index += 1;
-                }
+                w[index..index + size_of::<u32>()].copy_from_slice(&inside[0].to_le_bytes());
+                index += size_of::<u32>();
             }
         } else {
-            for i in key[0].to_le_bytes() {
-                w[index] = i;
-                index += 1;
-            }
+            w[index..index + size_of::<u32>()].copy_from_slice(&inside[0].to_le_bytes());
+            index += size_of::<u32>();
         }
     }
     //step 5
@@ -119,7 +100,7 @@ where
         round_with_save(
             input[16 * b..16 * (b + 1)].try_into().unwrap(),
             kb,
-            r,
+            O::R::U8,
             &mut w,
             &mut index,
             &mut valid,
@@ -148,13 +129,11 @@ fn round_with_save(
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1(&mut state, 4);
         for i in convert_from_batchblocks(inv_bitslice(&state))[..4][..4]
-            .to_vec()
             .iter()
-            .flat_map(|x| x.to_le_bytes())
-            .collect::<Vec<u8>>()
+            .map(|x| x.to_le_bytes())
         {
-            w[*index] = i;
-            *index += 1
+            w[*index..*index + size_of::<u32>()].copy_from_slice(&i);
+            *index += size_of::<u32>();
         }
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
@@ -176,27 +155,18 @@ where
     O: OWFParameters,
 {
     //Step 1 is ok by construction
-    let r = <O::R as Unsigned>::to_usize();
-    let nk = <O::NK as Unsigned>::to_usize();
     let mut out = GenericArray::default_boxed();
-    let lambda = <O::LAMBDA as Unsigned>::to_usize();
-    let mut index = 0;
-    for i in x.iter().take(lambda).cloned() {
-        out[index] = i;
-        index += 1;
-    }
-    let mut indice = lambda;
-    for j in nk as u16..(4 * (r + 1)) as u16 {
-        if (j % (nk as u16) == 0) || ((nk > 6) && (j % (nk as u16) == 4)) {
-            for i in &x[indice..indice + 32] {
-                out[index] = *i;
-                index += 1;
-            }
+    out[..O::LAMBDA::USIZE].copy_from_slice(&x[..O::LAMBDA::USIZE]);
+    let mut index = O::LAMBDA::USIZE;
+    let mut indice = O::LAMBDA::USIZE;
+    for j in O::NK::USIZE..(4 * (O::R::USIZE + 1)) {
+        if (j % O::NK::USIZE == 0) || ((O::NK::USIZE > 6) && (j % O::NK::USIZE == 4)) {
+            out[index..index + 32].copy_from_slice(&x[indice..indice + 32]);
+            index += 32;
             indice += 32;
         } else {
             for i in 0..32 {
-                out[index] =
-                    out[((32 * (j - nk as u16)) + i) as usize] + out[((32 * (j - 1)) + i) as usize];
+                out[index] = out[(32 * (j - O::NK::USIZE)) + i] + out[(32 * (j - 1)) + i];
                 index += 1;
             }
         }
@@ -222,46 +192,31 @@ fn aes_key_exp_bwd_mtag0_mkey0<O>(
 where
     O: OWFParameters,
 {
-    let ske = <O::SKE as Unsigned>::to_usize();
-    let mut out: Box<GenericArray<Field<O>, O::PRODSKE8>> = GenericArray::default_boxed();
-    let mut indice = 0u16;
-    let mut index = 0u16;
-    let mut c = 0u8;
+    let mut out = GenericArray::default_boxed();
+    let mut indice = 0;
+    let mut index = 0;
+    let mut c = 0;
     let mut rmvrcon = true;
     let mut ircon = 0;
     //Step 6
-    for j in 0..ske {
+    for j in 0..O::SKE::USIZE {
         //Step 7
-        let mut x_tilde: GenericArray<Field<O>, U8> = *GenericArray::from_slice(
-            &zip(
-                x.iter().skip(8 * j).take(8),
-                xk.iter().skip((indice + (8 * (c as u16))).into()).take(8),
-            )
-            .map(|(x, xk)| *x + *xk)
-            .collect::<GenericArray<Field<O>, U8>>(),
-        );
+        let mut x_tilde: [Field<O>; 8] = array::from_fn(|i| x[8 * j + i] + xk[indice + 8 * c + i]);
         //Step 8
         if rmvrcon && (c == 0) {
             let rcon = RCON_TABLE[ircon];
             ircon += 1;
-            let mut r = [Field::<O>::default(); 8];
             //Step 11
             for i in 0..8 {
-                r[i] = Field::<O>::ONE * ((rcon >> i) & 1);
-                x_tilde[i] += r[i];
+                x_tilde[i] += Field::<O>::ONE * ((rcon >> i) & 1);
             }
         }
-        let mut y_tilde = [Field::<O>::default(); 8];
-        //Step 15
-        for i in 0..8 {
-            y_tilde[i] = x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8];
-        }
+        let mut y_tilde: [Field<O>; 8] =
+            array::from_fn(|i| x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8]);
         y_tilde[0] += Field::<O>::ONE;
         y_tilde[2] += Field::<O>::ONE;
-        for i in &y_tilde {
-            out[index as usize] = *i;
-            index += 1;
-        }
+        out[index..index + 8].copy_from_slice(&y_tilde);
+        index += 8;
         c += 1;
         //Step 21
         if c == 4 {
@@ -286,33 +241,20 @@ fn aes_key_exp_bwd_mtag1_mkey0<O>(
 where
     O: OWFParameters,
 {
-    let ske = <O::SKE as Unsigned>::to_usize();
-    let mut out: Box<GenericArray<Field<O>, O::PRODSKE8>> = GenericArray::default_boxed();
-    let mut indice = 0u16;
-    let mut index = 0u16;
-    let mut c = 0u8;
+    let mut out = GenericArray::default_boxed();
+    let mut indice = 0;
+    let mut index = 0;
+    let mut c = 0;
     let mut rmvrcon = true;
     //Step 6
-    for j in 0..ske {
+    for j in 0..O::SKE::USIZE {
         //Step 7
-        let x_tilde: GenericArray<Field<O>, U8> = *GenericArray::from_slice(
-            &zip(
-                x.iter().skip(8 * j).take(8),
-                xk.iter().skip((indice + (8 * (c as u16))).into()).take(8),
-            )
-            .map(|(x, xk)| *x + *xk)
-            .collect::<GenericArray<Field<O>, U8>>(),
-        );
-        //Step 8
-        let mut y_tilde = [Field::<O>::default(); 8];
+        let x_tilde: [Field<O>; 8] = array::from_fn(|i| x[8 * j + i] + xk[indice + 8 * c + i]);
         //Step 15
-        for i in 0..8 {
-            y_tilde[i] = x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8];
-        }
-        for i in &y_tilde {
-            out[index as usize] = *i;
-            index += 1;
-        }
+        let y_tilde: [Field<O>; 8] =
+            array::from_fn(|i| x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8]);
+        out[index..index + 8].copy_from_slice(&y_tilde);
+        index += 8;
         c += 1;
         //Step 21
         if c == 4 {
@@ -338,45 +280,32 @@ fn aes_key_exp_bwd_mtag0_mkey1<O>(
 where
     O: OWFParameters,
 {
-    let mut out: Box<GenericArray<Field<O>, O::PRODSKE8>> = GenericArray::default_boxed();
-    let mut indice = 0u16;
+    let mut out = GenericArray::default_boxed();
+    let mut indice = 0;
     let mut index = 0;
-    let mut c = 0u8;
+    let mut c = 0;
     let mut rmvrcon = true;
     let mut ircon = 0;
     //Step 6
     for j in 0..O::SKE::USIZE {
         //Step 7
-        let mut x_tilde: GenericArray<Field<O>, U8> = *GenericArray::from_slice(
-            &zip(
-                x.iter().skip(8 * j).take(8),
-                xk.iter().skip((indice + (8 * (c as u16))).into()).take(8),
-            )
-            .map(|(x, xk)| *x + *xk)
-            .collect::<GenericArray<Field<O>, U8>>(),
-        );
+        let mut x_tilde: [Field<O>; 8] = array::from_fn(|i| x[8 * j + i] + xk[indice + 8 * c + i]);
         //Step 8
         if rmvrcon && (c == 0) {
             let rcon = RCON_TABLE[ircon];
             ircon += 1;
-            let mut r = [Field::<O>::default(); 8];
             //Step 11
             for i in 0..8 {
-                r[i] = delta * ((rcon >> i) & 1);
-                x_tilde[i] += r[i];
+                x_tilde[i] += delta * ((rcon >> i) & 1)
             }
         }
-        let mut y_tilde = [Field::<O>::default(); 8];
         //Step 15
-        for i in 0..8 {
-            y_tilde[i] = x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8];
-        }
+        let mut y_tilde: [Field<O>; 8] =
+            array::from_fn(|i| x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8]);
         y_tilde[0] += delta;
         y_tilde[2] += delta;
-        for i in &y_tilde {
-            out[index] = *i;
-            index += 1;
-        }
+        out[index..index + 8].copy_from_slice(&y_tilde);
+        index += 8;
         c += 1;
         //Step 21
         if c == 4 {
@@ -418,12 +347,11 @@ fn aes_key_exp_cstrnts_mkey0<O>(
 where
     O: OWFParameters,
 {
-    let kc = <O::NK as Unsigned>::to_u8();
-    let ske = <O::SKE as Unsigned>::to_u16();
-    let mut iwd: u16 = 32 * (kc - 1) as u16;
+    let mut iwd = 32 * (O::NK::USIZE - 1);
     let mut dorotword = true;
     let k = aes_key_exp_fwd::<O>(GenericArray::from_slice(
         &w.iter()
+            // FIXME!
             .map(|x| match x {
                 0 => Field::<O>::default(),
                 _ => Field::<O>::ONE,
@@ -457,7 +385,7 @@ where
         ),
         GenericArray::from_slice(&vk),
     );
-    for j in 0..ske / 4 {
+    for j in 0..O::SKE::USIZE / 4 {
         let mut k_hat = [Field::<O>::default(); 4];
         let mut v_k_hat = [Field::<O>::default(); 4];
         let mut w_hat = [Field::<O>::default(); 4];
@@ -503,9 +431,7 @@ fn aes_key_exp_cstrnts_mkey1<O>(
 where
     O: OWFParameters,
 {
-    let kc = <O::NK as Unsigned>::to_u8();
-    let ske = <O::SKE as Unsigned>::to_u16();
-    let mut iwd: u16 = 32 * (kc - 1) as u16;
+    let mut iwd = 32 * (O::NK::USIZE - 1);
     let mut dorotword = true;
     let q_k = aes_key_exp_fwd::<O>(q);
     // FIXME
@@ -521,7 +447,7 @@ where
         delta,
     );
     let delta_squared = delta * delta;
-    for j in 0..ske / 4 {
+    for j in 0..O::SKE::USIZE / 4 {
         let mut q_h_k = [Field::<O>::default(); 4];
         let mut q_h_w_b = [Field::<O>::default(); 4];
         for r in 0..4 {
@@ -571,7 +497,7 @@ where
         index += 1;
     }
     //Step 6
-    for j in 1..<O::R as Unsigned>::to_usize() {
+    for j in 1..O::R::USIZE {
         for c in 0..4 {
             let ix: usize = 128 * (j - 1) + 32 * c;
             let ik: usize = 128 * j + 32 * c;
@@ -619,7 +545,7 @@ where
         index += 1;
     }
     //Step 6
-    for j in 1..<O::R as Unsigned>::to_usize() {
+    for j in 1..O::R::USIZE {
         for c in 0..4 {
             let ix: usize = 128 * (j - 1) + 32 * c;
             let ik: usize = 128 * j + 32 * c;
@@ -659,7 +585,7 @@ where
         index += 1;
     }
     //Step 6
-    for j in 1..<O::R as Unsigned>::to_usize() {
+    for j in 1..O::R::USIZE {
         for c in 0..4 {
             let ix: usize = 128 * (j - 1) + 32 * c;
             let ik: usize = 128 * j + 32 * c;
@@ -698,15 +624,14 @@ where
     O: OWFParameters,
 {
     let mut res = GenericArray::default_boxed();
-    let r = <O::R as Unsigned>::to_usize();
     //Step 2
-    for j in 0..r {
+    for j in 0..O::R::USIZE {
         for c in 0..4 {
             //Step 4
             for k in 0..4 {
                 let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
                 let x_t: [Field<O>; 8];
-                if j < r - 1 {
+                if j < O::R::USIZE - 1 {
                     x_t = x[ird..ird + 8].try_into().unwrap();
                 } else {
                     let mut x_out = [Field::<O>::default(); 8];
@@ -744,16 +669,15 @@ where
     O: OWFParameters,
 {
     let mut res = GenericArray::default_boxed();
-    let r = <O::R as Unsigned>::to_usize();
     let immut = delta;
     //Step 2
-    for j in 0..r {
+    for j in 0..O::R::USIZE {
         for c in 0..4 {
             //Step 4
             for k in 0..4 {
                 let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
                 let x_t: [Field<O>; 8];
-                if j < r - 1 {
+                if j < O::R::USIZE - 1 {
                     x_t = x[ird..ird + 8].try_into().unwrap();
                 } else {
                     let mut x_out = [Field::<O>::default(); 8];
@@ -788,14 +712,13 @@ where
     O: OWFParameters,
 {
     let mut res = GenericArray::default_boxed();
-    let r = <O::R as Unsigned>::to_usize();
     //Step 2
-    for j in 0..r {
+    for j in 0..O::R::USIZE {
         for c in 0..4 {
             //Step 4
             for k in 0..4 {
                 let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
-                let x_t = if j < r - 1 {
+                let x_t = if j < O::R::USIZE - 1 {
                     &x[ird..ird + 8]
                 } else {
                     &xk[128 + ird..136 + ird]
@@ -823,7 +746,6 @@ fn aes_enc_cstrnts_mkey0<O>(
 ) where
     O: OWFParameters,
 {
-    let senc = <O::SENC as Unsigned>::to_usize();
     let mut field_w: Box<GenericArray<Field<O>, O::LENC>> = GenericArray::default_boxed();
     for i in 0..w.len() {
         for j in 0..8 {
@@ -835,7 +757,7 @@ fn aes_enc_cstrnts_mkey0<O>(
     let vs = aes_enc_fwd_mkey0_mtag1::<O>(v, vk);
     let s_b = aes_enc_bkwd_mkey0_mtag0::<O>(&field_w, k, output);
     let v_s_b = aes_enc_bkwd_mkey0_mtag1::<O>(v, vk);
-    for j in 0..senc {
+    for j in 0..O::SENC::USIZE {
         let a0 = vs[j] * v_s_b[j];
         let a1 = (s[j] + vs[j]) * (s_b[j] + v_s_b[j]) + Field::<O>::ONE + a0;
         a_t_hasher.update(&a1);
@@ -853,11 +775,10 @@ fn aes_enc_cstrnts_mkey1<O>(
 ) where
     O: OWFParameters,
 {
-    let senc = <O::SENC as Unsigned>::to_usize();
     let qs = aes_enc_fwd_mkey1_mtag0::<O>(q, qk, input, delta);
     let q_s_b = aes_enc_bkwd_mkey1_mtag0::<O>(q, qk, output, delta);
     let delta_square = delta * delta;
-    for j in 0..senc {
+    for j in 0..O::SENC::USIZE {
         let b = (qs[j] * q_s_b[j]) + delta_square;
         b_t_hasher.update(&b);
     }
