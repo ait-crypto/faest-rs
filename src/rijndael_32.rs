@@ -18,14 +18,14 @@ use aes::{
     },
     Block,
 };
-use cipher::{array::Array, consts::U2};
+use generic_array::{typenum::U2, GenericArray};
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
 /// AES block batch size for this implementation
 pub(crate) type FixsliceBlocks = U2;
 
-pub(crate) type BatchBlocks = Array<Block, FixsliceBlocks>;
+pub(crate) type BatchBlocks = GenericArray<Block, FixsliceBlocks>;
 
 /// 256-bit internal state
 pub(crate) type State = [u32; 8];
