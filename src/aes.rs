@@ -198,17 +198,17 @@ where
     let mut c = 0;
     let mut rmvrcon = true;
     let mut ircon = 0;
-    //Step 6
+    // Step 6
     for j in 0..O::SKE::USIZE {
-        //Step 7
+        // Step 7
         let mut x_tilde: [Field<O>; 8] = array::from_fn(|i| x[8 * j + i] + xk[indice + 8 * c + i]);
-        //Step 8
+        // Step 8
         if rmvrcon && (c == 0) {
             let rcon = RCON_TABLE[ircon];
             ircon += 1;
-            //Step 11
-            for i in 0..8 {
-                x_tilde[i] += Field::<O>::ONE * ((rcon >> i) & 1);
+            // Step 11
+            for (i, x) in x_tilde.iter_mut().enumerate() {
+                *x += Field::<O>::ONE * ((rcon >> i) & 1);
             }
         }
         let mut y_tilde: [Field<O>; 8] =
@@ -288,15 +288,15 @@ where
     let mut ircon = 0;
     //Step 6
     for j in 0..O::SKE::USIZE {
-        //Step 7
+        // Step 7
         let mut x_tilde: [Field<O>; 8] = array::from_fn(|i| x[8 * j + i] + xk[indice + 8 * c + i]);
-        //Step 8
+        // Step 8
         if rmvrcon && (c == 0) {
             let rcon = RCON_TABLE[ircon];
             ircon += 1;
-            //Step 11
-            for i in 0..8 {
-                x_tilde[i] += delta * ((rcon >> i) & 1)
+            // Step 11
+            for (i, x) in x_tilde.iter_mut().enumerate() {
+                *x += Field::<O>::ONE * ((rcon >> i) & 1);
             }
         }
         //Step 15
@@ -382,18 +382,12 @@ where
         let mut v_w_hat = [Field::<O>::default(); 4];
         for r in 0..4 {
             let r_p = if dorotword { (r + 3) % 4 } else { r };
-            k_hat[r_p] = Field::<O>::byte_combine_slice(
-                &k[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
-            );
-            v_k_hat[r_p] = Field::<O>::byte_combine_slice(
-                &vk[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
-            );
-            w_hat[r] = Field::<O>::byte_combine_slice(
-                &w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
-            );
-            v_w_hat[r] = Field::<O>::byte_combine_slice(
-                &v_w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
-            );
+            k_hat[r_p] = Field::<O>::byte_combine_slice(&k[iwd + (8 * r)..iwd + (8 * r) + 8]);
+            v_k_hat[r_p] = Field::<O>::byte_combine_slice(&vk[iwd + (8 * r)..iwd + (8 * r) + 8]);
+            w_hat[r] =
+                Field::<O>::byte_combine_slice(&w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
+            v_w_hat[r] =
+                Field::<O>::byte_combine_slice(&v_w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
         }
         for r in 0..4 {
             let a0 = v_k_hat[r] * v_w_hat[r];
@@ -442,12 +436,9 @@ where
         let mut q_h_w_b = [Field::<O>::default(); 4];
         for r in 0..4 {
             let r_p = if dorotword { (r + 3) % 4 } else { r };
-            q_h_k[r_p] = Field::<O>::byte_combine_slice(
-                &q_k[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
-            );
-            q_h_w_b[r] = Field::<O>::byte_combine_slice(
-                &q_w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
-            );
+            q_h_k[r_p] = Field::<O>::byte_combine_slice(&q_k[iwd + (8 * r)..iwd + (8 * r) + 8]);
+            q_h_w_b[r] =
+                Field::<O>::byte_combine_slice(&q_w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
         }
         for r in 0..4 {
             let b = q_h_k[r] * q_h_w_b[r] + delta_squared;
