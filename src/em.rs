@@ -97,13 +97,11 @@ where
     for j in 0..4 * O::NST::USIZE {
         res[index] = match z {
             Either::Left(z) => Field::<O>::byte_combine_bits(z[j]),
-            Either::Right(z) => Field::<O>::byte_combine(z[8 * j..8 * (j + 1)].try_into().unwrap()),
+            Either::Right(z) => Field::<O>::byte_combine_slice(&z[8 * j..8 * (j + 1)]),
         } + match x {
             None => Field::<O>::ZERO,
             Some(Either::Left(x)) => Field::<O>::byte_combine_bits(x[j]),
-            Some(Either::Right(x)) => {
-                Field::<O>::byte_combine(x[8 * j..8 * (j + 1)].try_into().unwrap())
-            }
+            Some(Either::Right(x)) => Field::<O>::byte_combine_slice(&x[8 * j..8 * (j + 1)]),
         };
         index += 1;
     }
@@ -117,14 +115,14 @@ where
                 z_hat[r] = match z {
                     Either::Left(z) => Field::<O>::byte_combine_bits(z[i / 8 + r]),
                     Either::Right(z) => {
-                        Field::<O>::byte_combine(z[i + 8 * r..i + 8 * r + 8].try_into().unwrap())
+                        Field::<O>::byte_combine_slice(&z[i + 8 * r..i + 8 * r + 8])
                     }
                 };
                 x_hat[r] = match x {
                     None => Field::<O>::ZERO,
                     Some(Either::Left(x)) => Field::<O>::byte_combine_bits(x[i / 8 + r]),
                     Some(Either::Right(x)) => {
-                        Field::<O>::byte_combine(x[i + 8 * r..i + 8 * r + 8].try_into().unwrap())
+                        Field::<O>::byte_combine_slice(&x[i + 8 * r..i + 8 * r + 8])
                     }
                 };
             }

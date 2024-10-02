@@ -65,6 +65,11 @@ pub trait ByteCombine: Field {
     /// "Combine" field elements
     fn byte_combine(x: &[Self; 8]) -> Self;
 
+    /// "Combine" field elements
+    ///
+    /// This is the same as [Self::byte_combine] but takes a slice instead. It panics if the slice has less than `8` elements.
+    fn byte_combine_slice(x: &[Self]) -> Self;
+
     /// "Combine" bits
     fn byte_combine_bits(x: u8) -> Self;
 }
@@ -78,6 +83,15 @@ where
             .skip(1)
             .zip(Self::ALPHA)
             .fold(x[0], |sum, (xi, alphai)| sum + (alphai * xi))
+    }
+
+    fn byte_combine_slice(x: &[Self]) -> Self {
+        debug_assert_eq!(x.len(), 8);
+        let (x0, x) = x.split_at(1);
+        x.iter()
+            .take(7)
+            .zip(Self::ALPHA)
+            .fold(x0[0], |sum, (xi, alphai)| sum + (alphai * xi))
     }
 
     fn byte_combine_bits(x: u8) -> Self {
@@ -2288,6 +2302,7 @@ mod test {
             let tab = array::from_fn(|idx| GF128::new(data[idx], 0u128));
             let result = GF128::new(data[8], 0);
             assert_eq!(GF128::byte_combine(&tab), result);
+            assert_eq!(GF128::byte_combine_slice(&tab), result);
         }
     }
 
@@ -4390,6 +4405,7 @@ mod test {
             let tab = array::from_fn(|i| GF192::new(data[2 * i], data[(2 * i) + 1]));
             let result = GF192::new(data[16], data[17]);
             assert_eq!(GF192::byte_combine(&tab), result);
+            assert_eq!(GF192::byte_combine_slice(&tab), result);
         }
     }
 
@@ -6568,6 +6584,7 @@ mod test {
             let tab = array::from_fn(|i| GF256::new(data[2 * i], data[(2 * i) + 1]));
             let result = GF256::new(data[16], data[17]);
             assert_eq!(GF256::byte_combine(&tab), result);
+            assert_eq!(GF256::byte_combine_slice(&tab), result);
         }
     }
 
