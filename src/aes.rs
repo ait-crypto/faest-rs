@@ -323,16 +323,6 @@ where
     out
 }
 
-///Make sure you have 8 element into input before calling this function
-fn into_array<T>(input: &[T]) -> [T; 8]
-where
-    T: std::default::Default + std::marker::Copy,
-{
-    let mut res = [T::default(); 8];
-    res.copy_from_slice(&input[..8]);
-    res
-}
-
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
 ///
 ///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
@@ -392,18 +382,18 @@ where
         let mut v_w_hat = [Field::<O>::default(); 4];
         for r in 0..4 {
             let r_p = if dorotword { (r + 3) % 4 } else { r };
-            k_hat[r_p] = Field::<O>::byte_combine(&into_array(
+            k_hat[r_p] = Field::<O>::byte_combine_slice(
                 &k[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
-            ));
-            v_k_hat[r_p] = Field::<O>::byte_combine(&into_array(
+            );
+            v_k_hat[r_p] = Field::<O>::byte_combine_slice(
                 &vk[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
-            ));
-            w_hat[r] = Field::<O>::byte_combine(&into_array(
+            );
+            w_hat[r] = Field::<O>::byte_combine_slice(
                 &w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
-            ));
-            v_w_hat[r] = Field::<O>::byte_combine(&into_array(
+            );
+            v_w_hat[r] = Field::<O>::byte_combine_slice(
                 &v_w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
-            ));
+            );
         }
         for r in 0..4 {
             let a0 = v_k_hat[r] * v_w_hat[r];
@@ -452,12 +442,12 @@ where
         let mut q_h_w_b = [Field::<O>::default(); 4];
         for r in 0..4 {
             let r_p = if dorotword { (r + 3) % 4 } else { r };
-            q_h_k[r_p] = Field::<O>::byte_combine(&into_array(
+            q_h_k[r_p] = Field::<O>::byte_combine_slice(
                 &q_k[(iwd as usize) + (8 * r)..(iwd as usize) + (8 * r) + 8],
-            ));
-            q_h_w_b[r] = Field::<O>::byte_combine(&into_array(
+            );
+            q_h_w_b[r] = Field::<O>::byte_combine_slice(
                 &q_w_b[(32 * j as usize) + (8 * r)..(32 * j as usize) + (8 * r) + 8],
-            ));
+            );
         }
         for r in 0..4 {
             let b = q_h_k[r] * q_h_w_b[r] + delta_squared;
@@ -493,7 +483,7 @@ where
     //Step 2-5
     for i in 0..16 {
         res[index] = Field::<O>::byte_combine_bits(input[i])
-            + Field::<O>::byte_combine(xk[8 * i..(8 * i) + 8].try_into().unwrap());
+            + Field::<O>::byte_combine_slice(&xk[8 * i..(8 * i) + 8]);
         index += 1;
     }
     //Step 6
@@ -504,10 +494,8 @@ where
             let mut x_hat = [Field::<O>::default(); 4];
             let mut x_hat_k = [Field::<O>::default(); 4];
             for r in 0..4 {
-                x_hat[r] =
-                    Field::<O>::byte_combine(x[ix + 8 * r..ix + 8 * r + 8].try_into().unwrap());
-                x_hat_k[r] =
-                    Field::<O>::byte_combine(xk[ik + 8 * r..ik + 8 * r + 8].try_into().unwrap());
+                x_hat[r] = Field::<O>::byte_combine_slice(&x[ix + 8 * r..ix + 8 * r + 8]);
+                x_hat_k[r] = Field::<O>::byte_combine_slice(&xk[ik + 8 * r..ik + 8 * r + 8]);
             }
 
             //Step 16
@@ -541,7 +529,7 @@ where
             *xin_item = delta * bit;
         }
         res[index] = Field::<O>::byte_combine(&xin)
-            + Field::<O>::byte_combine(xk[8 * i..(8 * i) + 8].try_into().unwrap());
+            + Field::<O>::byte_combine_slice(&xk[8 * i..(8 * i) + 8]);
         index += 1;
     }
     //Step 6
@@ -552,10 +540,8 @@ where
             let mut x_hat = [Field::<O>::default(); 4];
             let mut x_hat_k = [Field::<O>::default(); 4];
             for r in 0..4 {
-                x_hat[r] =
-                    Field::<O>::byte_combine(x[ix + 8 * r..ix + 8 * r + 8].try_into().unwrap());
-                x_hat_k[r] =
-                    Field::<O>::byte_combine(xk[ik + 8 * r..ik + 8 * r + 8].try_into().unwrap());
+                x_hat[r] = Field::<O>::byte_combine_slice(&x[ix + 8 * r..ix + 8 * r + 8]);
+                x_hat_k[r] = Field::<O>::byte_combine_slice(&xk[ik + 8 * r..ik + 8 * r + 8]);
             }
 
             //Step 16
@@ -581,7 +567,7 @@ where
     let mut res = GenericArray::default_boxed();
     //Step 2-5
     for i in 0..16 {
-        res[index] = Field::<O>::byte_combine(xk[8 * i..(8 * i) + 8].try_into().unwrap());
+        res[index] = Field::<O>::byte_combine_slice(&xk[8 * i..(8 * i) + 8]);
         index += 1;
     }
     //Step 6
@@ -592,10 +578,8 @@ where
             let mut x_hat = [Field::<O>::default(); 4];
             let mut x_hat_k = [Field::<O>::default(); 4];
             for r in 0..4 {
-                x_hat[r] =
-                    Field::<O>::byte_combine(x[ix + 8 * r..ix + 8 * r + 8].try_into().unwrap());
-                x_hat_k[r] =
-                    Field::<O>::byte_combine(xk[ik + 8 * r..ik + 8 * r + 8].try_into().unwrap());
+                x_hat[r] = Field::<O>::byte_combine_slice(&x[ix + 8 * r..ix + 8 * r + 8]);
+                x_hat_k[r] = Field::<O>::byte_combine_slice(&xk[ik + 8 * r..ik + 8 * r + 8]);
             }
 
             //Step 16
