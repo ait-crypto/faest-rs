@@ -181,7 +181,7 @@ where
 ///One of the first path to optimize the code could be to do the distinction
 ///Beware when calling it : if Mtag = 1 ∧ Mkey = 1 or Mkey = 1 ∧ ∆ = ⊥ return ⊥
 fn aes_key_exp_bwd_mtag0_mkey0<O>(
-    x: &GenericArray<Field<O>, O::LKE>,
+    x: &GenericArray<u8, O::LKE>,
     xk: &GenericArray<Field<O>, O::PRODRUN128>,
 ) -> Box<GenericArray<Field<O>, O::PRODSKE8>>
 where
@@ -196,7 +196,9 @@ where
     // Step 6
     for j in 0..O::SKE::USIZE {
         // Step 7
-        let mut x_tilde: [Field<O>; 8] = array::from_fn(|i| x[8 * j + i] + xk[indice + 8 * c + i]);
+        let mut x_tilde: [Field<O>; 8] = array::from_fn(|i| {
+            Field::<O>::ONE * ((x[8 * j + i + O::LAMBDA::USIZE]) & 1) + xk[indice + 8 * c + i]
+        });
         // Step 8
         if rmvrcon && (c == 0) {
             let rcon = RCON_TABLE[ircon];
@@ -345,21 +347,7 @@ where
     ));
     let vk = aes_key_exp_fwd::<O>(v);
     // FIXME
-    let w_b = aes_key_exp_bwd_mtag0_mkey0::<O>(
-        GenericArray::from_slice(
-            &[
-                &w.iter()
-                    .map(|x| match x {
-                        0 => Field::<O>::default(),
-                        _ => Field::<O>::ONE,
-                    })
-                    .collect::<Vec<Field<O>>>()[O::LAMBDA::USIZE..],
-                &vec![Field::<O>::default(); O::LAMBDA::USIZE],
-            ]
-            .concat(),
-        ),
-        GenericArray::from_slice(&k),
-    );
+    let w_b = aes_key_exp_bwd_mtag0_mkey0::<O>(w, GenericArray::from_slice(&k));
     let v_w_b = aes_key_exp_bwd_mtag1_mkey0::<O>(
         GenericArray::from_slice(
             &[
@@ -1061,7 +1049,7 @@ mod test {
         O: OWFParameters,
     {
         if !mkey && !mtag {
-            aes_key_exp_bwd_mtag0_mkey0::<O>(x, xk)
+            unreachable!()
         } else if mkey {
             aes_key_exp_bwd_mtag0_mkey1::<O>(x, xk, delta)
         } else if mtag {
@@ -1077,9 +1065,13 @@ mod test {
             serde_json::from_str(include_str!("../tests/data/AesKeyExpBwd.json"))
                 .expect("error while reading or parsing");
         for data in database {
+            let mtag = data.mtag != 0;
+            let mkey = data.mkey != 0;
+            if !mtag && !mtag {
+                continue;
+            }
+
             if data.lambda == 128 {
-                let mtag = data.mtag != 0;
-                let mkey = data.mkey != 0;
                 let delta = GF128::new(data.delta[0] + (data.delta[1] << 64), 0);
                 let (x, xk, out): (Vec<GF128>, Vec<GF128>, Vec<GF128>) = if !mtag && !mkey {
                     (
@@ -1126,8 +1118,6 @@ mod test {
                     assert_eq!(res[i], out[i]);
                 }
             } else if data.lambda == 192 {
-                let mtag = data.mtag != 0;
-                let mkey = data.mkey != 0;
                 let delta = GF192::new(data.delta[0] + (data.delta[1] << 64), data.delta[2]);
                 let (x, xk, out): (Vec<GF192>, Vec<GF192>, Vec<GF192>) = if !mtag && !mkey {
                     (
@@ -1173,8 +1163,6 @@ mod test {
                     assert_eq!(res[i], out[i]);
                 }
             } else {
-                let mtag = data.mtag != 0;
-                let mkey = data.mkey != 0;
                 let delta = GF256::new(
                     data.delta[0] + (data.delta[1] << 64),
                     data.delta[2] + (data.delta[3] << 64),
