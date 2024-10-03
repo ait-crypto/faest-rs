@@ -27,17 +27,17 @@ where
     let mut valid = true;
     let mut res: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
     let mut index = O::LAMBDABYTES::USIZE;
-    let x = rijndael_key_schedule(
+    let (kb, _) = rijndael_key_schedule(
         owf_input,
-        O::NST::U8,
-        O::NK::U8,
-        O::R::U8,
-        (4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE)) as u8,
+        O::NST::USIZE,
+        O::NK::USIZE,
+        O::R::USIZE,
+        4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE),
     );
     res[..O::LAMBDABYTES::USIZE].copy_from_slice(owf_key);
     let mut state = State::default();
     bitslice(&mut state, &owf_key[..16], &owf_key[16..]);
-    rijndael_add_round_key(&mut state, &x.0[..8]);
+    rijndael_add_round_key(&mut state, &kb[..8]);
     for j in 1..O::R::USIZE {
         for i in inv_bitslice(&state)[0][..].iter() {
             valid &= *i != 0;
@@ -53,16 +53,15 @@ where
         }
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
-        rijndael_shift_rows_1(&mut state, O::NST::U8);
-        for i in convert_from_batchblocks(inv_bitslice(&state))[..O::NK::USIZE][..O::NK::USIZE]
-            .iter()
-            .flat_map(|x| x.to_le_bytes())
+        rijndael_shift_rows_1(&mut state, O::NST::USIZE);
+        for i in
+            convert_from_batchblocks(inv_bitslice(&state))[..O::NK::USIZE][..O::NK::USIZE].iter()
         {
-            res[index] = i;
-            index += 1;
+            res[index..index + size_of::<u32>()].copy_from_slice(&i.to_le_bytes());
+            index += size_of::<u32>();
         }
         mix_columns_0(&mut state);
-        rijndael_add_round_key(&mut state, &x.0[8 * j..8 * (j + 1)]);
+        rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
     }
     for i in inv_bitslice(&state)[0][..].iter() {
         valid &= *i != 0;
@@ -357,10 +356,10 @@ where
 
     let x = rijndael_key_schedule(
         owf_input,
-        O::NST::U8,
-        O::NK::U8,
-        O::R::U8,
-        4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE) as u8,
+        O::NST::USIZE,
+        O::NK::USIZE,
+        O::R::USIZE,
+        4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE),
     );
     em_enc_cstrnts_mkey0::<O>(
         &mut a_t_hasher,
@@ -409,10 +408,10 @@ where
         <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
     let x = rijndael_key_schedule(
         owf_input,
-        O::NST::U8,
-        O::NK::U8,
-        O::R::U8,
-        4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE) as u8,
+        O::NST::USIZE,
+        O::NK::USIZE,
+        O::R::USIZE,
+        4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE),
     );
     em_enc_cstrnts_mkey1::<O>(
         &mut zk_hasher,

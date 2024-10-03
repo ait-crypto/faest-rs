@@ -1,4 +1,4 @@
-use std::{array, iter::zip};
+use std::array;
 
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
@@ -8,7 +8,7 @@ use crate::{
     parameter::{QSProof, TauParameters},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
-        rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
+        rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State, RCON_TABLE,
     },
     universal_hashing::{ZKHasherInit, ZKHasherProcess},
     utils::convert_gq,
@@ -59,8 +59,8 @@ where
     let mut w: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
     let mut index = 0;
     //step 3
-    let (temp_kb, mut valid) = rijndael_key_schedule(owf_key, 4, O::NK::U8, O::R::U8, O::SKE::U8);
-    let kb = GenericArray::<u32, O::KBLENGTH>::from_slice(&temp_kb[..O::KBLENGTH::USIZE]);
+    let (kb, mut valid) =
+        rijndael_key_schedule(owf_key, 4, O::NK::USIZE, O::R::USIZE, O::SKE::USIZE);
     //step 4
     for i in convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4]
         .iter()
@@ -98,8 +98,8 @@ where
     //step 5
     for b in 0..O::BETA::USIZE {
         round_with_save(
-            input[16 * b..16 * (b + 1)].try_into().unwrap(),
-            kb,
+            &input[16 * b..16 * (b + 1)],
+            &kb,
             O::R::U8,
             &mut w,
             &mut index,
@@ -111,7 +111,7 @@ where
 
 #[allow(clippy::too_many_arguments)]
 fn round_with_save(
-    input1: &[u8; 16],
+    input1: &[u8],
     kb: &[u32],
     r: u8,
     w: &mut [u8],
@@ -173,11 +173,6 @@ where
     }
     out
 }
-
-const RCON_TABLE: [u8; 30] = [
-    1, 2, 4, 8, 16, 32, 64, 128, 27, 54, 108, 216, 171, 77, 154, 47, 94, 188, 99, 198, 151, 53,
-    106, 212, 179, 125, 250, 239, 197, 145,
-];
 
 ///Choice is made to treat bits as element of GFlambda(that is, m=lambda anyway, while in the paper we can have m = 1),
 ///
@@ -603,9 +598,8 @@ where
             //Step 4
             for k in 0..4 {
                 let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
-                let x_t: [Field<O>; 8];
-                if j < O::R::USIZE - 1 {
-                    x_t = x[ird..ird + 8].try_into().unwrap();
+                let x_t: [_; 8] = if j < O::R::USIZE - 1 {
+                    array::from_fn(|i| x[ird + i])
                 } else {
                     let mut x_out = [Field::<O>::default(); 8];
                     for i in 0..8 {
@@ -613,16 +607,10 @@ where
                         x_out[i] = Field::<O>::ONE
                             * ((out[(ird - 128 * j + i) / 8] >> ((ird - 128 * j + i) % 8)) & 1);
                     }
-                    x_t = zip(x_out, &xk[128 + ird..136 + ird])
-                        .map(|(out, &k)| out + k)
-                        .collect::<Vec<Field<O>>>()
-                        .try_into()
-                        .unwrap();
-                }
-                let mut y_t = [Field::<O>::default(); 8];
-                for i in 0..8 {
-                    y_t[i] = x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8];
-                }
+                    array::from_fn(|i| x_out[i] + xk[128 + ird + i])
+                };
+                let mut y_t =
+                    array::from_fn(|i| x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8]);
                 y_t[0] += Field::<O>::ONE;
                 y_t[2] += Field::<O>::ONE;
                 res[k + c * 4 + j * 16] = Field::<O>::byte_combine(&y_t);
@@ -642,34 +630,26 @@ where
     O: OWFParameters,
 {
     let mut res = GenericArray::default_boxed();
-    let immut = delta;
     //Step 2
     for j in 0..O::R::USIZE {
         for c in 0..4 {
             //Step 4
             for k in 0..4 {
                 let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
-                let x_t: [Field<O>; 8];
-                if j < O::R::USIZE - 1 {
-                    x_t = x[ird..ird + 8].try_into().unwrap();
+                let x_t: [_; 8] = if j < O::R::USIZE - 1 {
+                    array::from_fn(|i| x[ird + i])
                 } else {
                     let mut x_out = [Field::<O>::default(); 8];
                     for i in 0..8 {
-                        x_out[i] = immut
+                        x_out[i] = delta
                             * ((out[(ird - 128 * j + i) / 8] >> ((ird - 128 * j + i) % 8)) & 1);
                     }
-                    x_t = zip(x_out, &xk[128 + ird..136 + ird])
-                        .map(|(out, &k)| out + k)
-                        .collect::<Vec<Field<O>>>()
-                        .try_into()
-                        .unwrap();
-                }
-                let mut y_t = [Field::<O>::default(); 8];
-                for i in 0..8 {
-                    y_t[i] = x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8];
-                }
-                y_t[0] += immut;
-                y_t[2] += immut;
+                    array::from_fn(|i| x_out[i] + xk[128 + ird + i])
+                };
+                let mut y_t =
+                    array::from_fn(|i| x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8]);
+                y_t[0] += delta;
+                y_t[2] += delta;
                 res[k + c * 4 + j * 16] = Field::<O>::byte_combine(&y_t);
             }
         }

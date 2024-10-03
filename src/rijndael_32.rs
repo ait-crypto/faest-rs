@@ -30,22 +30,27 @@ pub(crate) type BatchBlocks = GenericArray<Block, FixsliceBlocks>;
 /// 256-bit internal state
 pub(crate) type State = [u32; 8];
 
+pub(crate) const RCON_TABLE: [u8; 30] = [
+    1, 2, 4, 8, 16, 32, 64, 128, 27, 54, 108, 216, 171, 77, 154, 47, 94, 188, 99, 198, 151, 53,
+    106, 212, 179, 125, 250, 239, 197, 145,
+];
+
 /// Fully bitsliced Rijndael key schedule to match the fully-fixsliced representation.
 pub(crate) fn rijndael_key_schedule(
     key: &[u8],
-    nst: u8,
-    nk: u8,
-    r: u8,
-    ske: u8,
+    nst: usize,
+    nk: usize,
+    r: usize,
+    ske: usize,
 ) -> (Vec<u32>, bool) {
     let mut valid = true;
-    let mut rkeys = vec![0u32; (((nst.div_ceil(nk)) * 8 * (r + 1)) + 8).into()];
+    let mut rkeys = vec![0u32; (nst.div_ceil(nk) * 8 * (r + 1)) + 8];
 
     bitslice(&mut rkeys[..8], &key[..16], &key[16..]);
 
     let mut rk_off = 0;
     let mut count = 0;
-    for i in 0..ske / 4 {
+    for rcon in RCON_TABLE.iter().take(ske / 4) {
         if nk == 8 {
             if count < ske / 4 {
                 for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][12..].iter() {
@@ -67,16 +72,12 @@ pub(crate) fn rijndael_key_schedule(
         sub_bytes(&mut rkeys[rk_off..(rk_off + 8)]);
         sub_bytes_nots(&mut rkeys[rk_off..(rk_off + 8)]);
 
-        let table = [
-            1, 2, 4, 8, 16, 32, 64, 128, 27, 54, 108, 216, 171, 77, 154, 47, 94, 188, 99, 198, 151,
-            53, 106, 212, 179, 125, 250, 239, 197, 145,
-        ];
-        let ind = nk * 4;
+        let ind = (nk * 4) as u8;
         let mut rcon_0 = [0u8; 16];
         let mut rcon_1 = [0u8; 16];
-        rcon_0[13] = table[i as usize] * (1 - ind / 17);
-        rcon_1[5] = (table[i as usize] as u16 * (((ind / 8) % 2) as u16)) as u8;
-        rcon_1[13] = table[i as usize] * (ind / 32);
+        rcon_0[13] = rcon * (1 - ind / 17);
+        rcon_1[5] = (*rcon as u16 * (((ind / 8) % 2) as u16)) as u8;
+        rcon_1[13] = rcon * (ind / 32);
         let mut bitsliced_rcon = [0u32; 8];
         bitslice(&mut bitsliced_rcon, &rcon_0, &rcon_1);
 
@@ -293,7 +294,7 @@ pub(crate) fn rijndael_key_schedule(
 /// Fully-fixsliced AES-128 encryption (the ShiftRows is completely omitted).
 ///
 /// Encrypts four blocks in-place and in parallel.
-fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst: u8, r: u8) -> BatchBlocks {
+fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst: usize, r: usize) -> BatchBlocks {
     let mut state = State::default();
     bitslice(&mut state, &input[..16], &input[16..]);
     rijndael_add_round_key(&mut state, &rkeys[..8]);
@@ -306,7 +307,7 @@ fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst: u8, r: u8) -> BatchBlocks 
         rijndael_add_round_key(&mut state, &rkeys[rk_off..(rk_off + 8)]);
         rk_off += 8;
 
-        if rk_off == 8 * r as usize {
+        if rk_off == 8 * r {
             break;
         }
     }
@@ -317,7 +318,7 @@ fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst: u8, r: u8) -> BatchBlocks 
     sub_bytes(&mut state);
     sub_bytes_nots(&mut state);
     rijndael_shift_rows_1(&mut state, nst);
-    rijndael_add_round_key(&mut state, &rkeys[(r * 8) as usize..((r * 8) + 8) as usize]);
+    rijndael_add_round_key(&mut state, &rkeys[r * 8..(r * 8) + 8]);
     inv_bitslice(&state)
 }
 
@@ -572,7 +573,7 @@ fn delta_swap_2(a: &mut u32, b: &mut u32, shift: u32, mask: u32) {
 ///
 /// /// Applies ShiftRows once on an AES state (or key).
 #[inline]
-pub(crate) fn rijndael_shift_rows_1(state: &mut [u32], bc: u8) {
+pub(crate) fn rijndael_shift_rows_1(state: &mut [u32], bc: usize) {
     debug_assert_eq!(state.len(), 8);
     for x in state.iter_mut() {
         if bc == 4 {
@@ -599,7 +600,7 @@ pub(crate) fn rijndael_shift_rows_1(state: &mut [u32], bc: u8) {
 ///
 /// The `idx_ror` parameter refers to the rotation value, which varies between the
 /// different key schedules.
-fn xor_columns(rkeys: &mut [u32], offset: usize, idx_xor: usize, idx_ror: u32, nk: u8) {
+fn xor_columns(rkeys: &mut [u32], offset: usize, idx_xor: usize, idx_ror: usize, nk: usize) {
     if nk == 4 {
         for i in 0..8 {
             let off_i: usize = offset + i;
@@ -819,12 +820,12 @@ pub(crate) fn rijndael_add_round_key(state: &mut State, rkey: &[u32]) {
 }
 
 #[inline(always)]
-const fn ror(x: u32, y: u32) -> u32 {
-    x.rotate_right(y)
+const fn ror(x: u32, y: usize) -> u32 {
+    x.rotate_right(y as u32)
 }
 
 #[inline(always)]
-const fn ror_distance(rows: u32, cols: u32) -> u32 {
+const fn ror_distance(rows: usize, cols: usize) -> usize {
     (rows << 3) + (cols << 1)
 }
 
@@ -851,7 +852,7 @@ impl KeySizeUser for Rijndael192 {
 
 impl KeyInit for Rijndael192 {
     fn new(key: &aes::cipher::Key<Self>) -> Self {
-        Self(rijndael_key_schedule(key.as_slice(), 6, 6, 12, ske(12, 6, 6) as u8).0)
+        Self(rijndael_key_schedule(key.as_slice(), 6, 6, 12, ske(12, 6, 6)).0)
     }
 }
 
@@ -887,7 +888,7 @@ impl KeySizeUser for Rijndael256 {
 
 impl KeyInit for Rijndael256 {
     fn new(key: &aes::cipher::Key<Self>) -> Self {
-        Self(rijndael_key_schedule(key.as_slice(), 8, 8, 14, ske(14, 8, 8) as u8).0)
+        Self(rijndael_key_schedule(key.as_slice(), 8, 8, 14, ske(14, 8, 8)).0)
     }
 }
 
@@ -925,7 +926,7 @@ mod test {
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct ShiftRows {
-        bc: u8,
+        bc: usize,
         rep: u8,
         input: Vec<u8>,
         output: Vec<u8>,
@@ -941,10 +942,8 @@ mod test {
             let mut output = [0u32; 8];
             for i in 0..data.bc {
                 for j in 0..4 {
-                    input[i as usize] +=
-                        (data.input[(j * 4 + i) as usize] as u32) << (24 - (j) * 8);
-                    output[i as usize] +=
-                        (data.output[(i * 4 + j) as usize] as u32) << (24 - (j) * 8);
+                    input[i] += (data.input[j * 4 + i] as u32) << (24 - j * 8);
+                    output[i] += (data.output[i * 4 + j] as u32) << (24 - j * 8);
                 }
             }
             for _i in 0..32 - data.input.len() {
@@ -961,9 +960,7 @@ mod test {
             let mut input = [0u32; 8];
             for i in 0..data.bc {
                 for j in 0..4 {
-                    input[i as usize] += (res[(i / 4) as usize][(((i % 4) * 4) + j) as usize]
-                        as u32)
-                        << (24 - (j) * 8);
+                    input[i as usize] += (res[i / 4][((i % 4) * 4) + j] as u32) << (24 - j * 8);
                 }
             }
             assert_eq!(input, output);
@@ -1017,8 +1014,8 @@ mod test {
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct Rijndael {
-        kc: u8,
-        bc: u8,
+        kc: usize,
+        bc: usize,
         key: Vec<u8>,
         text: Vec<u8>,
         output: Vec<u8>,

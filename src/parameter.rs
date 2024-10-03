@@ -1162,6 +1162,10 @@ mod test {
     fn test_parameters_owf<O: OWFParameters>() {
         assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LAMBDABYTES::USIZE);
         assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::InputSize::USIZE);
+        assert_eq!(
+            O::SKE::USIZE,
+            (4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE))
+        );
     }
 
     #[test]
