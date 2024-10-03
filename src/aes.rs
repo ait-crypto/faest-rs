@@ -378,20 +378,19 @@ where
     for j in 0..O::SKE::USIZE / 4 {
         let mut k_hat = [Field::<O>::default(); 4];
         let mut v_k_hat = [Field::<O>::default(); 4];
-        let mut w_hat = [Field::<O>::default(); 4];
-        let mut v_w_hat = [Field::<O>::default(); 4];
         for r in 0..4 {
             let r_p = if dorotword { (r + 3) % 4 } else { r };
             k_hat[r_p] = Field::<O>::byte_combine_slice(&k[iwd + (8 * r)..iwd + (8 * r) + 8]);
             v_k_hat[r_p] = Field::<O>::byte_combine_slice(&vk[iwd + (8 * r)..iwd + (8 * r) + 8]);
-            w_hat[r] =
-                Field::<O>::byte_combine_slice(&w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
-            v_w_hat[r] =
-                Field::<O>::byte_combine_slice(&v_w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
         }
         for r in 0..4 {
-            let a0 = v_k_hat[r] * v_w_hat[r];
-            let a1 = ((k_hat[r] + v_k_hat[r]) * (w_hat[r] + v_w_hat[r])) + Field::<O>::ONE + a0;
+            let w_hat_r =
+                Field::<O>::byte_combine_slice(&w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
+            let v_w_hat_r =
+                Field::<O>::byte_combine_slice(&v_w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
+
+            let a0 = v_k_hat[r] * v_w_hat_r;
+            let a1 = ((k_hat[r] + v_k_hat[r]) * (w_hat_r + v_w_hat_r)) + Field::<O>::ONE + a0;
             a_t_hasher.update(&a1);
             b_t_hasher.update(&a0);
         }
@@ -433,15 +432,14 @@ where
     let delta_squared = delta * delta;
     for j in 0..O::SKE::USIZE / 4 {
         let mut q_h_k = [Field::<O>::default(); 4];
-        let mut q_h_w_b = [Field::<O>::default(); 4];
         for r in 0..4 {
             let r_p = if dorotword { (r + 3) % 4 } else { r };
             q_h_k[r_p] = Field::<O>::byte_combine_slice(&q_k[iwd + (8 * r)..iwd + (8 * r) + 8]);
-            q_h_w_b[r] =
-                Field::<O>::byte_combine_slice(&q_w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
         }
         for r in 0..4 {
-            let b = q_h_k[r] * q_h_w_b[r] + delta_squared;
+            let q_h_w_b_r =
+                Field::<O>::byte_combine_slice(&q_w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
+            let b = q_h_k[r] * q_h_w_b_r + delta_squared;
             b_t_hasher.update(&b);
         }
         if O::LAMBDA::USIZE == 128 {
@@ -784,11 +782,8 @@ where
     for i in 0..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE {
         for k in 0..8 {
             for j in 0..O::LAMBDABYTES::USIZE {
-                let mut temp = 0;
-                for l in 0..8 {
-                    temp += ((gv[(j * 8) + l][i] >> k) & 1) << l;
-                }
-                temp_v[i * O::LAMBDA::USIZE + k * O::LAMBDABYTES::USIZE + j] = temp;
+                temp_v[i * O::LAMBDA::USIZE + k * O::LAMBDABYTES::USIZE + j] =
+                    (0..8).map(|l| ((gv[(j * 8) + l][i] >> k) & 1) << l).sum();
             }
         }
     }
@@ -821,7 +816,7 @@ where
         ),
         GenericArray::from_slice(&new_v[O::LKE::USIZE..O::LKE::USIZE + O::LENC::USIZE]),
         &k,
-        GenericArray::from_slice(&vk),
+        &vk,
     );
 
     if O::LAMBDA::USIZE > 128 {
@@ -838,7 +833,7 @@ where
             ),
             GenericArray::from_slice(&new_v[(O::LKE::USIZE + O::LENC::USIZE)..O::L::USIZE]),
             &k,
-            GenericArray::from_slice(&vk),
+            &vk,
         );
     }
 
@@ -881,7 +876,7 @@ where
         owf_input[..16].try_into().unwrap(),
         owf_output[..16].try_into().unwrap(),
         GenericArray::from_slice(&new_q[O::LKE::USIZE..(O::LKE::USIZE + O::LENC::USIZE)]),
-        GenericArray::from_slice(&qk[..]),
+        &qk,
         delta,
     );
     if O::LAMBDA::USIZE > 128 {
@@ -890,7 +885,7 @@ where
             owf_input[16..].try_into().unwrap(),
             owf_output[16..].try_into().unwrap(),
             GenericArray::from_slice(&new_q[O::LKE::USIZE + O::LENC::USIZE..O::L::USIZE]),
-            GenericArray::from_slice(&qk[..]),
+            &qk,
             delta,
         );
     }
