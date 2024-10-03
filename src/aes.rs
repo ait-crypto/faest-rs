@@ -296,7 +296,7 @@ where
             ircon += 1;
             // Step 11
             for (i, x) in x_tilde.iter_mut().enumerate() {
-                *x += Field::<O>::ONE * ((rcon >> i) & 1);
+                *x += delta * ((rcon >> i) & 1);
             }
         }
         //Step 15
