@@ -5,16 +5,14 @@ edition = "2021"
 rust-version = "1.76"
 
 [dependencies]
-aes = "0.8.4"
-ctr = "0.9.2"
+aes = "0.8"
+ctr = "0.9"
 serde = { version = "1", optional = true, default-features = false, features = [
   "derive",
 ] }
-sha3 = "0.10.8"
-signature = { version = "2.2.0", default-features = false, features = [
-  "alloc",
-] }
-subtle = { version = "2.6", features = ["const-generics"] }
+sha3 = "0.10"
+signature = { version = "2", default-features = false, features = ["alloc"] }
+subtle = { version = "2", features = ["const-generics"] }
 generic-array = { version = "1", features = ["alloc"] }
 rand_core = { version = "0.6", default-features = false }
 zeroize = { version = "1", optional = true, default-features = false, features = [
@@ -24,13 +22,12 @@ either = { version = "1", default-features = false }
 paste = "1"
 
 [dev-dependencies]
-serde_derive = "1.0.200"
-serde = { version = "1.0.200", features = ["derive"] }
-serde_json = "1.0.116"
-criterion = "0.5.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+criterion = "0.5"
 rand = { version = "0.8", features = ["small_rng"] }
 nist-pqc-seeded-rng = "0.2"
-hex = "0.4.3"
+hex = "0.4"
 rand_chacha = { version = "0.3" }
 
 [features]
