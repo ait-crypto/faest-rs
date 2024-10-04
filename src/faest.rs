@@ -40,7 +40,7 @@ where
         buf
     }
 
-    fn try_from_bytes(bytes: &[u8]) -> Result<Self, ()> {
+    pub(crate) fn try_from_bytes(bytes: &[u8]) -> Result<Self, ()> {
         if bytes.len() == O::SK::USIZE {
             Ok(Self::from_bytes(GenericArray::from_slice(bytes)))
         } else {
@@ -137,7 +137,7 @@ where
         buf
     }
 
-    fn try_from_bytes(bytes: &[u8]) -> Result<Self, ()> {
+    pub(crate) fn try_from_bytes(bytes: &[u8]) -> Result<Self, ()> {
         if bytes.len() == O::PK::USIZE {
             Ok(Self::from_bytes(GenericArray::from_slice(bytes)))
         } else {

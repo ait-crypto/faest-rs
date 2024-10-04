@@ -76,16 +76,39 @@ macro_rules! define_impl {
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
             pub struct [<$param SigningKey>](SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>);
 
+            impl TryFrom<&[u8]> for  [<$param SigningKey>] {
+                type Error = Error;
+
+                fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+                    SecretKey::try_from_bytes(value).map(|sk| Self(sk)).map_err(|_| Error::new())
+                }
+            }
+
             #[doc = "Verification key for " $param]
             #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
             pub struct [<$param VerificationKey>](PublicKey<<[<$param Parameters>] as FAESTParameters>::OWF>);
 
+            impl TryFrom<&[u8]> for  [<$param VerificationKey>] {
+                type Error = Error;
+
+                fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+                    PublicKey::try_from_bytes(value).map(|pk| Self(pk)).map_err(|_| Error::new())
+                }
+            }
 
             #[doc = "Keypair for " $param]
             #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
             pub struct [<$param KeyPair>]([<$param SigningKey>], #[cfg_attr(feature = "zeroize", zeroize(skip))] [<$param VerificationKey>]);
+
+            impl TryFrom<&[u8]> for  [<$param KeyPair>] {
+                type Error = Error;
+
+                fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+                    SecretKey::try_from_bytes(value).map(|sk| { let pk = sk.as_public_key(); Self([<$param SigningKey>](sk), [<$param VerificationKey>](pk)) }).map_err(|_| Error::new())
+                }
+            }
 
             impl Keypair for [<$param SigningKey>] {
                 type VerifyingKey = [<$param VerificationKey>];
@@ -218,6 +241,7 @@ macro_rules! define_impl {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
                     self.0.try_sign(msg)
                 }
+
                 fn sign(&self, msg: &[u8]) -> [<$param Signature>] {
                     self.0.sign(msg)
                 }
