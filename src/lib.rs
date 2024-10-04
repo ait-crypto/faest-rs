@@ -71,7 +71,7 @@ macro_rules! define_impl {
     ($param:ident) => {
         paste! {
             #[doc = "Signing key for " $param]
-            #[derive(Debug, Clone)]
+            #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
             pub struct [<$param SigningKey>](SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>);
@@ -81,8 +81,9 @@ macro_rules! define_impl {
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
             pub struct [<$param VerificationKey>](PublicKey<<[<$param Parameters>] as FAESTParameters>::OWF>);
 
+
             #[doc = "Keypair for " $param]
-            #[derive(Debug, Clone)]
+            #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
             pub struct [<$param KeyPair>]([<$param SigningKey>], #[cfg_attr(feature = "zeroize", zeroize(skip))] [<$param VerificationKey>]);
 
