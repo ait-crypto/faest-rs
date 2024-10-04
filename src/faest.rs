@@ -1,4 +1,6 @@
-use std::{fmt, io::Write, iter::zip, marker::PhantomData};
+#[cfg(feature = "serde")]
+use std::{fmt, marker::PhantomData};
+use std::{io::Write, iter::zip};
 
 use crate::{
     parameter::{BaseParameters, FAESTParameters, OWFParameters, TauParameters, Variant},

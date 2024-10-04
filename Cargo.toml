@@ -31,7 +31,7 @@ hex = "0.4"
 rand_chacha = { version = "0.3" }
 
 [features]
-default = ["zeroize", "randomized-signer", "serde"]
+default = ["zeroize", "randomized-signer"]
 zeroize = ["dep:zeroize", "aes/zeroize", "ctr/zeroize"]
 randomized-signer = ["signature/rand_core"]
 serde = ["dep:serde", "generic-array/serde"]
