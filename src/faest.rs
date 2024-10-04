@@ -35,7 +35,7 @@ impl<O> SecretKey<O>
 where
     O: OWFParameters,
 {
-    fn as_bytes(&self) -> GenericArray<u8, O::SK> {
+    pub(crate) fn as_bytes(&self) -> GenericArray<u8, O::SK> {
         let mut buf = GenericArray::default();
         buf[..O::InputSize::USIZE].copy_from_slice(&self.owf_input);
         buf[O::InputSize::USIZE..].copy_from_slice(&self.owf_key);
@@ -132,7 +132,7 @@ impl<O> PublicKey<O>
 where
     O: OWFParameters,
 {
-    fn as_bytes(&self) -> GenericArray<u8, O::PK> {
+    pub(crate) fn as_bytes(&self) -> GenericArray<u8, O::PK> {
         let mut buf = GenericArray::default();
         buf[..O::InputSize::USIZE].copy_from_slice(&self.owf_input);
         buf[O::InputSize::USIZE..].copy_from_slice(&self.owf_output);

@@ -76,11 +76,17 @@ macro_rules! define_impl {
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
             pub struct [<$param SigningKey>](SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>);
 
-            impl TryFrom<&[u8]> for  [<$param SigningKey>] {
+            impl TryFrom<&[u8]> for [<$param SigningKey>] {
                 type Error = Error;
 
                 fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
                     SecretKey::try_from_bytes(value).map(|sk| Self(sk)).map_err(|_| Error::new())
+                }
+            }
+
+            impl From<&[<$param SigningKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE] {
+                fn from(value: &[<$param SigningKey>]) -> Self {
+                    value.0.as_bytes().into_array()
                 }
             }
 
@@ -89,11 +95,17 @@ macro_rules! define_impl {
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
             pub struct [<$param VerificationKey>](PublicKey<<[<$param Parameters>] as FAESTParameters>::OWF>);
 
-            impl TryFrom<&[u8]> for  [<$param VerificationKey>] {
+            impl TryFrom<&[u8]> for [<$param VerificationKey>] {
                 type Error = Error;
 
                 fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
                     PublicKey::try_from_bytes(value).map(|pk| Self(pk)).map_err(|_| Error::new())
+                }
+            }
+
+            impl From<&[<$param VerificationKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE] {
+                fn from(value: &[<$param VerificationKey>]) -> Self {
+                    value.0.as_bytes().into_array()
                 }
             }
 
@@ -102,11 +114,20 @@ macro_rules! define_impl {
             #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
             pub struct [<$param KeyPair>]([<$param SigningKey>], #[cfg_attr(feature = "zeroize", zeroize(skip))] [<$param VerificationKey>]);
 
-            impl TryFrom<&[u8]> for  [<$param KeyPair>] {
+            impl TryFrom<&[u8]> for [<$param KeyPair>] {
                 type Error = Error;
 
                 fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-                    SecretKey::try_from_bytes(value).map(|sk| { let pk = sk.as_public_key(); Self([<$param SigningKey>](sk), [<$param VerificationKey>](pk)) }).map_err(|_| Error::new())
+                    SecretKey::try_from_bytes(value).map(|sk| {
+                        let pk = sk.as_public_key();
+                        Self([<$param SigningKey>](sk), [<$param VerificationKey>](pk))
+                     }).map_err(|_| Error::new())
+                }
+            }
+
+            impl From<&[<$param KeyPair>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE] {
+                fn from(value: &[<$param KeyPair>]) -> Self {
+                    Self::from(&value.0)
                 }
             }
 
@@ -287,7 +308,7 @@ macro_rules! define_impl {
 
             impl AsRef<[u8]> for [<$param Signature>] {
                 fn as_ref(&self) -> &[u8] {
-                    &self.0
+                    self.0.as_slice()
                 }
             }
 
