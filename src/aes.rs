@@ -285,7 +285,8 @@ where
     //Step 6
     for j in 0..O::SKE::USIZE {
         // Step 7
-        let mut x_tilde: [Field<O>; 8] = array::from_fn(|i| x[8 * j + i] + xk[indice + 8 * c + i]);
+        let mut x_tilde: [Field<O>; 8] =
+            array::from_fn(|i| x[8 * j + i + O::LAMBDA::USIZE] + xk[indice + 8 * c + i]);
         // Step 8
         if rmvrcon && (c == 0) {
             let rcon = RCON_TABLE[ircon];
@@ -400,17 +401,7 @@ where
     let mut dorotword = true;
     let q_k = aes_key_exp_fwd::<O>(q);
     // FIXME
-    let q_w_b = aes_key_exp_bwd_mtag0_mkey1::<O>(
-        GenericArray::from_slice(
-            &[
-                &q[O::LAMBDA::USIZE..],
-                &vec![Field::<O>::default(); O::LAMBDA::USIZE],
-            ]
-            .concat(),
-        ),
-        GenericArray::from_slice(&q_k),
-        delta,
-    );
+    let q_w_b = aes_key_exp_bwd_mtag0_mkey1::<O>(q, &q_k, delta);
     let delta_squared = delta * delta;
     for j in 0..O::SKE::USIZE / 4 {
         let mut q_h_k = [Field::<O>::default(); 4];
