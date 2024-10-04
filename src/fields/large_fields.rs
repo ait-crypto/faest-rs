@@ -43,6 +43,8 @@ trait Alphas: Sized {
 pub trait BigGaloisField:
     Field
     + Copy
+    + Add<u8, Output = Self>
+    + AddAssign<u8>
     + Mul<u8, Output = Self>
     + Mul<GF64, Output = Self>
     + ConditionallySelectable
@@ -195,6 +197,20 @@ where
     }
 }
 
+impl<T, const N: usize, const LENGTH: usize> Add<u8> for BigGF<T, N, LENGTH>
+where
+    T: BitXorAssign + From<u8> + Copy,
+{
+    type Output = Self;
+
+    #[inline]
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn add(mut self, rhs: u8) -> Self::Output {
+        self.0[0] ^= rhs.into();
+        self
+    }
+}
+
 impl<T, const N: usize, const LENGTH: usize> AddAssign for BigGF<T, N, LENGTH>
 where
     T: BitXorAssign<T> + Copy,
@@ -218,6 +234,17 @@ where
         for idx in 0..N {
             self.0[idx] ^= rhs.0[idx];
         }
+    }
+}
+
+impl<T, const N: usize, const LENGTH: usize> AddAssign<u8> for BigGF<T, N, LENGTH>
+where
+    T: BitXorAssign + From<u8> + Copy,
+{
+    #[inline]
+    #[allow(clippy::suspicious_op_assign_impl)]
+    fn add_assign(&mut self, rhs: u8) {
+        self.0[0] ^= rhs.into();
     }
 }
 
