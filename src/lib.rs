@@ -84,7 +84,7 @@ macro_rules! define_impl {
 
             #[doc = "Keypair for " $param]
             #[derive(Debug, Clone, PartialEq, Eq)]
-            #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
+            #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
             pub struct [<$param KeyPair>]([<$param SigningKey>], #[cfg_attr(feature = "zeroize", zeroize(skip))] [<$param VerificationKey>]);
 
             impl Keypair for [<$param SigningKey>] {
