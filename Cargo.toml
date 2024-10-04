@@ -48,6 +48,10 @@ test = false
 name = "simple"
 required-features = ["randomized-signer"]
 
+[[test]]
+name = "nist"
+required-features = ["randomized-signer"]
+
 [profile.dev.package."*"]
 opt-level = 3
 

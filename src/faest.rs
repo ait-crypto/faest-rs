@@ -587,21 +587,14 @@ fn sigma_to_signature<Lambda>(
 mod test {
     use super::*;
 
-    use std::{
-        fs::File,
-        io::{BufRead, BufReader},
-        path::Path,
-    };
-
     use generic_array::GenericArray;
-    use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
     use rand::RngCore;
 
     use crate::parameter::{
         FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
         FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters, FAESTEM128sParameters,
         FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters, FAESTEM256sParameters,
-        FAESTParameters, OWFParameters,
+        FAESTParameters,
     };
 
     const RUNS: usize = 10;
@@ -687,160 +680,5 @@ mod test {
     #[test]
     fn faest_em_test_256f() {
         run_faest_test::<FAESTEM256fParameters>();
-    }
-
-    ///NIST tests
-    #[derive(Default, Clone)]
-    struct TestVector {
-        seed: Vec<u8>,
-        message: Vec<u8>,
-        pk: Vec<u8>,
-        sk: Vec<u8>,
-        sm: Vec<u8>,
-    }
-
-    fn parse_hex(value: &str) -> Vec<u8> {
-        hex::decode(value).expect("hex value")
-    }
-
-    fn read_kats(kats: &str) -> Vec<TestVector> {
-        let kats = BufReader::new(
-            File::open(
-                Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("tests/data")
-                    .join(kats),
-            )
-            .unwrap(),
-        );
-
-        let mut ret = Vec::new();
-
-        let mut kat = TestVector::default();
-        for line in kats.lines() {
-            let Ok(line) = line else {
-                break;
-            };
-
-            // skip comments and empty lines
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-
-            let (kind, value) = line.split_once(" = ").expect("kind = value");
-            match kind {
-                // ignore count, message and signature lenghts, and seed
-                "count" | "mlen" | "smlen" => {}
-                "seed" => {
-                    kat.seed = parse_hex(value);
-                }
-                "sk" => {
-                    kat.sk = parse_hex(value);
-                }
-                "pk" => {
-                    kat.pk = parse_hex(value);
-                }
-                "msg" => {
-                    kat.message = parse_hex(value);
-                }
-                "sm" => {
-                    kat.sm = parse_hex(value);
-                    assert!(
-                        !kat.sk.is_empty()
-                            && !kat.pk.is_empty()
-                            && !kat.message.is_empty()
-                            && !kat.sm.is_empty()
-                    );
-                    ret.push(kat);
-                    kat = TestVector::default();
-                }
-                _ => {
-                    unreachable!("unknown kind");
-                }
-            }
-        }
-        ret
-    }
-
-    fn test_nist<P: FAESTParameters>(test_data: &str) {
-        let datas = read_kats(test_data);
-        for data in datas {
-            let mut rng = NistPqcAes256CtrRng::try_from(data.seed.as_slice()).unwrap();
-            let msg = data.message;
-            let sig = data.sm;
-
-            let sk = P::Cypher::keygen_with_rng(&mut rng);
-            let pk = sk.as_public_key();
-            assert_eq!(data.pk.as_slice(), pk.as_bytes().as_slice());
-            assert_eq!(data.sk.as_slice(), sk.as_bytes().as_slice());
-
-            let mut rho = GenericArray::<u8, <P::OWF as OWFParameters>::LAMBDABYTES>::default();
-            rng.fill_bytes(&mut rho);
-
-            let mut signature = GenericArray::default_boxed();
-            faest_sign::<P>(&msg, &sk, &rho, &mut signature);
-            assert_eq!(&sig[..sig.len() - signature.len()], &msg);
-            assert_eq!(&sig[sig.len() - signature.len()..], signature.as_slice());
-            assert!(faest_verify::<P>(&msg, &pk, &signature).is_ok());
-        }
-    }
-
-    #[test]
-    fn test_nist_faest_128s_aes() {
-        test_nist::<FAEST128sParameters>("PQCsignKAT_faest_128s.rsp");
-    }
-
-    #[test]
-    fn test_nist_faest_128f_aes() {
-        test_nist::<FAEST128fParameters>("PQCsignKAT_faest_128f.rsp");
-    }
-
-    #[test]
-    fn test_nist_faest_192s_aes() {
-        test_nist::<FAEST192sParameters>("PQCsignKAT_faest_192s.rsp");
-    }
-
-    #[test]
-    fn test_nist_faest_192f_aes() {
-        test_nist::<FAEST192fParameters>("PQCsignKAT_faest_192f.rsp");
-    }
-
-    #[test]
-    fn test_nist_faest_256s_aes() {
-        test_nist::<FAEST256sParameters>("PQCsignKAT_faest_256s.rsp");
-    }
-
-    #[test]
-    fn test_nist_faest_256f_aes() {
-        test_nist::<FAEST256fParameters>("PQCsignKAT_faest_256f.rsp");
-    }
-
-    #[test]
-    fn test_nist_faest_128s_em() {
-        test_nist::<FAESTEM128sParameters>("PQCsignKAT_faest_em_128s.rsp");
-    }
-
-    #[test]
-    fn test_nist_faest_128f_em() {
-        test_nist::<FAESTEM128fParameters>("PQCsignKAT_faest_em_128f.rsp");
-    }
-
-    #[test]
-    fn test_nist_faest_192s_em() {
-        test_nist::<FAESTEM192sParameters>("PQCsignKAT_faest_em_192s.rsp");
-    }
-
-    #[test]
-    fn test_nist_faest_192f_em() {
-        test_nist::<FAESTEM192fParameters>("PQCsignKAT_faest_em_192f.rsp");
-    }
-
-    #[test]
-    fn test_nist_faest_256s_em() {
-        test_nist::<FAESTEM256sParameters>("PQCsignKAT_faest_em_256s.rsp");
-    }
-
-    #[test]
-    fn test_nist_faest_256f_em() {
-        test_nist::<FAESTEM256fParameters>("PQCsignKAT_faest_em_256f.rsp");
     }
 }
