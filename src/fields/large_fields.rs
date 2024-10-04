@@ -472,7 +472,7 @@ where
     }
 }
 
-impl<T, const N: usize, const LENGTH: usize> Mul<u64> for BigGF<T, N, LENGTH>
+impl<T, const N: usize, const LENGTH: usize> Mul<GF64> for BigGF<T, N, LENGTH>
 where
     Self: Modulus<T>,
     Self: ToMask<T>,
@@ -480,12 +480,13 @@ where
     Self: AddAssign,
     Self: ShiftLeft1<Output = Self>,
     T: BitAnd<Output = T>,
-    T: BitXorAssign + std::fmt::Debug,
+    T: BitXorAssign,
     u64: ToMask<T>,
 {
     type Output = Self;
 
-    fn mul(mut self, rhs: u64) -> Self::Output {
+    fn mul(mut self, rhs: GF64) -> Self::Output {
+        let rhs = u64::from(rhs);
         let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
         for idx in 1..64 {
             let mask = self.to_mask();
@@ -498,27 +499,15 @@ where
     }
 }
 
-impl<T, const N: usize, const LENGTH: usize> Mul<u64> for &BigGF<T, N, LENGTH>
+impl<T, const N: usize, const LENGTH: usize> Mul<GF64> for &BigGF<T, N, LENGTH>
 where
+    BigGF<T, N, LENGTH>: Mul<GF64, Output = BigGF<T, N, LENGTH>>,
     BigGF<T, N, LENGTH>: Copy,
-    BigGF<T, N, LENGTH>: Mul<u64, Output = BigGF<T, N, LENGTH>>,
 {
     type Output = BigGF<T, N, LENGTH>;
 
-    fn mul(self, rhs: u64) -> Self::Output {
-        *self * rhs
-    }
-}
-
-impl<T, const N: usize, const LENGTH: usize> Mul<GF64> for BigGF<T, N, LENGTH>
-where
-    Self: Mul<u64, Output = Self>,
-{
-    type Output = Self;
-
-    #[inline]
     fn mul(self, rhs: GF64) -> Self::Output {
-        self * (rhs.into())
+        *self * rhs
     }
 }
 
@@ -2030,49 +2019,16 @@ mod test {
     //output : the product of the two according to the rules of Galois Fields arithmetic
     #[allow(clippy::erasing_op)]
     fn gf128_test_mul_64() {
-        let mut rng = SmallRng::from_entropy();
-
-        let pol_0 = GF128::default();
-        for _i in 0..1000 {
-            //0 * anything = 0
-            let anything: u64 = rng.gen();
-            let pol_res = pol_0 * anything;
-            let first_value = pol_res;
-            assert_eq!(first_value.0[0], 0u128);
-            //1 * anything = anything
-            let pol_res_1 = GF128::ONE * anything;
-            let first_value_1 = pol_res_1;
-            assert_eq!(first_value_1.0[0], anything.into());
-            //anything * 0 = 0
-            let anything: GF128 = rng.gen();
-            let pol_res_rev = anything * 0u64;
-            let first_value_rev = pol_res_rev;
-            assert_eq!(first_value_rev.0[0], 0u128);
-            //anything * 1 = anything
-            let first_value_anything = anything;
-            let pol_res_rev = anything * 1u64;
-            let first_value_rev = pol_res_rev;
-            assert_eq!(first_value_rev, first_value_anything);
-        }
         //to test with complex values we use the tests values of the reference implementation
-        let mut left = GF128::new(0xefcdab8967452301efcdab8967452301u128, 0);
-        let mut left_2 = GF128::new(0xefcdab8967452301efcdab8967452301u128, 0);
-        let right = 0x0123456789abcdefu64;
+        let left = GF128::new(0xefcdab8967452301efcdab8967452301u128, 0);
+        let right = GF64::from(0x0123456789abcdefu64);
         let result = GF128::new(0x40404040404040403bf4ad534a85dc22u128, 0);
         let res = left * right;
         assert_eq!(res, result);
         //to test with ref
         #[allow(clippy::op_ref)]
-        let res_rev = &left * right;
-        #[allow(clippy::op_ref)]
-        let res = left * right;
+        let res = &left * right;
         assert_eq!(res, result);
-        assert_eq!(res_rev, result);
-        //to test mulassign
-        left *= right;
-        left_2 *= right;
-        assert_eq!(left, result);
-        assert_eq!(left_2, result);
 
         let first_value = res;
         assert_eq!(first_value, result);
@@ -3970,44 +3926,13 @@ mod test {
     //output : the product of the two according to the rules of Galois Fields arithmetic
     #[allow(clippy::erasing_op)]
     fn gf192_test_mul_64() {
-        let mut rng = SmallRng::from_entropy();
-
-        let pol_0 = GF192::default();
-        for _i in 0..1000 {
-            //0 * anything = 0
-            let anything: u64 = rng.gen();
-            let pol_res = pol_0 * anything;
-            let (first_value, second_value) = (pol_res.0[0], pol_res.0[1]);
-            assert_eq!(first_value, 0u128);
-            assert_eq!(second_value, 0u128);
-            //1 * anything = anything
-            let pol_res_1 = GF192::ONE * anything;
-            let (first_value_1, second_value_1) = (pol_res_1.0[0], pol_res_1.0[1]);
-            assert_eq!(first_value_1, anything as u128);
-            assert_eq!(second_value_1, 0u128);
-            //anything * 0 = 0
-            let anything: GF192 = rng.gen();
-            let pol_res_rev = anything * 0u64;
-            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
-            assert_eq!(first_value_rev, 0u128);
-            assert_eq!(second_value_rev, 0u128);
-            //anything * 1 = anything
-            let (first_value_anything, second_value_anything) = (anything.0[0], anything.0[1]);
-            let pol_res_rev = anything * 1u64;
-            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
-            assert_eq!(first_value_rev, first_value_anything);
-            assert_eq!(second_value_rev, second_value_anything);
-        }
         //to test with complex values we use the tests values of the reference implementation
-        let mut left = GF192::new(
+        let left = GF192::new(
             0xefcdab8967452301efcdab8967452301u128,
             0xefcdab8967452301u128,
         );
-        let mut left_2 = GF192::new(
-            0xefcdab8967452301efcdab8967452301u128,
-            0xefcdab8967452301u128,
-        );
-        let right = 0x0123456789abcdefu64;
+
+        let right = GF64::from(0x0123456789abcdefu64);
         let result = GF192::new(
             0x40404040404040403bf4ad534a85dc22u128,
             0x4040404040404040u128,
@@ -4016,16 +3941,8 @@ mod test {
         assert_eq!(res, result);
         //to test with ref
         #[allow(clippy::op_ref)]
-        let res_rev = &left * right;
-        #[allow(clippy::op_ref)]
         let res = left * right;
         assert_eq!(res, result);
-        assert_eq!(res_rev, result);
-        //to test mulassign
-        left *= right;
-        left_2 *= right;
-        assert_eq!(left, result);
-        assert_eq!(left_2, result);
     }
 
     #[test]
@@ -6149,44 +6066,12 @@ mod test {
     //output : the product of the two according to the rules of Galois Fields arithmetic
     #[allow(clippy::erasing_op)]
     fn gf256_test_mul_64() {
-        let mut rng = SmallRng::from_entropy();
-
-        let pol_0 = GF256::default();
-        for _i in 0..1000 {
-            //0 * anything = 0
-            let anything: u64 = rng.gen();
-            let pol_res = pol_0 * anything;
-            let (first_value, second_value) = (pol_res.0[0], pol_res.0[1]);
-            assert_eq!(first_value, 0u128);
-            assert_eq!(second_value, 0u128);
-            //1 * anything = anything
-            let pol_res_1 = GF256::ONE * anything;
-            let (first_value_1, second_value_1) = (pol_res_1.0[0], pol_res_1.0[1]);
-            assert_eq!(first_value_1, anything as u128);
-            assert_eq!(second_value_1, 0u128);
-            //anything * 0 = 0
-            let anything: GF256 = rng.gen();
-            let pol_res_rev = anything * 0u64;
-            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
-            assert_eq!(first_value_rev, 0u128);
-            assert_eq!(second_value_rev, 0u128);
-            //anything * 1 = anything
-            let (first_value_anything, second_value_anything) = (anything.0[0], anything.0[1]);
-            let pol_res_rev = anything * 1u64;
-            let (first_value_rev, second_value_rev) = (pol_res_rev.0[0], pol_res_rev.0[1]);
-            assert_eq!(first_value_rev, first_value_anything);
-            assert_eq!(second_value_rev, second_value_anything);
-        }
         //to test with complex values we use the tests values of the reference implementation
-        let mut left = GF256::new(
+        let left = GF256::new(
             0xefcdab8967452301efcdab8967452301u128,
             0xefcdab8967452301efcdab8967452301u128,
         );
-        let mut left_2 = GF256::new(
-            0xefcdab8967452301efcdab8967452301u128,
-            0xefcdab8967452301efcdab8967452301u128,
-        );
-        let right = 0x0123456789abcdefu64;
+        let right = GF64::from(0x0123456789abcdefu64);
         let result = GF256::new(
             0x4040404040404043911817139d141b1cu128,
             0x40404040404040404040404040404040u128,
@@ -6195,16 +6080,8 @@ mod test {
         assert_eq!(res, result);
         //to test with ref
         #[allow(clippy::op_ref)]
-        let res_rev = &left * right;
-        #[allow(clippy::op_ref)]
         let res = left * right;
         assert_eq!(res, result);
-        assert_eq!(res_rev, result);
-        //to test mulassign
-        left *= right;
-        left_2 *= right;
-        assert_eq!(left, result);
-        assert_eq!(left_2, result);
     }
 
     #[test]
