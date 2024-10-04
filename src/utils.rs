@@ -59,3 +59,22 @@ where
 
     Box::<GenericArray<_, _>>::from_iter(temp_q.chunks(O::LAMBDABYTES::USIZE).map(From::from))
 }
+
+#[cfg(test)]
+pub(crate) mod test {
+    use std::{fs::File, path::Path};
+
+    use serde::de::DeserializeOwned;
+
+    pub(crate) fn read_test_data<T: DeserializeOwned>(path: &str) -> Vec<T> {
+        serde_json::from_reader(
+            File::open(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("tests/data")
+                    .join(path),
+            )
+            .expect(&format!("Failed to open test file {}", path)),
+        )
+        .expect(&format!("Failed to read JSON test data from {}", path))
+    }
+}

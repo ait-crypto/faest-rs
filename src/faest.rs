@@ -587,6 +587,12 @@ fn sigma_to_signature<Lambda>(
 mod test {
     use super::*;
 
+    use std::{
+        fs::File,
+        io::{BufRead, BufReader},
+        path::Path,
+    };
+
     use generic_array::GenericArray;
     use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
     use rand::RngCore;
@@ -698,10 +704,23 @@ mod test {
     }
 
     fn read_kats(kats: &str) -> Vec<TestVector> {
+        let kats = BufReader::new(
+            File::open(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("tests/data")
+                    .join(kats),
+            )
+            .unwrap(),
+        );
+
         let mut ret = Vec::new();
 
         let mut kat = TestVector::default();
         for line in kats.lines() {
+            let Ok(line) = line else {
+                break;
+            };
+
             // skip comments and empty lines
             if line.is_empty() || line.starts_with('#') {
                 continue;
@@ -767,73 +786,61 @@ mod test {
 
     #[test]
     fn test_nist_faest_128s_aes() {
-        test_nist::<FAEST128sParameters>(include_str!("../tests/data/PQCsignKAT_faest_128s.rsp"));
+        test_nist::<FAEST128sParameters>("PQCsignKAT_faest_128s.rsp");
     }
 
     #[test]
     fn test_nist_faest_128f_aes() {
-        test_nist::<FAEST128fParameters>(include_str!("../tests/data/PQCsignKAT_faest_128f.rsp"));
+        test_nist::<FAEST128fParameters>("PQCsignKAT_faest_128f.rsp");
     }
 
     #[test]
     fn test_nist_faest_192s_aes() {
-        test_nist::<FAEST192sParameters>(include_str!("../tests/data/PQCsignKAT_faest_192s.rsp"));
+        test_nist::<FAEST192sParameters>("PQCsignKAT_faest_192s.rsp");
     }
 
     #[test]
     fn test_nist_faest_192f_aes() {
-        test_nist::<FAEST192fParameters>(include_str!("../tests/data/PQCsignKAT_faest_192f.rsp"));
+        test_nist::<FAEST192fParameters>("PQCsignKAT_faest_192f.rsp");
     }
 
     #[test]
     fn test_nist_faest_256s_aes() {
-        test_nist::<FAEST256sParameters>(include_str!("../tests/data/PQCsignKAT_faest_256s.rsp"));
+        test_nist::<FAEST256sParameters>("PQCsignKAT_faest_256s.rsp");
     }
 
     #[test]
     fn test_nist_faest_256f_aes() {
-        test_nist::<FAEST256fParameters>(include_str!("../tests/data/PQCsignKAT_faest_256f.rsp"));
+        test_nist::<FAEST256fParameters>("PQCsignKAT_faest_256f.rsp");
     }
 
     #[test]
     fn test_nist_faest_128s_em() {
-        test_nist::<FAESTEM128sParameters>(include_str!(
-            "../tests/data/PQCsignKAT_faest_em_128s.rsp"
-        ));
+        test_nist::<FAESTEM128sParameters>("PQCsignKAT_faest_em_128s.rsp");
     }
 
     #[test]
     fn test_nist_faest_128f_em() {
-        test_nist::<FAESTEM128fParameters>(include_str!(
-            "../tests/data/PQCsignKAT_faest_em_128f.rsp"
-        ));
+        test_nist::<FAESTEM128fParameters>("PQCsignKAT_faest_em_128f.rsp");
     }
 
     #[test]
     fn test_nist_faest_192s_em() {
-        test_nist::<FAESTEM192sParameters>(include_str!(
-            "../tests/data/PQCsignKAT_faest_em_192s.rsp"
-        ));
+        test_nist::<FAESTEM192sParameters>("PQCsignKAT_faest_em_192s.rsp");
     }
 
     #[test]
     fn test_nist_faest_192f_em() {
-        test_nist::<FAESTEM192fParameters>(include_str!(
-            "../tests/data/PQCsignKAT_faest_em_192f.rsp"
-        ));
+        test_nist::<FAESTEM192fParameters>("PQCsignKAT_faest_em_192f.rsp");
     }
 
     #[test]
     fn test_nist_faest_256s_em() {
-        test_nist::<FAESTEM256sParameters>(include_str!(
-            "../tests/data/PQCsignKAT_faest_em_256s.rsp"
-        ));
+        test_nist::<FAESTEM256sParameters>("PQCsignKAT_faest_em_256s.rsp");
     }
 
     #[test]
     fn test_nist_faest_256f_em() {
-        test_nist::<FAESTEM256fParameters>(include_str!(
-            "../tests/data/PQCsignKAT_faest_em_256f.rsp"
-        ));
+        test_nist::<FAESTEM256fParameters>("PQCsignKAT_faest_em_256f.rsp");
     }
 }

@@ -194,6 +194,7 @@ mod test {
     use crate::{
         prg::{PRG128, PRG192, PRG256},
         random_oracles::{RandomOracleShake128, RandomOracleShake256},
+        utils::test::read_test_data,
     };
 
     #[derive(Debug, Deserialize)]
@@ -256,9 +257,7 @@ mod test {
 
     #[test]
     fn commit_test() {
-        let database: Vec<DataCommit> =
-            serde_json::from_str(include_str!("../tests/data/vc_com.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<DataCommit> = read_test_data("vc_com.json");
         for data in database {
             let lamdabytes = data.keyroot.len();
             if lamdabytes == 16 {
@@ -288,9 +287,7 @@ mod test {
 
     #[test]
     fn open_test() {
-        let database: Vec<DataOpen> =
-            serde_json::from_str(include_str!("../tests/data/vc_open.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<DataOpen> = read_test_data("vc_open.json");
         for data in database {
             if data.k[0].len() == 16 {
                 type D = U4;
@@ -396,9 +393,7 @@ mod test {
 
     #[test]
     fn reconstruct_test() {
-        let database: Vec<DataReconstruct> =
-            serde_json::from_str(include_str!("../tests/data/vc_reconstruct.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<DataReconstruct> = read_test_data("vc_reconstruct.json");
         for data in database {
             let lambdabyte = data.com_j.len();
             if lambdabyte == 32 {

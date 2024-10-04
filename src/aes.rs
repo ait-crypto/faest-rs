@@ -864,6 +864,7 @@ mod test {
             FAEST128sParameters, FAEST192sParameters, FAEST256sParameters, FAESTParameters,
             OWFParameters, OWF128, OWF192, OWF256,
         },
+        utils::test::read_test_data,
     };
 
     use generic_array::{typenum::U8, GenericArray};
@@ -884,9 +885,7 @@ mod test {
 
     #[test]
     fn aes_extended_witness_test() {
-        let database: Vec<AesExtendedWitness> =
-            serde_json::from_str(include_str!("../tests/data/AesExtendedWitness.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<AesExtendedWitness> = read_test_data("AesExtendedWitness.json");
         for data in database {
             if data.lambda == 128 {
                 let res = aes_extendedwitness::<OWF128>(
@@ -933,9 +932,7 @@ mod test {
 
     #[test]
     fn aes_key_exp_fwd_test() {
-        let database: Vec<AesKeyExpFwd> =
-            serde_json::from_str(include_str!("../tests/data/AesKeyExpFwd.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<AesKeyExpFwd> = read_test_data("AesKeyExpFwd.json");
         for data in database {
             if data.lambda == 128 {
                 let (out, input): (Vec<GF128>, Vec<GF128>) = if data.x.len() >= 448 {
@@ -1051,9 +1048,7 @@ mod test {
 
     #[test]
     fn aes_key_exp_bwd_test() {
-        let database: Vec<AesKeyExpBwd> =
-            serde_json::from_str(include_str!("../tests/data/AesKeyExpBwd.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<AesKeyExpBwd> = read_test_data("AesKeyExpBwd.json");
         for data in database {
             let mtag = data.mtag != 0;
             let mkey = data.mkey != 0;
@@ -1241,9 +1236,7 @@ mod test {
 
     #[test]
     fn aes_enc_fwd_test() {
-        let database: Vec<AesEncFwd> =
-            serde_json::from_str(include_str!("../tests/data/AesEncFwd.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<AesEncFwd> = read_test_data("AesEncFwd.json");
         for data in database {
             if data.lambda == 128 {
                 let mtag = data.mtag != 0;
@@ -1449,9 +1442,7 @@ mod test {
 
     #[test]
     fn aes_enc_bkwd_test() {
-        let database: Vec<AesEncBkwd> =
-            serde_json::from_str(include_str!("../tests/data/AesEncBkwd.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<AesEncBkwd> = read_test_data("AesEncBkwd.json");
         for data in database {
             if data.lambda == 128 {
                 let mtag = data.mtag != 0;
@@ -1614,9 +1605,7 @@ mod test {
 
     #[test]
     fn aes_prove_test() {
-        let database: Vec<AesProve> =
-            serde_json::from_str(include_str!("../tests/data/AesProve.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<AesProve> = read_test_data("AesProve.json");
         for data in database {
             if data.lambda == 128 {
                 let res: (ZkHash128, ZkHash128) = aes_prove::<OWF128>(
@@ -1726,9 +1715,7 @@ mod test {
 
     #[test]
     fn aes_verify_test() {
-        let database: Vec<AesVerify> =
-            serde_json::from_str(include_str!("../tests/data/AesVerify.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<AesVerify> = read_test_data("AesVerify.json");
         for data in database {
             if data.lambda == 128 {
                 let out = aes_verify::<OWF128, <FAEST128sParameters as FAESTParameters>::Tau>(

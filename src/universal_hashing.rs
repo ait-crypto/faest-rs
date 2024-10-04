@@ -316,7 +316,10 @@ mod test {
     use generic_array::GenericArray;
     use serde::{de::DeserializeOwned, Deserialize};
 
-    use crate::fields::{GF128, GF192, GF256};
+    use crate::{
+        fields::{GF128, GF192, GF256},
+        utils::test::read_test_data,
+    };
 
     #[derive(Debug, Deserialize)]
     #[serde(bound = "F: DeserializeOwned")]
@@ -336,9 +339,7 @@ mod test {
 
     #[test]
     fn test_volehash_128() {
-        let database: Vec<VoleHashDatabaseEntry> =
-            serde_json::from_str(include_str!("../tests/data/volehash_128.json")).unwrap();
-
+        let database: Vec<VoleHashDatabaseEntry> = read_test_data("volehash_128.json");
         for data in database {
             let sd = GenericArray::from_slice(&data.sd);
             let h = *GenericArray::from_slice(&data.h);
@@ -351,9 +352,7 @@ mod test {
 
     #[test]
     fn test_volehash_192() {
-        let database: Vec<VoleHashDatabaseEntry> =
-            serde_json::from_str(include_str!("../tests/data/volehash_192.json")).unwrap();
-
+        let database: Vec<VoleHashDatabaseEntry> = read_test_data("volehash_192.json");
         for data in database {
             let sd = GenericArray::from_slice(&data.sd);
             let h = *GenericArray::from_slice(&data.h);
@@ -366,8 +365,7 @@ mod test {
 
     #[test]
     fn test_volehash_256() {
-        let database: Vec<VoleHashDatabaseEntry> =
-            serde_json::from_str(include_str!("../tests/data/volehash_256.json")).unwrap();
+        let database: Vec<VoleHashDatabaseEntry> = read_test_data("volehash_256.json");
 
         for data in database {
             let sd = GenericArray::from_slice(&data.sd);
@@ -381,8 +379,7 @@ mod test {
 
     #[test]
     fn test_zkhash_128() {
-        let database: Vec<ZKHashDatabaseEntry<GF128>> =
-            serde_json::from_str(include_str!("../tests/data/zkhash_128.json")).unwrap();
+        let database: Vec<ZKHashDatabaseEntry<GF128>> = read_test_data("zkhash_128.json");
 
         for data in database {
             let sd = GenericArray::from_slice(&data.sd);
@@ -398,8 +395,7 @@ mod test {
 
     #[test]
     fn test_zkhash_192() {
-        let database: Vec<ZKHashDatabaseEntry<GF192>> =
-            serde_json::from_str(include_str!("../tests/data/zkhash_192.json")).unwrap();
+        let database: Vec<ZKHashDatabaseEntry<GF192>> = read_test_data("zkhash_192.json");
 
         for data in database {
             let sd = GenericArray::from_slice(&data.sd);
@@ -415,8 +411,7 @@ mod test {
 
     #[test]
     fn test_zkhash_256() {
-        let database: Vec<ZKHashDatabaseEntry<GF256>> =
-            serde_json::from_str(include_str!("../tests/data/zkhash_256.json")).unwrap();
+        let database: Vec<ZKHashDatabaseEntry<GF256>> = read_test_data("zkhash_256.json");
 
         for data in database {
             let sd = GenericArray::from_slice(&data.sd);

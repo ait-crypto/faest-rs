@@ -917,11 +917,14 @@ impl BlockEncrypt for Rijndael256 {
 
 #[cfg(test)]
 mod test {
-    use aes::cipher::generic_array::GenericArray;
-    use serde::Deserialize;
+    use super::*;
+
     use std::cmp::max;
 
-    use super::*;
+    use aes::cipher::generic_array::GenericArray;
+    use serde::Deserialize;
+
+    use crate::utils::test::read_test_data;
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -934,9 +937,7 @@ mod test {
 
     #[test]
     fn shift_row_test() {
-        let database: Vec<ShiftRows> =
-            serde_json::from_str(include_str!("../tests/data/shift_row_data.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<ShiftRows> = read_test_data("shift_row_data.json");
         for mut data in database {
             let mut input = [0u32; 8];
             let mut output = [0u32; 8];
@@ -977,9 +978,7 @@ mod test {
 
     #[test]
     fn mix_column_test() {
-        let database: Vec<MixColumns> =
-            serde_json::from_str(include_str!("../tests/data/mix_column_data.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<MixColumns> = read_test_data("mix_column_data.json");
         for mut data in database {
             let mut input = [0u32; 8];
             let mut output = [0u32; 8];
@@ -1023,9 +1022,7 @@ mod test {
 
     #[test]
     fn rijndael_test() {
-        let database: Vec<Rijndael> =
-            serde_json::from_str(include_str!("../tests/data/rijndael_data.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<Rijndael> = read_test_data("rijndael_data.json");
         for data in database {
             let mut input = [0u8; 32];
             input[..data.text.len()].copy_from_slice(&data.text[..]);

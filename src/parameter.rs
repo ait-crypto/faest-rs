@@ -1118,6 +1118,8 @@ mod test {
 
     use serde::Deserialize;
 
+    use crate::utils::test::read_test_data;
+
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct DataChalDec {
@@ -1129,9 +1131,7 @@ mod test {
 
     #[test]
     fn chaldec_test() {
-        let database: Vec<DataChalDec> =
-            serde_json::from_str(include_str!("../tests/data/decode_challenge.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<DataChalDec> = read_test_data("decode_challenge.json");
         for data in database {
             if data.chal.len() == 16 {
                 if data.k0[0] == 12 {

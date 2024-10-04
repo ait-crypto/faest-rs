@@ -446,6 +446,7 @@ mod test {
             FAESTEM192sParameters, FAESTEM256fParameters, FAESTEM256sParameters, FAESTParameters,
             OWF128EM, OWF192EM, OWF256EM,
         },
+        utils::test::read_test_data,
     };
 
     use generic_array::{typenum::U8, GenericArray};
@@ -462,9 +463,7 @@ mod test {
 
     #[test]
     fn em_extended_witness_test() {
-        let database: Vec<EmExtendedWitness> =
-            serde_json::from_str(include_str!("../tests/data/EM-ExtendedWitness.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<EmExtendedWitness> = read_test_data("EM-ExtendedWitness.json");
         for data in database {
             if data.lambda == 128 {
                 let res = em_extendedwitness::<OWF128EM>(
@@ -506,9 +505,7 @@ mod test {
 
     #[test]
     fn em_enc_fwd_test() {
-        let database: Vec<EmEncFwd> =
-            serde_json::from_str(include_str!("../tests/data/EmEncFwd.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<EmEncFwd> = read_test_data("EmEncFwd.json");
         for data in database {
             if data.lambda == 128 {
                 let (input_x, input_z): (Vec<GF128>, Vec<GF128>) = if data.m == 1 {
@@ -679,9 +676,7 @@ mod test {
 
     #[test]
     fn em_enc_bkwd_test() {
-        let database: Vec<EmEncBkwd> =
-            serde_json::from_str(include_str!("../tests/data/EmEncBkwd.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<EmEncBkwd> = read_test_data("EmEncBkwd.json");
         for data in database {
             if data.lambda == 128 {
                 let (x_in, z_in, z_out_in) = if data.m == 1 {
@@ -880,9 +875,7 @@ mod test {
 
     #[test]
     fn em_prove_test() {
-        let database: Vec<EmProve> =
-            serde_json::from_str(include_str!("../tests/data/EmProve.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<EmProve> = read_test_data("EmProve.json");
         for data in database {
             if data.lambda == 128 {
                 let res = em_prove::<OWF128EM>(
@@ -1005,9 +998,7 @@ mod test {
 
     #[test]
     fn em_verify_test() {
-        let database: Vec<EmVerify> =
-            serde_json::from_str(include_str!("../tests/data/EmVerify.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<EmVerify> = read_test_data("EmVerify.json");
         for data in database {
             if data.lambda == 128 {
                 let res = if data.tau == 11 {

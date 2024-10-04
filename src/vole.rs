@@ -166,11 +166,14 @@ mod test {
     use generic_array::GenericArray;
     use serde::Deserialize;
 
-    use crate::parameter::{
-        BaseParameters, FAEST128fParameters, FAEST128sParameters, FAEST192fParameters,
-        FAEST192sParameters, FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters,
-        FAESTEM128sParameters, FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters,
-        FAESTEM256sParameters, FAESTParameters, OWFParameters,
+    use crate::{
+        parameter::{
+            BaseParameters, FAEST128fParameters, FAEST128sParameters, FAEST192fParameters,
+            FAEST192sParameters, FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters,
+            FAESTEM128sParameters, FAESTEM192fParameters, FAESTEM192sParameters,
+            FAESTEM256fParameters, FAESTEM256sParameters, FAESTParameters, OWFParameters,
+        },
+        utils::test::read_test_data,
     };
 
     #[derive(Debug, Deserialize)]
@@ -190,9 +193,7 @@ mod test {
 
     #[test]
     fn volecommit_test() {
-        let database: Vec<DataVoleCommit> =
-            serde_json::from_str(include_str!("../tests/data/DataVoleCommit.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<DataVoleCommit> = read_test_data("DataVoleCommit.json");
         for data in database {
             if data.lambdabytes[0] == 16 {
                 if data.u.len() == 234 {
@@ -882,9 +883,7 @@ mod test {
 
     #[test]
     fn volereconstruct_test() {
-        let database: Vec<DataVoleReconstruct> =
-            serde_json::from_str(include_str!("../tests/data/DataVoleReconstruct.json"))
-                .expect("error while reading or parsing");
+        let database: Vec<DataVoleReconstruct> = read_test_data("DataVoleReconstruct.json");
         for data in database {
             if data.chal.len() == 16 {
                 if data.q[0].len() == 8 {
