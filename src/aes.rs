@@ -196,9 +196,8 @@ where
     // Step 6
     for j in 0..O::SKE::USIZE {
         // Step 7
-        let mut x_tilde: [Field<O>; 8] = array::from_fn(|i| {
-            Field::<O>::ONE * ((x[8 * j + i + O::LAMBDA::USIZE]) & 1) + xk[indice + 8 * c + i]
-        });
+        let mut x_tilde: [Field<O>; 8] =
+            array::from_fn(|i| xk[indice + 8 * c + i] + ((x[8 * j + i + O::LAMBDA::USIZE]) & 1));
         // Step 8
         if rmvrcon && (c == 0) {
             let rcon = RCON_TABLE[ircon];

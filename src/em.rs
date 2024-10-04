@@ -274,7 +274,7 @@ fn em_enc_cstrnts_mkey0<O>(
     let mut index = 0;
     for i in 0..O::LAMBDABYTES::USIZE {
         for j in 0..8 {
-            w_out[index] = Field::<O>::ONE * ((output[i] >> j) & 1) + new_w[i * 8 + j];
+            w_out[index] = new_w[i * 8 + j] + ((output[i] >> j) & 1);
             index += 1;
         }
     }
