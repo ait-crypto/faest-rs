@@ -6,7 +6,7 @@ const MESSAGE: &str = "This is a message.";
 
 fn run_example<KP, S>(name: &str)
 where
-    KP: KeypairGenerator + Signer<Box<S>> + RandomizedSigner<S>,
+    KP: KeypairGenerator + Signer<Box<S>> + RandomizedSigner<Box<S>>,
     KP::VerifyingKey: Verifier<S>,
 {
     let mut rng = rand::thread_rng();
