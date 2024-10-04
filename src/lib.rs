@@ -142,17 +142,25 @@ macro_rules! define_impl {
 
             impl Signer<[<$param Signature>]> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
+                    Ok(self.sign(msg))
+                }
+
+                fn sign(&self, msg: &[u8]) -> [<$param Signature>] {
                     let mut signature = GenericArray::default();
                     faest_sign::<[<$param Parameters>]>(msg, &self.0, &[], &mut signature);
-                    Ok([<$param Signature>](signature))
+                    [<$param Signature>](signature)
                 }
             }
 
             impl Signer<Box<[<$param Signature>]>> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<Box<[<$param Signature>]>, Error> {
+                    Ok(self.sign(msg))
+                }
+
+                fn sign(&self, msg: &[u8]) -> Box<[<$param Signature>]> {
                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));
                     faest_sign::<[<$param Parameters>]>(msg, &self.0, &[], &mut signature.0);
-                    Ok(signature)
+                    signature
                 }
             }
 
@@ -210,11 +218,18 @@ macro_rules! define_impl {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
                     self.0.try_sign(msg)
                 }
+                fn sign(&self, msg: &[u8]) -> [<$param Signature>] {
+                    self.0.sign(msg)
+                }
             }
 
             impl Signer<Box<[<$param Signature>]>> for [<$param KeyPair>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<Box<[<$param Signature>]>, Error> {
                     self.0.try_sign(msg)
+                }
+
+                fn sign(&self, msg: &[u8]) -> Box<[<$param Signature>]> {
+                    self.0.sign(msg)
                 }
             }
 
