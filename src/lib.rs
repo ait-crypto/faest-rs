@@ -18,7 +18,7 @@ use signature::RandomizedSigner;
 pub use signature::{self, Error};
 use signature::{Keypair, SignatureEncoding, Signer, Verifier};
 #[cfg(feature = "zeroize")]
-use zeroize::ZeroizeOnDrop;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 mod aes;
 mod em;
@@ -72,7 +72,7 @@ macro_rules! define_impl {
         paste! {
             #[doc = "Signing key for " $param]
             #[derive(Debug, Clone)]
-            #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
+            #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
             pub struct [<$param SigningKey>](SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>);
 

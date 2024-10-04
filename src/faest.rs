@@ -16,10 +16,10 @@ use rand_core::CryptoRngCore;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use signature::Error;
 #[cfg(feature = "zeroize")]
-use zeroize::ZeroizeOnDrop;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
+#[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
 pub(crate) struct SecretKey<O>
 where
     O: OWFParameters,
