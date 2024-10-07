@@ -10,13 +10,16 @@ use crate::{
     utils::Reader,
     vc::VectorCommitment,
     vole::{volecommit, volereconstruct},
+    Error,
 };
 
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
-use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
-use signature::Error;
+use serde::{
+    de::{Unexpected, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -42,11 +45,11 @@ where
         buf
     }
 
-    pub(crate) fn try_from_bytes(bytes: &[u8]) -> Result<Self, ()> {
+    pub(crate) fn try_from_bytes(bytes: &[u8]) -> Result<Self, Error> {
         if bytes.len() == O::SK::USIZE {
             Ok(Self::from_bytes(GenericArray::from_slice(bytes)))
         } else {
-            Err(())
+            Err(Error::new())
         }
     }
 
@@ -139,20 +142,16 @@ where
         buf
     }
 
-    pub(crate) fn try_from_bytes(bytes: &[u8]) -> Result<Self, ()> {
+    pub(crate) fn try_from_bytes(bytes: &[u8]) -> Result<Self, Error> {
         if bytes.len() == O::PK::USIZE {
-            Ok(Self::from_bytes(GenericArray::from_slice(bytes)))
+            let owf_input = GenericArray::from_slice(&bytes[..O::InputSize::USIZE]);
+            let owf_output = GenericArray::from_slice(&bytes[O::InputSize::USIZE..]);
+            Ok(Self {
+                owf_input: owf_input.clone(),
+                owf_output: owf_output.clone(),
+            })
         } else {
-            Err(())
-        }
-    }
-
-    fn from_bytes(bytes: &GenericArray<u8, O::PK>) -> Self {
-        let owf_input = GenericArray::from_slice(&bytes[..O::InputSize::USIZE]);
-        let owf_output = GenericArray::from_slice(&bytes[O::InputSize::USIZE..]);
-        Self {
-            owf_input: owf_input.clone(),
-            owf_output: owf_output.clone(),
+            Err(Error::new())
         }
     }
 }

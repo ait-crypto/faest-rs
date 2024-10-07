@@ -80,7 +80,7 @@ macro_rules! define_impl {
                 type Error = Error;
 
                 fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-                    SecretKey::try_from_bytes(value).map(|sk| Self(sk)).map_err(|_| Error::new())
+                    SecretKey::try_from_bytes(value).map(|sk| Self(sk))
                 }
             }
 
@@ -99,7 +99,7 @@ macro_rules! define_impl {
                 type Error = Error;
 
                 fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-                    PublicKey::try_from_bytes(value).map(|pk| Self(pk)).map_err(|_| Error::new())
+                    PublicKey::try_from_bytes(value).map(|pk| Self(pk))
                 }
             }
 
