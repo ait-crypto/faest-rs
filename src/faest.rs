@@ -49,13 +49,18 @@ where
         if bytes.len() == O::SK::USIZE {
             let owf_input = GenericArray::from_slice(&bytes[..O::InputSize::USIZE]);
             let owf_key = GenericArray::from_slice(&bytes[O::InputSize::USIZE..]);
-            let mut owf_output = GenericArray::default();
-            O::evaluate_owf(owf_key, owf_input, &mut owf_output);
-            Ok(Self {
-                owf_key: owf_key.clone(),
-                owf_input: owf_input.clone(),
-                owf_output,
-            })
+
+            if O::extendwitness(owf_key, owf_input).1 {
+                let mut owf_output = GenericArray::default();
+                O::evaluate_owf(owf_key, owf_input, &mut owf_output);
+                Ok(Self {
+                    owf_key: owf_key.clone(),
+                    owf_input: owf_input.clone(),
+                    owf_output,
+                })
+            } else {
+                Err(Error::new())
+            }
         } else {
             Err(Error::new())
         }
