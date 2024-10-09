@@ -20,7 +20,7 @@ type Field<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
 pub(crate) fn em_extendedwitness<O>(
     owf_key: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
-) -> (Box<GenericArray<u8, O::LBYTES>>, bool)
+) -> Option<Box<GenericArray<u8, O::LBYTES>>>
 where
     O: OWFParameters,
 {
@@ -75,7 +75,11 @@ where
             valid &= *i != 0;
         }
     }
-    (res, valid)
+    if valid {
+        Some(res)
+    } else {
+        None
+    }
 }
 
 ///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
@@ -472,7 +476,7 @@ mod test {
                         &data.input[..<OWF128EM as OWFParameters>::InputSize::USIZE],
                     ),
                 );
-                assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
+                assert_eq!(res.unwrap(), Box::new(*GenericArray::from_slice(&data.w)));
             } else if data.lambda == 192 {
                 let res = em_extendedwitness::<OWF192EM>(
                     GenericArray::from_slice(&data.key),
@@ -480,7 +484,7 @@ mod test {
                         &data.input[..<OWF192EM as OWFParameters>::InputSize::USIZE],
                     ),
                 );
-                assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
+                assert_eq!(res.unwrap(), Box::new(*GenericArray::from_slice(&data.w)));
             } else {
                 let res = em_extendedwitness::<OWF256EM>(
                     GenericArray::from_slice(&data.key),
@@ -488,7 +492,7 @@ mod test {
                         &data.input[..<OWF256EM as OWFParameters>::InputSize::USIZE],
                     ),
                 );
-                assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
+                assert_eq!(res.unwrap(), Box::new(*GenericArray::from_slice(&data.w)));
             }
         }
     }

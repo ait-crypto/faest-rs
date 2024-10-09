@@ -26,7 +26,7 @@ type CstrntsVal<'a, O> = &'a GenericArray<
     <O as OWFParameters>::LAMBDA,
 >;
 
-pub(crate) fn byte_to_bit(input: u8) -> Vec<u8> {
+fn byte_to_bit(input: u8) -> Vec<u8> {
     (0..8).map(|i| (input >> i) & 1).collect()
 }
 
@@ -49,7 +49,7 @@ where
 pub(crate) fn aes_extendedwitness<O>(
     owf_key: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
-) -> (Box<GenericArray<u8, O::LBYTES>>, bool)
+) -> Option<Box<GenericArray<u8, O::LBYTES>>>
 where
     O: OWFParameters,
 {
@@ -106,7 +106,11 @@ where
             &mut valid,
         );
     }
-    (w, valid)
+    if valid {
+        Some(w)
+    } else {
+        None
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -894,7 +898,7 @@ mod test {
                         &data.input[..<OWF128 as OWFParameters>::InputSize::USIZE],
                     ),
                 );
-                assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
+                assert_eq!(res.unwrap(), Box::new(*GenericArray::from_slice(&data.w)));
             } else if data.lambda == 192 {
                 let res = aes_extendedwitness::<OWF192>(
                     GenericArray::from_slice(&data.key),
@@ -902,7 +906,7 @@ mod test {
                         &data.input[..<OWF192 as OWFParameters>::InputSize::USIZE],
                     ),
                 );
-                assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
+                assert_eq!(res.unwrap(), Box::new(*GenericArray::from_slice(&data.w)));
             } else {
                 let res = aes_extendedwitness::<OWF256>(
                     GenericArray::from_slice(&data.key),
@@ -910,7 +914,7 @@ mod test {
                         &data.input[..<OWF256 as OWFParameters>::InputSize::USIZE],
                     ),
                 );
-                assert_eq!(res.0, Box::new(*GenericArray::from_slice(&data.w)));
+                assert_eq!(res.unwrap(), Box::new(*GenericArray::from_slice(&data.w)));
             }
         }
     }

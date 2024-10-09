@@ -159,13 +159,14 @@ pub(crate) trait OWFParameters: Sized {
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool);
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>>;
 
     fn witness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
     ) -> Box<GenericArray<u8, Self::LBYTES>> {
-        Self::extendwitness(owf_key, owf_input).0
+        // SAFETY: only ever called on valid inputs
+        Self::extendwitness(owf_key, owf_input).unwrap()
     }
 
     ///input : witness of l bits, masking values (l+lambda in aes, lambda in em), Vole tag ((l + lambda) *lambda bits), public key, chall(3lambda + 64)
@@ -204,7 +205,7 @@ pub(crate) trait OWFParameters: Sized {
             let owf_input = GenericArray::from_slice(&sk[..Self::InputSize::USIZE]);
             let owf_key = GenericArray::from_slice(&sk[Self::InputSize::USIZE..]);
 
-            if !Self::extendwitness(owf_key, owf_input).1 {
+            if Self::extendwitness(owf_key, owf_input).is_none() {
                 continue;
             }
 
@@ -290,7 +291,7 @@ impl OWFParameters for OWF128 {
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool) {
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
@@ -395,7 +396,7 @@ impl OWFParameters for OWF192 {
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool) {
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
@@ -500,7 +501,7 @@ impl OWFParameters for OWF256 {
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool) {
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
@@ -604,7 +605,7 @@ impl OWFParameters for OWF128EM {
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool) {
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
         em_extendedwitness::<Self>(owf_key, owf_input)
     }
 
@@ -708,7 +709,7 @@ impl OWFParameters for OWF192EM {
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool) {
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
         em_extendedwitness::<Self>(owf_key, owf_input)
     }
 
@@ -812,7 +813,7 @@ impl OWFParameters for OWF256EM {
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool) {
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
         em_extendedwitness::<Self>(owf_key, owf_input)
     }
 
