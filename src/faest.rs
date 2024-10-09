@@ -3,7 +3,7 @@ use std::{fmt, marker::PhantomData};
 use std::{io::Write, iter::zip};
 
 use crate::{
-    parameter::{BaseParameters, FAESTParameters, OWFParameters, TauParameters, Variant},
+    parameter::{BaseParameters, FAESTParameters, OWFParameters, TauParameters},
     prg::IV,
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
@@ -47,21 +47,17 @@ where
 
     pub(crate) fn try_from_bytes(bytes: &[u8]) -> Result<Self, Error> {
         if bytes.len() == O::SK::USIZE {
-            Ok(Self::from_bytes(GenericArray::from_slice(bytes)))
+            let owf_input = GenericArray::from_slice(&bytes[..O::InputSize::USIZE]);
+            let owf_key = GenericArray::from_slice(&bytes[O::InputSize::USIZE..]);
+            let mut owf_output = GenericArray::default();
+            O::evaluate_owf(owf_key, owf_input, &mut owf_output);
+            Ok(Self {
+                owf_key: owf_key.clone(),
+                owf_input: owf_input.clone(),
+                owf_output,
+            })
         } else {
             Err(Error::new())
-        }
-    }
-
-    fn from_bytes(bytes: &GenericArray<u8, O::SK>) -> Self {
-        let owf_input = GenericArray::from_slice(&bytes[..O::InputSize::USIZE]);
-        let owf_key = GenericArray::from_slice(&bytes[O::InputSize::USIZE..]);
-        let mut owf_output = GenericArray::default();
-        O::evaluate_owf(owf_key, owf_input, &mut owf_output);
-        Self {
-            owf_key: owf_key.clone(),
-            owf_input: owf_input.clone(),
-            owf_output,
         }
     }
 
@@ -189,15 +185,23 @@ where
             type Value = PublicKey<O>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str(&format!("a byte array of length {}", O::SK::USIZE))
+                formatter.write_str(&format!(
+                    "a byte array of length {} encoding a secret key",
+                    O::SK::USIZE
+                ))
             }
 
             fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
             where
                 E: serde::de::Error,
             {
-                PublicKey::<O>::try_from_bytes(v)
-                    .map_err(|_| E::invalid_length(O::SK::USIZE, &self))
+                PublicKey::<O>::try_from_bytes(v).map_err(|_| {
+                    if v.len() != O::SK::USIZE {
+                        E::invalid_length(O::SK::USIZE, &self)
+                    } else {
+                        E::invalid_value(Unexpected::Bytes(v), &self)
+                    }
+                })
             }
         }
 
@@ -272,12 +276,12 @@ where
 }
 
 #[inline]
-pub(crate) fn faest_keygen<P, R>(rng: R) -> SecretKey<P::OWF>
+pub(crate) fn faest_keygen<O, R>(rng: R) -> SecretKey<O>
 where
-    P: FAESTParameters,
+    O: OWFParameters,
     R: CryptoRngCore,
 {
-    P::Cypher::keygen_with_rng(rng)
+    O::keygen_with_rng(rng)
 }
 
 ///input : Message (an array of bytes), sk : secret key, pk : public key, rho : lambda bits
@@ -343,7 +347,7 @@ where
         GenericArray::default();
     h1_hasher.finish().read(&mut hv);
 
-    let w = P::Cypher::witness(&sk.owf_key, &sk.owf_input);
+    let w = P::OWF::witness(&sk.owf_key, &sk.owf_input);
     let d = Box::<GenericArray<u8, O::LBYTES>>::from_iter(
         zip(w.iter(), &u[..O::LBYTES::USIZE]).map(|(w, u)| w ^ *u),
     );
@@ -367,7 +371,7 @@ where
         }),
     );
 
-    let (a_t, b_t) = P::Cypher::prove(&w, new_u, &new_gv, &sk.owf_input, &sk.owf_output, &chall2);
+    let (a_t, b_t) = P::OWF::prove(&w, new_u, &new_gv, &sk.owf_input, &sk.owf_output, &chall2);
 
     let mut chall3 = GenericArray::<u8, O::LAMBDABYTES>::default();
     hash_challenge_3::<RO<P>>(&mut chall3, &chall2, &a_t, &b_t);
@@ -532,7 +536,7 @@ where
             + 2 * O::LAMBDABYTES::USIZE
             + 2
             + O::LBYTES::USIZE];
-    let b_t = P::Cypher::verify::<P::Tau>(
+    let b_t = P::OWF::verify::<P::Tau>(
         GenericArray::from_slice(d),
         Box::<GenericArray<_, _>>::from_iter(gq.iter().flat_map(|x| {
             x.iter()
@@ -613,7 +617,7 @@ mod test {
     fn run_faest_test<P: FAESTParameters>() {
         let mut rng = rand::thread_rng();
         for _i in 0..RUNS {
-            let sk = P::Cypher::keygen_with_rng(&mut rng);
+            let sk = P::OWF::keygen_with_rng(&mut rng);
             let msg = random_message(&mut rng);
             let mut sigma = GenericArray::default_boxed();
             faest_sign::<P>(&msg, &sk, &[], &mut sigma);

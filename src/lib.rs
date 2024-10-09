@@ -164,7 +164,7 @@ macro_rules! define_impl {
                 where
                     R: CryptoRngCore,
                 {
-                    Self(faest_keygen::<[<$param Parameters>], R>(rng))
+                    Self(faest_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng))
                 }
             }
 
@@ -173,7 +173,7 @@ macro_rules! define_impl {
                 where
                     R: CryptoRngCore,
                 {
-                    let sk = faest_keygen::<[<$param Parameters>], R>(rng);
+                    let sk = faest_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng);
                     let pk = sk.as_public_key();
                     Self([<$param SigningKey>](sk), [<$param VerificationKey>](pk))
                 }

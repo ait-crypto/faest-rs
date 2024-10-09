@@ -1,7 +1,4 @@
-use std::{
-    marker::PhantomData,
-    ops::{Add, Sub},
-};
+use std::ops::{Add, Sub};
 
 use aes::{
     cipher::{generic_array::GenericArray as GenericArray_AES, BlockEncrypt, KeyInit},
@@ -124,43 +121,7 @@ pub(crate) type QSProof<O> = (
     GenericArray<u8, <O as OWFParameters>::LAMBDABYTES>,
 );
 
-pub(crate) trait Variant<O: OWFParameters> {
-    fn witness(
-        owf_key: &GenericArray<u8, O::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-    ) -> Box<GenericArray<u8, O::LBYTES>>;
-
-    ///input : witness of l bits, masking values (l+lambda in aes, lambda in em), Vole tag ((l + lambda) *lambda bits), public key, chall(3lambda + 64)
-    ///Output : QuickSilver response (Lambda bytes)
-    fn prove(
-        w: &GenericArray<u8, O::LBYTES>,
-        u: &GenericArray<u8, O::LAMBDALBYTES>,
-        gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::InputSize>,
-        chall: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<O>;
-
-    ///input : Masked witness (l bits), Vole Key ((l + lambda) * Lambda bits), hash of constrints values (lambda bits), chall2 (3*lambda + 64 bits), chall3 (lambda bits), public key
-    ///output q_tilde - delta * a_tilde (lambda bytes)
-    fn verify<Tau>(
-        d: &GenericArray<u8, O::LBYTES>,
-        gq: Box<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>,
-        a_t: &GenericArray<u8, O::LAMBDABYTES>,
-        chall2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
-        chall3: &GenericArray<u8, O::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::InputSize>,
-    ) -> GenericArray<u8, O::LAMBDABYTES>
-    where
-        Tau: TauParameters;
-
-    ///input : a random number generator
-    /// output = pk : input, output; sk : input, key
-    fn keygen_with_rng(rng: impl RngCore) -> SecretKey<O>;
-}
-
-pub(crate) trait OWFParameters {
+pub(crate) trait OWFParameters: Sized {
     // Base parameters of the OWF
     type BaseParams: BaseParameters<Lambda = Self::LAMBDA, LambdaBytes = Self::LAMBDABYTES>;
     /// The input (= output) size of the OWF (in bytes)
@@ -194,6 +155,69 @@ pub(crate) trait OWFParameters {
     type LAMBDAR1BYTE: ArrayLength;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]);
+
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool);
+
+    fn witness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+    ) -> Box<GenericArray<u8, Self::LBYTES>> {
+        Self::extendwitness(owf_key, owf_input).0
+    }
+
+    ///input : witness of l bits, masking values (l+lambda in aes, lambda in em), Vole tag ((l + lambda) *lambda bits), public key, chall(3lambda + 64)
+    ///Output : QuickSilver response (Lambda bytes)
+    fn prove(
+        w: &GenericArray<u8, Self::LBYTES>,
+        u: &GenericArray<u8, Self::LAMBDALBYTES>,
+        gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+        chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+    ) -> QSProof<Self>;
+
+    ///input : Masked witness (l bits), Vole Key ((l + lambda) * Lambda bits), hash of constrints values (lambda bits), chall2 (3*lambda + 64 bits), chall3 (lambda bits), public key
+    ///output q_tilde - delta * a_tilde (lambda bytes)
+    fn verify<Tau>(
+        d: &GenericArray<u8, Self::LBYTES>,
+        gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
+        a_t: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall3: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+    ) -> GenericArray<u8, Self::LAMBDABYTES>
+    where
+        Tau: TauParameters;
+
+    ///input : a random number generator
+    /// output = pk : input, output; sk : input, key
+    fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<Self> {
+        loop {
+            // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
+            let mut sk: GenericArray<u8, Self::SK> = GenericArray::default();
+            rng.fill_bytes(&mut sk);
+
+            let owf_input = GenericArray::from_slice(&sk[..Self::InputSize::USIZE]);
+            let owf_key = GenericArray::from_slice(&sk[Self::InputSize::USIZE..]);
+
+            if !Self::extendwitness(owf_key, owf_input).1 {
+                continue;
+            }
+
+            let mut owf_output = GenericArray::default();
+            Self::evaluate_owf(owf_key, owf_input, &mut owf_output);
+
+            return SecretKey {
+                owf_key: owf_key.clone(),
+                owf_input: owf_input.clone(),
+                owf_output,
+            };
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -261,6 +285,39 @@ impl OWFParameters for OWF128 {
             GenericArray_AES::from_slice(input),
             GenericArray_AES::from_mut_slice(output),
         );
+    }
+
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool) {
+        aes_extendedwitness::<Self>(owf_key, owf_input)
+    }
+
+    fn prove(
+        w: &GenericArray<u8, Self::LBYTES>,
+        u: &GenericArray<u8, Self::LAMBDALBYTES>,
+        gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+        chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+    ) -> QSProof<Self> {
+        aes_prove::<Self>(w, u, gv, owf_input, owf_output, chall)
+    }
+
+    fn verify<Tau>(
+        d: &GenericArray<u8, Self::LBYTES>,
+        gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
+        a_t: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall3: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+    ) -> GenericArray<u8, Self::LAMBDABYTES>
+    where
+        Tau: TauParameters,
+    {
+        aes_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
     }
 }
 
@@ -334,6 +391,39 @@ impl OWFParameters for OWF192 {
             GenericArray_AES::from_mut_slice(&mut output[16..]),
         );
     }
+
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool) {
+        aes_extendedwitness::<Self>(owf_key, owf_input)
+    }
+
+    fn prove(
+        w: &GenericArray<u8, Self::LBYTES>,
+        u: &GenericArray<u8, Self::LAMBDALBYTES>,
+        gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+        chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+    ) -> QSProof<Self> {
+        aes_prove::<Self>(w, u, gv, owf_input, owf_output, chall)
+    }
+
+    fn verify<Tau>(
+        d: &GenericArray<u8, Self::LBYTES>,
+        gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
+        a_t: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall3: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+    ) -> GenericArray<u8, Self::LAMBDABYTES>
+    where
+        Tau: TauParameters,
+    {
+        aes_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -406,6 +496,39 @@ impl OWFParameters for OWF256 {
             GenericArray_AES::from_mut_slice(&mut output[16..]),
         );
     }
+
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool) {
+        aes_extendedwitness::<Self>(owf_key, owf_input)
+    }
+
+    fn prove(
+        w: &GenericArray<u8, Self::LBYTES>,
+        u: &GenericArray<u8, Self::LAMBDALBYTES>,
+        gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+        chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+    ) -> QSProof<Self> {
+        aes_prove::<Self>(w, u, gv, owf_input, owf_output, chall)
+    }
+
+    fn verify<Tau>(
+        d: &GenericArray<u8, Self::LBYTES>,
+        gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
+        a_t: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall3: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+    ) -> GenericArray<u8, Self::LAMBDABYTES>
+    where
+        Tau: TauParameters,
+    {
+        aes_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -476,6 +599,39 @@ impl OWFParameters for OWF128EM {
         for idx in 0..Self::InputSize::USIZE {
             output[idx] ^= key[idx];
         }
+    }
+
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool) {
+        em_extendedwitness::<Self>(owf_key, owf_input)
+    }
+
+    fn prove(
+        w: &GenericArray<u8, Self::LBYTES>,
+        u: &GenericArray<u8, Self::LAMBDALBYTES>,
+        gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+        chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+    ) -> QSProof<Self> {
+        em_prove::<Self>(w, u, gv, owf_input, owf_output, chall)
+    }
+
+    fn verify<Tau>(
+        d: &GenericArray<u8, Self::LBYTES>,
+        gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
+        a_t: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall3: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+    ) -> GenericArray<u8, Self::LAMBDABYTES>
+    where
+        Tau: TauParameters,
+    {
+        em_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
     }
 }
 
@@ -548,6 +704,39 @@ impl OWFParameters for OWF192EM {
             output[idx] ^= key[idx];
         }
     }
+
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool) {
+        em_extendedwitness::<Self>(owf_key, owf_input)
+    }
+
+    fn prove(
+        w: &GenericArray<u8, Self::LBYTES>,
+        u: &GenericArray<u8, Self::LAMBDALBYTES>,
+        gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+        chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+    ) -> QSProof<Self> {
+        em_prove::<Self>(w, u, gv, owf_input, owf_output, chall)
+    }
+
+    fn verify<Tau>(
+        d: &GenericArray<u8, Self::LBYTES>,
+        gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
+        a_t: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall3: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+    ) -> GenericArray<u8, Self::LAMBDABYTES>
+    where
+        Tau: TauParameters,
+    {
+        em_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -618,6 +807,39 @@ impl OWFParameters for OWF256EM {
         for idx in 0..Self::InputSize::USIZE {
             output[idx] ^= key[idx];
         }
+    }
+
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+    ) -> (Box<GenericArray<u8, Self::LBYTES>>, bool) {
+        em_extendedwitness::<Self>(owf_key, owf_input)
+    }
+
+    fn prove(
+        w: &GenericArray<u8, Self::LBYTES>,
+        u: &GenericArray<u8, Self::LAMBDALBYTES>,
+        gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+        chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+    ) -> QSProof<Self> {
+        em_prove::<Self>(w, u, gv, owf_input, owf_output, chall)
+    }
+
+    fn verify<Tau>(
+        d: &GenericArray<u8, Self::LBYTES>,
+        gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
+        a_t: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall3: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+        owf_output: &GenericArray<u8, Self::InputSize>,
+    ) -> GenericArray<u8, Self::LAMBDABYTES>
+    where
+        Tau: TauParameters,
+    {
+        em_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
     }
 }
 
@@ -716,7 +938,6 @@ impl TauParameters for Tau256Fast {
 
 pub(crate) trait FAESTParameters {
     type OWF: OWFParameters;
-    type Cypher: Variant<Self::OWF>;
     type Tau: TauParameters;
 
     type N0: ArrayLength;
@@ -744,8 +965,6 @@ impl FAESTParameters for FAEST128sParameters {
     type LH = U234;
 
     type SIG = Sum<U142, Sum<U256, Sum<U512, U4096>>>;
-
-    type Cypher = AesCypher<Self::OWF>;
 }
 
 pub(crate) struct FAEST128fParameters;
@@ -765,8 +984,6 @@ impl FAESTParameters for FAEST128fParameters {
     type LH = U234;
 
     type SIG = Sum<U192, Sum<U2048, U4096>>;
-
-    type Cypher = AesCypher<Self::OWF>;
 }
 
 pub(crate) struct FAEST192sParameters;
@@ -786,8 +1003,6 @@ impl FAESTParameters for FAEST192sParameters {
     type LH = U458;
 
     type SIG = Sum<U200, Sum<U256, Sum<U8192, U4096>>>;
-
-    type Cypher = AesCypher<Self::OWF>;
 }
 
 pub(crate) struct FAEST192fParameters;
@@ -807,8 +1022,6 @@ impl FAESTParameters for FAEST192fParameters {
     type LH = U458;
 
     type SIG = Sum<U152, Sum<U256, U16384>>;
-
-    type Cypher = AesCypher<Self::OWF>;
 }
 
 pub(crate) struct FAEST256sParameters;
@@ -828,8 +1041,6 @@ impl FAESTParameters for FAEST256sParameters {
     type LH = U566;
 
     type SIG = Sum<U596, Sum<U1024, Sum<U4096, U16384>>>;
-
-    type Cypher = AesCypher<Self::OWF>;
 }
 
 pub(crate) struct FAEST256fParameters;
@@ -849,8 +1060,6 @@ impl FAESTParameters for FAEST256fParameters {
     type LH = U566;
 
     type SIG = Sum<U752, Sum<U1024, Sum<U2048, Sum<U8192, U16384>>>>;
-
-    type Cypher = AesCypher<Self::OWF>;
 }
 
 pub(crate) struct FAESTEM128sParameters;
@@ -870,8 +1079,6 @@ impl FAESTParameters for FAESTEM128sParameters {
     type LH = U194;
 
     type SIG = Sum<U470, U4096>;
-
-    type Cypher = EmCypher<Self::OWF>;
 }
 
 pub(crate) struct FAESTEM128fParameters;
@@ -891,8 +1098,6 @@ impl FAESTParameters for FAESTEM128fParameters {
     type LH = U194;
 
     type SIG = Sum<U576, Sum<U1024, U4096>>;
-
-    type Cypher = EmCypher<Self::OWF>;
 }
 
 pub(crate) struct FAESTEM192sParameters;
@@ -912,8 +1117,6 @@ impl FAESTParameters for FAESTEM192sParameters {
     type LH = U338;
 
     type SIG = Sum<U584, Sum<U2048, U8192>>;
-
-    type Cypher = EmCypher<Self::OWF>;
 }
 
 pub(crate) struct FAESTEM192fParameters;
@@ -934,8 +1137,6 @@ impl FAESTParameters for FAESTEM192fParameters {
     type LH = U338;
 
     type SIG = Sum<U600, Sum<U1024, Sum<U4096, U8192>>>;
-
-    type Cypher = EmCypher<Self::OWF>;
 }
 
 pub(crate) struct FAESTEM256sParameters;
@@ -956,8 +1157,6 @@ impl FAESTParameters for FAESTEM256sParameters {
     type LH = U514;
 
     type SIG = Sum<U476, Sum<U4096, U16384>>;
-
-    type Cypher = EmCypher<Self::OWF>;
 }
 
 pub(crate) struct FAESTEM256fParameters;
@@ -978,138 +1177,6 @@ impl FAESTParameters for FAESTEM256fParameters {
     type LH = U514;
 
     type SIG = Sum<U112, Sum<U2048, Sum<U8192, U16384>>>;
-
-    type Cypher = EmCypher<Self::OWF>;
-}
-
-pub(crate) struct AesCypher<OWF>(PhantomData<OWF>)
-where
-    OWF: OWFParameters;
-
-impl<OWF: OWFParameters> Variant<OWF> for AesCypher<OWF> {
-    fn witness(
-        owf_key: &GenericArray<u8, OWF::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, OWF::InputSize>,
-    ) -> Box<GenericArray<u8, OWF::LBYTES>> {
-        aes_extendedwitness::<OWF>(owf_key, owf_input).0
-    }
-
-    fn prove(
-        w: &GenericArray<u8, OWF::LBYTES>,
-        u: &GenericArray<u8, OWF::LAMBDALBYTES>,
-        gv: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
-        owf_input: &GenericArray<u8, OWF::InputSize>,
-        owf_output: &GenericArray<u8, OWF::InputSize>,
-        chall: &GenericArray<u8, <<OWF as OWFParameters>::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<OWF> {
-        aes_prove::<OWF>(w, u, gv, owf_input, owf_output, chall)
-    }
-
-    fn verify<Tau>(
-        d: &GenericArray<u8, OWF::LBYTES>,
-        gq: Box<GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>>,
-        a_t: &GenericArray<u8, OWF::LAMBDABYTES>,
-        chall2: &GenericArray<u8, <<OWF as OWFParameters>::BaseParams as BaseParameters>::Chall>,
-        chall3: &GenericArray<u8, OWF::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, OWF::InputSize>,
-        owf_output: &GenericArray<u8, OWF::InputSize>,
-    ) -> GenericArray<u8, OWF::LAMBDABYTES>
-    where
-        Tau: TauParameters,
-    {
-        aes_verify::<OWF, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
-    }
-
-    ///Input : the parameter of the faest protocol
-    /// Output : sk : inputOWF||keyOWF, pk : inputOWF||outputOWF
-    fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<OWF> {
-        loop {
-            // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
-            let mut sk: GenericArray<u8, OWF::SK> = GenericArray::default();
-            rng.fill_bytes(&mut sk);
-
-            let owf_input = GenericArray::from_slice(&sk[..OWF::InputSize::USIZE]);
-            let owf_key = GenericArray::from_slice(&sk[OWF::InputSize::USIZE..]);
-
-            let test = aes_extendedwitness::<OWF>(owf_key, owf_input).1;
-            if !test {
-                continue;
-            }
-
-            let mut owf_output = GenericArray::default();
-            OWF::evaluate_owf(owf_key, owf_input, &mut owf_output);
-
-            return SecretKey {
-                owf_key: owf_key.clone(),
-                owf_input: owf_input.clone(),
-                owf_output,
-            };
-        }
-    }
-}
-
-pub(crate) struct EmCypher<OWF>(PhantomData<OWF>)
-where
-    OWF: OWFParameters;
-
-impl<OWF: OWFParameters> Variant<OWF> for EmCypher<OWF> {
-    fn witness(
-        owf_key: &GenericArray<u8, OWF::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, OWF::InputSize>,
-    ) -> Box<GenericArray<u8, OWF::LBYTES>> {
-        em_extendedwitness::<OWF>(owf_key, owf_input).0
-    }
-
-    fn prove(
-        w: &GenericArray<u8, OWF::LBYTES>,
-        u: &GenericArray<u8, OWF::LAMBDALBYTES>,
-        gv: &GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>,
-        owf_input: &GenericArray<u8, OWF::InputSize>,
-        owf_output: &GenericArray<u8, OWF::InputSize>,
-        chall: &GenericArray<u8, <<OWF as OWFParameters>::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<OWF> {
-        em_prove::<OWF>(w, u, gv, owf_input, owf_output, chall)
-    }
-
-    fn verify<Tau>(
-        d: &GenericArray<u8, OWF::LBYTES>,
-        gq: Box<GenericArray<GenericArray<u8, OWF::LAMBDALBYTES>, OWF::LAMBDA>>,
-        a_t: &GenericArray<u8, OWF::LAMBDABYTES>,
-        chall2: &GenericArray<u8, <<OWF as OWFParameters>::BaseParams as BaseParameters>::Chall>,
-        chall3: &GenericArray<u8, OWF::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, OWF::InputSize>,
-        owf_output: &GenericArray<u8, OWF::InputSize>,
-    ) -> GenericArray<u8, OWF::LAMBDABYTES>
-    where
-        Tau: TauParameters,
-    {
-        em_verify::<OWF, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
-    }
-
-    fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<OWF> {
-        loop {
-            // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
-            let mut sk: GenericArray<u8, OWF::SK> = GenericArray::default();
-            rng.fill_bytes(&mut sk);
-
-            let owf_input = GenericArray::from_slice(&sk[..OWF::InputSize::USIZE]);
-            let owf_key = GenericArray::from_slice(&sk[OWF::InputSize::USIZE..]);
-
-            let test = em_extendedwitness::<OWF>(owf_key, owf_input).1;
-            if !test {
-                continue;
-            }
-
-            let mut owf_output = GenericArray::default();
-            OWF::evaluate_owf(owf_key, owf_input, &mut owf_output);
-
-            return SecretKey {
-                owf_key: owf_key.clone(),
-                owf_input: owf_input.clone(),
-                owf_output,
-            };
-        }
-    }
 }
 
 #[cfg(test)]
