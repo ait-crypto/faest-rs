@@ -60,7 +60,7 @@ where
                         owf_output,
                     }
                 })
-                .ok_or_else(|| Error::new())
+                .ok_or_else(Error::new)
         } else {
             Err(Error::new())
         }
