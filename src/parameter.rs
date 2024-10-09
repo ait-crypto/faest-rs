@@ -1,5 +1,3 @@
-use std::ops::{Add, Sub};
-
 use aes::{
     cipher::{generic_array::GenericArray as GenericArray_AES, BlockEncrypt, KeyInit},
     Aes128Enc, Aes192Enc, Aes256Enc,
@@ -229,55 +227,30 @@ impl OWFParameters for OWF128 {
     type InputSize = U16;
 
     type LAMBDA = U128;
-
     type LAMBDABYTES = U16;
-
-    type L = <U1024 as Add<U576>>::Output;
-
+    type L = Sum<U1024, U576>;
     type LBYTES = U200;
-
-    type LAMBDALBYTES = <Self::LAMBDABYTES as Add<Self::LBYTES>>::Output;
-
+    type LAMBDALBYTES = Sum<Self::LAMBDABYTES, Self::LBYTES>;
     type NK = U4;
-
     type R = U10;
-
     type SKE = U40;
-
     type SENC = U160;
-
     type LKE = U448;
-
-    type LENC = <U1024 as Add<U128>>::Output;
-
+    type LENC = Sum<U1024, U128>;
     type BETA = U1;
-
     type NST = U0;
-
     type PK = U32;
-
     type SK = U32;
-
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
-
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
-
     type LPRIMEBYTE = U256;
-
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
-
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
-
     type PRODSKE8 = Prod<Self::SKE, U8>;
-
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
-
     type QUOTLENC8 = Quot<Self::LENC, U8>;
-
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
-
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
@@ -330,55 +303,30 @@ impl OWFParameters for OWF192 {
     type InputSize = U32;
 
     type LAMBDA = U192;
-
     type LAMBDABYTES = U24;
-
-    type L = <U4096 as Sub<U832>>::Output;
-
+    type L = Diff<U4096, U832>;
     type LBYTES = U408;
-
-    type LAMBDALBYTES = <Self::LAMBDABYTES as Add<Self::LBYTES>>::Output;
-
+    type LAMBDALBYTES = Sum<Self::LAMBDABYTES, Self::LBYTES>;
     type NK = U6;
-
     type R = U12;
-
     type SKE = U32;
-
     type SENC = U192;
-
     type LKE = U448;
-
-    type LENC = <U1024 as Add<U384>>::Output;
-
+    type LENC = Sum<U1024, U384>;
     type BETA = U2;
-
     type NST = U0;
-
     type PK = U64;
-
     type SK = U56;
-
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
-
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
-
     type LPRIMEBYTE = U384;
-
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
-
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
-
     type PRODSKE8 = Prod<Self::SKE, U8>;
-
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
-
     type QUOTLENC8 = Quot<Self::LENC, U8>;
-
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
-
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
@@ -435,55 +383,30 @@ impl OWFParameters for OWF256 {
     type InputSize = U32;
 
     type LAMBDA = U256;
-
     type LAMBDABYTES = U32;
-
-    type L = <U4096 as Sub<U96>>::Output;
-
+    type L = Diff<U4096, U96>;
     type LBYTES = U500;
-
-    type LAMBDALBYTES = <Self::LAMBDABYTES as Add<Self::LBYTES>>::Output;
-
+    type LAMBDALBYTES = Sum<Self::LAMBDABYTES, Self::LBYTES>;
     type NK = U8;
-
     type R = U14;
-
     type SKE = U52;
-
     type SENC = U224;
-
     type LKE = U672;
-
-    type LENC = <U1024 as Add<U640>>::Output;
-
+    type LENC = Sum<U1024, U640>;
     type BETA = U2;
-
     type NST = U0;
-
     type PK = U64;
-
     type SK = U64;
-
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
-
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
-
     type LPRIMEBYTE = U512;
-
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
-
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
-
     type PRODSKE8 = Prod<Self::SKE, U8>;
-
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
-
     type QUOTLENC8 = Quot<Self::LENC, U8>;
-
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
-
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
@@ -540,55 +463,30 @@ impl OWFParameters for OWF128EM {
     type InputSize = U16;
 
     type LAMBDA = U128;
-
     type LAMBDABYTES = U16;
-
-    type L = <U1024 as Add<U256>>::Output;
-
+    type L = Sum<U1024, U256>;
     type LBYTES = U160;
-
-    type LAMBDALBYTES = <Self::LAMBDABYTES as Add<Self::LBYTES>>::Output;
-
+    type LAMBDALBYTES = Sum<Self::LAMBDABYTES, Self::LBYTES>;
     type NK = U4;
-
     type R = U10;
-
     type SKE = U40;
-
     type SENC = U160;
-
     type LKE = U448;
-
-    type LENC = <U1024 as Add<U128>>::Output;
-
+    type LENC = Sum<U1024, U128>;
     type BETA = U1;
-
     type NST = U4;
-
     type PK = U32;
-
     type SK = U32;
-
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
-
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
-
     type LPRIMEBYTE = U256;
-
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
-
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
-
     type PRODSKE8 = Prod<Self::SKE, U8>;
-
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
-
     type QUOTLENC8 = Quot<Self::LENC, U8>;
-
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
-
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
@@ -644,55 +542,30 @@ impl OWFParameters for OWF192EM {
     type InputSize = U24;
 
     type LAMBDA = U192;
-
     type LAMBDABYTES = U24;
-
-    type L = <U2048 as Add<U256>>::Output;
-
+    type L = Sum<U2048, U256>;
     type LBYTES = U288;
-
-    type LAMBDALBYTES = <Self::LAMBDABYTES as Add<Self::LBYTES>>::Output;
-
+    type LAMBDALBYTES = Sum<Self::LAMBDABYTES, Self::LBYTES>;
     type NK = U6;
-
     type R = U12;
-
     type SKE = U32;
-
     type SENC = U288;
-
     type LKE = U448;
-
-    type LENC = <U1024 as Add<U384>>::Output;
-
+    type LENC = Sum<U1024, U384>;
     type BETA = U2;
-
     type NST = U6;
-
     type PK = U48;
-
     type SK = U48;
-
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
-
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
-
     type LPRIMEBYTE = U384;
-
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
-
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
-
     type PRODSKE8 = Prod<Self::SKE, U8>;
-
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
-
     type QUOTLENC8 = Quot<Self::LENC, U8>;
-
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
-
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
@@ -748,55 +621,30 @@ impl OWFParameters for OWF256EM {
     type InputSize = U32;
 
     type LAMBDA = U256;
-
     type LAMBDABYTES = U32;
-
-    type L = <U4096 as Sub<U512>>::Output;
-
+    type L = Diff<U4096, U512>;
     type LBYTES = U448;
-
-    type LAMBDALBYTES = <Self::LAMBDABYTES as Add<Self::LBYTES>>::Output;
-
+    type LAMBDALBYTES = Sum<Self::LAMBDABYTES, Self::LBYTES>;
     type NK = U8;
-
     type R = U14;
-
     type SKE = U52;
-
     type SENC = U448;
-
     type LKE = U672;
-
-    type LENC = <U1024 as Add<U640>>::Output;
-
+    type LENC = Sum<U1024, U640>;
     type BETA = U2;
-
     type NST = U8;
-
     type PK = U64;
-
     type SK = U64;
-
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
-
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
-
     type LPRIMEBYTE = U512;
-
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
-
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
-
     type PRODSKE8 = Prod<Self::SKE, U8>;
-
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
-
     type QUOTLENC8 = Quot<Self::LENC, U8>;
-
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-
     type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
-
     type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
@@ -956,15 +804,10 @@ impl FAESTParameters for FAEST128sParameters {
     type Tau = Tau128Small;
 
     type N0 = U4096;
-
     type POWK0 = Diff<U8192, U1>;
-
     type N1 = U2048;
-
     type POWK1 = Diff<U4096, U1>;
-
     type LH = U234;
-
     type SIG = Sum<U142, Sum<U256, Sum<U512, U4096>>>;
 }
 
@@ -975,15 +818,10 @@ impl FAESTParameters for FAEST128fParameters {
     type Tau = Tau128Fast;
 
     type N0 = U256;
-
     type POWK0 = U511;
-
     type N1 = U256;
-
     type POWK1 = U511;
-
     type LH = U234;
-
     type SIG = Sum<U192, Sum<U2048, U4096>>;
 }
 
@@ -994,15 +832,10 @@ impl FAESTParameters for FAEST192sParameters {
     type Tau = Tau192Small;
 
     type N0 = U4096;
-
     type POWK0 = Diff<U8192, U1>;
-
     type N1 = U4096;
-
     type POWK1 = Diff<U8192, U1>;
-
     type LH = U458;
-
     type SIG = Sum<U200, Sum<U256, Sum<U8192, U4096>>>;
 }
 
@@ -1013,15 +846,10 @@ impl FAESTParameters for FAEST192fParameters {
     type Tau = Tau192Fast;
 
     type N0 = U256;
-
     type POWK0 = U511;
-
     type N1 = U256;
-
     type POWK1 = U511;
-
     type LH = U458;
-
     type SIG = Sum<U152, Sum<U256, U16384>>;
 }
 
@@ -1032,15 +860,10 @@ impl FAESTParameters for FAEST256sParameters {
     type Tau = Tau256Small;
 
     type N0 = U4096;
-
     type POWK0 = Diff<U8192, U1>;
-
     type N1 = U2048;
-
     type POWK1 = Diff<U4096, U1>;
-
     type LH = U566;
-
     type SIG = Sum<U596, Sum<U1024, Sum<U4096, U16384>>>;
 }
 
@@ -1051,15 +874,10 @@ impl FAESTParameters for FAEST256fParameters {
     type Tau = Tau256Fast;
 
     type N0 = U256;
-
     type POWK0 = U511;
-
     type N1 = U256;
-
     type POWK1 = U511;
-
     type LH = U566;
-
     type SIG = Sum<U752, Sum<U1024, Sum<U2048, Sum<U8192, U16384>>>>;
 }
 
@@ -1070,15 +888,10 @@ impl FAESTParameters for FAESTEM128sParameters {
     type Tau = Tau128Small;
 
     type N0 = U4096;
-
     type POWK0 = Diff<U8192, U1>;
-
     type N1 = U2048;
-
     type POWK1 = Diff<U4096, U1>;
-
     type LH = U194;
-
     type SIG = Sum<U470, U4096>;
 }
 
@@ -1089,15 +902,10 @@ impl FAESTParameters for FAESTEM128fParameters {
     type Tau = Tau128Fast;
 
     type N0 = U256;
-
     type POWK0 = U511;
-
     type N1 = U256;
-
     type POWK1 = U511;
-
     type LH = U194;
-
     type SIG = Sum<U576, Sum<U1024, U4096>>;
 }
 
@@ -1108,15 +916,10 @@ impl FAESTParameters for FAESTEM192sParameters {
     type Tau = Tau192Small;
 
     type N0 = U4096;
-
     type POWK0 = Diff<U8192, U1>;
-
     type N1 = U4096;
-
     type POWK1 = Diff<U8192, U1>;
-
     type LH = U338;
-
     type SIG = Sum<U584, Sum<U2048, U8192>>;
 }
 
@@ -1124,19 +927,13 @@ pub(crate) struct FAESTEM192fParameters;
 
 impl FAESTParameters for FAESTEM192fParameters {
     type OWF = OWF192EM;
-
     type Tau = Tau192Fast;
 
     type N0 = U256;
-
     type POWK0 = U511;
-
     type N1 = U256;
-
     type POWK1 = U511;
-
     type LH = U338;
-
     type SIG = Sum<U600, Sum<U1024, Sum<U4096, U8192>>>;
 }
 
@@ -1144,19 +941,13 @@ pub(crate) struct FAESTEM256sParameters;
 
 impl FAESTParameters for FAESTEM256sParameters {
     type OWF = OWF256EM;
-
     type Tau = Tau256Small;
 
     type N0 = U4096;
-
     type POWK0 = Diff<U8192, U1>;
-
     type N1 = U2048;
-
     type POWK1 = Diff<U4096, U1>;
-
     type LH = U514;
-
     type SIG = Sum<U476, Sum<U4096, U16384>>;
 }
 
@@ -1164,19 +955,13 @@ pub(crate) struct FAESTEM256fParameters;
 
 impl FAESTParameters for FAESTEM256fParameters {
     type OWF = OWF256EM;
-
     type Tau = Tau256Fast;
 
     type N0 = U256;
-
     type POWK0 = U511;
-
     type N1 = U256;
-
     type POWK1 = U511;
-
     type LH = U514;
-
     type SIG = Sum<U112, Sum<U2048, Sum<U8192, U16384>>>;
 }
 
