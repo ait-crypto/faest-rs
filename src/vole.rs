@@ -1,3 +1,5 @@
+use std::iter::zip;
+
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
 use crate::{
@@ -20,7 +22,7 @@ where
 {
     // this parameters are known upfront!
     let n = sd.len() + 1;
-    let d = (128 - (n as u128).leading_zeros() - 1) as usize;
+    let d = (64 - (n as u64).leading_zeros() - 1) as usize;
     let mut r = vec![GenericArray::<u8, LH>::default(); n * 2];
     if let Some(sd0) = sd_0 {
         let mut prg = PRG::new_prg(sd0, iv);
@@ -76,10 +78,8 @@ where
     let mut prg = VC::PRG::new_prg(r, iv);
     let mut decom = GenericArray::default_boxed();
     let mut u = GenericArray::<GenericArray<u8, LH>, Tau::Tau>::default_boxed();
-    let mut v: Box<GenericArray<Vec<GenericArray<u8, LH>>, Tau::Tau>> =
-        GenericArray::default_boxed();
-    let mut c: Box<GenericArray<GenericArray<u8, LH>, Tau::TauMinus1>> =
-        GenericArray::default_boxed();
+    let mut v = GenericArray::default_boxed();
+    let mut c = GenericArray::<GenericArray<u8, LH>, Tau::TauMinus1>::default_boxed();
 
     let mut hasher = VC::RO::h1_init();
     for i in 0..Tau::Tau::USIZE {
@@ -93,11 +93,9 @@ where
         (u[i], v[i]) = to_vole_convert::<VC::PRG, _>(Some(&sd_i[0]), sd_i.iter().skip(1), iv);
     }
     for i in 1..Tau::Tau::USIZE {
-        c[i - 1] = u[0]
-            .iter()
-            .zip(u[i].iter())
-            .map(|(&x1, &x2)| x1 ^ x2)
-            .collect();
+        for (c, (u0, ui)) in zip(c[i - 1].iter_mut(), zip(&u[0], &u[i])) {
+            *c = u0 ^ ui;
+        }
     }
     let mut hcom = GenericArray::default();
     hasher.finish().read(&mut hcom);
