@@ -1,6 +1,9 @@
 use std::array;
 
-use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
+use generic_array::{
+    typenum::{Unsigned, U4},
+    ArrayLength, GenericArray,
+};
 
 use crate::{
     fields::{BigGaloisField, ByteCombine, ByteCombineConstants, Field as _, SumPoly},
@@ -59,8 +62,7 @@ where
     let mut w: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
     let mut index = 0;
     //step 3
-    let (kb, mut valid) =
-        rijndael_key_schedule(owf_key, 4, O::NK::USIZE, O::R::USIZE, O::SKE::USIZE);
+    let (kb, mut valid) = rijndael_key_schedule::<U4, O::NK, O::R>(owf_key, O::SKE::USIZE);
     //step 4
     for i in convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4]
         .iter()
@@ -131,7 +133,7 @@ fn round_with_save(
         }
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
-        rijndael_shift_rows_1(&mut state, 4);
+        rijndael_shift_rows_1::<U4>(&mut state);
         for i in convert_from_batchblocks(inv_bitslice(&state))[..4][..4]
             .iter()
             .map(|x| x.to_le_bytes())

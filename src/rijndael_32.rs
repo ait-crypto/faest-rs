@@ -18,7 +18,10 @@ use aes::{
     },
     Block,
 };
-use generic_array::{typenum::U2, GenericArray};
+use generic_array::{
+    typenum::{Unsigned, U12, U14, U2, U6, U8},
+    GenericArray,
+};
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
@@ -36,29 +39,26 @@ pub(crate) const RCON_TABLE: [u8; 30] = [
 ];
 
 /// Fully bitsliced Rijndael key schedule to match the fully-fixsliced representation.
-pub(crate) fn rijndael_key_schedule(
+pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
     key: &[u8],
-    nst: usize,
-    nk: usize,
-    r: usize,
     ske: usize,
 ) -> (Vec<u32>, bool) {
     let mut valid = true;
-    let mut rkeys = vec![0u32; (nst.div_ceil(nk) * 8 * (r + 1)) + 8];
+    let mut rkeys = vec![0u32; (NST::USIZE.div_ceil(NK::USIZE) * 8 * (R::USIZE + 1)) + 8];
 
     bitslice(&mut rkeys[..8], &key[..16], &key[16..]);
 
     let mut rk_off = 0;
     let mut count = 0;
     for rcon in RCON_TABLE.iter().take(ske / 4) {
-        if nk == 8 {
+        if NK::USIZE == 8 {
             if count < ske / 4 {
                 for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][12..].iter() {
                     valid &= 0 != *i;
                 }
                 count += 1
             }
-        } else if nk == 6 {
+        } else if NK::USIZE == 6 {
             for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][4..8].iter() {
                 valid &= 0 != *i;
             }
@@ -72,7 +72,7 @@ pub(crate) fn rijndael_key_schedule(
         sub_bytes(&mut rkeys[rk_off..(rk_off + 8)]);
         sub_bytes_nots(&mut rkeys[rk_off..(rk_off + 8)]);
 
-        let ind = (nk * 4) as u8;
+        let ind = (NK::USIZE * 4) as u8;
         let mut rcon_0 = [0u8; 16];
         let mut rcon_1 = [0u8; 16];
         rcon_0[13] = rcon * (1 - ind / 17);
@@ -85,16 +85,8 @@ pub(crate) fn rijndael_key_schedule(
             rkeys[rk_off + j] ^= bitsliced_rcon[j];
         }
 
-        let idx_ror = if nk == 4 {
-            14
-        } else if nk == 6 {
-            11
-        } else {
-            15
-        };
-
-        xor_columns(&mut rkeys, rk_off, 8, idx_ror, nk);
-        if nk == 8 && count < ske / 4 {
+        xor_columns::<NK>(&mut rkeys, rk_off);
+        if NK::USIZE == 8 && count < ske / 4 {
             for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..].iter() {
                 valid &= 0 != *i;
             }
@@ -102,199 +94,99 @@ pub(crate) fn rijndael_key_schedule(
         }
     }
 
-    if nk == 4 {
-        let mut final_res: Vec<u8> = vec![];
+    let mut final_res: Vec<u8> = vec![];
+    if NK::USIZE == 4 {
         for i in 0..rkeys.len() / 8 {
             let res = inv_bitslice(&rkeys[i * 8..(i + 1) * 8]);
-            if nst == 4 {
-                for j in 0..16 {
-                    final_res.push(res[0][j]);
-                }
-                for _j in 0..16 {
-                    final_res.push(0);
-                }
-            } else if nst == 6 {
+            if NST::USIZE == 4 {
+                final_res.extend_from_slice(&res[0][0..16]);
+                final_res.resize(final_res.len() + 16, 0);
+            } else if NST::USIZE == 6 {
                 if i % 3 == 0 {
-                    for j in 0..16 {
-                        final_res.push(res[0][j]);
-                    }
+                    final_res.extend_from_slice(&res[0][0..16]);
                 } else if i % 3 == 1 {
-                    for j in 0..8 {
-                        final_res.push(res[0][j]);
-                    }
-                    for _j in 0..8 {
-                        final_res.push(0);
-                    }
-                    for j in 8..16 {
-                        final_res.push(res[0][j]);
-                    }
+                    final_res.extend_from_slice(&res[0][0..8]);
+                    final_res.resize(final_res.len() + 8, 0);
+                    final_res.extend_from_slice(&res[0][8..16]);
                 } else {
-                    for j in 0..16 {
-                        final_res.push(res[0][j]);
-                    }
-                    for _j in 0..8 {
-                        final_res.push(0);
-                    }
+                    final_res.extend_from_slice(&res[0][0..16]);
+                    final_res.resize(final_res.len() + 8, 0);
                 }
             } else {
-                for j in 0..16 {
-                    final_res.push(res[0][j]);
-                }
+                final_res.extend_from_slice(&res[0][0..16]);
             }
         }
-
-        let mut final_bitsliced_res = vec![0u32; final_res.len() / 4];
-        for i in 0..final_res.len() / 32 {
-            bitslice(
-                &mut final_bitsliced_res[i * 8..(i + 1) * 8],
-                &final_res[32 * i..(32 * i) + 16],
-                &final_res[(32 * i) + 16..32 * (i + 1)],
-            );
-        }
-        (final_bitsliced_res, valid)
-    } else if nk == 6 {
-        let mut final_res: Vec<u8> = vec![];
+    } else if NK::USIZE == 6 {
         for i in 0..rkeys.len() / 8 {
             let res = inv_bitslice(&rkeys[i * 8..(i + 1) * 8]);
-            if nst == 4 {
+            if NST::USIZE == 4 {
                 if i % 2 == 0 {
-                    for j in 0..16 {
-                        final_res.push(res[0][j]);
-                    }
-                    for _j in 0..16 {
-                        final_res.push(0);
-                    }
-                    for j in 0..8 {
-                        final_res.push(res[1][j]);
-                    }
+                    final_res.extend_from_slice(&res[0][0..16]);
+                    final_res.resize(final_res.len() + 16, 0);
+                    final_res.extend_from_slice(&res[1][0..8]);
                 } else {
-                    for j in 0..8 {
-                        final_res.push(res[0][j]);
-                    }
-                    for _j in 0..16 {
-                        final_res.push(0);
-                    }
-                    for j in 8..16 {
-                        final_res.push(res[0][j]);
-                    }
-                    for j in 0..8 {
-                        final_res.push(res[1][j]);
-                    }
-                    for _j in 0..16 {
-                        final_res.push(0);
-                    }
+                    final_res.extend_from_slice(&res[0][0..8]);
+                    final_res.resize(final_res.len() + 16, 0);
+                    final_res.extend_from_slice(&res[0][8..16]);
+                    final_res.extend_from_slice(&res[1][0..8]);
+                    final_res.resize(final_res.len() + 16, 0);
                 }
-            } else if nst == 6 {
-                for j in 0..16 {
-                    final_res.push(res[0][j]);
-                }
-                for j in 0..8 {
-                    final_res.push(res[1][j]);
-                }
-                for _j in 0..8 {
-                    final_res.push(0);
-                }
+            } else if NST::USIZE == 6 {
+                final_res.extend_from_slice(&res[0][0..16]);
+                final_res.extend_from_slice(&res[1][0..8]);
+                final_res.resize(final_res.len() + 8, 0);
             } else {
-                for j in 0..16 {
-                    final_res.push(res[0][j]);
-                }
-                for j in 0..8 {
-                    final_res.push(res[1][j]);
-                }
+                final_res.extend_from_slice(&res[0][0..16]);
+                final_res.extend_from_slice(&res[1][0..8]);
             }
         }
-        let mut final_bitsliced_res = vec![0u32; final_res.len() / 4];
-        for i in 0..final_res.len() / 32 {
-            bitslice(
-                &mut final_bitsliced_res[i * 8..(i + 1) * 8],
-                &final_res[32 * i..(32 * i) + 16],
-                &final_res[(32 * i) + 16..32 * (i + 1)],
-            );
-        }
-        (final_bitsliced_res, valid)
     } else {
-        let mut final_res: Vec<u8> = vec![];
         for i in 0..rkeys.len() / 8 {
             let res = inv_bitslice(&rkeys[i * 8..(i + 1) * 8]);
-            if nst == 4 {
-                for j in 0..16 {
-                    final_res.push(res[0][j]);
-                }
-                for _j in 0..16 {
-                    final_res.push(0);
-                }
-                for j in 0..16 {
-                    final_res.push(res[1][j]);
-                }
-                for _j in 0..16 {
-                    final_res.push(0);
-                }
-            } else if nst == 6 {
+            if NST::USIZE == 4 {
+                final_res.extend_from_slice(&res[0][0..16]);
+                final_res.resize(final_res.len() + 16, 0);
+                final_res.extend_from_slice(&res[1][0..16]);
+                final_res.resize(final_res.len() + 16, 0);
+            } else if NST::USIZE == 6 {
                 if i % 3 == 0 {
-                    for j in 0..16 {
-                        final_res.push(res[0][j]);
-                    }
-                    for j in 0..8 {
-                        final_res.push(res[1][j]);
-                    }
-                    for _j in 0..8 {
-                        final_res.push(0);
-                    }
-                    for j in 8..16 {
-                        final_res.push(res[1][j]);
-                    }
+                    final_res.extend_from_slice(&res[0][0..16]);
+                    final_res.extend_from_slice(&res[1][0..8]);
+                    final_res.resize(final_res.len() + 8, 0);
+                    final_res.extend_from_slice(&res[1][8..16]);
                 } else if i % 3 == 1 {
-                    for j in 0..16 {
-                        final_res.push(res[0][j]);
-                    }
-                    for _j in 0..8 {
-                        final_res.push(0);
-                    }
-                    for j in 0..16 {
-                        final_res.push(res[1][j]);
-                    }
+                    final_res.extend_from_slice(&res[0][0..16]);
+                    final_res.resize(final_res.len() + 8, 0);
+                    final_res.extend_from_slice(&res[1][0..16]);
                 } else {
-                    for j in 0..8 {
-                        final_res.push(res[0][j]);
-                    }
-                    for _j in 0..8 {
-                        final_res.push(0);
-                    }
-                    for j in 8..16 {
-                        final_res.push(res[0][j]);
-                    }
-                    for j in 0..16 {
-                        final_res.push(res[1][j]);
-                    }
-                    for _j in 0..8 {
-                        final_res.push(0);
-                    }
+                    final_res.extend_from_slice(&res[0][0..8]);
+                    final_res.resize(final_res.len() + 8, 0);
+                    final_res.extend_from_slice(&res[0][8..16]);
+                    final_res.extend_from_slice(&res[1][0..16]);
+                    final_res.resize(final_res.len() + 8, 0);
                 }
             } else {
-                for j in 0..16 {
-                    final_res.push(res[0][j]);
-                }
-                for j in 0..16 {
-                    final_res.push(res[1][j]);
-                }
+                final_res.extend_from_slice(&res[0][0..16]);
+                final_res.extend_from_slice(&res[1][0..16]);
             }
         }
-        let mut final_bitsliced_res = vec![0u32; final_res.len() / 4];
-        for i in 0..final_res.len() / 32 {
-            bitslice(
-                &mut final_bitsliced_res[i * 8..(i + 1) * 8],
-                &final_res[32 * i..(32 * i) + 16],
-                &final_res[(32 * i) + 16..32 * (i + 1)],
-            );
-        }
-        (final_bitsliced_res, valid)
     }
+
+    let mut final_bitsliced_res = vec![0u32; final_res.len() / 4];
+    for i in 0..final_res.len() / 32 {
+        bitslice(
+            &mut final_bitsliced_res[i * 8..(i + 1) * 8],
+            &final_res[32 * i..(32 * i) + 16],
+            &final_res[(32 * i) + 16..32 * (i + 1)],
+        );
+    }
+    (final_bitsliced_res, valid)
 }
 
 /// Fully-fixsliced AES-128 encryption (the ShiftRows is completely omitted).
 ///
 /// Encrypts four blocks in-place and in parallel.
-fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst: usize, r: usize) -> BatchBlocks {
+fn rijndael_encrypt<NST: Unsigned, R: Unsigned>(rkeys: &[u32], input: &[u8]) -> BatchBlocks {
     let mut state = State::default();
     bitslice(&mut state, &input[..16], &input[16..]);
     rijndael_add_round_key(&mut state, &rkeys[..8]);
@@ -302,23 +194,20 @@ fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst: usize, r: usize) -> BatchB
     loop {
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
-        rijndael_shift_rows_1(&mut state, nst);
+        rijndael_shift_rows_1::<NST>(&mut state);
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &rkeys[rk_off..(rk_off + 8)]);
         rk_off += 8;
 
-        if rk_off == 8 * r {
+        if rk_off == 8 * R::USIZE {
             break;
         }
     }
-    //not even Mansour
-    //192f ok
-    //192s ok
-    //temp_display_state(state);
+
     sub_bytes(&mut state);
     sub_bytes_nots(&mut state);
-    rijndael_shift_rows_1(&mut state, nst);
-    rijndael_add_round_key(&mut state, &rkeys[r * 8..(r * 8) + 8]);
+    rijndael_shift_rows_1::<NST>(&mut state);
+    rijndael_add_round_key(&mut state, &rkeys[R::USIZE * 8..(R::USIZE * 8) + 8]);
     inv_bitslice(&state)
 }
 
@@ -510,50 +399,39 @@ pub(crate) fn sub_bytes_nots(state: &mut [u32]) {
 /// rotations used according to the round number mod 4.
 ///
 /// Based on Käsper-Schwabe, similar to https://github.com/Ko-/aes-armcortexm.
-macro_rules! define_mix_columns {
-    (
-        $name:ident,
-        $first_rotate:path,
-        $second_rotate:path
-    ) => {
-        #[rustfmt::skip]
-        pub(crate) fn $name(state: &mut State) {
-            let (a0, a1, a2, a3, a4, a5, a6, a7) = (
-                state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7]
-            );
-            let (b0, b1, b2, b3, b4, b5, b6, b7) = (
-                $first_rotate(a0),
-                $first_rotate(a1),
-                $first_rotate(a2),
-                $first_rotate(a3),
-                $first_rotate(a4),
-                $first_rotate(a5),
-                $first_rotate(a6),
-                $first_rotate(a7),
-            );
-            let (c0, c1, c2, c3, c4, c5, c6, c7) = (
-                a0 ^ b0,
-                a1 ^ b1,
-                a2 ^ b2,
-                a3 ^ b3,
-                a4 ^ b4,
-                a5 ^ b5,
-                a6 ^ b6,
-                a7 ^ b7,
-            );
-            state[0] = b0      ^ c7 ^ $second_rotate(c0);
-            state[1] = b1 ^ c0 ^ c7 ^ $second_rotate(c1);
-            state[2] = b2 ^ c1      ^ $second_rotate(c2);
-            state[3] = b3 ^ c2 ^ c7 ^ $second_rotate(c3);
-            state[4] = b4 ^ c3 ^ c7 ^ $second_rotate(c4);
-            state[5] = b5 ^ c4      ^ $second_rotate(c5);
-            state[6] = b6 ^ c5      ^ $second_rotate(c6);
-            state[7] = b7 ^ c6      ^ $second_rotate(c7);
-        }
-    }
+pub(crate) fn mix_columns_0(state: &mut State) {
+    let (a0, a1, a2, a3, a4, a5, a6, a7) = (
+        state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7],
+    );
+    let (b0, b1, b2, b3, b4, b5, b6, b7) = (
+        rotate_rows_1(a0),
+        rotate_rows_1(a1),
+        rotate_rows_1(a2),
+        rotate_rows_1(a3),
+        rotate_rows_1(a4),
+        rotate_rows_1(a5),
+        rotate_rows_1(a6),
+        rotate_rows_1(a7),
+    );
+    let (c0, c1, c2, c3, c4, c5, c6, c7) = (
+        a0 ^ b0,
+        a1 ^ b1,
+        a2 ^ b2,
+        a3 ^ b3,
+        a4 ^ b4,
+        a5 ^ b5,
+        a6 ^ b6,
+        a7 ^ b7,
+    );
+    state[0] = b0 ^ c7 ^ rotate_rows_2(c0);
+    state[1] = b1 ^ c0 ^ c7 ^ rotate_rows_2(c1);
+    state[2] = b2 ^ c1 ^ rotate_rows_2(c2);
+    state[3] = b3 ^ c2 ^ c7 ^ rotate_rows_2(c3);
+    state[4] = b4 ^ c3 ^ c7 ^ rotate_rows_2(c4);
+    state[5] = b5 ^ c4 ^ rotate_rows_2(c5);
+    state[6] = b6 ^ c5 ^ rotate_rows_2(c6);
+    state[7] = b7 ^ c6 ^ rotate_rows_2(c7);
 }
-
-define_mix_columns!(mix_columns_0, rotate_rows_1, rotate_rows_2);
 
 #[inline]
 fn delta_swap_1(a: &mut u32, shift: u32, mask: u32) {
@@ -568,18 +446,15 @@ fn delta_swap_2(a: &mut u32, b: &mut u32, shift: u32, mask: u32) {
     *b ^= t << shift;
 }
 
-/// Applies ShiftRows once on an AES state (or key).################################################################################### check first rotate
-///
-///
-/// /// Applies ShiftRows once on an AES state (or key).
+/// Applies ShiftRows once on an AES state (or key).
 #[inline]
-pub(crate) fn rijndael_shift_rows_1(state: &mut [u32], bc: usize) {
+pub(crate) fn rijndael_shift_rows_1<BC: Unsigned>(state: &mut [u32]) {
     debug_assert_eq!(state.len(), 8);
     for x in state.iter_mut() {
-        if bc == 4 {
+        if BC::USIZE == 4 {
             delta_swap_1(x, 4, 0x0c0f0300);
             delta_swap_1(x, 2, 0x33003300);
-        } else if bc == 6 {
+        } else if BC::USIZE == 6 {
             delta_swap_1(x, 6, 0x01000000);
             delta_swap_1(x, 3, 0x000a0200);
             delta_swap_1(x, 2, 0x00003300);
@@ -593,25 +468,18 @@ pub(crate) fn rijndael_shift_rows_1(state: &mut [u32], bc: usize) {
 }
 
 /// XOR the columns after the S-box during the key schedule round function.
-///
-/// The `idx_xor` parameter refers to the index of the previous round key that is
-/// involved in the XOR computation (should be 8 and 16 for AES-128 and AES-256,
-/// respectively).
-///
-/// The `idx_ror` parameter refers to the rotation value, which varies between the
-/// different key schedules.
-fn xor_columns(rkeys: &mut [u32], offset: usize, idx_xor: usize, idx_ror: usize, nk: usize) {
-    if nk == 4 {
+fn xor_columns<NK: Unsigned>(rkeys: &mut [u32], offset: usize) {
+    if NK::USIZE == 4 {
         for i in 0..8 {
             let off_i: usize = offset + i;
-            let rk = rkeys[off_i - idx_xor] ^ (0x03030303 & ror(rkeys[off_i], idx_ror));
+            let rk = rkeys[off_i - 8] ^ (0x03030303 & ror(rkeys[off_i], 14));
             rkeys[off_i] =
                 rk ^ (0xfcfcfcfc & (rk << 2)) ^ (0xf0f0f0f0 & (rk << 4)) ^ (0xc0c0c0c0 & (rk << 6));
         }
-    } else if nk == 6 {
+    } else if NK::USIZE == 6 {
         for i in 0..8 {
             let off_i = offset + i;
-            let rk = rkeys[off_i - idx_xor] ^ (0x01010101 & ror(rkeys[off_i], idx_ror));
+            let rk = rkeys[off_i - 8] ^ (0x01010101 & ror(rkeys[off_i], 11));
             rkeys[off_i] = rk
                 ^ (0x5c5c5c5c & (rk << 2))
                 ^ (0x02020202 & (rk >> 5))
@@ -627,15 +495,11 @@ fn xor_columns(rkeys: &mut [u32], offset: usize, idx_xor: usize, idx_ror: usize,
         #[allow(clippy::needless_range_loop)]
         for i in 0..8 {
             let off_i = offset + i;
-            let rk = rkeys[off_i - idx_xor] ^ (0x01010101 & ror(rkeys[off_i], idx_ror));
+            let rk = rkeys[off_i - 8] ^ (0x01010101 & ror(rkeys[off_i], 15));
             rkeys[off_i] =
                 rk ^ (0x54545454 & (rk << 2)) ^ (0x50505050 & (rk << 4)) ^ (0x40404040 & (rk << 6));
             temp[i] = rkeys[off_i];
         }
-        //Not even Mansour
-        //0 pour 256
-        //192s see nothing
-        //temp_display_state(temp);
         sub_bytes(&mut temp);
         sub_bytes_nots(&mut temp);
         for i in 0..8 {
@@ -852,7 +716,7 @@ impl KeySizeUser for Rijndael192 {
 
 impl KeyInit for Rijndael192 {
     fn new(key: &aes::cipher::Key<Self>) -> Self {
-        Self(rijndael_key_schedule(key.as_slice(), 6, 6, 12, ske(12, 6, 6)).0)
+        Self(rijndael_key_schedule::<U6, U6, U12>(key.as_slice(), ske(12, 6, 6)).0)
     }
 }
 
@@ -873,7 +737,7 @@ impl BlockEncrypt for Rijndael192 {
         in_block: &aes::cipher::Block<Self>,
         out_block: &mut aes::cipher::Block<Self>,
     ) {
-        let out = rijndael_encrypt(&self.0, in_block.as_slice(), 6, 12);
+        let out = rijndael_encrypt::<U6, U12>(&self.0, in_block.as_slice());
         out_block[..16].copy_from_slice(&out[0]);
         out_block[16..].copy_from_slice(&out[1][..8]);
     }
@@ -888,7 +752,7 @@ impl KeySizeUser for Rijndael256 {
 
 impl KeyInit for Rijndael256 {
     fn new(key: &aes::cipher::Key<Self>) -> Self {
-        Self(rijndael_key_schedule(key.as_slice(), 8, 8, 14, ske(14, 8, 8)).0)
+        Self(rijndael_key_schedule::<U8, U8, U14>(key.as_slice(), ske(14, 8, 8)).0)
     }
 }
 
@@ -909,7 +773,7 @@ impl BlockEncrypt for Rijndael256 {
         in_block: &aes::cipher::Block<Self>,
         out_block: &mut aes::cipher::Block<Self>,
     ) {
-        let out = rijndael_encrypt(&self.0, in_block.as_slice(), 8, 14);
+        let out = rijndael_encrypt::<U8, U14>(&self.0, in_block.as_slice());
         out_block[..16].copy_from_slice(&out[0]);
         out_block[16..].copy_from_slice(&out[1]);
     }
@@ -922,93 +786,10 @@ mod test {
     use std::cmp::max;
 
     use aes::cipher::generic_array::GenericArray;
+    use generic_array::typenum::{U10, U12, U14, U4, U6, U8};
     use serde::Deserialize;
 
     use crate::utils::test::read_test_data;
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct ShiftRows {
-        bc: usize,
-        rep: u8,
-        input: Vec<u8>,
-        output: Vec<u8>,
-    }
-
-    #[test]
-    fn shift_row_test() {
-        let database: Vec<ShiftRows> = read_test_data("shift_row_data.json");
-        for mut data in database {
-            let mut input = [0u32; 8];
-            let mut output = [0u32; 8];
-            for i in 0..data.bc {
-                for j in 0..4 {
-                    input[i] += (data.input[j * 4 + i] as u32) << (24 - j * 8);
-                    output[i] += (data.output[i * 4 + j] as u32) << (24 - j * 8);
-                }
-            }
-            for _i in 0..32 - data.input.len() {
-                data.input.push(0u8);
-            }
-            let mut bitsliced_input = [0u32; 8];
-            bitslice(&mut bitsliced_input, &data.input[..16], &data.input[16..]);
-            if data.rep == 1 {
-                rijndael_shift_rows_1(&mut bitsliced_input, data.bc);
-            } else {
-                continue;
-            }
-            let res = inv_bitslice(&bitsliced_input);
-            let mut input = [0u32; 8];
-            for i in 0..data.bc {
-                for j in 0..4 {
-                    input[i as usize] += (res[i / 4][((i % 4) * 4) + j] as u32) << (24 - j * 8);
-                }
-            }
-            assert_eq!(input, output);
-        }
-    }
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct MixColumns {
-        bc: u8,
-        input: Vec<u8>,
-        output: Vec<u8>,
-    }
-
-    #[test]
-    fn mix_column_test() {
-        let database: Vec<MixColumns> = read_test_data("mix_column_data.json");
-        for mut data in database {
-            let mut input = [0u32; 8];
-            let mut output = [0u32; 8];
-            for i in 0..data.bc {
-                for j in 0..4 {
-                    input[i as usize] +=
-                        (data.input[(j * 4 + i) as usize] as u32) << (24 - (j) * 8);
-                    output[i as usize] +=
-                        (data.output[(i * 4 + j) as usize] as u32) << (24 - (j) * 8);
-                }
-            }
-            for _i in 0..32 - data.input.len() {
-                data.input.push(0u8);
-            }
-            let mut bitsliced_input = [0u32; 8];
-            bitslice(&mut bitsliced_input, &data.input[..16], &data.input[16..]);
-            mix_columns_0(&mut bitsliced_input);
-
-            let res = inv_bitslice(&bitsliced_input);
-            let mut input = [0u32; 8];
-            for i in 0..data.bc {
-                for j in 0..4 {
-                    input[i as usize] += (res[(i / 4) as usize][(((i % 4) * 4) + j) as usize]
-                        as u32)
-                        << (24 - (j) * 8);
-                }
-            }
-            assert_eq!(input, output);
-        }
-    }
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -1018,6 +799,34 @@ mod test {
         key: Vec<u8>,
         text: Vec<u8>,
         output: Vec<u8>,
+    }
+
+    fn rijndael_key_schedule(key: &[u8], bc: usize, kc: usize, ske: usize) -> (Vec<u32>, bool) {
+        match (bc, kc) {
+            (4, 4) => super::rijndael_key_schedule::<U4, U4, U10>(key, ske),
+            (6, 4) => super::rijndael_key_schedule::<U6, U4, U12>(key, ske),
+            (8, 4) => super::rijndael_key_schedule::<U8, U4, U14>(key, ske),
+            (4, 6) => super::rijndael_key_schedule::<U4, U6, U12>(key, ske),
+            (6, 6) => super::rijndael_key_schedule::<U6, U6, U12>(key, ske),
+            (8, 6) => super::rijndael_key_schedule::<U8, U6, U14>(key, ske),
+            (4, 8) => super::rijndael_key_schedule::<U4, U8, U14>(key, ske),
+            (6, 8) => super::rijndael_key_schedule::<U6, U8, U14>(key, ske),
+            (8, 8) => super::rijndael_key_schedule::<U8, U8, U14>(key, ske),
+            _ => unreachable!(),
+        }
+    }
+
+    fn rijndael_encrypt(rkeys: &[u32], input: &[u8], nst: usize, r: usize) -> BatchBlocks {
+        match (nst, r) {
+            (4, 10) => super::rijndael_encrypt::<U4, U10>(rkeys, input),
+            (6, 12) => super::rijndael_encrypt::<U6, U12>(rkeys, input),
+            (8, 14) => super::rijndael_encrypt::<U8, U14>(rkeys, input),
+            (4, 12) => super::rijndael_encrypt::<U4, U12>(rkeys, input),
+            (8, 12) => super::rijndael_encrypt::<U8, U14>(rkeys, input),
+            (4, 14) => super::rijndael_encrypt::<U4, U14>(rkeys, input),
+            (6, 14) => super::rijndael_encrypt::<U6, U14>(rkeys, input),
+            _ => unreachable!(),
+        }
     }
 
     #[test]
@@ -1031,7 +840,6 @@ mod test {
                 &data.key,
                 data.bc,
                 data.kc,
-                r,
                 4 * (((r + 1) * data.bc) / data.kc),
             );
             let res = rijndael_encrypt(&rkeys.0, &input, data.bc, r);

@@ -27,11 +27,8 @@ where
     let mut valid = true;
     let mut res: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
     let mut index = O::LAMBDABYTES::USIZE;
-    let (kb, _) = rijndael_key_schedule(
+    let (kb, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(
         owf_input,
-        O::NST::USIZE,
-        O::NK::USIZE,
-        O::R::USIZE,
         4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE),
     );
     res[..O::LAMBDABYTES::USIZE].copy_from_slice(owf_key);
@@ -53,7 +50,7 @@ where
         }
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
-        rijndael_shift_rows_1(&mut state, O::NST::USIZE);
+        rijndael_shift_rows_1::<O::NST>(&mut state);
         for i in
             convert_from_batchblocks(inv_bitslice(&state))[..O::NK::USIZE][..O::NK::USIZE].iter()
         {
@@ -358,18 +355,15 @@ where
     let mut b_t_hasher =
         <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
 
-    let x = rijndael_key_schedule(
+    let (x, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(
         owf_input,
-        O::NST::USIZE,
-        O::NK::USIZE,
-        O::R::USIZE,
         4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE),
     );
     em_enc_cstrnts_mkey0::<O>(
         &mut a_t_hasher,
         &mut b_t_hasher,
         owf_output,
-        &x.0.chunks(8)
+        &x.chunks(8)
             .flat_map(|x| {
                 convert_from_batchblocks(inv_bitslice(x))
                     .iter()
@@ -410,17 +404,14 @@ where
     let new_q = convert_gq::<O, Tau>(d, gq, chall3);
     let mut zk_hasher =
         <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
-    let x = rijndael_key_schedule(
+    let (x, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(
         owf_input,
-        O::NST::USIZE,
-        O::NK::USIZE,
-        O::R::USIZE,
         4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE),
     );
     em_enc_cstrnts_mkey1::<O>(
         &mut zk_hasher,
         owf_output,
-        &x.0.chunks(8)
+        &x.chunks(8)
             .flat_map(|x| {
                 convert_from_batchblocks(inv_bitslice(x))
                     .iter()
