@@ -323,7 +323,7 @@ where
     hash_r_iv::<RO<P>>(&mut r, &mut iv, &sk.owf_key, &mu, rho);
 
     let (hcom, decom, c, u, gv) =
-        volecommit::<<O::BaseParams as BaseParameters>::VC, P::Tau, P::LH>(&r, &iv);
+        volecommit::<<O::BaseParams as BaseParameters>::VC, P::Tau, O::LHATBYTES>(&r, &iv);
     let mut chall1 =
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
     hash_challenge_1::<RO<P>, _>(
@@ -438,7 +438,7 @@ where
         GenericArray::default();
     hash_mu::<RO<P>>(&mut mu, &pk.owf_input, &pk.owf_output, msg);
 
-    let (hcom, gq_p) = volereconstruct::<<O::BaseParams as BaseParameters>::VC, P::Tau, P::LH>(
+    let (hcom, gq_p) = volereconstruct::<<O::BaseParams as BaseParameters>::VC, P::Tau, O::LHATBYTES>(
         chall3,
         &sigma[(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1))
             + (2 * O::LAMBDABYTES::USIZE)
@@ -454,12 +454,9 @@ where
 
     let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
     let def = GenericArray::default();
-    let def2 = GenericArray::default();
+    let def2 = GenericArray::<u8, O::LHATBYTES>::default();
     let mut gq: Box<
-        GenericArray<
-            Vec<GenericArray<u8, <P as FAESTParameters>::LH>>,
-            <P::Tau as TauParameters>::Tau,
-        >,
+        GenericArray<Vec<GenericArray<u8, O::LHATBYTES>>, <P::Tau as TauParameters>::Tau>,
     > = GenericArray::default_boxed();
     let mut gd_t: Box<GenericArray<Vec<&GenericArray<u8, O::LAMBDAPLUS2>>, O::LAMBDALBYTES>> =
         GenericArray::default_boxed();
@@ -496,19 +493,15 @@ where
             .iter()
             .zip(delta.iter().map(|d| {
                 if *d == 1 {
-                    GenericArray::<u8, P::LH>::from_slice(
+                    GenericArray::from_slice(
                         &c[O::LHATBYTES::USIZE * (i - 1)..O::LHATBYTES::USIZE * i],
                     )
                 } else {
                     &def2
                 }
             }))
-            .map(|(q, d)| {
-                zip(q, d)
-                    .map(|(q, d)| (q ^ d))
-                    .collect::<GenericArray<u8, P::LH>>()
-            })
-            .collect::<Vec<GenericArray<u8, <P as FAESTParameters>::LH>>>();
+            .map(|(q, d)| zip(q, d).map(|(q, d)| (q ^ d)).collect())
+            .collect::<Vec<GenericArray<u8, O::LHATBYTES>>>();
     }
     let gq_t = gq
         .iter()

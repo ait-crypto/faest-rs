@@ -5,10 +5,9 @@ use aes::{
 use generic_array::{
     typenum::{
         Diff, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1024, U11, U112, U12, U128, U14, U142, U152,
-        U16, U160, U16384, U192, U194, U2, U200, U2048, U22, U224, U234, U24, U256, U288, U3, U32,
-        U338, U384, U4, U40, U408, U4096, U448, U458, U470, U476, U48, U5, U500, U511, U512, U514,
-        U52, U56, U566, U576, U584, U596, U6, U600, U64, U640, U672, U7, U752, U8, U8192, U832,
-        U96,
+        U16, U160, U16384, U192, U2, U200, U2048, U22, U224, U24, U256, U288, U3, U32, U384, U4,
+        U40, U408, U4096, U448, U470, U476, U48, U5, U500, U511, U512, U52, U56, U576, U584, U596,
+        U6, U600, U64, U640, U672, U7, U752, U8, U8192, U832, U96,
     },
     ArrayLength, GenericArray,
 };
@@ -793,7 +792,6 @@ pub(crate) trait FAESTParameters {
     type N1: ArrayLength;
     type POWK0: ArrayLength;
     type POWK1: ArrayLength;
-    type LH: ArrayLength;
     type SIG: ArrayLength;
 }
 
@@ -807,7 +805,7 @@ impl FAESTParameters for FAEST128sParameters {
     type POWK0 = Diff<U8192, U1>;
     type N1 = U2048;
     type POWK1 = Diff<U4096, U1>;
-    type LH = U234;
+
     type SIG = Sum<U142, Sum<U256, Sum<U512, U4096>>>;
 }
 
@@ -821,7 +819,6 @@ impl FAESTParameters for FAEST128fParameters {
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type LH = U234;
     type SIG = Sum<U192, Sum<U2048, U4096>>;
 }
 
@@ -835,7 +832,6 @@ impl FAESTParameters for FAEST192sParameters {
     type POWK0 = Diff<U8192, U1>;
     type N1 = U4096;
     type POWK1 = Diff<U8192, U1>;
-    type LH = U458;
     type SIG = Sum<U200, Sum<U256, Sum<U8192, U4096>>>;
 }
 
@@ -849,7 +845,6 @@ impl FAESTParameters for FAEST192fParameters {
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type LH = U458;
     type SIG = Sum<U152, Sum<U256, U16384>>;
 }
 
@@ -863,7 +858,6 @@ impl FAESTParameters for FAEST256sParameters {
     type POWK0 = Diff<U8192, U1>;
     type N1 = U2048;
     type POWK1 = Diff<U4096, U1>;
-    type LH = U566;
     type SIG = Sum<U596, Sum<U1024, Sum<U4096, U16384>>>;
 }
 
@@ -877,7 +871,6 @@ impl FAESTParameters for FAEST256fParameters {
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type LH = U566;
     type SIG = Sum<U752, Sum<U1024, Sum<U2048, Sum<U8192, U16384>>>>;
 }
 
@@ -891,7 +884,6 @@ impl FAESTParameters for FAESTEM128sParameters {
     type POWK0 = Diff<U8192, U1>;
     type N1 = U2048;
     type POWK1 = Diff<U4096, U1>;
-    type LH = U194;
     type SIG = Sum<U470, U4096>;
 }
 
@@ -905,7 +897,6 @@ impl FAESTParameters for FAESTEM128fParameters {
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type LH = U194;
     type SIG = Sum<U576, Sum<U1024, U4096>>;
 }
 
@@ -919,7 +910,6 @@ impl FAESTParameters for FAESTEM192sParameters {
     type POWK0 = Diff<U8192, U1>;
     type N1 = U4096;
     type POWK1 = Diff<U8192, U1>;
-    type LH = U338;
     type SIG = Sum<U584, Sum<U2048, U8192>>;
 }
 
@@ -933,7 +923,6 @@ impl FAESTParameters for FAESTEM192fParameters {
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type LH = U338;
     type SIG = Sum<U600, Sum<U1024, Sum<U4096, U8192>>>;
 }
 
@@ -947,7 +936,6 @@ impl FAESTParameters for FAESTEM256sParameters {
     type POWK0 = Diff<U8192, U1>;
     type N1 = U2048;
     type POWK1 = Diff<U4096, U1>;
-    type LH = U514;
     type SIG = Sum<U476, Sum<U4096, U16384>>;
 }
 
@@ -961,7 +949,6 @@ impl FAESTParameters for FAESTEM256fParameters {
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type LH = U514;
     type SIG = Sum<U112, Sum<U2048, Sum<U8192, U16384>>>;
 }
 
