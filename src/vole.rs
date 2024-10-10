@@ -161,7 +161,7 @@ where
 mod test {
     use super::*;
 
-    use generic_array::GenericArray;
+    use generic_array::{sequence::GenericSequence, GenericArray};
     use serde::Deserialize;
 
     use crate::{
@@ -181,16 +181,10 @@ mod test {
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct DataVoleCommit {
-        r: Vec<u8>,
-        iv: [u8; 16],
         lambdabytes: [u16; 1],
         k0: [u8; 1],
         hcom: Vec<u8>,
-        k: Vec<Vec<Vec<u8>>>,
-        com: Vec<Vec<Vec<u8>>>,
-        c: Vec<Vec<u8>>,
         u: Vec<u8>,
-        v: Vec<Vec<Vec<u8>>>,
     }
 
     #[test]
@@ -205,229 +199,41 @@ mod test {
                             Tau<FAEST128sParameters>,
                             LH<FAEST128sParameters>,
                         >(
-                            GenericArray::from_slice(&data.r), &data.iv
+                            &GenericArray::generate(|idx| idx as u8), &IV::default()
                         );
-                        assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                        for i in 0..res.1.len() {
-                            assert_eq!(
-                                res.1[i],
-                                (
-                                    data.k[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone(),
-                                    data.com[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone()
-                                )
-                            );
-                        }
-                        for i in 0..data.com.len() {
-                            assert_eq!(
-                                res.1[i],
-                                (
-                                    data.k[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone(),
-                                    data.com[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone()
-                                )
-                            );
-                        }
-                        assert_eq!(
-                            res.2,
-                            data.c
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect()
-                        );
+                        assert_eq!(res.0.as_slice(), &data.hcom);
                         assert_eq!(res.3.as_slice(), &data.u);
-                        assert_eq!(
-                            res.4,
-                            data.v
-                                .iter()
-                                .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
-                                .collect()
-                        );
                     } else {
                         let res = volecommit::<
                             VC<FAEST128fParameters>,
                             Tau<FAEST128fParameters>,
                             LH<FAEST128fParameters>,
                         >(
-                            GenericArray::from_slice(&data.r), &data.iv
+                            &GenericArray::generate(|idx| idx as u8), &IV::default()
                         );
-                        assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                        for i in 0..res.1.len() {
-                            assert_eq!(
-                                res.1[i],
-                                (
-                                    data.k[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone(),
-                                    data.com[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone()
-                                )
-                            );
-                        }
-                        for i in 0..data.com.len() {
-                            assert_eq!(
-                                res.1[i],
-                                (
-                                    data.k[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone(),
-                                    data.com[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone()
-                                )
-                            );
-                        }
-                        assert_eq!(
-                            res.2,
-                            data.c
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect()
-                        );
+                        assert_eq!(res.0.as_slice(), &data.hcom);
                         assert_eq!(res.3.as_slice(), &data.u);
-                        assert_eq!(
-                            res.4,
-                            data.v
-                                .iter()
-                                .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
-                                .collect()
-                        );
                     }
                 } else if data.k0[0] == 12 {
                     let res = volecommit::<
                         VC<FAESTEM128sParameters>,
                         Tau<FAESTEM128sParameters>,
                         LH<FAESTEM128sParameters>,
-                    >(GenericArray::from_slice(&data.r), &data.iv);
-                    assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                    for i in 0..res.1.len() {
-                        assert_eq!(
-                            res.1[i],
-                            (
-                                data.k[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone(),
-                                data.com[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone()
-                            )
-                        );
-                    }
-                    for i in 0..data.com.len() {
-                        assert_eq!(
-                            res.1[i],
-                            (
-                                data.k[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone(),
-                                data.com[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone()
-                            )
-                        );
-                    }
-                    assert_eq!(
-                        res.2,
-                        data.c
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect()
+                    >(
+                        &GenericArray::generate(|idx| idx as u8), &IV::default()
                     );
+                    assert_eq!(res.0.as_slice(), &data.hcom);
                     assert_eq!(res.3.as_slice(), &data.u);
-                    assert_eq!(
-                        res.4,
-                        data.v
-                            .iter()
-                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
-                            .collect()
-                    );
                 } else {
                     let res = volecommit::<
                         VC<FAESTEM128fParameters>,
                         Tau<FAESTEM128fParameters>,
                         LH<FAESTEM128fParameters>,
-                    >(GenericArray::from_slice(&data.r), &data.iv);
-                    assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                    for i in 0..res.1.len() {
-                        assert_eq!(
-                            res.1[i],
-                            (
-                                data.k[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone(),
-                                data.com[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone()
-                            )
-                        );
-                    }
-                    for i in 0..data.com.len() {
-                        assert_eq!(
-                            res.1[i],
-                            (
-                                data.k[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone(),
-                                data.com[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone()
-                            )
-                        );
-                    }
-                    assert_eq!(
-                        res.2,
-                        data.c
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect()
+                    >(
+                        &GenericArray::generate(|idx| idx as u8), &IV::default()
                     );
+                    assert_eq!(res.0.as_slice(), &data.hcom);
                     assert_eq!(res.3.as_slice(), &data.u);
-                    assert_eq!(
-                        res.4,
-                        data.v
-                            .iter()
-                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
-                            .collect()
-                    );
                 }
             } else if data.lambdabytes[0] == 24 {
                 if data.u.len() == 458 {
@@ -437,229 +243,41 @@ mod test {
                             Tau<FAEST192sParameters>,
                             LH<FAEST192sParameters>,
                         >(
-                            GenericArray::from_slice(&data.r), &data.iv
+                            &GenericArray::generate(|idx| idx as u8), &IV::default()
                         );
-                        assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                        for i in 0..res.1.len() {
-                            assert_eq!(
-                                res.1[i],
-                                (
-                                    data.k[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone(),
-                                    data.com[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone()
-                                )
-                            );
-                        }
-                        for i in 0..data.com.len() {
-                            assert_eq!(
-                                res.1[i],
-                                (
-                                    data.k[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone(),
-                                    data.com[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone()
-                                )
-                            );
-                        }
-                        assert_eq!(
-                            res.2,
-                            data.c
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect()
-                        );
+                        assert_eq!(res.0.as_slice(), &data.hcom);
                         assert_eq!(res.3.as_slice(), &data.u);
-                        assert_eq!(
-                            res.4,
-                            data.v
-                                .iter()
-                                .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
-                                .collect()
-                        );
                     } else {
                         let res = volecommit::<
                             VC<FAEST192fParameters>,
                             Tau<FAEST192fParameters>,
                             LH<FAEST192fParameters>,
                         >(
-                            GenericArray::from_slice(&data.r), &data.iv
+                            &GenericArray::generate(|idx| idx as u8), &IV::default()
                         );
-                        assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                        for i in 0..res.1.len() {
-                            assert_eq!(
-                                res.1[i],
-                                (
-                                    data.k[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone(),
-                                    data.com[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone()
-                                )
-                            );
-                        }
-                        for i in 0..data.com.len() {
-                            assert_eq!(
-                                res.1[i],
-                                (
-                                    data.k[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone(),
-                                    data.com[i]
-                                        .iter()
-                                        .map(|x| *GenericArray::from_slice(x))
-                                        .collect::<Vec<GenericArray<u8, _>>>()
-                                        .clone()
-                                )
-                            );
-                        }
-                        assert_eq!(
-                            res.2,
-                            data.c
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect()
-                        );
+                        assert_eq!(res.0.as_slice(), &data.hcom);
                         assert_eq!(res.3.as_slice(), &data.u);
-                        assert_eq!(
-                            res.4,
-                            data.v
-                                .iter()
-                                .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
-                                .collect()
-                        );
                     }
                 } else if data.k0[0] == 12 {
                     let res = volecommit::<
                         VC<FAESTEM192sParameters>,
                         Tau<FAESTEM192sParameters>,
                         LH<FAESTEM192sParameters>,
-                    >(GenericArray::from_slice(&data.r), &data.iv);
-                    assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                    for i in 0..res.1.len() {
-                        assert_eq!(
-                            res.1[i],
-                            (
-                                data.k[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone(),
-                                data.com[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone()
-                            )
-                        );
-                    }
-                    for i in 0..data.com.len() {
-                        assert_eq!(
-                            res.1[i],
-                            (
-                                data.k[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone(),
-                                data.com[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone()
-                            )
-                        );
-                    }
-                    assert_eq!(
-                        res.2,
-                        data.c
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect()
+                    >(
+                        &GenericArray::generate(|idx| idx as u8), &IV::default()
                     );
+                    assert_eq!(res.0.as_slice(), &data.hcom);
                     assert_eq!(res.3.as_slice(), &data.u);
-                    assert_eq!(
-                        res.4,
-                        data.v
-                            .iter()
-                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
-                            .collect()
-                    );
                 } else {
                     let res = volecommit::<
                         VC<FAESTEM192fParameters>,
                         Tau<FAESTEM192fParameters>,
                         LH<FAESTEM192fParameters>,
-                    >(GenericArray::from_slice(&data.r), &data.iv);
-                    assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                    for i in 0..res.1.len() {
-                        assert_eq!(
-                            res.1[i],
-                            (
-                                data.k[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone(),
-                                data.com[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone()
-                            )
-                        );
-                    }
-                    for i in 0..data.com.len() {
-                        assert_eq!(
-                            res.1[i],
-                            (
-                                data.k[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone(),
-                                data.com[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone()
-                            )
-                        );
-                    }
-                    assert_eq!(
-                        res.2,
-                        data.c
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect()
+                    >(
+                        &GenericArray::generate(|idx| idx as u8), &IV::default()
                     );
+                    assert_eq!(res.0.as_slice(), &data.hcom);
                     assert_eq!(res.3.as_slice(), &data.u);
-                    assert_eq!(
-                        res.4,
-                        data.v
-                            .iter()
-                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
-                            .collect()
-                    );
                 }
             } else if data.u.len() == 566 {
                 if data.k0[0] == 12 {
@@ -667,226 +285,40 @@ mod test {
                         VC<FAEST256sParameters>,
                         Tau<FAEST256sParameters>,
                         LH<FAEST256sParameters>,
-                    >(GenericArray::from_slice(&data.r), &data.iv);
-                    assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                    for i in 0..res.1.len() {
-                        assert_eq!(
-                            res.1[i],
-                            (
-                                data.k[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone(),
-                                data.com[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone()
-                            )
-                        );
-                    }
-                    for i in 0..data.com.len() {
-                        assert_eq!(
-                            res.1[i],
-                            (
-                                data.k[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone(),
-                                data.com[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone()
-                            )
-                        );
-                    }
-                    assert_eq!(
-                        res.2,
-                        data.c
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect()
+                    >(
+                        &GenericArray::generate(|idx| idx as u8), &IV::default()
                     );
+                    assert_eq!(res.0.as_slice(), &data.hcom);
                     assert_eq!(res.3.as_slice(), &data.u);
-                    assert_eq!(
-                        res.4,
-                        data.v
-                            .iter()
-                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
-                            .collect()
-                    );
                 } else {
                     let res = volecommit::<
                         VC<FAEST256fParameters>,
                         Tau<FAEST256fParameters>,
                         LH<FAEST256fParameters>,
-                    >(GenericArray::from_slice(&data.r), &data.iv);
-                    assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                    for i in 0..res.1.len() {
-                        assert_eq!(
-                            res.1[i],
-                            (
-                                data.k[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone(),
-                                data.com[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone()
-                            )
-                        );
-                    }
-                    for i in 0..data.com.len() {
-                        assert_eq!(
-                            res.1[i],
-                            (
-                                data.k[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone(),
-                                data.com[i]
-                                    .iter()
-                                    .map(|x| *GenericArray::from_slice(x))
-                                    .collect::<Vec<GenericArray<u8, _>>>()
-                                    .clone()
-                            )
-                        );
-                    }
-                    assert_eq!(
-                        res.2,
-                        data.c
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect()
+                    >(
+                        &GenericArray::generate(|idx| idx as u8), &IV::default()
                     );
+                    assert_eq!(res.0.as_slice(), &data.hcom);
                     assert_eq!(res.3.as_slice(), &data.u);
-                    assert_eq!(
-                        res.4,
-                        data.v
-                            .iter()
-                            .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
-                            .collect()
-                    );
                 }
             } else if data.k0[0] == 12 {
-                let res = volecommit::<
-                    VC<FAESTEM256sParameters>,
-                    Tau<FAESTEM256sParameters>,
-                    LH<FAESTEM256sParameters>,
-                >(GenericArray::from_slice(&data.r), &data.iv);
-                assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                for i in 0..res.1.len() {
-                    assert_eq!(
-                        res.1[i],
-                        (
-                            data.k[i]
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>()
-                                .clone(),
-                            data.com[i]
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>()
-                                .clone()
-                        )
-                    );
-                }
-                for i in 0..data.com.len() {
-                    assert_eq!(
-                        res.1[i],
-                        (
-                            data.k[i]
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>()
-                                .clone(),
-                            data.com[i]
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>()
-                                .clone()
-                        )
-                    );
-                }
-                assert_eq!(
-                    res.2,
-                    data.c
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect()
-                );
+                let res =
+                    volecommit::<
+                        VC<FAESTEM256sParameters>,
+                        Tau<FAESTEM256sParameters>,
+                        LH<FAESTEM256sParameters>,
+                    >(&GenericArray::generate(|idx| idx as u8), &IV::default());
+                assert_eq!(res.0.as_slice(), &data.hcom);
                 assert_eq!(res.3.as_slice(), &data.u);
-                assert_eq!(
-                    res.4,
-                    data.v
-                        .iter()
-                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
-                        .collect()
-                );
             } else {
-                let res = volecommit::<
-                    VC<FAESTEM256fParameters>,
-                    Tau<FAESTEM256fParameters>,
-                    LH<FAESTEM256fParameters>,
-                >(GenericArray::from_slice(&data.r), &data.iv);
-                assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                for i in 0..res.1.len() {
-                    assert_eq!(
-                        res.1[i],
-                        (
-                            data.k[i]
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>()
-                                .clone(),
-                            data.com[i]
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>()
-                                .clone()
-                        )
-                    );
-                }
-                for i in 0..data.com.len() {
-                    assert_eq!(
-                        res.1[i],
-                        (
-                            data.k[i]
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>()
-                                .clone(),
-                            data.com[i]
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>()
-                                .clone()
-                        )
-                    );
-                }
-                assert_eq!(
-                    res.2,
-                    data.c
-                        .iter()
-                        .map(|x| *GenericArray::from_slice(x))
-                        .collect()
-                );
+                let res =
+                    volecommit::<
+                        VC<FAESTEM256fParameters>,
+                        Tau<FAESTEM256fParameters>,
+                        LH<FAESTEM256fParameters>,
+                    >(&GenericArray::generate(|idx| idx as u8), &IV::default());
+                assert_eq!(res.0.as_slice(), &data.hcom);
                 assert_eq!(res.3.as_slice(), &data.u);
-                assert_eq!(
-                    res.4,
-                    data.v
-                        .iter()
-                        .map(|x| x.iter().map(|y| *GenericArray::from_slice(y)).collect())
-                        .collect()
-                );
             }
         }
     }
@@ -897,7 +329,6 @@ mod test {
         chal: Vec<u8>,
         pdec: Vec<Vec<Vec<u8>>>,
         com: Vec<Vec<u8>>,
-        iv: [u8; 16],
         hcom: Vec<u8>,
         q: Vec<Vec<Vec<u8>>>,
     }
@@ -920,7 +351,7 @@ mod test {
                         VC<FAEST128fParameters>,
                         Tau<FAEST128fParameters>,
                         LH<FAEST128fParameters>,
-                    >(&data.chal, pdecom, &data.iv);
+                    >(&data.chal, pdecom, &IV::default());
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(res.1[i].len(), data.q[i].len());
@@ -938,7 +369,7 @@ mod test {
                         VC<FAEST128sParameters>,
                         Tau<FAEST128sParameters>,
                         LH<FAEST128sParameters>,
-                    >(&data.chal, pdecom, &data.iv);
+                    >(&data.chal, pdecom, &IV::default());
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(res.1[i].len(), data.q[i].len());
@@ -958,7 +389,7 @@ mod test {
                         VC<FAEST192fParameters>,
                         Tau<FAEST192fParameters>,
                         LH<FAEST192fParameters>,
-                    >(&data.chal, pdecom, &data.iv);
+                    >(&data.chal, pdecom, &IV::default());
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(res.1[i].len(), data.q[i].len());
@@ -976,7 +407,7 @@ mod test {
                         VC<FAEST192sParameters>,
                         Tau<FAEST192sParameters>,
                         LH<FAEST192sParameters>,
-                    >(&data.chal, pdecom, &data.iv);
+                    >(&data.chal, pdecom, &IV::default());
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                     for i in 0..res.1.len() {
                         assert_eq!(res.1[i].len(), data.q[i].len());
@@ -995,7 +426,7 @@ mod test {
                     VC<FAEST256fParameters>,
                     Tau<FAEST256fParameters>,
                     LH<FAEST256fParameters>,
-                >(&data.chal, pdecom, &data.iv);
+                >(&data.chal, pdecom, &IV::default());
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
                     assert_eq!(res.1[i].len(), data.q[i].len());
@@ -1013,7 +444,7 @@ mod test {
                     VC<FAEST256sParameters>,
                     Tau<FAEST256sParameters>,
                     LH<FAEST256sParameters>,
-                >(&data.chal, pdecom, &data.iv);
+                >(&data.chal, pdecom, &IV::default());
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
                 for i in 0..res.1.len() {
                     assert_eq!(res.1[i].len(), data.q[i].len());
