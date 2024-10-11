@@ -7,16 +7,9 @@ stages:
 build:
   stage: build
   script:
+    - cargo build --release --no-default-features
     - cargo build --release
-
-build-all-features:
-  stage: build
-  script:
     - cargo build --release --all-features
-
-build-bench:
-  stage: build
-  script:
     - cargo build --bench benchmark_faest_rs
 
 clippy:
@@ -32,14 +25,7 @@ fmt:
 test:
   stage: test
   script:
+    - cargo test --release --no-default-features
     - cargo test --release
-
-test-all-features:
-  stage: test
-  script:
     - cargo test --release --all-features
-
-test-example-simple:
-  stage: test
-  script:
     - cargo run --release --example simple
