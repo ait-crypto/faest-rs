@@ -491,14 +491,13 @@ fn xor_columns<NK: Unsigned>(rkeys: &mut [u32], offset: usize) {
                 ^ (0x40404040 & (rk << 6));
         }
     } else {
-        let mut temp = [0u32; 8];
-        #[allow(clippy::needless_range_loop)]
-        for i in 0..8 {
+        let mut temp = State::default();
+        for (i, t) in temp.iter_mut().enumerate() {
             let off_i = offset + i;
             let rk = rkeys[off_i - 8] ^ (0x01010101 & ror(rkeys[off_i], 15));
             rkeys[off_i] =
                 rk ^ (0x54545454 & (rk << 2)) ^ (0x50505050 & (rk << 4)) ^ (0x40404040 & (rk << 6));
-            temp[i] = rkeys[off_i];
+            *t = rkeys[off_i];
         }
         sub_bytes(&mut temp);
         sub_bytes_nots(&mut temp);
