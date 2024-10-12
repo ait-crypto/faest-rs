@@ -842,18 +842,14 @@ mod test {
                 4 * (((r + 1) * data.bc) / data.kc),
             );
             let res = rijndael_encrypt(&rkeys.0, &input, data.bc, r);
-            let mut input = [0u32; 8];
-            let mut output = [0u32; 8];
             for i in 0..data.bc {
-                for j in 0..4 {
-                    input[i as usize] += (res[(i / 4) as usize][(((i % 4) * 4) + j) as usize]
-                        as u32)
-                        << (24 - (j) * 8);
-                    output[i as usize] +=
-                        (data.output[(i * 4 + j) as usize] as u32) << (24 - (j) * 8);
-                }
+                let input = u32::from_le_bytes(
+                    res[i / 4][(i % 4) * 4..(i % 4) * 4 + 4].try_into().unwrap(),
+                );
+                let output =
+                    u32::from_le_bytes(data.output[i * 4..(i + 1) * 4].try_into().unwrap());
+                assert_eq!(input, output);
             }
-            assert_eq!(input, output);
         }
     }
 
