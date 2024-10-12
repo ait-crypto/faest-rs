@@ -662,14 +662,9 @@ pub(crate) fn convert_from_batchblocks(input: BatchBlocks) -> Vec<u32> {
 }
 
 /// Copy 32-bytes within the provided slice to an 8-byte offset
+#[inline]
 fn memshift32(buffer: &mut [u32], src_offset: usize) {
-    debug_assert_eq!(src_offset % 8, 0);
-    let dst_offset = src_offset + 8;
-    debug_assert!(dst_offset + 8 <= buffer.len());
-
-    for i in (0..8).rev() {
-        buffer[dst_offset + i] = buffer[src_offset + i];
-    }
+    buffer.copy_within(src_offset..(src_offset + 8), src_offset + 8);
 }
 
 /// XOR the round key to the internal state. The round keys are expected to be
