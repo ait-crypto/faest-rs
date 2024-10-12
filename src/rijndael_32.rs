@@ -472,14 +472,14 @@ fn xor_columns<NK: Unsigned>(rkeys: &mut [u32], offset: usize) {
     if NK::USIZE == 4 {
         for i in 0..8 {
             let off_i: usize = offset + i;
-            let rk = rkeys[off_i - 8] ^ (0x03030303 & ror(rkeys[off_i], 14));
+            let rk = rkeys[off_i - 8] ^ (0x03030303 & rkeys[off_i].rotate_right(14));
             rkeys[off_i] =
                 rk ^ (0xfcfcfcfc & (rk << 2)) ^ (0xf0f0f0f0 & (rk << 4)) ^ (0xc0c0c0c0 & (rk << 6));
         }
     } else if NK::USIZE == 6 {
         for i in 0..8 {
             let off_i = offset + i;
-            let rk = rkeys[off_i - 8] ^ (0x01010101 & ror(rkeys[off_i], 11));
+            let rk = rkeys[off_i - 8] ^ (0x01010101 & rkeys[off_i].rotate_right(11));
             rkeys[off_i] = rk
                 ^ (0x5c5c5c5c & (rk << 2))
                 ^ (0x02020202 & (rk >> 5))
@@ -494,7 +494,7 @@ fn xor_columns<NK: Unsigned>(rkeys: &mut [u32], offset: usize) {
         let mut temp = State::default();
         for (i, t) in temp.iter_mut().enumerate() {
             let off_i = offset + i;
-            let rk = rkeys[off_i - 8] ^ (0x01010101 & ror(rkeys[off_i], 15));
+            let rk = rkeys[off_i - 8] ^ (0x01010101 & rkeys[off_i].rotate_right(15));
             rkeys[off_i] =
                 rk ^ (0x54545454 & (rk << 2)) ^ (0x50505050 & (rk << 4)) ^ (0x40404040 & (rk << 6));
             *t = rkeys[off_i];
@@ -683,23 +683,18 @@ pub(crate) fn rijndael_add_round_key(state: &mut State, rkey: &[u32]) {
 }
 
 #[inline(always)]
-const fn ror(x: u32, y: usize) -> u32 {
-    x.rotate_right(y as u32)
-}
-
-#[inline(always)]
-const fn ror_distance(rows: usize, cols: usize) -> usize {
+const fn ror_distance(rows: u32, cols: u32) -> u32 {
     (rows << 3) + (cols << 1)
 }
 
 #[inline(always)]
 const fn rotate_rows_1(x: u32) -> u32 {
-    ror(x, ror_distance(1, 0))
+    x.rotate_right(ror_distance(1, 0))
 }
 
 #[inline(always)]
 const fn rotate_rows_2(x: u32) -> u32 {
-    ror(x, ror_distance(2, 0))
+    x.rotate_right(ror_distance(2, 0))
 }
 
 const fn ske(r: usize, nst: usize, nk: usize) -> usize {
