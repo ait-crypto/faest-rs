@@ -12,7 +12,6 @@ serde = { version = "1", optional = true, default-features = false, features = [
 ] }
 sha3 = "0.10"
 signature = { version = "2", default-features = false, features = ["alloc"] }
-subtle = { version = "2", features = ["const-generics"] }
 generic-array = { version = "1", features = ["alloc"] }
 rand_core = { version = "0.6", default-features = false }
 zeroize = { version = "1", optional = true, default-features = false, features = [
