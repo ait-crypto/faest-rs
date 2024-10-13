@@ -21,7 +21,7 @@ pub(crate) trait Field:
     + AddAssign
     + Sub<Self, Output = Self>
     + SubAssign
-    + Neg
+    + Neg<Output = Self>
     + Mul<Self, Output = Self>
     + MulAssign
 {
