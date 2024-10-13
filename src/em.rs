@@ -1,6 +1,5 @@
 use std::{array, iter::zip};
 
-use either::Either;
 use generic_array::{typenum::Unsigned, GenericArray};
 
 use crate::{
@@ -79,15 +78,52 @@ where
     }
 }
 
-///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
-///
-///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
-///
-///One of the first path to optimize the code could be to do the distinction
-fn em_enc_fwd<O>(
-    z: Either<&[u8], &[Field<O>]>,
-    x: Option<Either<&[u8], &[Field<O>]>>,
-) -> Box<GenericArray<Field<O>, O::SENC>>
+/// Implementation of `EncFwd` with `GF(2)`
+fn em_enc_fwd_1<O>(z: &[u8], x: &[u8]) -> Box<GenericArray<Field<O>, O::SENC>>
+where
+    O: OWFParameters,
+{
+    let mut res = GenericArray::default_boxed();
+    //Step 2-3
+    for j in 0..4 * O::NST::USIZE {
+        res[j] = Field::<O>::byte_combine_bits(z[j]) + Field::<O>::byte_combine_bits(x[j]);
+    }
+    let mut index = 4 * O::NST::USIZE;
+    //Step 4
+    for j in 1..O::R::USIZE {
+        for c in 0..O::NST::USIZE {
+            let i: usize = 32 * O::NST::USIZE * j + 32 * c;
+            let mut z_hat = [Field::<O>::default(); 4];
+            for r in 0..4 {
+                z_hat[r] = Field::<O>::byte_combine_bits(z[i / 8 + r]);
+                res[index + r] = Field::<O>::byte_combine_bits(x[i / 8 + r]);
+            }
+
+            //Step 16
+            res[index] += z_hat[0] * Field::<O>::BYTE_COMBINE_2
+                + z_hat[1] * Field::<O>::BYTE_COMBINE_3
+                + z_hat[2]
+                + z_hat[3];
+            res[index + 1] += z_hat[0]
+                + z_hat[1] * Field::<O>::BYTE_COMBINE_2
+                + z_hat[2] * Field::<O>::BYTE_COMBINE_3
+                + z_hat[3];
+            res[index + 2] += z_hat[0]
+                + z_hat[1]
+                + z_hat[2] * Field::<O>::BYTE_COMBINE_2
+                + z_hat[3] * Field::<O>::BYTE_COMBINE_3;
+            res[index + 3] += z_hat[0] * Field::<O>::BYTE_COMBINE_3
+                + z_hat[1]
+                + z_hat[2]
+                + z_hat[3] * Field::<O>::BYTE_COMBINE_2;
+            index += 4;
+        }
+    }
+    res
+}
+
+/// Implementation of `EncFwd` for `GF(\lambda)` for signing
+fn em_enc_fwd_proof<O>(z: &[Field<O>]) -> Box<GenericArray<Field<O>, O::SENC>>
 where
     O: OWFParameters,
 {
@@ -95,14 +131,7 @@ where
     let mut index = 0;
     //Step 2-3
     for j in 0..4 * O::NST::USIZE {
-        res[index] = match z {
-            Either::Left(z) => Field::<O>::byte_combine_bits(z[j]),
-            Either::Right(z) => Field::<O>::byte_combine_slice(&z[8 * j..8 * (j + 1)]),
-        } + match x {
-            None => Field::<O>::ZERO,
-            Some(Either::Left(x)) => Field::<O>::byte_combine_bits(x[j]),
-            Some(Either::Right(x)) => Field::<O>::byte_combine_slice(&x[8 * j..8 * (j + 1)]),
-        };
+        res[index] = Field::<O>::byte_combine_slice(&z[8 * j..8 * (j + 1)]);
         index += 1;
     }
     //Step 4
@@ -110,28 +139,72 @@ where
         for c in 0..O::NST::USIZE {
             let i: usize = 32 * O::NST::USIZE * j + 32 * c;
             let mut z_hat = [Field::<O>::default(); 4];
-            let mut x_hat = [Field::<O>::default(); 4];
             for r in 0..4 {
-                z_hat[r] = match z {
-                    Either::Left(z) => Field::<O>::byte_combine_bits(z[i / 8 + r]),
-                    Either::Right(z) => {
-                        Field::<O>::byte_combine_slice(&z[i + 8 * r..i + 8 * r + 8])
-                    }
-                };
-                x_hat[r] = match x {
-                    None => Field::<O>::ZERO,
-                    Some(Either::Left(x)) => Field::<O>::byte_combine_bits(x[i / 8 + r]),
-                    Some(Either::Right(x)) => {
-                        Field::<O>::byte_combine_slice(&x[i + 8 * r..i + 8 * r + 8])
-                    }
-                };
+                z_hat[r] = Field::<O>::byte_combine_slice(&z[i + 8 * r..i + 8 * r + 8]);
             }
 
             //Step 16
-            res[index] = z_hat[0] * Field::<O>::BYTE_COMBINE_2  + z_hat[1] * Field::<O>::BYTE_COMBINE_3  + z_hat[2] /* * a */ + z_hat[3] /* * a */ + x_hat[0];
-            res[index + 1] = z_hat[0] /* * a */ + z_hat[1] * Field::<O>::BYTE_COMBINE_2  + z_hat[2] * Field::<O>::BYTE_COMBINE_3  + z_hat[3] /* * a */ + x_hat[1];
-            res[index + 2] = z_hat[0] /* * a */ + z_hat[1] /* * a */ + z_hat[2] * Field::<O>::BYTE_COMBINE_2  + z_hat[3] * Field::<O>::BYTE_COMBINE_3  + x_hat[2];
-            res[index + 3] = z_hat[0] * Field::<O>::BYTE_COMBINE_3  + z_hat[1] /* * a */ + z_hat[2] /* * a */ + z_hat[3] * Field::<O>::BYTE_COMBINE_2  + x_hat[3];
+            res[index] = z_hat[0] * Field::<O>::BYTE_COMBINE_2
+                + z_hat[1] * Field::<O>::BYTE_COMBINE_3
+                + z_hat[2]
+                + z_hat[3];
+            res[index + 1] = z_hat[0]
+                + z_hat[1] * Field::<O>::BYTE_COMBINE_2
+                + z_hat[2] * Field::<O>::BYTE_COMBINE_3
+                + z_hat[3];
+            res[index + 2] = z_hat[0]
+                + z_hat[1]
+                + z_hat[2] * Field::<O>::BYTE_COMBINE_2
+                + z_hat[3] * Field::<O>::BYTE_COMBINE_3;
+            res[index + 3] = z_hat[0] * Field::<O>::BYTE_COMBINE_3
+                + z_hat[1]
+                + z_hat[2]
+                + z_hat[3] * Field::<O>::BYTE_COMBINE_2;
+            index += 4;
+        }
+    }
+    res
+}
+
+fn em_enc_fwd_verify<O>(z: &[Field<O>], x: &[Field<O>]) -> Box<GenericArray<Field<O>, O::SENC>>
+where
+    O: OWFParameters,
+{
+    let mut res = GenericArray::default_boxed();
+    let mut index = 0;
+    //Step 2-3
+    for j in 0..4 * O::NST::USIZE {
+        res[index] = Field::<O>::byte_combine_slice(&z[8 * j..8 * (j + 1)])
+            + Field::<O>::byte_combine_slice(&x[8 * j..8 * (j + 1)]);
+        index += 1;
+    }
+    //Step 4
+    for j in 1..O::R::USIZE {
+        for c in 0..O::NST::USIZE {
+            let i: usize = 32 * O::NST::USIZE * j + 32 * c;
+            let mut z_hat = [Field::<O>::default(); 4];
+            for r in 0..4 {
+                z_hat[r] = Field::<O>::byte_combine_slice(&z[i + 8 * r..i + 8 * r + 8]);
+                res[index + r] = Field::<O>::byte_combine_slice(&x[i + 8 * r..i + 8 * r + 8]);
+            }
+
+            //Step 16
+            res[index] += z_hat[0] * Field::<O>::BYTE_COMBINE_2
+                + z_hat[1] * Field::<O>::BYTE_COMBINE_3
+                + z_hat[2]
+                + z_hat[3];
+            res[index + 1] += z_hat[0]
+                + z_hat[1] * Field::<O>::BYTE_COMBINE_2
+                + z_hat[2] * Field::<O>::BYTE_COMBINE_3
+                + z_hat[3];
+            res[index + 2] += z_hat[0]
+                + z_hat[1]
+                + z_hat[2] * Field::<O>::BYTE_COMBINE_2
+                + z_hat[3] * Field::<O>::BYTE_COMBINE_3;
+            res[index + 3] += z_hat[0] * Field::<O>::BYTE_COMBINE_3
+                + z_hat[1]
+                + z_hat[2]
+                + z_hat[3] * Field::<O>::BYTE_COMBINE_2;
             index += 4;
         }
     }
@@ -280,11 +353,8 @@ fn em_enc_cstrnts_mkey0<O>(
         }
     }
     let v_out = GenericArray::from_slice(&v[..O::LAMBDA::USIZE]);
-    let s = em_enc_fwd::<O>(
-        Either::Left(w),
-        Some(Either::Left(&x[..4 * O::NST::USIZE * (O::R::USIZE + 1)])),
-    );
-    let vs = em_enc_fwd::<O>(Either::Right(v), None);
+    let s = em_enc_fwd_1::<O>(w, &x[..4 * O::NST::USIZE * (O::R::USIZE + 1)]);
+    let vs = em_enc_fwd_proof::<O>(v);
     let s_b = em_enc_bkwd_mkey0_mtag0::<O>(&new_x, &new_w, &w_out);
     let v_s_b = em_enc_bkwd_mkey0_mtag1::<O>(v, v_out);
     for j in 0..O::SENC::USIZE {
@@ -312,7 +382,7 @@ fn em_enc_cstrnts_mkey1<O>(
     let q_out = Box::<GenericArray<Field<O>, O::LAMBDA>>::from_iter(
         (0..O::LAMBDA::USIZE).map(|idx| delta * ((output[idx / 8] >> (idx % 8)) & 1) + q[idx]),
     );
-    let qs = em_enc_fwd::<O>(Either::Right(q), Some(Either::Right(new_x.as_slice())));
+    let qs = em_enc_fwd_verify::<O>(q, new_x.as_slice());
     let qs_b = em_enc_bkwd_mkey1_mtag0::<O>(&new_x, q, &q_out, delta);
     let immut = delta * delta;
 
