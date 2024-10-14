@@ -238,17 +238,6 @@ impl From<&[u8]> for GF64 {
     }
 }
 
-impl GF64 {
-    #[allow(dead_code)]
-    pub fn to_field(x: &[u8]) -> Vec<GF64> {
-        let mut res = vec![];
-        for i in 0..x.len() / 8 {
-            res.push(GF64::from(&x[(i * 8)..((i + 1) * 8)]))
-        }
-        res
-    }
-}
-
 #[cfg(test)]
 mod test {
     use rand::{rngs::SmallRng, Rng, SeedableRng};
@@ -375,27 +364,6 @@ mod test {
             assert_eq!(res, result);
             //to test commutativity
             assert_eq!(res, res_rev);
-        }
-    }
-
-    #[test]
-    fn gf64_test_to_field() {
-        let mut rng = SmallRng::from_entropy();
-
-        for _i in 0..RUNS {
-            let random: [u8; 8] = rng.gen();
-            let res = GF64::to_field(&random);
-            let verif = u64::from_le_bytes(random);
-            assert_eq!(res[0], verif);
-        }
-        //with many
-        for _i in 0..RUNS {
-            let random: [u8; 16] = rng.gen();
-            let res = GF64::to_field(&random);
-            let verif_1 = u64::from_le_bytes(random[0..8].try_into().unwrap());
-            let verif_2 = u64::from_le_bytes(random[8..16].try_into().unwrap());
-            assert_eq!(res[0], verif_1);
-            assert_eq!(res[1], verif_2);
         }
     }
 }
