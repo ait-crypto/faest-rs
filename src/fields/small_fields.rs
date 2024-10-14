@@ -244,8 +244,6 @@ mod test {
 
     use super::*;
 
-    const RUNS: usize = 10;
-
     #[test]
     fn gf8_test_mul() {
         let mut rng = SmallRng::from_entropy();
