@@ -212,24 +212,6 @@ impl Field for GF64 {
     }
 }
 
-impl GF8 {
-    //---------------------------------------------------------------------------check this
-    #[allow(dead_code)]
-    pub fn inv(self) -> Self {
-        let t2 = self * self;
-        let t3 = self * t2;
-        let t5 = t3 * t2;
-        let t7 = t5 * t2;
-        let t14 = t7 * t7;
-        let t28 = t14 * t14;
-        let t56 = t28 * t28;
-        let t63 = t56 * t7;
-        let t126 = t63 * t63;
-        let t252 = t126 * t126;
-        t252 * t2
-    }
-}
-
 impl From<&[u8]> for GF64 {
     fn from(value: &[u8]) -> Self {
         let mut array = [0u8; 8];
@@ -277,39 +259,6 @@ mod test {
             let res_rev = right * left;
             assert_eq!(res, result);
             assert_eq!(res, res_rev);
-        }
-    }
-
-    #[test]
-    //anything * inv(anything) should be equal to 1
-    //anything * inv(0) should be equal to 0
-    fn gf8_test_inv() {
-        let mut rng = SmallRng::from_entropy();
-
-        let pol_1 = GF8::from(1u8);
-        let pol_0 = GF8::from(0u8);
-        let anything = {
-            let mut r = 0;
-            while r == 0 {
-                r = rng.gen();
-            }
-            r
-        };
-        let pol_anything = GF8::from(anything);
-        assert_eq!(pol_anything * GF8::inv(GF8::from(anything)), pol_1);
-        assert_eq!(pol_anything * GF8::inv(GF8::from(0u8)), pol_0);
-        let database = [
-            (0xccu8, 0x1bu8),
-            (0xb1u8, 0xe0u8),
-            (0x78u8, 0xb6u8),
-            (0x81u8, 0x7eu8),
-            (0xb1u8, 0xe0u8),
-        ];
-        for (input, result) in database {
-            let input = GF8::from(input);
-            let result = GF8::from(result);
-            let res = input.inv();
-            assert_eq!(res, result);
         }
     }
 
