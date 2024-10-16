@@ -53,7 +53,7 @@ pub(crate) trait BaseParameters {
     type VoleHasherOutputLength: ArrayLength;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct BaseParams128;
 
 impl BaseParameters for BaseParams128 {
@@ -73,7 +73,7 @@ impl BaseParameters for BaseParams128 {
     type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct BaseParams192;
 
 impl BaseParameters for BaseParams192 {
@@ -93,7 +93,7 @@ impl BaseParameters for BaseParams192 {
     type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct BaseParams256;
 
 impl BaseParameters for BaseParams256 {
@@ -718,6 +718,7 @@ pub(crate) trait TauParameters {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Tau128Small;
 
 impl TauParameters for Tau128Small {
@@ -729,6 +730,7 @@ impl TauParameters for Tau128Small {
     type Tau1 = U4;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Tau128Fast;
 
 impl TauParameters for Tau128Fast {
@@ -740,6 +742,7 @@ impl TauParameters for Tau128Fast {
     type Tau1 = U8;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Tau192Small;
 
 impl TauParameters for Tau192Small {
@@ -751,6 +754,7 @@ impl TauParameters for Tau192Small {
     type Tau1 = U8;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Tau192Fast;
 
 impl TauParameters for Tau192Fast {
@@ -762,6 +766,7 @@ impl TauParameters for Tau192Fast {
     type Tau1 = U12;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Tau256Small;
 
 impl TauParameters for Tau256Small {
@@ -773,6 +778,7 @@ impl TauParameters for Tau256Small {
     type Tau1 = U8;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Tau256Fast;
 
 impl TauParameters for Tau256Fast {
@@ -795,6 +801,7 @@ pub(crate) trait FAESTParameters {
     type SIG: ArrayLength;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FAEST128sParameters;
 
 impl FAESTParameters for FAEST128sParameters {
@@ -809,6 +816,7 @@ impl FAESTParameters for FAEST128sParameters {
     type SIG = Sum<U142, Sum<U256, Sum<U512, U4096>>>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FAEST128fParameters;
 
 impl FAESTParameters for FAEST128fParameters {
@@ -822,6 +830,7 @@ impl FAESTParameters for FAEST128fParameters {
     type SIG = Sum<U192, Sum<U2048, U4096>>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FAEST192sParameters;
 
 impl FAESTParameters for FAEST192sParameters {
@@ -835,6 +844,7 @@ impl FAESTParameters for FAEST192sParameters {
     type SIG = Sum<U200, Sum<U256, Sum<U8192, U4096>>>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FAEST192fParameters;
 
 impl FAESTParameters for FAEST192fParameters {
@@ -848,6 +858,7 @@ impl FAESTParameters for FAEST192fParameters {
     type SIG = Sum<U152, Sum<U256, U16384>>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FAEST256sParameters;
 
 impl FAESTParameters for FAEST256sParameters {
@@ -861,6 +872,7 @@ impl FAESTParameters for FAEST256sParameters {
     type SIG = Sum<U596, Sum<U1024, Sum<U4096, U16384>>>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FAEST256fParameters;
 
 impl FAESTParameters for FAEST256fParameters {
@@ -874,6 +886,7 @@ impl FAESTParameters for FAEST256fParameters {
     type SIG = Sum<U752, Sum<U1024, Sum<U2048, Sum<U8192, U16384>>>>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FAESTEM128sParameters;
 
 impl FAESTParameters for FAESTEM128sParameters {
@@ -887,6 +900,7 @@ impl FAESTParameters for FAESTEM128sParameters {
     type SIG = Sum<U470, U4096>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FAESTEM128fParameters;
 
 impl FAESTParameters for FAESTEM128fParameters {
@@ -900,6 +914,7 @@ impl FAESTParameters for FAESTEM128fParameters {
     type SIG = Sum<U576, Sum<U1024, U4096>>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FAESTEM192sParameters;
 
 impl FAESTParameters for FAESTEM192sParameters {
@@ -913,6 +928,7 @@ impl FAESTParameters for FAESTEM192sParameters {
     type SIG = Sum<U584, Sum<U2048, U8192>>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FAESTEM192fParameters;
 
 impl FAESTParameters for FAESTEM192fParameters {
@@ -926,6 +942,7 @@ impl FAESTParameters for FAESTEM192fParameters {
     type SIG = Sum<U600, Sum<U1024, Sum<U4096, U8192>>>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FAESTEM256sParameters;
 
 impl FAESTParameters for FAESTEM256sParameters {
@@ -939,6 +956,7 @@ impl FAESTParameters for FAESTEM256sParameters {
     type SIG = Sum<U476, Sum<U4096, U16384>>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FAESTEM256fParameters;
 
 impl FAESTParameters for FAESTEM256fParameters {

@@ -1,6 +1,8 @@
-#[cfg(feature = "serde")]
-use std::{fmt, marker::PhantomData};
-use std::{io::Write, iter::zip};
+use std::{
+    fmt::{self, Debug},
+    io::Write,
+    iter::zip,
+};
 
 use crate::{
     parameter::{BaseParameters, FAESTParameters, OWFParameters, TauParameters},
@@ -16,14 +18,11 @@ use crate::{
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
-use serde::{
-    de::{Unexpected, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Default)]
 #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
 pub(crate) struct SecretKey<O>
 where
@@ -74,6 +73,32 @@ where
     }
 }
 
+impl<O> Debug for SecretKey<O>
+where
+    O: OWFParameters,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SecretKey")
+            .field("owf_key", &"redacted")
+            .field("owf_input", &self.owf_input.as_slice())
+            .field("owf_output", &self.owf_output.as_slice())
+            .finish()
+    }
+}
+
+impl<O> PartialEq for SecretKey<O>
+where
+    O: OWFParameters,
+{
+    fn eq(&self, rhs: &Self) -> bool {
+        self.owf_key == rhs.owf_key
+            && self.owf_input == rhs.owf_input
+            && self.owf_output == rhs.owf_output
+    }
+}
+
+impl<O> Eq for SecretKey<O> where O: OWFParameters {}
+
 #[cfg(feature = "serde")]
 impl<O> Serialize for SecretKey<O>
 where
@@ -83,7 +108,7 @@ where
     where
         S: Serializer,
     {
-        serializer.serialize_bytes(&self.as_bytes())
+        self.as_bytes().serialize(serializer)
     }
 }
 
@@ -96,34 +121,14 @@ where
     where
         D: Deserializer<'de>,
     {
-        struct BytesVisitor<O>(PhantomData<O>)
-        where
-            O: OWFParameters;
-
-        impl<'de, O> Visitor<'de> for BytesVisitor<O>
-        where
-            O: OWFParameters,
-        {
-            type Value = SecretKey<O>;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str(&format!("a byte array of length {}", O::SK::USIZE))
-            }
-
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                SecretKey::<O>::try_from_bytes(v)
-                    .map_err(|_| E::invalid_length(O::SK::USIZE, &self))
-            }
-        }
-
-        deserializer.deserialize_bytes(BytesVisitor(PhantomData))
+        GenericArray::<u8, O::SK>::deserialize(deserializer).and_then(|bytes| {
+            SecretKey::<O>::try_from_bytes(bytes.as_slice())
+                .map_err(|_| serde::de::Error::custom("expected a valid secret key"))
+        })
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub(crate) struct PublicKey<O>
 where
     O: OWFParameters,
@@ -157,6 +162,29 @@ where
     }
 }
 
+impl<O> Debug for PublicKey<O>
+where
+    O: OWFParameters,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PublicKey")
+            .field("owf_input", &self.owf_input.as_slice())
+            .field("owf_output", &self.owf_output.as_slice())
+            .finish()
+    }
+}
+
+impl<O> PartialEq for PublicKey<O>
+where
+    O: OWFParameters,
+{
+    fn eq(&self, rhs: &Self) -> bool {
+        self.owf_input == rhs.owf_input && self.owf_output == rhs.owf_output
+    }
+}
+
+impl<O> Eq for PublicKey<O> where O: OWFParameters {}
+
 #[cfg(feature = "serde")]
 impl<O> Serialize for PublicKey<O>
 where
@@ -166,7 +194,7 @@ where
     where
         S: Serializer,
     {
-        serializer.serialize_bytes(&self.as_bytes())
+        self.as_bytes().serialize(serializer)
     }
 }
 
@@ -179,38 +207,10 @@ where
     where
         D: Deserializer<'de>,
     {
-        struct BytesVisitor<O>(PhantomData<O>)
-        where
-            O: OWFParameters;
-
-        impl<'de, O> Visitor<'de> for BytesVisitor<O>
-        where
-            O: OWFParameters,
-        {
-            type Value = PublicKey<O>;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str(&format!(
-                    "a byte array of length {} encoding a secret key",
-                    O::SK::USIZE
-                ))
-            }
-
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                PublicKey::<O>::try_from_bytes(v).map_err(|_| {
-                    if v.len() != O::SK::USIZE {
-                        E::invalid_length(O::SK::USIZE, &self)
-                    } else {
-                        E::invalid_value(Unexpected::Bytes(v), &self)
-                    }
-                })
-            }
-        }
-
-        deserializer.deserialize_bytes(BytesVisitor(PhantomData))
+        GenericArray::<u8, O::PK>::deserialize(deserializer).and_then(|bytes| {
+            PublicKey::<O>::try_from_bytes(bytes.as_slice())
+                .map_err(|_| serde::de::Error::custom("expected a valid public key"))
+        })
     }
 }
 
@@ -625,6 +625,34 @@ mod test {
             let res = faest_verify::<P>(&msg, &pk, &sigma);
             assert!(res.is_ok());
         }
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serialize<P: FAESTParameters>() {
+        let mut rng = rand::thread_rng();
+        let sk = P::OWF::keygen_with_rng(&mut rng);
+
+        let mut out = vec![];
+        let mut ser = serde_json::Serializer::new(&mut out);
+
+        sk.serialize(&mut ser).expect("serialize key pair");
+        let serialized = String::from_utf8(out).expect("serialize to string");
+
+        let mut de = serde_json::Deserializer::from_str(&serialized);
+        let sk2 = SecretKey::<P::OWF>::deserialize(&mut de).expect("deserialize secret key");
+        assert_eq!(sk, sk2);
+
+        let pk = sk.as_public_key();
+        let mut out = vec![];
+        let mut ser = serde_json::Serializer::new(&mut out);
+
+        pk.serialize(&mut ser).expect("serialize key pair");
+        let serialized = String::from_utf8(out).expect("serialize to string");
+
+        let mut de = serde_json::Deserializer::from_str(&serialized);
+        let pk2 = PublicKey::<P::OWF>::deserialize(&mut de).expect("deserialize public key");
+        assert_eq!(pk, pk2);
     }
 
     #[instantiate_tests(<FAEST128fParameters>)]
