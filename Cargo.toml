@@ -35,7 +35,7 @@ randomized-signer = ["signature/rand_core"]
 serde = ["dep:serde", "generic-array/serde"]
 
 [[bench]]
-name = "benchmark_faest_rs"
+name = "bench"
 required-features = ["randomized-signer"]
 harness = false
 test = false
