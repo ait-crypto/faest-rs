@@ -1,0 +1,77 @@
+name: Rust
+
+on: [push, pull_request]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+          - "1.76"
+    name: Test with Rust ${{matrix.toolchain}} toolchain
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{matrix.toolchain}}
+      - uses: Swatinem/rust-cache@v2
+      - name: Test without default features
+        run: cargo test -r --no-default-features --workspace
+      - name: Test with default features
+        run: cargo test -r --workspace
+      - name: Test with all features
+        run: cargo test -r --all-features --workspace
+
+  build-cross:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - aarch64-unknown-linux-gnu
+          - armv7-unknown-linux-gnueabihf
+          - i686-unknown-linux-gnu
+          - powerpc64le-unknown-linux-gnu
+          - riscv64gc-unknown-linux-gnu
+          - s390x-unknown-linux-gnu
+    name: Cross test for ${{matrix.target}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{matrix.target}}
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cross
+        run: cargo install cross
+      - name: Test with default features
+        run: cross test -r --workspace --target ${{matrix.target}}
+      - name: Test with all features
+        run: cross test -r --all-features --workspace --target ${{matrix.target}}
+
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --all --all-features -- -D warnings
