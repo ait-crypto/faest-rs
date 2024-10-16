@@ -1,4 +1,20 @@
 #![doc = include_str!("../README.md")]
+//! ## Usage
+//!
+//! Key generation, signing and verification can be implemented as follows:
+//! ```
+//! # {
+//! use faest::{FAEST128fKeyPair, FAEST128fSignature, Signer, Verifier, Keypair, KeypairGenerator};
+//!
+//! let keypair = FAEST128fKeyPair::generate(rand::thread_rng());
+//! let msg = "some message".as_bytes();
+//! let signature: FAEST128fSignature = keypair.sign(msg);
+//!
+//! let verification_key = keypair.verifying_key();
+//! verification_key.verify(msg, &signature).expect("Verification failed");
+//! # }
+//! ```
+
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 // TODO: fix those
