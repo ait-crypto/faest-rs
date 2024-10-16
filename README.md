@@ -1,9 +1,8 @@
 # Pure Rust implementation of the FAEST digital signature scheme
 
-[FAEST](https://faest.info/) is a digital signature algorithm designed to be
-secure against quantum computers. The security of FAEST is based on standard
-cryptographic hashes and ciphers, specifically SHA3 and AES, which are
-believed to remain secure against quantum adversaries.
+[FAEST](https://faest.info/) is a digital signature algorithm designed to be secure against quantum
+computers. The security of FAEST is based on standard cryptographic hashes and ciphers, specifically
+SHA3 and AES, which are believed to remain secure against quantum adversaries.
 
 This crate provides an implementation of FAEST written in Rust.
 
@@ -13,4 +12,7 @@ This crate has received no security audit. Use at your own risk.
 
 ## License
 
-This crate is licensed under the MIT license.
+This crate is licensed under the MIT license. Some parts of `src/rijndael_32.rs` are based on the
+bitspliced implementation of AES from the [aes](https://crates.io/crates/aes) crate which is
+licensed under [Apache License version 2.0](http://www.apache.org/licenses/LICENSE-2.0) or the MIT
+license.
