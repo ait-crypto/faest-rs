@@ -15,7 +15,9 @@ build:
 clippy:
   stage: test
   script:
+    - cargo clippy --no-default-features -- -D warnings
     - cargo clippy -- -D warnings
+    - cargo clippy --all-features -- -D warnings
 
 fmt:
   stage: test
