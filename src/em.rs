@@ -1,4 +1,4 @@
-use std::{array, iter::zip};
+use std::{array, iter::zip, mem::size_of};
 
 use generic_array::{typenum::Unsigned, GenericArray};
 

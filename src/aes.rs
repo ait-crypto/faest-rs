@@ -1,4 +1,4 @@
-use std::array;
+use std::{array, mem::size_of};
 
 use generic_array::{
     typenum::{Unsigned, U4},
