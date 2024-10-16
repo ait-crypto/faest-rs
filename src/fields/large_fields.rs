@@ -1095,6 +1095,19 @@ mod test {
             assert_eq!(F::byte_combine(&elements), F::byte_combine_slice(&elements));
         }
 
+        #[test]
+        fn byte_conversions<F: BigGaloisField + Debug + Eq>()
+        where
+            Standard: Distribution<F>,
+        {
+            let mut rng = SmallRng::from_entropy();
+
+            let element = rng.gen();
+            let bytes = element.as_bytes();
+            assert_eq!(element, F::from(&bytes));
+            assert_eq!(element, F::from(bytes.as_slice()));
+        }
+
         #[instantiate_tests(<GF128>)]
         mod gf128 {}
 
