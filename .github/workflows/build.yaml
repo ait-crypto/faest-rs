@@ -51,8 +51,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install cross
         run: cargo install cross
-      - name: Test with default features
-        run: cross test -r --workspace --target ${{matrix.target}}
       - name: Test with all features
         run: cross test -r --all-features --workspace --target ${{matrix.target}}
 
