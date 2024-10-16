@@ -20,12 +20,14 @@ jobs:
         with:
           toolchain: ${{matrix.toolchain}}
       - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-nextest
+        run: cargo install cargo-nextest
       - name: Test without default features
-        run: cargo test -r --no-default-features --workspace
+        run: cargo nextest run -r --no-default-features --workspace
       - name: Test with default features
-        run: cargo test -r --workspace
+        run: cargo nextest run -r --workspace
       - name: Test with all features
-        run: cargo test -r --all-features --workspace
+        run: cargo nextest run -r --all-features --workspace
 
   build-cross:
     needs: test
