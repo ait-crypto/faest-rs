@@ -55,7 +55,7 @@ use generic_array::{typenum::Unsigned, GenericArray};
 use paste::paste;
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 #[cfg(feature = "randomized-signer")]
 pub use signature::RandomizedSigner;
 use signature::SignatureEncoding;
@@ -230,6 +230,26 @@ macro_rules! define_impl {
                     let sk = faest_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng);
                     let pk = sk.as_public_key();
                     Self([<$param SigningKey>](sk), [<$param VerificationKey>](pk))
+                }
+            }
+
+            #[cfg(feature = "serde")]
+            impl Serialize for [<$param KeyPair>] {
+                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                    where
+                        S: Serializer,
+                    {
+                        self.0.serialize(serializer)
+                    }
+            }
+
+            #[cfg(feature = "serde")]
+            impl<'de> Deserialize<'de> for [<$param KeyPair>] {
+                fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                where
+                    D: Deserializer<'de>,
+                {
+                    [<$param SigningKey>]::deserialize(deserializer).map(|sk| { let vk = sk.verifying_key(); Self(sk, vk) })
                 }
             }
 
@@ -428,6 +448,12 @@ define_impl!(FAESTEM256s);
 mod tests {
     use super::*;
 
+    #[cfg(feature = "serde")]
+    use std::fmt::Debug;
+
+    #[cfg(feature = "serde")]
+    use serde::{de::DeserializeOwned, Serialize};
+
     const TEST_MESSAGE: &[u8] = "test message".as_bytes();
 
     #[test]
@@ -481,6 +507,24 @@ mod tests {
         let signature2 = S::try_from(signature.as_ref()).expect("signature deserializes");
         vk.verify(TEST_MESSAGE, &signature2)
             .expect("signature verifies");
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_serialization<KP, S>()
+    where
+        KP: KeypairGenerator + Serialize + DeserializeOwned + Eq + Debug,
+    {
+        let mut out = vec![];
+        let mut ser = serde_json::Serializer::new(&mut out);
+
+        let kp = KP::generate(rand::thread_rng());
+        kp.serialize(&mut ser).expect("serialize key pair");
+        let serialized = String::from_utf8(out).expect("serialize to string");
+
+        let mut de = serde_json::Deserializer::from_str(&serialized);
+        let kp2 = KP::deserialize(&mut de).expect("deserialize key pair");
+        assert_eq!(kp, kp2);
     }
 
     #[instantiate_tests(<FAEST128fKeyPair, FAEST128fSignature>)]
