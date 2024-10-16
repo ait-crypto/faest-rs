@@ -13,7 +13,7 @@ edition = "2021"
 rust-version = "1.76"
 keywords = ["signatures", "FAEST"]
 categories = ["cryptography"]
-exclude = ["tests/data/*.json"]
+exclude = ["tests/data/*.json", "tests/data/PQCsignKAT_*.rsp"]
 
 [dependencies]
 aes = "0.8"

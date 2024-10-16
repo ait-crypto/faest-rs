@@ -31,7 +31,14 @@ fn read_kats(kats: &str) -> Vec<TestVector> {
                 .join("tests/data")
                 .join(kats),
         )
-        .unwrap(),
+        .unwrap_or_else(|_| {
+            File::open(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("tests/data")
+                    .join(format!("reduced_{}", kats)),
+            )
+            .unwrap()
+        }),
     );
 
     let mut ret = Vec::new();
