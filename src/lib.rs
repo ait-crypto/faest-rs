@@ -422,3 +422,100 @@ define_impl!(FAESTEM192f);
 define_impl!(FAESTEM192s);
 define_impl!(FAESTEM256f);
 define_impl!(FAESTEM256s);
+
+#[cfg(test)]
+#[generic_tests::define]
+mod tests {
+    use super::*;
+
+    const TEST_MESSAGE: &[u8] = "test message".as_bytes();
+
+    #[test]
+    fn sign_and_verify<KP, S>()
+    where
+        KP: KeypairGenerator + Signer<S> + Verifier<S>,
+        KP::VerifyingKey: Verifier<S> + for<'a> Verifier<SignatureRef<'a>>,
+        S: AsRef<[u8]>,
+    {
+        let kp = KP::generate(rand::thread_rng());
+        let vk = kp.verifying_key();
+        let signature = kp.sign(TEST_MESSAGE);
+        vk.verify(TEST_MESSAGE, &signature)
+            .expect("signatures verifies");
+        vk.verify(TEST_MESSAGE, &SignatureRef::from(signature.as_ref()))
+            .expect("signature verifies as &[u8]");
+        kp.verify(TEST_MESSAGE, &signature)
+            .expect("signature verifies with sk");
+    }
+
+    #[cfg(feature = "randomized-signer")]
+    #[test]
+    fn randomized_sign_and_verify<KP, S>()
+    where
+        KP: KeypairGenerator + RandomizedSigner<S> + Verifier<S>,
+        KP::VerifyingKey: Verifier<S> + for<'a> Verifier<SignatureRef<'a>>,
+        S: AsRef<[u8]>,
+    {
+        let mut rng = rand::thread_rng();
+        let kp = KP::generate(&mut rng);
+        let vk = kp.verifying_key();
+        let signature = kp.sign_with_rng(&mut rng, TEST_MESSAGE);
+        vk.verify(TEST_MESSAGE, &signature)
+            .expect("signatures verifies");
+        vk.verify(TEST_MESSAGE, &SignatureRef::from(signature.as_ref()))
+            .expect("signature verifies as &[u8]");
+        kp.verify(TEST_MESSAGE, &signature)
+            .expect("signature verifies with sk");
+    }
+
+    #[test]
+    fn serialize_signature<KP, S>()
+    where
+        KP: KeypairGenerator + Signer<S> + Verifier<S>,
+        KP::VerifyingKey: Verifier<S> + for<'a> Verifier<SignatureRef<'a>>,
+        S: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = Error>,
+    {
+        let kp = KP::generate(rand::thread_rng());
+        let vk = kp.verifying_key();
+        let signature = kp.sign(TEST_MESSAGE);
+        let signature2 = S::try_from(signature.as_ref()).expect("signature deserializes");
+        vk.verify(TEST_MESSAGE, &signature2)
+            .expect("signature verifies");
+    }
+
+    #[instantiate_tests(<FAEST128fKeyPair, FAEST128fSignature>)]
+    mod faest_128f {}
+
+    #[instantiate_tests(<FAEST128sKeyPair, FAEST128sSignature>)]
+    mod faest_128s {}
+
+    #[instantiate_tests(<FAEST192fKeyPair, FAEST192fSignature>)]
+    mod faest_192f {}
+
+    #[instantiate_tests(<FAEST192sKeyPair, FAEST192sSignature>)]
+    mod faest_192s {}
+
+    #[instantiate_tests(<FAEST256fKeyPair, FAEST256fSignature>)]
+    mod faest_256f {}
+
+    #[instantiate_tests(<FAEST256sKeyPair, FAEST256sSignature>)]
+    mod faest_256s {}
+
+    #[instantiate_tests(<FAESTEM128fKeyPair, FAESTEM128fSignature>)]
+    mod faest_em_128f {}
+
+    #[instantiate_tests(<FAESTEM128sKeyPair, FAESTEM128sSignature>)]
+    mod faest_em_128s {}
+
+    #[instantiate_tests(<FAESTEM192fKeyPair, FAESTEM192fSignature>)]
+    mod faest_em_192f {}
+
+    #[instantiate_tests(<FAESTEM192sKeyPair, FAESTEM192sSignature>)]
+    mod faest_em_192s {}
+
+    #[instantiate_tests(<FAESTEM256fKeyPair, FAESTEM256fSignature>)]
+    mod faest_em_256f {}
+
+    #[instantiate_tests(<FAESTEM256sKeyPair, FAESTEM256sSignature>)]
+    mod faest_em_256s {}
+}
