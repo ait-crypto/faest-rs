@@ -153,7 +153,17 @@ impl GaloisFieldHelper<u64> for SmallGF<u64> {
     const ONE: Wrapping<u64> = Wrapping(1u64);
 }
 
-impl Mul for SmallGF<u8> {
+impl<T> Mul for SmallGF<T>
+where
+    Self: GaloisFieldHelper<T>,
+    T: Sized + Copy,
+    Wrapping<T>: BitAnd<Output = Wrapping<T>>
+        + BitXor<Output = Wrapping<T>>
+        + BitXorAssign
+        + Neg<Output = Wrapping<T>>
+        + Shl<usize, Output = Wrapping<T>>
+        + Shr<usize, Output = Wrapping<T>>,
+{
     type Output = Self;
 
     #[inline(always)]
@@ -162,23 +172,17 @@ impl Mul for SmallGF<u8> {
     }
 }
 
-impl MulAssign for SmallGF<u8> {
-    #[inline(always)]
-    fn mul_assign(&mut self, rhs: Self) {
-        self.0 = Self::mul_helper(self.0, rhs.0);
-    }
-}
-
-impl Mul for SmallGF<u64> {
-    type Output = Self;
-
-    #[inline(always)]
-    fn mul(self, rhs: Self) -> Self::Output {
-        Self(Self::mul_helper(self.0, rhs.0))
-    }
-}
-
-impl MulAssign for SmallGF<u64> {
+impl<T> MulAssign for SmallGF<T>
+where
+    Self: GaloisFieldHelper<T>,
+    T: Sized + Copy,
+    Wrapping<T>: BitAnd<Output = Wrapping<T>>
+        + BitXor<Output = Wrapping<T>>
+        + BitXorAssign
+        + Neg<Output = Wrapping<T>>
+        + Shl<usize, Output = Wrapping<T>>
+        + Shr<usize, Output = Wrapping<T>>,
+{
     #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
         self.0 = Self::mul_helper(self.0, rhs.0);
