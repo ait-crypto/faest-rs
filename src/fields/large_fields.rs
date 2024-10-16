@@ -656,8 +656,7 @@ impl ByteCombineConstants for BigGF<u128, 1, 128> {
 
 impl From<&[u8]> for BigGF<u128, 1, 128> {
     fn from(value: &[u8]) -> Self {
-        // FIXME
-        // assert_eq!(value.len(), 16);
+        debug_assert_eq!(value.len(), 16);
         let mut array = [0u8; 16];
         array.copy_from_slice(&value[..16]);
         Self([u128::from_le_bytes(array)])
@@ -765,8 +764,7 @@ impl ByteCombineConstants for BigGF<u128, 2, 192> {
 
 impl From<&[u8]> for BigGF<u128, 2, 192> {
     fn from(value: &[u8]) -> Self {
-        // FIXME
-        // assert_eq!(value.len(), 24);
+        debug_assert_eq!(value.len(), 24);
         let mut array_1 = [0u8; 16];
         array_1.copy_from_slice(&value[..16]);
         let mut array_2 = [0u8; 16];
@@ -881,7 +879,7 @@ impl ByteCombineConstants for BigGF<u128, 2, 256> {
 
 impl From<&[u8]> for BigGF<u128, 2, 256> {
     fn from(value: &[u8]) -> Self {
-        assert_eq!(value.len(), 32);
+        debug_assert_eq!(value.len(), 32);
         Self(array::from_fn(|idx| {
             let mut array = [0u8; 16];
             array.copy_from_slice(&value[idx * 16..(idx + 1) * 16]);

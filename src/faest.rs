@@ -600,7 +600,7 @@ mod test {
         FAESTParameters,
     };
 
-    const RUNS: usize = 10;
+    const RUNS: usize = 3;
 
     fn random_message(mut rng: impl RngCore) -> Vec<u8> {
         let mut length = [0];

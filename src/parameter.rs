@@ -970,7 +970,7 @@ mod test {
     }
 
     #[test]
-    fn chaldec_test() {
+    fn chaldec() {
         let database: Vec<DataChalDec> = read_test_data("decode_challenge.json");
         for data in database {
             if data.chal.len() == 16 {
@@ -999,38 +999,38 @@ mod test {
         }
     }
 
-    fn test_parameters_owf<O: OWFParameters>() {
+    fn parameters_owf<O: OWFParameters>() {
         assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LAMBDABYTES::USIZE);
         assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::InputSize::USIZE);
     }
 
     #[test]
-    fn test_parameters_owf_128() {
-        test_parameters_owf::<OWF128>();
+    fn parameters_owf_128() {
+        parameters_owf::<OWF128>();
     }
 
     #[test]
-    fn test_parameters_owf_192() {
-        test_parameters_owf::<OWF192>();
+    fn parameters_owf_192() {
+        parameters_owf::<OWF192>();
     }
 
     #[test]
-    fn test_parameters_owf_256() {
-        test_parameters_owf::<OWF256>();
+    fn parameters_owf_256() {
+        parameters_owf::<OWF256>();
     }
 
     #[test]
-    fn test_parameters_owf_128em() {
-        test_parameters_owf::<OWF128EM>();
+    fn parameters_owf_128em() {
+        parameters_owf::<OWF128EM>();
     }
 
     #[test]
-    fn test_parameters_owf_192em() {
-        test_parameters_owf::<OWF192EM>();
+    fn parameters_owf_192em() {
+        parameters_owf::<OWF192EM>();
     }
 
     #[test]
-    fn test_parameters_owf_256em() {
-        test_parameters_owf::<OWF256EM>();
+    fn parameters_owf_256em() {
+        parameters_owf::<OWF256EM>();
     }
 }

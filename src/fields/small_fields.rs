@@ -218,6 +218,7 @@ impl Field for GF64 {
 
 impl From<&[u8]> for GF64 {
     fn from(value: &[u8]) -> Self {
+        debug_assert_eq!(value.len(), 8);
         let mut array = [0u8; 8];
         array.copy_from_slice(&value[..8]);
         Self::from(u64::from_le_bytes(array))
