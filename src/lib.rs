@@ -14,9 +14,9 @@ use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "randomized-signer")]
-use signature::RandomizedSigner;
-pub use signature::{self, Error};
-use signature::{Keypair, SignatureEncoding, Signer, Verifier};
+pub use signature::RandomizedSigner;
+use signature::SignatureEncoding;
+pub use signature::{self, Error, Keypair, Signer, Verifier};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
