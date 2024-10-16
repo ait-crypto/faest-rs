@@ -6,3 +6,11 @@ cryptographic hashes and ciphers, specifically SHA3 and AES, which are
 believed to remain secure against quantum adversaries.
 
 This crate provides an implementation of FAEST written in Rust.
+
+## Security Notes
+
+This crate has received no security audit. Use at your own risk.
+
+## License
+
+This crate is licensed under the MIT license.
