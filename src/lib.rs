@@ -3,7 +3,6 @@
 //!
 //! Key generation, signing and verification can be implemented as follows:
 //! ```
-//! # {
 //! use faest::{FAEST128fKeyPair, FAEST128fSignature, Signer, Verifier, Keypair, KeypairGenerator};
 //!
 //! let keypair = FAEST128fKeyPair::generate(rand::thread_rng());
@@ -12,12 +11,10 @@
 //!
 //! let verification_key = keypair.verifying_key();
 //! verification_key.verify(msg, &signature).expect("Verification failed");
-//! # }
 //! ```
 //!
 //! Due to the size of the sigantures, all variants support signing into boxed signatures:
 //! ```
-//! # {
 //! use faest::{FAEST128fKeyPair, FAEST128fSignature, Signer, Verifier, Keypair, KeypairGenerator};
 //!
 //! let keypair = FAEST128fKeyPair::generate(rand::thread_rng());
@@ -26,7 +23,6 @@
 //!
 //! let verification_key = keypair.verifying_key();
 //! verification_key.verify(msg, &signature).expect("Verification failed");
-//! # }
 //! ```
 //!
 //! The signature generation is determinstic per default. If the
@@ -158,7 +154,6 @@ macro_rules! define_impl {
 
             #[doc = "Keypair for " $param]
             /// ```
-            /// # {
             #[doc = "use faest::{" $param "KeyPair as KP, " $param "Signature as Sig};"]
             /// use faest::{Signer, Verifier, Keypair, KeypairGenerator};
             ///
@@ -168,7 +163,6 @@ macro_rules! define_impl {
             ///
             /// let verification_key = keypair.verifying_key();
             /// verification_key.verify(msg, &signature).expect("Verification failed");
-            /// # }
             /// ```
             #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
