@@ -587,6 +587,7 @@ fn sigma_to_signature<Lambda>(
 }
 
 #[cfg(test)]
+#[generic_tests::define]
 mod test {
     use super::*;
 
@@ -612,7 +613,8 @@ mod test {
         ret
     }
 
-    fn run_faest_test<P: FAESTParameters>() {
+    #[test]
+    fn sign_and_verify<P: FAESTParameters>() {
         let mut rng = rand::thread_rng();
         for _i in 0..RUNS {
             let sk = P::OWF::keygen_with_rng(&mut rng);
@@ -625,63 +627,39 @@ mod test {
         }
     }
 
-    #[test]
-    fn faest_aes_test_128f() {
-        run_faest_test::<FAEST128fParameters>();
-    }
+    #[instantiate_tests(<FAEST128fParameters>)]
+    mod faest_128f {}
 
-    #[test]
-    fn faest_aes_test_128s() {
-        run_faest_test::<FAEST128sParameters>();
-    }
+    #[instantiate_tests(<FAEST128sParameters>)]
+    mod faest_128s {}
 
-    #[test]
-    fn faest_aes_test_192f() {
-        run_faest_test::<FAEST192fParameters>();
-    }
+    #[instantiate_tests(<FAEST192fParameters>)]
+    mod faest_192f {}
 
-    #[test]
-    fn faest_aes_test_192s() {
-        run_faest_test::<FAEST192sParameters>();
-    }
+    #[instantiate_tests(<FAEST192sParameters>)]
+    mod faest_192s {}
 
-    #[test]
-    fn faest_aes_test_256s() {
-        run_faest_test::<FAEST256sParameters>();
-    }
+    #[instantiate_tests(<FAEST256fParameters>)]
+    mod faest_256f {}
 
-    #[test]
-    fn faest_aes_test_256f() {
-        run_faest_test::<FAEST256fParameters>();
-    }
+    #[instantiate_tests(<FAEST256sParameters>)]
+    mod faest_256s {}
 
-    #[test]
-    fn faest_em_test_128s() {
-        run_faest_test::<FAESTEM128sParameters>();
-    }
+    #[instantiate_tests(<FAESTEM128fParameters>)]
+    mod faest_em_128f {}
 
-    #[test]
-    fn faest_em_test_128f() {
-        run_faest_test::<FAESTEM128fParameters>();
-    }
+    #[instantiate_tests(<FAESTEM128sParameters>)]
+    mod faest_em_128s {}
 
-    #[test]
-    fn faest_em_test_192f() {
-        run_faest_test::<FAESTEM192fParameters>();
-    }
+    #[instantiate_tests(<FAESTEM192fParameters>)]
+    mod faest_em_192f {}
 
-    #[test]
-    fn faest_em_test_192s() {
-        run_faest_test::<FAESTEM192sParameters>();
-    }
+    #[instantiate_tests(<FAESTEM192sParameters>)]
+    mod faest_em_192s {}
 
-    #[test]
-    fn faest_em_test_256s() {
-        run_faest_test::<FAESTEM256sParameters>();
-    }
+    #[instantiate_tests(<FAESTEM256fParameters>)]
+    mod faest_em_256f {}
 
-    #[test]
-    fn faest_em_test_256f() {
-        run_faest_test::<FAESTEM256fParameters>();
-    }
+    #[instantiate_tests(<FAESTEM256sParameters>)]
+    mod faest_em_256s {}
 }

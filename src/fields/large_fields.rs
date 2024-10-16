@@ -956,53 +956,153 @@ impl NewFromU128 for GF256 {
 mod test {
     use super::*;
 
-    use std::{fmt::Debug, iter::zip};
-
-    use generic_array::typenum::Unsigned;
-    use rand::{rngs::SmallRng, RngCore, SeedableRng};
+    use std::fmt::Debug;
 
     const RUNS: usize = 10;
 
-    fn add<F: BigGaloisField + Debug + Eq>()
-    where
-        Standard: Distribution<F>,
-    {
-        let mut rng = SmallRng::from_entropy();
+    #[generic_tests::define]
+    mod field_ops {
+        use super::*;
 
-        for _ in 0..RUNS {
-            let mut random_1: F = rng.gen();
-            let random_2: F = rng.gen();
-            let res = random_1 + random_2;
+        use std::iter::zip;
 
-            let res_bytes = res.as_bytes();
-            let random_1_bytes = random_1.as_bytes();
-            let random_2_bytes = random_2.as_bytes();
-            let expected =
-                GenericArray::from_iter(zip(random_1_bytes, random_2_bytes).map(|(a, b)| a ^ b));
-            assert_eq!(res_bytes, expected);
-            assert_eq!(random_2 + random_1, res);
+        use generic_array::typenum::Unsigned;
+        use rand::{rngs::SmallRng, RngCore, SeedableRng};
 
-            let ref_res = random_1 + &random_2;
-            assert_eq!(res, ref_res);
+        #[test]
+        fn add<F: BigGaloisField + Debug + Eq>()
+        where
+            Standard: Distribution<F>,
+        {
+            let mut rng = SmallRng::from_entropy();
 
-            random_1 += random_2;
-            assert_eq!(random_1, res);
+            for _ in 0..RUNS {
+                let mut random_1: F = rng.gen();
+                let random_2: F = rng.gen();
+                let res = random_1 + random_2;
+
+                let res_bytes = res.as_bytes();
+                let random_1_bytes = random_1.as_bytes();
+                let random_2_bytes = random_2.as_bytes();
+                let expected = GenericArray::from_iter(
+                    zip(random_1_bytes, random_2_bytes).map(|(a, b)| a ^ b),
+                );
+                assert_eq!(res_bytes, expected);
+                assert_eq!(random_2 + random_1, res);
+
+                let ref_res = random_1 + &random_2;
+                assert_eq!(res, ref_res);
+
+                random_1 += random_2;
+                assert_eq!(random_1, res);
+            }
         }
-    }
 
-    #[test]
-    fn gf128_add() {
-        add::<GF128>();
-    }
+        #[test]
+        fn mul_64<F: BigGaloisField + Debug + Eq>()
+        where
+            Standard: Distribution<F>,
+        {
+            let mut rng = SmallRng::from_entropy();
 
-    #[test]
-    fn gf192_add() {
-        add::<GF192>();
-    }
+            for _ in 0..RUNS {
+                let lhs: F = rng.gen();
+                let mut rhs = GenericArray::<u8, F::Length>::default();
+                rng.fill_bytes(&mut rhs[..8]);
 
-    #[test]
-    fn gf256_add() {
-        add::<GF256>();
+                let rhs_f = F::from(&rhs);
+                let rhs_64 = GF64::try_from(&rhs[..8]).unwrap();
+
+                assert_eq!(lhs * rhs_64, lhs * rhs_f);
+            }
+        }
+
+        #[test]
+        fn mul_bit<F: BigGaloisField + Debug + Eq>()
+        where
+            Standard: Distribution<F>,
+        {
+            let mut rng = SmallRng::from_entropy();
+
+            for _ in 0..RUNS {
+                let anything: F = rng.gen();
+                let res = anything * 0u8;
+                assert_eq!(res, F::ZERO);
+                let res = anything * 1u8;
+                assert_eq!(res, anything);
+
+                let anything: F = rng.gen();
+                let res = anything * F::ZERO;
+                assert_eq!(res, F::ZERO);
+                let res = anything * F::ONE;
+                assert_eq!(res, anything);
+            }
+        }
+
+        #[test]
+        fn sum_poly<F: BigGaloisField + Debug + Eq>() {
+            let all_zeroes = vec![F::ZERO; F::Length::USIZE * 8];
+            assert_eq!(F::sum_poly(&all_zeroes), F::ZERO);
+
+            let all_ones = vec![F::ONE; F::Length::USIZE * 8];
+            assert_eq!(
+                F::sum_poly(&all_ones),
+                F::try_from(vec![0xff; F::Length::USIZE].as_slice()).unwrap()
+            );
+        }
+
+        #[test]
+        fn byte_combine_constants<F: BigGaloisField + Debug + Eq>() {
+            assert_eq!(F::ZERO, F::byte_combine(&[F::ZERO; 8]));
+            assert_eq!(
+                F::BYTE_COMBINE_2,
+                F::byte_combine(&[
+                    F::ZERO,
+                    F::ONE,
+                    F::ZERO,
+                    F::ZERO,
+                    F::ZERO,
+                    F::ZERO,
+                    F::ZERO,
+                    F::ZERO
+                ])
+            );
+            assert_eq!(
+                F::BYTE_COMBINE_3,
+                F::byte_combine(&[
+                    F::ONE,
+                    F::ONE,
+                    F::ZERO,
+                    F::ZERO,
+                    F::ZERO,
+                    F::ZERO,
+                    F::ZERO,
+                    F::ZERO
+                ])
+            );
+
+            assert_eq!(F::ZERO, F::byte_combine_bits(0));
+        }
+
+        #[test]
+        fn byte_combine_slice<F: BigGaloisField + Debug + Eq>()
+        where
+            Standard: Distribution<F>,
+        {
+            let mut rng = SmallRng::from_entropy();
+
+            let elements = array::from_fn(|_| rng.gen());
+            assert_eq!(F::byte_combine(&elements), F::byte_combine_slice(&elements));
+        }
+
+        #[instantiate_tests(<GF128>)]
+        mod gf128 {}
+
+        #[instantiate_tests(<GF192>)]
+        mod gf192 {}
+
+        #[instantiate_tests(<GF256>)]
+        mod gf256 {}
     }
 
     fn mul<F: BigGaloisField + Debug + Eq>(test_data: &[(&str, &str, &str)]) {
@@ -1113,101 +1213,6 @@ mod test {
         mul::<GF256>(&database);
     }
 
-    fn mul_64<F: BigGaloisField + Debug + Eq>()
-    where
-        Standard: Distribution<F>,
-    {
-        let mut rng = SmallRng::from_entropy();
-
-        for _ in 0..RUNS {
-            let lhs: F = rng.gen();
-            let mut rhs = GenericArray::<u8, F::Length>::default();
-            rng.fill_bytes(&mut rhs[..8]);
-
-            let rhs_f = F::from(&rhs);
-            let rhs_64 = GF64::try_from(&rhs[..8]).unwrap();
-
-            assert_eq!(lhs * rhs_64, lhs * rhs_f);
-        }
-    }
-
-    #[test]
-    fn gf128_mul_64() {
-        mul_64::<GF128>();
-    }
-
-    #[test]
-    fn gf192_mul_64() {
-        mul_64::<GF192>();
-    }
-
-    #[test]
-    fn gf256_mul_64() {
-        mul_64::<GF256>();
-    }
-
-    fn mul_bit<F: BigGaloisField + Debug + Eq>()
-    where
-        Standard: Distribution<F>,
-    {
-        let mut rng = SmallRng::from_entropy();
-
-        for _ in 0..RUNS {
-            let anything: F = rng.gen();
-            let res = anything * 0u8;
-            assert_eq!(res, F::ZERO);
-            let res = anything * 1u8;
-            assert_eq!(res, anything);
-
-            let anything: F = rng.gen();
-            let res = anything * F::ZERO;
-            assert_eq!(res, F::ZERO);
-            let res = anything * F::ONE;
-            assert_eq!(res, anything);
-        }
-    }
-
-    #[test]
-    fn gf128_mul_bit() {
-        mul_bit::<GF128>();
-    }
-
-    #[test]
-    fn gf192_mul_bit() {
-        mul_bit::<GF192>();
-    }
-
-    #[test]
-    fn gf256_mul_bit() {
-        mul_bit::<GF256>();
-    }
-
-    fn sum_poly<F: BigGaloisField + Debug + Eq>() {
-        let all_zeroes = vec![F::ZERO; F::Length::USIZE * 8];
-        assert_eq!(F::sum_poly(&all_zeroes), F::ZERO);
-
-        let all_ones = vec![F::ONE; F::Length::USIZE * 8];
-        assert_eq!(
-            F::sum_poly(&all_ones),
-            F::try_from(vec![0xff; F::Length::USIZE].as_slice()).unwrap()
-        );
-    }
-
-    #[test]
-    fn gf128_sum_poly() {
-        sum_poly::<GF128>();
-    }
-
-    #[test]
-    fn gf192_sum_poly() {
-        sum_poly::<GF192>();
-    }
-
-    #[test]
-    fn gf256_sum_poly() {
-        sum_poly::<GF256>();
-    }
-
     fn byte_combine_bits<F: BigGaloisField + Debug + Eq>(test_data: &[(u8, &str)]) {
         for (x, data) in test_data {
             let result = F::try_from(hex::decode(*data).unwrap().as_slice()).unwrap();
@@ -1252,78 +1257,6 @@ mod test {
             ),
         ];
         byte_combine_bits::<GF256>(&database);
-    }
-
-    fn byte_combine_constants<F: BigGaloisField + Debug + Eq>() {
-        assert_eq!(F::ZERO, F::byte_combine(&[F::ZERO; 8]));
-        assert_eq!(
-            F::BYTE_COMBINE_2,
-            F::byte_combine(&[
-                F::ZERO,
-                F::ONE,
-                F::ZERO,
-                F::ZERO,
-                F::ZERO,
-                F::ZERO,
-                F::ZERO,
-                F::ZERO
-            ])
-        );
-        assert_eq!(
-            F::BYTE_COMBINE_3,
-            F::byte_combine(&[
-                F::ONE,
-                F::ONE,
-                F::ZERO,
-                F::ZERO,
-                F::ZERO,
-                F::ZERO,
-                F::ZERO,
-                F::ZERO
-            ])
-        );
-
-        assert_eq!(F::ZERO, F::byte_combine_bits(0));
-    }
-
-    #[test]
-    fn gf128_byte_combine_constants() {
-        byte_combine_constants::<GF128>();
-    }
-
-    #[test]
-    fn gf192_byte_combine_constants() {
-        byte_combine_constants::<GF192>();
-    }
-
-    #[test]
-    fn gf256_byte_combine_constants() {
-        byte_combine_constants::<GF256>();
-    }
-
-    fn byte_combine_slice<F: BigGaloisField + Debug + Eq>()
-    where
-        Standard: Distribution<F>,
-    {
-        let mut rng = SmallRng::from_entropy();
-
-        let elements = array::from_fn(|_| rng.gen());
-        assert_eq!(F::byte_combine(&elements), F::byte_combine_slice(&elements));
-    }
-
-    #[test]
-    fn gf128_byte_combine_slice() {
-        byte_combine_slice::<GF128>();
-    }
-
-    #[test]
-    fn gf192_byte_combine_slice() {
-        byte_combine_slice::<GF192>();
-    }
-
-    #[test]
-    fn gf256_byte_combine_slice() {
-        byte_combine_slice::<GF256>();
     }
 
     fn byte_combine<F: BigGaloisField + Debug + Eq>(

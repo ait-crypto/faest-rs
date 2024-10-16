@@ -999,38 +999,32 @@ mod test {
         }
     }
 
-    fn parameters_owf<O: OWFParameters>() {
-        assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LAMBDABYTES::USIZE);
-        assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::InputSize::USIZE);
-    }
+    #[generic_tests::define]
+    mod parameters {
+        use super::*;
 
-    #[test]
-    fn parameters_owf_128() {
-        parameters_owf::<OWF128>();
-    }
+        #[test]
+        fn pk_sk_size<O: OWFParameters>() {
+            assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LAMBDABYTES::USIZE);
+            assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::InputSize::USIZE);
+        }
 
-    #[test]
-    fn parameters_owf_192() {
-        parameters_owf::<OWF192>();
-    }
+        #[instantiate_tests(<OWF128>)]
+        mod owf_128 {}
 
-    #[test]
-    fn parameters_owf_256() {
-        parameters_owf::<OWF256>();
-    }
+        #[instantiate_tests(<OWF192>)]
+        mod owf_192 {}
 
-    #[test]
-    fn parameters_owf_128em() {
-        parameters_owf::<OWF128EM>();
-    }
+        #[instantiate_tests(<OWF256>)]
+        mod owf_256 {}
 
-    #[test]
-    fn parameters_owf_192em() {
-        parameters_owf::<OWF192EM>();
-    }
+        #[instantiate_tests(<OWF128EM>)]
+        mod owf_em_128 {}
 
-    #[test]
-    fn parameters_owf_256em() {
-        parameters_owf::<OWF256EM>();
+        #[instantiate_tests(<OWF192EM>)]
+        mod owf_em_192 {}
+
+        #[instantiate_tests(<OWF256EM>)]
+        mod owf_em_256 {}
     }
 }
