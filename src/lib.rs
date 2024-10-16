@@ -230,6 +230,12 @@ macro_rules! define_impl {
                 }
             }
 
+            impl Verifier<Box<[<$param Signature>]>> for [<$param VerificationKey>] {
+                fn verify(&self, msg: &[u8], signature: &Box<[<$param Signature>]>) -> Result<(), Error> {
+                    faest_verify::<[<$param Parameters>]>(msg, &self.0, &signature.0)
+                }
+            }
+
             impl Verifier<SignatureRef<'_>> for [<$param VerificationKey>] {
                 fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
                     GenericArray::try_from_slice(signature.0)
