@@ -13,6 +13,7 @@ edition = "2021"
 rust-version = "1.76"
 keywords = ["signatures", "FAEST"]
 categories = ["cryptography"]
+exclude = ["tests/data/*.json"]
 
 [dependencies]
 aes = "0.8"
