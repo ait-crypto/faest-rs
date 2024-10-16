@@ -10,7 +10,7 @@ build:
     - cargo build --no-default-features
     - cargo build
     - cargo build --all-features
-    - cargo build --bench benchmark_faest_rs
+    - cargo build --bench bench
 
 clippy:
   stage: test
