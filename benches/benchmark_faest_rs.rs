@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use faest::*;
 use rand::{RngCore, SeedableRng};
-use signature::{Signer, Verifier};
+use signature::{RandomizedSigner, Signer, Verifier};
 
 type Message = [u8; 32];
 
@@ -13,7 +13,7 @@ fn random_message(mut rng: impl RngCore) -> Message {
 
 fn benchmark<KP, S>(c: &mut Criterion, name: &str)
 where
-    KP: KeypairGenerator + Signer<S>,
+    KP: KeypairGenerator + Signer<S> + RandomizedSigner<S>,
     KP::VerifyingKey: Verifier<S>,
 {
     let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
@@ -25,6 +25,10 @@ where
     c.bench_function("sign", |b| {
         let message = random_message(&mut rng);
         b.iter(|| black_box(kp.sign(&message)));
+    });
+    c.bench_function("sign (randomized)", |b| {
+        let message = random_message(&mut rng);
+        b.iter(|| black_box(kp.sign_with_rng(&mut rng, &message)));
     });
     c.bench_function("verify", |b| {
         let message = random_message(&mut rng);
