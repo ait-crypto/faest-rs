@@ -972,7 +972,7 @@ mod test {
         let mut rng = SmallRng::from_entropy();
 
         for _ in 0..RUNS {
-            let random_1: F = rng.gen();
+            let mut random_1: F = rng.gen();
             let random_2: F = rng.gen();
             let res = random_1 + random_2;
 
@@ -982,10 +982,13 @@ mod test {
             let expected =
                 GenericArray::from_iter(zip(random_1_bytes, random_2_bytes).map(|(a, b)| a ^ b));
             assert_eq!(res_bytes, expected);
+            assert_eq!(random_2 + random_1, res);
 
-            #[allow(clippy::op_ref)]
             let ref_res = random_1 + &random_2;
             assert_eq!(res, ref_res);
+
+            random_1 += random_2;
+            assert_eq!(random_1, res);
         }
     }
 
@@ -1006,10 +1009,13 @@ mod test {
 
     fn mul<F: BigGaloisField + Debug + Eq>(test_data: &[(&str, &str, &str)]) {
         for (lhs, rhs, expected) in test_data {
-            let lhs = F::try_from(hex::decode(*lhs).unwrap().as_slice()).unwrap();
+            let mut lhs = F::try_from(hex::decode(*lhs).unwrap().as_slice()).unwrap();
             let rhs = F::try_from(hex::decode(*rhs).unwrap().as_slice()).unwrap();
             let expected = F::try_from(hex::decode(*expected).unwrap().as_slice()).unwrap();
             assert_eq!(lhs * rhs, expected);
+            assert_eq!(rhs * lhs, expected);
+            lhs *= rhs;
+            assert_eq!(lhs, expected);
         }
     }
 
