@@ -39,18 +39,18 @@ where
 }
 
 fn faest_benchmark(c: &mut Criterion) {
-    benchmark::<FAEST128fKeyPair, FAEST128fSignature>(c, "FAEST-128f");
-    benchmark::<FAEST128sKeyPair, FAEST128sSignature>(c, "FAEST-128s");
-    benchmark::<FAEST192fKeyPair, FAEST192fSignature>(c, "FAEST-192f");
-    benchmark::<FAEST192sKeyPair, FAEST192sSignature>(c, "FAEST-192s");
-    benchmark::<FAEST256fKeyPair, FAEST256fSignature>(c, "FAEST-256f");
-    benchmark::<FAEST256sKeyPair, FAEST256sSignature>(c, "FAEST-256s");
-    benchmark::<FAESTEM128fKeyPair, FAESTEM128fSignature>(c, "FAEST-EM-128f");
-    benchmark::<FAESTEM128sKeyPair, FAESTEM128sSignature>(c, "FAEST-EM-128s");
-    benchmark::<FAESTEM192fKeyPair, FAESTEM192fSignature>(c, "FAEST-EM-192f");
-    benchmark::<FAESTEM192sKeyPair, FAESTEM192sSignature>(c, "FAEST-EM-192s");
-    benchmark::<FAESTEM256fKeyPair, FAESTEM256fSignature>(c, "FAEST-EM-256f");
-    benchmark::<FAESTEM256sKeyPair, FAESTEM256sSignature>(c, "FAEST-EM-256s");
+    benchmark::<FAEST128fSigningKey, FAEST128fSignature>(c, "FAEST-128f");
+    benchmark::<FAEST128sSigningKey, FAEST128sSignature>(c, "FAEST-128s");
+    benchmark::<FAEST192fSigningKey, FAEST192fSignature>(c, "FAEST-192f");
+    benchmark::<FAEST192sSigningKey, FAEST192sSignature>(c, "FAEST-192s");
+    benchmark::<FAEST256fSigningKey, FAEST256fSignature>(c, "FAEST-256f");
+    benchmark::<FAEST256sSigningKey, FAEST256sSignature>(c, "FAEST-256s");
+    benchmark::<FAESTEM128fSigningKey, FAESTEM128fSignature>(c, "FAEST-EM-128f");
+    benchmark::<FAESTEM128sSigningKey, FAESTEM128sSignature>(c, "FAEST-EM-128s");
+    benchmark::<FAESTEM192fSigningKey, FAESTEM192fSignature>(c, "FAEST-EM-192f");
+    benchmark::<FAESTEM192sSigningKey, FAESTEM192sSignature>(c, "FAEST-EM-192s");
+    benchmark::<FAESTEM256fSigningKey, FAESTEM256fSignature>(c, "FAEST-EM-256f");
+    benchmark::<FAESTEM256sSigningKey, FAESTEM256sSignature>(c, "FAEST-EM-256s");
 }
 
 criterion_group!(benches, faest_benchmark);
