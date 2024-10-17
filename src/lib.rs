@@ -157,21 +157,21 @@ macro_rules! define_impl {
 
             impl From<&[<$param SigningKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE] {
                 fn from(value: &[<$param SigningKey>]) -> Self {
-                    value.0.to_bytes().into_array()
+                    value.to_bytes()
                 }
             }
 
-            /*
+            impl From<[<$param SigningKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE] {
+                fn from(value: [<$param SigningKey>]) -> Self {
+                    value.to_bytes()
+                }
+            }
+
             impl ByteEncoding for [<$param SigningKey>] {
                 type Repr = [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE];
 
                 fn to_bytes(&self) -> Self::Repr {
-                    self.0.as_bytes().into_array()
-
-                    // NOTE: this could be done with Into if it would be supported
-                    // let mut ret = [0; <[<$param Parameters>] as FAESTParameters>::SIG::USIZE];
-                    // ret.copy_from_slice(self.0.as_slice());
-                    // ret
+                    self.0.to_bytes().into_array()
                 }
 
                 fn to_vec(&self) -> Vec<u8> {
@@ -179,9 +179,9 @@ macro_rules! define_impl {
                 }
 
                 fn encoded_len(&self) -> usize {
-                    <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE
+                    self.0.encoded_len()
                 }
-            } */
+            }
 
             #[doc = "Verification key for " $param]
             #[derive(Debug, Clone, PartialEq, Eq)]
@@ -198,7 +198,29 @@ macro_rules! define_impl {
 
             impl From<&[<$param VerificationKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE] {
                 fn from(value: &[<$param VerificationKey>]) -> Self {
-                    value.0.to_bytes().into_array()
+                    value.to_bytes()
+                }
+            }
+
+            impl From<[<$param VerificationKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE] {
+                fn from(value: [<$param VerificationKey>]) -> Self {
+                    value.to_bytes()
+                }
+            }
+
+            impl ByteEncoding for [<$param VerificationKey>] {
+                type Repr = [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE];
+
+                fn to_bytes(&self) -> Self::Repr {
+                    self.0.to_bytes().into_array()
+                }
+
+                fn to_vec(&self) -> Vec<u8> {
+                    self.0.to_vec()
+                }
+
+                fn encoded_len(&self) -> usize {
+                    self.0.encoded_len()
                 }
             }
 
