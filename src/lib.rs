@@ -3,9 +3,9 @@
 //!
 //! Key generation, signing and verification can be implemented as follows:
 //! ```
-//! use faest::{FAEST128fKeyPair, FAEST128fSignature, Signer, Verifier, Keypair, KeypairGenerator};
+//! use faest::{FAEST128fSigningKey, FAEST128fSignature, Signer, Verifier, Keypair, KeypairGenerator};
 //!
-//! let keypair = FAEST128fKeyPair::generate(rand::thread_rng());
+//! let keypair = FAEST128fSigningKey::generate(rand::thread_rng());
 //! let msg = "some message".as_bytes();
 //! let signature: FAEST128fSignature = keypair.sign(msg);
 //!
@@ -15,9 +15,9 @@
 //!
 //! Due to the size of the sigantures, all variants support signing into boxed signatures:
 //! ```
-//! use faest::{FAEST128fKeyPair, FAEST128fSignature, Signer, Verifier, Keypair, KeypairGenerator};
+//! use faest::{FAEST128fSigningKey, FAEST128fSignature, Signer, Verifier, Keypair, KeypairGenerator};
 //!
-//! let keypair = FAEST128fKeyPair::generate(rand::thread_rng());
+//! let keypair = FAEST128fSigningKey::generate(rand::thread_rng());
 //! let msg = "some message".as_bytes();
 //! let signature: Box<FAEST128fSignature> = keypair.sign(msg);
 //!
@@ -30,10 +30,10 @@
 //! trait is also implemented:
 //! ```
 //! # #[cfg(feature="randomized-signer")] {
-//! use faest::{FAEST128fKeyPair, FAEST128fSignature, RandomizedSigner, Verifier, Keypair, KeypairGenerator};
+//! use faest::{FAEST128fSigningKey, FAEST128fSignature, RandomizedSigner, Verifier, Keypair, KeypairGenerator};
 //!
 //! let mut rng = rand::thread_rng();
-//! let keypair = FAEST128fKeyPair::generate(&mut rng);
+//! let keypair = FAEST128fSigningKey::generate(&mut rng);
 //! let msg = "some message".as_bytes();
 //! let signature: FAEST128fSignature = keypair.sign_with_rng(&mut rng, msg);
 //!
@@ -135,7 +135,7 @@ macro_rules! define_impl {
             #[doc = "use faest::{" $param "SigningKey as SK, " $param "Signature as Sig};"]
             /// use faest::{Signer, Verifier, Keypair, KeypairGenerator};
             ///
-            /// let keypair = SG::generate(rand::thread_rng());
+            /// let keypair = SK::generate(rand::thread_rng());
             /// let msg = "some message".as_bytes();
             /// let signature: Sig = keypair.sign(msg);
             ///
