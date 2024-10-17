@@ -8,7 +8,7 @@ authors = [
 ]
 homepage = "https://faest.info"
 repository = "https://github.com/ait-crypto/faest-rs"
-license = "MIT"
+license = "Apache-2.0 OR MIT"
 edition = "2021"
 rust-version = "1.76"
 keywords = ["signatures", "FAEST"]
