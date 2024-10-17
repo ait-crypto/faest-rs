@@ -55,7 +55,7 @@ use generic_array::{typenum::Unsigned, GenericArray};
 use paste::paste;
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
-use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "randomized-signer")]
 pub use signature::RandomizedSigner;
 use signature::SignatureEncoding;
@@ -408,7 +408,6 @@ define_impl!(FAESTEM256s);
 mod tests {
     use super::*;
 
-    #[cfg(feature = "serde")]
     use std::fmt::Debug;
 
     #[cfg(feature = "serde")]
@@ -469,25 +468,30 @@ mod tests {
             .expect("signature verifies");
     }
 
-    /*
     #[test]
     fn serialize_keys<KP, S>()
     where
-        KP: KeypairGenerator + Signer<S> + Verifier<S> + for<'a> TryFrom<&'a [u8]> + Into<[u8; _]>,
-        KP::VerifyingKey: Verifier<S> + for<'a> Verifier<SignatureRef<'a>>,
+        KP: KeypairGenerator + Signer<S> + Verifier<S> + ByteEncoding + Eq + Debug,
+        KP::VerifyingKey: Verifier<S> + ByteEncoding + Eq + Debug,
+        for<'a> <KP as TryFrom<&'a [u8]>>::Error: Debug,
+        for<'a> <KP::VerifyingKey as TryFrom<&'a [u8]>>::Error: Debug,
     {
         let kp = KP::generate(rand::thread_rng());
         let vk = kp.verifying_key();
         let signature = kp.sign(TEST_MESSAGE);
 
-        let kp2 = KP::try_from(&kp.into());
+        let kp2 = KP::try_from(kp.to_bytes().as_ref()).unwrap();
+        let vk2 = KP::VerifyingKey::try_from(vk.to_bytes().as_ref()).unwrap();
 
-        let sk2 = SigningKey::<P>::try_from(sk.as_ref()).expect("sk -> [u8] -> sk");
-        let vk2 = VerificationKey::<P>::try_from(vk.as_ref()).expect("vk -> [u8] -> vk");
+        assert_eq!(kp, kp2);
+        assert_eq!(vk, vk2);
 
-        assert_eq!(sk, sk2);
-        assert_eq!(vk, vk2)
-    } */
+        vk2.verify(TEST_MESSAGE, &signature)
+            .expect("signature verifies");
+        let signature = kp2.sign(TEST_MESSAGE);
+        vk.verify(TEST_MESSAGE, &signature)
+            .expect("signature verifies");
+    }
 
     /*
     #[cfg(feature = "subtle")]
