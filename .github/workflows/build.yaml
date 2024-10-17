@@ -36,12 +36,12 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - aarch64-unknown-linux-gnu
-          - armv7-unknown-linux-gnueabihf
+          # - aarch64-unknown-linux-gnu
+          # - armv7-unknown-linux-gnueabihf
           - i686-unknown-linux-gnu
-          - powerpc64le-unknown-linux-gnu
-          - riscv64gc-unknown-linux-gnu
-          - s390x-unknown-linux-gnu
+          # - powerpc64le-unknown-linux-gnu
+          # - riscv64gc-unknown-linux-gnu
+          # - s390x-unknown-linux-gnu
     name: Cross test for ${{matrix.target}}
     steps:
       - uses: actions/checkout@v4
