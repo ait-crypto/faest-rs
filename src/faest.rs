@@ -12,7 +12,7 @@ use crate::{
     utils::Reader,
     vc::VectorCommitment,
     vole::{volecommit, volereconstruct},
-    Error,
+    ByteEncoding, Error,
 };
 
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
@@ -22,29 +22,35 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-#[derive(Clone, Default)]
 #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
 pub(crate) struct SecretKey<O>
 where
     O: OWFParameters,
 {
     pub(crate) owf_key: GenericArray<u8, O::LAMBDABYTES>,
-    pub(crate) owf_input: GenericArray<u8, O::InputSize>,
-    pub(crate) owf_output: GenericArray<u8, O::InputSize>,
+    #[cfg_attr(feature = "zeroize", zeroize(skip))]
+    pub(crate) pk: PublicKey<O>,
 }
 
-impl<O> SecretKey<O>
+impl<O> Clone for SecretKey<O>
 where
     O: OWFParameters,
 {
-    pub(crate) fn as_bytes(&self) -> GenericArray<u8, O::SK> {
-        let mut buf = GenericArray::default();
-        buf[..O::InputSize::USIZE].copy_from_slice(&self.owf_input);
-        buf[O::InputSize::USIZE..].copy_from_slice(&self.owf_key);
-        buf
+    fn clone(&self) -> Self {
+        Self {
+            owf_key: self.owf_key.clone(),
+            pk: self.pk.clone(),
+        }
     }
+}
 
-    pub(crate) fn try_from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+impl<O> TryFrom<&[u8]> for SecretKey<O>
+where
+    O: OWFParameters,
+{
+    type Error = Error;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() == O::SK::USIZE {
             let owf_input = GenericArray::from_slice(&bytes[..O::InputSize::USIZE]);
             let owf_key = GenericArray::from_slice(&bytes[O::InputSize::USIZE..]);
@@ -55,8 +61,10 @@ where
                     O::evaluate_owf(owf_key, owf_input, &mut owf_output);
                     Self {
                         owf_key: owf_key.clone(),
-                        owf_input: owf_input.clone(),
-                        owf_output,
+                        pk: PublicKey {
+                            owf_input: owf_input.clone(),
+                            owf_output,
+                        },
                     }
                 })
                 .ok_or_else(Error::new)
@@ -64,12 +72,48 @@ where
             Err(Error::new())
         }
     }
+}
 
+impl<O> From<SecretKey<O>> for GenericArray<u8, O::SK>
+where
+    O: OWFParameters,
+{
+    fn from(value: SecretKey<O>) -> Self {
+        value.to_bytes()
+    }
+}
+
+impl<O> ByteEncoding for SecretKey<O>
+where
+    O: OWFParameters,
+{
+    type Repr = GenericArray<u8, O::SK>;
+
+    fn to_bytes(&self) -> Self::Repr {
+        let mut buf = GenericArray::default();
+        buf[..O::InputSize::USIZE].copy_from_slice(&self.pk.owf_input);
+        buf[O::InputSize::USIZE..].copy_from_slice(&self.owf_key);
+        buf
+    }
+
+    fn to_vec(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(O::SK::USIZE);
+        buf.extend_from_slice(&self.pk.owf_input);
+        buf.extend_from_slice(&self.owf_key);
+        buf
+    }
+
+    fn encoded_len(&self) -> usize {
+        O::SK::USIZE
+    }
+}
+
+impl<O> SecretKey<O>
+where
+    O: OWFParameters,
+{
     pub(crate) fn as_public_key(&self) -> PublicKey<O> {
-        PublicKey {
-            owf_input: self.owf_input.clone(),
-            owf_output: self.owf_output.clone(),
-        }
+        self.pk.clone()
     }
 }
 
@@ -80,8 +124,8 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SecretKey")
             .field("owf_key", &"redacted")
-            .field("owf_input", &self.owf_input.as_slice())
-            .field("owf_output", &self.owf_output.as_slice())
+            .field("owf_input", &self.pk.owf_input.as_slice())
+            .field("owf_output", &self.pk.owf_output.as_slice())
             .finish()
     }
 }
@@ -91,9 +135,7 @@ where
     O: OWFParameters,
 {
     fn eq(&self, rhs: &Self) -> bool {
-        self.owf_key == rhs.owf_key
-            && self.owf_input == rhs.owf_input
-            && self.owf_output == rhs.owf_output
+        self.owf_key == rhs.owf_key && self.pk == rhs.pk
     }
 }
 
@@ -108,7 +150,7 @@ where
     where
         S: Serializer,
     {
-        self.as_bytes().serialize(serializer)
+        self.to_bytes().serialize(serializer)
     }
 }
 
@@ -122,13 +164,12 @@ where
         D: Deserializer<'de>,
     {
         GenericArray::<u8, O::SK>::deserialize(deserializer).and_then(|bytes| {
-            SecretKey::<O>::try_from_bytes(bytes.as_slice())
+            SecretKey::<O>::try_from(bytes.as_slice())
                 .map_err(|_| serde::de::Error::custom("expected a valid secret key"))
         })
     }
 }
 
-#[derive(Clone)]
 pub(crate) struct PublicKey<O>
 where
     O: OWFParameters,
@@ -137,18 +178,25 @@ where
     pub(crate) owf_output: GenericArray<u8, O::InputSize>,
 }
 
-impl<O> PublicKey<O>
+impl<O> Clone for PublicKey<O>
 where
     O: OWFParameters,
 {
-    pub(crate) fn as_bytes(&self) -> GenericArray<u8, O::PK> {
-        let mut buf = GenericArray::default();
-        buf[..O::InputSize::USIZE].copy_from_slice(&self.owf_input);
-        buf[O::InputSize::USIZE..].copy_from_slice(&self.owf_output);
-        buf
+    fn clone(&self) -> Self {
+        Self {
+            owf_input: self.owf_input.clone(),
+            owf_output: self.owf_output.clone(),
+        }
     }
+}
 
-    pub(crate) fn try_from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+impl<O> TryFrom<&[u8]> for PublicKey<O>
+where
+    O: OWFParameters,
+{
+    type Error = Error;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() == O::PK::USIZE {
             let owf_input = GenericArray::from_slice(&bytes[..O::InputSize::USIZE]);
             let owf_output = GenericArray::from_slice(&bytes[O::InputSize::USIZE..]);
@@ -159,6 +207,40 @@ where
         } else {
             Err(Error::new())
         }
+    }
+}
+
+impl<O> From<PublicKey<O>> for GenericArray<u8, O::PK>
+where
+    O: OWFParameters,
+{
+    fn from(value: PublicKey<O>) -> Self {
+        value.to_bytes()
+    }
+}
+
+impl<O> ByteEncoding for PublicKey<O>
+where
+    O: OWFParameters,
+{
+    type Repr = GenericArray<u8, O::PK>;
+
+    fn to_bytes(&self) -> Self::Repr {
+        let mut buf = GenericArray::default();
+        buf[..O::InputSize::USIZE].copy_from_slice(&self.owf_input);
+        buf[O::InputSize::USIZE..].copy_from_slice(&self.owf_output);
+        buf
+    }
+
+    fn to_vec(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(O::PK::USIZE);
+        buf.extend_from_slice(&self.owf_input);
+        buf.extend_from_slice(&self.owf_output);
+        buf
+    }
+
+    fn encoded_len(&self) -> usize {
+        O::PK::USIZE
     }
 }
 
@@ -194,7 +276,7 @@ where
     where
         S: Serializer,
     {
-        self.as_bytes().serialize(serializer)
+        self.to_bytes().serialize(serializer)
     }
 }
 
@@ -208,7 +290,7 @@ where
         D: Deserializer<'de>,
     {
         GenericArray::<u8, O::PK>::deserialize(deserializer).and_then(|bytes| {
-            PublicKey::<O>::try_from_bytes(bytes.as_slice())
+            PublicKey::<O>::try_from(bytes.as_slice())
                 .map_err(|_| serde::de::Error::custom("expected a valid public key"))
         })
     }
@@ -316,7 +398,7 @@ where
 {
     let mut mu =
         GenericArray::<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2>::default();
-    hash_mu::<RO<P>>(&mut mu, &sk.owf_input, &sk.owf_output, msg);
+    hash_mu::<RO<P>>(&mut mu, &sk.pk.owf_input, &sk.pk.owf_output, msg);
 
     let mut r = GenericArray::<u8, O::LAMBDABYTES>::default();
     let mut iv = IV::default();
@@ -352,7 +434,7 @@ where
         GenericArray::default();
     h1_hasher.finish().read(&mut hv);
 
-    let w = P::OWF::witness(&sk.owf_key, &sk.owf_input);
+    let w = P::OWF::witness(&sk.owf_key, &sk.pk.owf_input);
     let d = Box::<GenericArray<u8, O::LBYTES>>::from_iter(
         zip(w.iter(), &u[..O::LBYTES::USIZE]).map(|(w, u)| w ^ *u),
     );
@@ -376,7 +458,14 @@ where
         }),
     );
 
-    let (a_t, b_t) = P::OWF::prove(&w, new_u, &new_gv, &sk.owf_input, &sk.owf_output, &chall2);
+    let (a_t, b_t) = P::OWF::prove(
+        &w,
+        new_u,
+        &new_gv,
+        &sk.pk.owf_input,
+        &sk.pk.owf_output,
+        &chall2,
+    );
 
     let mut chall3 = GenericArray::<u8, O::LAMBDABYTES>::default();
     hash_challenge_3::<RO<P>>(&mut chall3, &chall2, &a_t, &b_t);

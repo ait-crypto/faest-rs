@@ -110,6 +110,23 @@ where
     }
 }
 
+//// Byte-based encoding of keys
+///
+/// This is similar to [signature::SignatureEncoding] but for keys.
+pub trait ByteEncoding: Clone + Sized + for<'a> TryFrom<&'a [u8]> + TryInto<Self::Repr> {
+    /// Byte representation of a key.
+    type Repr: 'static + AsRef<[u8]> + Clone + Send + Sync;
+
+    /// Encode key as its byte representation.
+    fn to_bytes(&self) -> Self::Repr;
+
+    /// Encode keys as a byte vector.
+    fn to_vec(&self) -> Vec<u8>;
+
+    /// Get length of encoded key.
+    fn encoded_len(&self) -> usize;
+}
+
 macro_rules! define_impl {
     ($param:ident) => {
         paste! {
@@ -123,15 +140,37 @@ macro_rules! define_impl {
                 type Error = Error;
 
                 fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-                    SecretKey::try_from_bytes(value).map(|sk| Self(sk))
+                    SecretKey::try_from(value).map(|sk| Self(sk))
                 }
             }
 
             impl From<&[<$param SigningKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE] {
                 fn from(value: &[<$param SigningKey>]) -> Self {
-                    value.0.as_bytes().into_array()
+                    value.0.to_bytes().into_array()
                 }
             }
+
+            /*
+            impl ByteEncoding for [<$param SigningKey>] {
+                type Repr = [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE];
+
+                fn to_bytes(&self) -> Self::Repr {
+                    self.0.as_bytes().into_array()
+
+                    // NOTE: this could be done with Into if it would be supported
+                    // let mut ret = [0; <[<$param Parameters>] as FAESTParameters>::SIG::USIZE];
+                    // ret.copy_from_slice(self.0.as_slice());
+                    // ret
+                }
+
+                fn to_vec(&self) -> Vec<u8> {
+                    self.0.to_vec()
+                }
+
+                fn encoded_len(&self) -> usize {
+                    <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE
+                }
+            } */
 
             #[doc = "Verification key for " $param]
             #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,13 +181,13 @@ macro_rules! define_impl {
                 type Error = Error;
 
                 fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-                    PublicKey::try_from_bytes(value).map(|pk| Self(pk))
+                    PublicKey::try_from(value).map(|pk| Self(pk))
                 }
             }
 
             impl From<&[<$param VerificationKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE] {
                 fn from(value: &[<$param VerificationKey>]) -> Self {
-                    value.0.as_bytes().into_array()
+                    value.0.to_bytes().into_array()
                 }
             }
 
@@ -172,7 +211,7 @@ macro_rules! define_impl {
                 type Error = Error;
 
                 fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-                    SecretKey::try_from_bytes(value).map(|sk| {
+                    SecretKey::try_from(value).map(|sk| {
                         let pk = sk.as_public_key();
                         Self([<$param SigningKey>](sk), [<$param VerificationKey>](pk))
                      }).map_err(|_| Error::new())

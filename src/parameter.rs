@@ -16,7 +16,7 @@ use rand_core::RngCore;
 use crate::{
     aes::{aes_extendedwitness, aes_prove, aes_verify},
     em::{em_extendedwitness, em_prove, em_verify},
-    faest::SecretKey,
+    faest::{PublicKey, SecretKey},
     fields::{BigGaloisField, GF128, GF192, GF256},
     prg::{PseudoRandomGenerator, PRG128, PRG192, PRG256},
     random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake256},
@@ -211,8 +211,10 @@ pub(crate) trait OWFParameters: Sized {
 
             return SecretKey {
                 owf_key: owf_key.clone(),
-                owf_input: owf_input.clone(),
-                owf_output,
+                pk: PublicKey {
+                    owf_input: owf_input.clone(),
+                    owf_output,
+                },
             };
         }
     }
