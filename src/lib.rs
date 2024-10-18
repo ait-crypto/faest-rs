@@ -1,43 +1,53 @@
 #![doc = include_str!("../README.md")]
 //! ## Usage
 //!
+//! The crate implements the traits defined by the [signature] crate. The crate
+//! itself together with the [Signer] and [Verifier] trait are re-exported for
+//! convinience. The following examples are based on FAEST-128f. They work
+//! exactly the same for the other variants by replacing the types of the
+//! signing key and the signature.
+//!
 //! Key generation, signing and verification can be implemented as follows:
 //! ```
-//! use faest::{FAEST128fSigningKey, FAEST128fSignature, Signer, Verifier, Keypair, KeypairGenerator};
+//! use faest::{FAEST128fSigningKey, FAEST128fSignature}
+//! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
 //!
-//! let keypair = FAEST128fSigningKey::generate(rand::thread_rng());
+//! let sk = FAEST128fSigningKey::generate(rand::thread_rng());
 //! let msg = "some message".as_bytes();
-//! let signature: FAEST128fSignature = keypair.sign(msg);
+//! let signature: FAEST128fSignature = sk.sign(msg);
 //!
-//! let verification_key = keypair.verifying_key();
+//! let verification_key = sk.verifying_key();
 //! verification_key.verify(msg, &signature).expect("Verification failed");
 //! ```
 //!
-//! Due to the size of the sigantures, all variants support signing into boxed signatures:
+//! Due to the size of the signatures, all variants support signing into boxed signatures:
 //! ```
-//! use faest::{FAEST128fSigningKey, FAEST128fSignature, Signer, Verifier, Keypair, KeypairGenerator};
+//! use faest::{FAEST128fSigningKey, FAEST128fSignature}
+//! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
 //!
-//! let keypair = FAEST128fSigningKey::generate(rand::thread_rng());
+//! let sk = FAEST128fSigningKey::generate(rand::thread_rng());
 //! let msg = "some message".as_bytes();
-//! let signature: Box<FAEST128fSignature> = keypair.sign(msg);
+//! let signature: Box<FAEST128fSignature> = sk.sign(msg);
 //!
-//! let verification_key = keypair.verifying_key();
+//! let verification_key = sk.verifying_key();
 //! verification_key.verify(msg, &signature).expect("Verification failed");
 //! ```
 //!
 //! The signature generation is determinstic per default. If the
 //! `randomized-signer` feature is enabled, the [signature::RandomizedSigner]
-//! trait is also implemented:
+//! trait is also implemented which allows the caller to specify an RNG to
+//! provide additional randomness:
 //! ```
 //! # #[cfg(feature="randomized-signer")] {
-//! use faest::{FAEST128fSigningKey, FAEST128fSignature, RandomizedSigner, Verifier, Keypair, KeypairGenerator};
+//! use faest::{FAEST128fSigningKey, FAEST128fSignature};
+//! use faest::{signature::{RandomizedSigner, Verifier, Keypair}, KeypairGenerator};
 //!
 //! let mut rng = rand::thread_rng();
-//! let keypair = FAEST128fSigningKey::generate(&mut rng);
+//! let sk = FAEST128fSigningKey::generate(&mut rng);
 //! let msg = "some message".as_bytes();
-//! let signature: FAEST128fSignature = keypair.sign_with_rng(&mut rng, msg);
+//! let signature: FAEST128fSignature = sk.sign_with_rng(&mut rng, msg);
 //!
-//! let verification_key = keypair.verifying_key();
+//! let verification_key = sk.verifying_key();
 //! verification_key.verify(msg, &signature).expect("Verification failed");
 //! # }
 //! ```
@@ -135,12 +145,15 @@ macro_rules! define_impl {
             #[doc = "use faest::{" $param "SigningKey as SK, " $param "Signature as Sig};"]
             /// use faest::{Signer, Verifier, Keypair, KeypairGenerator};
             ///
-            /// let keypair = SK::generate(rand::thread_rng());
+            /// let sk = SK::generate(rand::thread_rng());
             /// let msg = "some message".as_bytes();
-            /// let signature: Sig = keypair.sign(msg);
+            /// let signature: Sig = sk.sign(msg);
             ///
-            /// let verification_key = keypair.verifying_key();
+            /// // verify with verification key
+            /// let verification_key = sk.verifying_key();
             /// verification_key.verify(msg, &signature).expect("Verification failed");
+            /// // secret keys can also verify
+            /// sk.verify(msg, &signature).expect("Verification failed");
             /// ```
             #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
