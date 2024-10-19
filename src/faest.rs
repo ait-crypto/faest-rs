@@ -371,13 +371,6 @@ where
     O::keygen_with_rng(rng)
 }
 
-///input : Message (an array of bytes), sk : secret key, pk : public key, rho : lambda bits
-///
-///output : correction string (tau - 1 * (l_hat bits)), Hash of VOLE sceet (LAMBDA + 16 bits), Commitment to the witness (l bits)
-///
-/// Quicksilver proof (Lambda), Partial decommitment (Tau * (t0 * k0*lambda + t1 * k1*lambda  +  2Lambda) bits),
-///
-///last challenge (lambda bits), initialisation vector
 #[inline(always)]
 pub(crate) fn faest_sign<P>(
     msg: &[u8],
