@@ -258,7 +258,6 @@ where
 
 fn em_enc_bkwd_mkey0_mtag1<O>(
     z: &GenericArray<Field<O>, O::L>,
-    z_out: &GenericArray<Field<O>, O::LAMBDA>,
 ) -> Box<GenericArray<Field<O>, O::SENC>>
 where
     O: OWFParameters,
@@ -278,8 +277,7 @@ where
                 let z_t = if j < O::R::USIZE - 1 {
                     &z[ird..ird + 8]
                 } else {
-                    &z_out
-                        [ird - 32 * O::NST::USIZE * (j + 1)..ird - 32 * O::NST::USIZE * (j + 1) + 8]
+                    &z[ird - 32 * O::NST::USIZE * (j + 1)..ird - 32 * O::NST::USIZE * (j + 1) + 8]
                 };
                 let y_t =
                     array::from_fn(|i| z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]);
@@ -352,11 +350,10 @@ fn em_enc_cstrnts_mkey0<O>(
             index += 1;
         }
     }
-    let v_out = GenericArray::from_slice(&v[..O::LAMBDA::USIZE]);
     let s = em_enc_fwd_1::<O>(w, &x[..4 * O::NST::USIZE * (O::R::USIZE + 1)]);
     let vs = em_enc_fwd_proof::<O>(v);
     let s_b = em_enc_bkwd_mkey0_mtag0::<O>(&new_x, &new_w, &w_out);
-    let v_s_b = em_enc_bkwd_mkey0_mtag1::<O>(v, v_out);
+    let v_s_b = em_enc_bkwd_mkey0_mtag1::<O>(v);
     for j in 0..O::SENC::USIZE {
         let a0 = v_s_b[j] * vs[j];
         let a1 = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + Field::<O>::ONE + a0;
