@@ -165,7 +165,19 @@ where
     res
 }
 
-fn em_enc_fwd_verify<O>(z: &[Field<O>], x: &[Field<O>]) -> Box<GenericArray<Field<O>, O::SENC>>
+fn bit_combine_with_delta<O>(x: u8, delta: &Field<O>) -> Field<O>
+where
+    O: OWFParameters,
+{
+    let tmp = array::from_fn(|index| *delta * ((x >> (index % 8)) & 1));
+    Field::<O>::byte_combine(&tmp)
+}
+
+fn em_enc_fwd_verify<O>(
+    z: &[Field<O>],
+    x: &[u8],
+    delta: &Field<O>,
+) -> Box<GenericArray<Field<O>, O::SENC>>
 where
     O: OWFParameters,
 {
@@ -174,7 +186,7 @@ where
     //Step 2-3
     for j in 0..4 * O::NST::USIZE {
         res[index] = Field::<O>::byte_combine_slice(&z[8 * j..8 * (j + 1)])
-            + Field::<O>::byte_combine_slice(&x[8 * j..8 * (j + 1)]);
+            + bit_combine_with_delta::<O>(x[j], delta);
         index += 1;
     }
     //Step 4
@@ -184,7 +196,7 @@ where
             let mut z_hat = [Field::<O>::default(); 4];
             for r in 0..4 {
                 z_hat[r] = Field::<O>::byte_combine_slice(&z[i + 8 * r..i + 8 * r + 8]);
-                res[index + r] = Field::<O>::byte_combine_slice(&x[i + 8 * r..i + 8 * r + 8]);
+                res[index + r] = bit_combine_with_delta::<O>(x[(i + 8 * r) / 8], delta);
             }
 
             //Step 16
@@ -285,10 +297,10 @@ where
 }
 
 fn em_enc_bkwd_mkey1_mtag0<O>(
-    x: &GenericArray<Field<O>, O::LAMBDAR1>,
+    x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     z: &GenericArray<Field<O>, O::L>,
     z_out: &GenericArray<Field<O>, O::LAMBDA>,
-    delta: Field<O>,
+    delta: &Field<O>,
 ) -> Box<GenericArray<Field<O>, O::SENC>>
 where
     O: OWFParameters,
@@ -310,7 +322,7 @@ where
                 } else {
                     let z_out_t = &z_out[ird - 32 * O::NST::USIZE * (j + 1)
                         ..ird - 32 * O::NST::USIZE * (j + 1) + 8];
-                    array::from_fn(|idx| z_out_t[idx] + x[ird + idx])
+                    array::from_fn(|idx| z_out_t[idx] + *delta * ((x[(ird + idx) / 8] >> idx) & 1))
                 };
                 let mut y_t =
                     array::from_fn(|i| z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]);
@@ -356,21 +368,16 @@ fn em_enc_cstrnts_mkey1<O>(
     output: &GenericArray<u8, O::InputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     q: &GenericArray<Field<O>, O::L>,
-    delta: Field<O>,
+    delta: &Field<O>,
 ) where
     O: OWFParameters,
 {
-    let new_x = Box::<GenericArray<Field<O>, O::LAMBDAR1>>::from_iter(
-        (0..4 * O::NST::USIZE * (O::R::USIZE + 1) * 8)
-            .map(|index| delta * ((x[index / 8] >> (index % 8)) & 1)),
-    );
-
     let q_out = Box::<GenericArray<Field<O>, O::LAMBDA>>::from_iter(
-        (0..O::LAMBDA::USIZE).map(|idx| delta * ((output[idx / 8] >> (idx % 8)) & 1) + q[idx]),
+        (0..O::LAMBDA::USIZE).map(|idx| *delta * ((output[idx / 8] >> (idx % 8)) & 1) + q[idx]),
     );
-    let qs = em_enc_fwd_verify::<O>(q, new_x.as_slice());
-    let qs_b = em_enc_bkwd_mkey1_mtag0::<O>(&new_x, q, &q_out, delta);
-    let immut = delta * delta;
+    let qs = em_enc_fwd_verify::<O>(q, x, delta);
+    let qs_b = em_enc_bkwd_mkey1_mtag0::<O>(x, q, &q_out, delta);
+    let immut = *delta * delta;
 
     zip(qs, qs_b).for_each(|(q, qb)| {
         let b = (q * qb) + immut;
@@ -478,7 +485,7 @@ where
             .take(O::LAMBDABYTES::USIZE * (O::R::USIZE + 1))
             .collect::<GenericArray<u8, _>>(),
         GenericArray::from_slice(&new_q[..O::L::USIZE]),
-        delta,
+        &delta,
     );
 
     let q_s = Field::<O>::sum_poly(&new_q[O::L::USIZE..O::L::USIZE + O::LAMBDA::USIZE]);
