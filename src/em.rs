@@ -23,7 +23,7 @@ where
     O: OWFParameters,
 {
     let mut valid = true;
-    let mut res: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
+    let mut res = GenericArray::default_boxed();
     let mut index = O::LAMBDABYTES::USIZE;
     let (kb, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(
         owf_input,
@@ -235,7 +235,7 @@ fn em_enc_bkwd_mkey0_mtag0<O>(
 where
     O: OWFParameters,
 {
-    let mut res: Box<GenericArray<Field<O>, O::SENC>> = GenericArray::default_boxed();
+    let mut res = GenericArray::default_boxed();
     let mut index = 0;
 
     //Step 2
@@ -269,7 +269,7 @@ fn em_enc_bkwd_mkey0_mtag1<O>(
 where
     O: OWFParameters,
 {
-    let mut res: Box<GenericArray<Field<O>, O::SENC>> = GenericArray::default_boxed();
+    let mut res = GenericArray::default_boxed();
     let mut index = 0;
     //Step 2
     for j in 0..O::R::USIZE {
@@ -305,7 +305,7 @@ fn em_enc_bkwd_mkey1_mtag0<O>(
 where
     O: OWFParameters,
 {
-    let mut res: Box<GenericArray<Field<O>, O::SENC>> = GenericArray::default_boxed();
+    let mut res = GenericArray::default_boxed();
     let mut index = 0;
     //Step 2
     for j in 0..O::R::USIZE {
