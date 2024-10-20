@@ -149,12 +149,12 @@ where
     let mut out = GenericArray::default_boxed();
     out[..O::LAMBDA::USIZE].copy_from_slice(&x[..O::LAMBDA::USIZE]);
     let mut index = O::LAMBDA::USIZE;
-    let mut indice = O::LAMBDA::USIZE;
+    let mut x_index = O::LAMBDA::USIZE;
     for j in O::NK::USIZE..(4 * (O::R::USIZE + 1)) {
         if (j % O::NK::USIZE == 0) || ((O::NK::USIZE > 6) && (j % O::NK::USIZE == 4)) {
-            out[index..index + 32].copy_from_slice(&x[indice..indice + 32]);
+            out[index..index + 32].copy_from_slice(&x[x_index..x_index + 32]);
             index += 32;
-            indice += 32;
+            x_index += 32;
         } else {
             for i in 0..32 {
                 out[index] = out[(32 * (j - O::NK::USIZE)) + i] + out[(32 * (j - 1)) + i];

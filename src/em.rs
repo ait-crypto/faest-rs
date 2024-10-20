@@ -222,11 +222,6 @@ where
     res
 }
 
-///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
-///
-///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
-///
-///One of the first path to optimize the code could be to do the distinction
 fn em_enc_bkwd_mkey0_mtag0<O>(
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     z: &GenericArray<u8, O::LBYTES>,
@@ -347,13 +342,9 @@ fn em_enc_cstrnts_mkey0<O>(
     O: OWFParameters,
 {
     let w_out = GenericArray::from_iter(zip(&w[..O::InputSize::USIZE], output).map(|(l, r)| l ^ r));
-    let s = em_enc_fwd_1::<O>(w, &x[..4 * O::NST::USIZE * (O::R::USIZE + 1)]);
+    let s = em_enc_fwd_1::<O>(w, x);
     let vs = em_enc_fwd_proof::<O>(v);
-    let s_b = em_enc_bkwd_mkey0_mtag0::<O>(
-        GenericArray::from_slice(&x[..4 * O::NST::USIZE * (O::R::USIZE + 1)]),
-        w,
-        &w_out,
-    );
+    let s_b = em_enc_bkwd_mkey0_mtag0::<O>(x, w, &w_out);
     let v_s_b = em_enc_bkwd_mkey0_mtag1::<O>(v);
     for j in 0..O::SENC::USIZE {
         let a0 = v_s_b[j] * vs[j];
