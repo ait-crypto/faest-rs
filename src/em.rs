@@ -3,7 +3,6 @@ use std::{array, iter::zip, mem::size_of};
 use generic_array::{typenum::Unsigned, GenericArray};
 
 use crate::{
-    aes::convert_to_bit,
     fields::{ByteCombine, ByteCombineConstants, Field as _, SumPoly},
     parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},
     rijndael_32::{
@@ -217,9 +216,9 @@ where
 ///
 ///One of the first path to optimize the code could be to do the distinction
 fn em_enc_bkwd_mkey0_mtag0<O>(
-    x: &GenericArray<Field<O>, O::LAMBDAR1>,
-    z: &GenericArray<Field<O>, O::L>,
-    z_out: &GenericArray<Field<O>, O::LAMBDA>,
+    x: &GenericArray<u8, O::LAMBDAR1BYTE>,
+    z: &GenericArray<u8, O::LBYTES>,
+    z_out: &GenericArray<u8, O::LAMBDABYTES>,
 ) -> Box<GenericArray<Field<O>, O::SENC>>
 where
     O: OWFParameters,
@@ -237,18 +236,14 @@ where
                     icol = (icol + O::NST::USIZE - 1) % O::NST::USIZE;
                 }
                 let ird = O::LAMBDA::USIZE + 32 * O::NST::USIZE * j + 32 * icol + 8 * k;
-                let z_t: [_; 8] = if j < O::R::USIZE - 1 {
-                    array::from_fn(|idx| z[ird + idx])
+                let z_t = if j < O::R::USIZE - 1 {
+                    z[ird / 8]
                 } else {
-                    let z_out_t = &z_out[ird - 32 * O::NST::USIZE * (j + 1)
-                        ..ird - 32 * O::NST::USIZE * (j + 1) + 8];
-                    array::from_fn(|idx| z_out_t[idx] + x[ird + idx])
+                    let z_out_t = z_out[(ird - 32 * O::NST::USIZE * (j + 1)) / 8];
+                    z_out_t ^ x[ird / 8]
                 };
-                let mut y_t =
-                    array::from_fn(|i| z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]);
-                y_t[0] += Field::<O>::ONE;
-                y_t[2] += Field::<O>::ONE;
-                res[index] = Field::<O>::byte_combine(&y_t);
+                let y_t = z_t.rotate_right(7) ^ z_t.rotate_right(5) ^ z_t.rotate_right(2) ^ 0x5;
+                res[index] = Field::<O>::byte_combine_bits(y_t);
                 index += 1;
             }
         }
@@ -339,20 +334,14 @@ fn em_enc_cstrnts_mkey0<O>(
 ) where
     O: OWFParameters,
 {
-    let new_w = convert_to_bit::<Field<O>, O::L>(w);
-    let new_x =
-        convert_to_bit::<Field<O>, O::LAMBDAR1>(&x[..4 * O::NST::USIZE * (O::R::USIZE + 1)]);
-    let mut w_out: Box<GenericArray<Field<O>, O::LAMBDA>> = GenericArray::default_boxed();
-    let mut index = 0;
-    for i in 0..O::LAMBDABYTES::USIZE {
-        for j in 0..8 {
-            w_out[index] = new_w[i * 8 + j] + ((output[i] >> j) & 1);
-            index += 1;
-        }
-    }
+    let w_out = GenericArray::from_iter(zip(&w[..O::InputSize::USIZE], output).map(|(l, r)| l ^ r));
     let s = em_enc_fwd_1::<O>(w, &x[..4 * O::NST::USIZE * (O::R::USIZE + 1)]);
     let vs = em_enc_fwd_proof::<O>(v);
-    let s_b = em_enc_bkwd_mkey0_mtag0::<O>(&new_x, &new_w, &w_out);
+    let s_b = em_enc_bkwd_mkey0_mtag0::<O>(
+        GenericArray::from_slice(&x[..4 * O::NST::USIZE * (O::R::USIZE + 1)]),
+        w,
+        &w_out,
+    );
     let v_s_b = em_enc_bkwd_mkey0_mtag1::<O>(v);
     for j in 0..O::SENC::USIZE {
         let a0 = v_s_b[j] * vs[j];

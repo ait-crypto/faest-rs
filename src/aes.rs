@@ -2,11 +2,11 @@ use std::{array, mem::size_of};
 
 use generic_array::{
     typenum::{Unsigned, U4},
-    ArrayLength, GenericArray,
+    GenericArray,
 };
 
 use crate::{
-    fields::{BigGaloisField, ByteCombine, ByteCombineConstants, Field as _, SumPoly},
+    fields::{ByteCombine, ByteCombineConstants, Field as _, SumPoly},
     parameter::{BaseParameters, OWFParameters},
     parameter::{QSProof, TauParameters},
     rijndael_32::{
@@ -31,21 +31,6 @@ type CstrntsVal<'a, O> = &'a GenericArray<
 
 fn byte_to_bit(input: u8) -> Vec<u8> {
     (0..8).map(|i| (input >> i) & 1).collect()
-}
-
-pub(crate) fn convert_to_bit<F, S>(input: &[u8]) -> Box<GenericArray<F, S>>
-where
-    F: BigGaloisField,
-    S: ArrayLength,
-{
-    let mut res = GenericArray::default_boxed();
-    for i in 0..res.len() / 8 {
-        for j in 0..8 {
-            // FIXME
-            res[i * 8 + j] = F::ONE * ((input[i] >> j) & 1);
-        }
-    }
-    res
 }
 
 //The first member of the tuples are the effectives witness while the second is the validity according Faest requiremenbt of the keypair at the origin of the operation
