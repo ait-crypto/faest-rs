@@ -346,9 +346,9 @@ fn em_enc_cstrnts_mkey0<O>(
     let vs = em_enc_fwd_proof::<O>(v);
     let s_b = em_enc_bkwd_mkey0_mtag0::<O>(x, w, &w_out);
     let v_s_b = em_enc_bkwd_mkey0_mtag1::<O>(v);
-    for j in 0..O::SENC::USIZE {
-        let a0 = v_s_b[j] * vs[j];
-        let a1 = ((s[j] + vs[j]) * (s_b[j] + v_s_b[j])) + Field::<O>::ONE + a0;
+    for ((s_j, vs_j), (s_b_j, v_s_b_j)) in zip(zip(s, vs), zip(s_b, v_s_b)) {
+        let a0 = v_s_b_j * vs_j;
+        let a1 = ((s_j + vs_j) * (s_b_j + v_s_b_j)) + Field::<O>::ONE + a0;
         a_t_hasher.update(&a1);
         b_t_hasher.update(&a0);
     }
@@ -370,10 +370,10 @@ fn em_enc_cstrnts_mkey1<O>(
     let qs_b = em_enc_bkwd_mkey1_mtag0::<O>(x, q, &q_out, delta);
     let immut = *delta * delta;
 
-    zip(qs, qs_b).for_each(|(q, qb)| {
+    for (q, qb) in zip(qs, qs_b) {
         let b = (q * qb) + immut;
         b_t_hasher.update(&b);
-    });
+    }
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
