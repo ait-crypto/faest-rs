@@ -20,7 +20,7 @@ use crate::{
 type Field<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
 
 type KeyCstrnts<O> = (
-    Box<GenericArray<Field<O>, <O as OWFParameters>::PRODRUN128>>,
+    Box<GenericArray<u8, <O as OWFParameters>::PRODRUN128Bytes>>,
     Box<GenericArray<Field<O>, <O as OWFParameters>::PRODRUN128>>,
 );
 
@@ -28,10 +28,6 @@ type CstrntsVal<'a, O> = &'a GenericArray<
     GenericArray<u8, <O as OWFParameters>::LAMBDALBYTES>,
     <O as OWFParameters>::LAMBDA,
 >;
-
-fn byte_to_bit(input: u8) -> Vec<u8> {
-    (0..8).map(|i| (input >> i) & 1).collect()
-}
 
 //The first member of the tuples are the effectives witness while the second is the validity according Faest requiremenbt of the keypair at the origin of the operation
 pub(crate) fn aes_extendedwitness<O>(
@@ -134,11 +130,31 @@ fn round_with_save(
     }
 }
 
-///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
-///
-///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
-///
-///One of the first path to optimize the code could be to do the distinction
+fn aes_key_exp_fwd_1<O>(
+    x: &GenericArray<u8, O::LKEBytes>,
+) -> Box<GenericArray<u8, O::PRODRUN128Bytes>>
+where
+    O: OWFParameters,
+{
+    let mut out = GenericArray::default_boxed();
+    out[..O::LAMBDABYTES::USIZE].copy_from_slice(&x[..O::LAMBDABYTES::USIZE]);
+    let mut index = O::LAMBDABYTES::USIZE;
+    let mut x_index = O::LAMBDABYTES::USIZE;
+    for j in O::NK::USIZE..(4 * (O::R::USIZE + 1)) {
+        if (j % O::NK::USIZE == 0) || ((O::NK::USIZE > 6) && (j % O::NK::USIZE == 4)) {
+            out[index..index + 32 / 8].copy_from_slice(&x[x_index..x_index + 32 / 8]);
+            index += 32 / 8;
+            x_index += 32 / 8;
+        } else {
+            for i in 0..4 {
+                out[index] = out[(32 * (j - O::NK::USIZE)) / 8 + i] ^ out[(32 * (j - 1)) / 8 + i];
+                index += 1;
+            }
+        }
+    }
+    out
+}
+
 fn aes_key_exp_fwd<O>(
     x: &GenericArray<Field<O>, O::LKE>,
 ) -> Box<GenericArray<Field<O>, O::PRODRUN128>>
@@ -172,46 +188,39 @@ where
 ///One of the first path to optimize the code could be to do the distinction
 ///Beware when calling it : if Mtag = 1 ∧ Mkey = 1 or Mkey = 1 ∧ ∆ = ⊥ return ⊥
 fn aes_key_exp_bwd_mtag0_mkey0<O>(
-    x: &GenericArray<u8, O::LKE>,
-    xk: &GenericArray<Field<O>, O::PRODRUN128>,
-) -> Box<GenericArray<Field<O>, O::PRODSKE8>>
+    x: &GenericArray<u8, O::LKEBytes>,
+    xk: &GenericArray<u8, O::PRODRUN128Bytes>,
+) -> Box<GenericArray<u8, O::SKE>>
 where
     O: OWFParameters,
 {
     let mut out = GenericArray::default_boxed();
     let mut indice = 0;
-    let mut index = 0;
     let mut c = 0;
     let mut rmvrcon = true;
     let mut ircon = 0;
     // Step 6
     for j in 0..O::SKE::USIZE {
         // Step 7
-        let mut x_tilde: [Field<O>; 8] =
-            array::from_fn(|i| xk[indice + 8 * c + i] + ((x[8 * j + i + O::LAMBDA::USIZE]) & 1));
+        let mut x_tilde = xk[indice + c] ^ x[j + O::LAMBDABYTES::USIZE];
         // Step 8
         if rmvrcon && (c == 0) {
             let rcon = RCON_TABLE[ircon];
             ircon += 1;
             // Step 11
-            for (i, x) in x_tilde.iter_mut().enumerate() {
-                *x += Field::<O>::ONE * ((rcon >> i) & 1);
-            }
+            x_tilde ^= rcon;
         }
-        let mut y_tilde: [Field<O>; 8] =
-            array::from_fn(|i| x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8]);
-        y_tilde[0] += Field::<O>::ONE;
-        y_tilde[2] += Field::<O>::ONE;
-        out[index..index + 8].copy_from_slice(&y_tilde);
-        index += 8;
+        let y_tilde =
+            x_tilde.rotate_right(7) ^ x_tilde.rotate_right(5) ^ x_tilde.rotate_right(2) ^ 0x5;
+        out[j] = y_tilde;
         c += 1;
-        //Step 21
+        // Step 21
         if c == 4 {
             c = 0;
             if O::LAMBDA::USIZE == 192 {
-                indice += 192;
+                indice += 192 / 8;
             } else {
-                indice += 128;
+                indice += 128 / 8;
                 if O::LAMBDA::USIZE == 256 {
                     rmvrcon = !rmvrcon;
                 }
@@ -319,7 +328,7 @@ where
 fn aes_key_exp_cstrnts_mkey0<O>(
     a_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
     b_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
-    w: &GenericArray<u8, O::LKE>,
+    w: &GenericArray<u8, O::LKEBytes>,
     v: &GenericArray<Field<O>, O::LKE>,
 ) -> KeyCstrnts<O>
 where
@@ -327,15 +336,7 @@ where
 {
     let mut iwd = 32 * (O::NK::USIZE - 1);
     let mut dorotword = true;
-    let k = aes_key_exp_fwd::<O>(GenericArray::from_slice(
-        &w.iter()
-            // FIXME!
-            .map(|x| match x {
-                0 => Field::<O>::default(),
-                _ => Field::<O>::ONE,
-            })
-            .collect::<Vec<Field<O>>>(),
-    ));
+    let k = aes_key_exp_fwd_1::<O>(w);
     let vk = aes_key_exp_fwd::<O>(v);
     // FIXME
     let w_b = aes_key_exp_bwd_mtag0_mkey0::<O>(w, &k);
@@ -354,12 +355,11 @@ where
         let mut v_k_hat = [Field::<O>::default(); 4];
         for r in 0..4 {
             let r_p = if dorotword { (r + 3) % 4 } else { r };
-            k_hat[r_p] = Field::<O>::byte_combine_slice(&k[iwd + (8 * r)..iwd + (8 * r) + 8]);
+            k_hat[r_p] = Field::<O>::byte_combine_bits(k[iwd / 8 + r]);
             v_k_hat[r_p] = Field::<O>::byte_combine_slice(&vk[iwd + (8 * r)..iwd + (8 * r) + 8]);
         }
         for r in 0..4 {
-            let w_hat_r =
-                Field::<O>::byte_combine_slice(&w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
+            let w_hat_r = Field::<O>::byte_combine_bits(w_b[32 / 8 * j + r]);
             let v_w_hat_r =
                 Field::<O>::byte_combine_slice(&v_w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
 
@@ -425,7 +425,7 @@ where
 ///One of the first path to optimize the code could be to do the distinction
 fn aes_enc_fwd_mkey0_mtag0<O>(
     x: &GenericArray<Field<O>, O::LENC>,
-    xk: &GenericArray<Field<O>, O::PRODRUN128>,
+    xk: &GenericArray<u8, O::PRODRUN128Bytes>,
     input: &[u8; 16],
 ) -> Box<GenericArray<Field<O>, O::SENC>>
 where
@@ -435,8 +435,7 @@ where
     let mut res = GenericArray::default_boxed();
     //Step 2-5
     for i in 0..16 {
-        res[index] = Field::<O>::byte_combine_bits(input[i])
-            + Field::<O>::byte_combine_slice(&xk[8 * i..(8 * i) + 8]);
+        res[index] = Field::<O>::byte_combine_bits(input[i]) + Field::<O>::byte_combine_bits(xk[i]);
         index += 1;
     }
     //Step 6
@@ -448,7 +447,7 @@ where
             let mut x_hat_k = [Field::<O>::default(); 4];
             for r in 0..4 {
                 x_hat[r] = Field::<O>::byte_combine_slice(&x[ix + 8 * r..ix + 8 * r + 8]);
-                x_hat_k[r] = Field::<O>::byte_combine_slice(&xk[ik + 8 * r..ik + 8 * r + 8]);
+                x_hat_k[r] = Field::<O>::byte_combine_bits(xk[ik / 8 + r]);
             }
 
             //Step 16
@@ -602,7 +601,7 @@ where
 ///One of the first path to optimize the code could be to do the distinction
 fn aes_enc_bkwd_mkey0_mtag0<O>(
     x: &GenericArray<Field<O>, O::LENC>,
-    xk: &GenericArray<Field<O>, O::PRODRUN128>,
+    xk: &GenericArray<u8, O::PRODRUN128Bytes>,
     out: &[u8; 16],
 ) -> Box<GenericArray<Field<O>, O::SENC>>
 where
@@ -624,7 +623,7 @@ where
                         x_out[i] = Field::<O>::ONE
                             * ((out[(ird - 128 * j + i) / 8] >> ((ird - 128 * j + i) % 8)) & 1);
                     }
-                    array::from_fn(|i| x_out[i] + xk[128 + ird + i])
+                    array::from_fn(|i| x_out[i] + ((xk[(128 + ird) / 8] >> i) & 1))
                 };
                 let mut y_t =
                     array::from_fn(|i| x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8]);
@@ -711,7 +710,7 @@ fn aes_enc_cstrnts_mkey0<O>(
     output: &[u8; 16],
     w: &GenericArray<u8, O::QUOTLENC8>,
     v: &GenericArray<Field<O>, O::LENC>,
-    k: &GenericArray<Field<O>, O::PRODRUN128>,
+    k: &GenericArray<u8, O::PRODRUN128Bytes>,
     vk: &GenericArray<Field<O>, O::PRODRUN128>,
 ) where
     O: OWFParameters,
@@ -766,7 +765,6 @@ pub(crate) fn aes_prove<O>(
 where
     O: OWFParameters,
 {
-    let new_w: GenericArray<u8, O::L> = w.iter().flat_map(|x| byte_to_bit(*x)).collect();
     let mut temp_v: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
     for i in 0..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE {
         for k in 0..8 {
@@ -787,7 +785,7 @@ where
     let (k, vk) = aes_key_exp_cstrnts_mkey0::<O>(
         &mut a_t_hasher,
         &mut b_t_hasher,
-        GenericArray::from_slice(&new_w[..O::LKE::USIZE]),
+        GenericArray::from_slice(&w[..O::LKE::USIZE / 8]),
         GenericArray::from_slice(&new_v[..O::LKE::USIZE]),
     );
 

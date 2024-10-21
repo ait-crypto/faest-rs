@@ -133,6 +133,7 @@ pub(crate) trait OWFParameters: Sized {
     type SKE: ArrayLength;
     type SENC: ArrayLength;
     type LKE: ArrayLength;
+    type LKEBytes: ArrayLength;
     type LENC: ArrayLength;
     type QUOTLENC8: ArrayLength;
     type BETA: ArrayLength;
@@ -146,6 +147,7 @@ pub(crate) trait OWFParameters: Sized {
     type LPRIMEBYTE: ArrayLength;
     type KBLENGTH: ArrayLength;
     type PRODRUN128: ArrayLength;
+    type PRODRUN128Bytes: ArrayLength;
     type PRODSKE8: ArrayLength;
     type LAMBDALBYTESLAMBDA: ArrayLength;
     type LAMBDAR1: ArrayLength;
@@ -237,6 +239,7 @@ impl OWFParameters for OWF128 {
     type SKE = U40;
     type SENC = U160;
     type LKE = U448;
+    type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = Sum<U1024, U128>;
     type BETA = U1;
     type NST = U0;
@@ -247,6 +250,7 @@ impl OWFParameters for OWF128 {
     type LPRIMEBYTE = U256;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     type PRODSKE8 = Prod<Self::SKE, U8>;
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
     type QUOTLENC8 = Quot<Self::LENC, U8>;
@@ -313,6 +317,7 @@ impl OWFParameters for OWF192 {
     type SKE = U32;
     type SENC = U192;
     type LKE = U448;
+    type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = Sum<U1024, U384>;
     type BETA = U2;
     type NST = U0;
@@ -323,6 +328,7 @@ impl OWFParameters for OWF192 {
     type LPRIMEBYTE = U384;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     type PRODSKE8 = Prod<Self::SKE, U8>;
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
     type QUOTLENC8 = Quot<Self::LENC, U8>;
@@ -393,6 +399,7 @@ impl OWFParameters for OWF256 {
     type SKE = U52;
     type SENC = U224;
     type LKE = U672;
+    type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = Sum<U1024, U640>;
     type BETA = U2;
     type NST = U0;
@@ -403,6 +410,7 @@ impl OWFParameters for OWF256 {
     type LPRIMEBYTE = U512;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     type PRODSKE8 = Prod<Self::SKE, U8>;
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
     type QUOTLENC8 = Quot<Self::LENC, U8>;
@@ -473,6 +481,7 @@ impl OWFParameters for OWF128EM {
     type SKE = U40;
     type SENC = U160;
     type LKE = U448;
+    type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = Sum<U1024, U128>;
     type BETA = U1;
     type NST = U4;
@@ -483,6 +492,7 @@ impl OWFParameters for OWF128EM {
     type LPRIMEBYTE = U256;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     type PRODSKE8 = Prod<Self::SKE, U8>;
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
     type QUOTLENC8 = Quot<Self::LENC, U8>;
@@ -552,6 +562,7 @@ impl OWFParameters for OWF192EM {
     type SKE = U32;
     type SENC = U288;
     type LKE = U448;
+    type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = Sum<U1024, U384>;
     type BETA = U2;
     type NST = U6;
@@ -562,6 +573,7 @@ impl OWFParameters for OWF192EM {
     type LPRIMEBYTE = U384;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     type PRODSKE8 = Prod<Self::SKE, U8>;
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
     type QUOTLENC8 = Quot<Self::LENC, U8>;
@@ -631,6 +643,7 @@ impl OWFParameters for OWF256EM {
     type SKE = U52;
     type SENC = U448;
     type LKE = U672;
+    type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = Sum<U1024, U640>;
     type BETA = U2;
     type NST = U8;
@@ -641,6 +654,7 @@ impl OWFParameters for OWF256EM {
     type LPRIMEBYTE = U512;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     type PRODSKE8 = Prod<Self::SKE, U8>;
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
     type QUOTLENC8 = Quot<Self::LENC, U8>;
