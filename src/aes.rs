@@ -424,7 +424,7 @@ where
 ///
 ///One of the first path to optimize the code could be to do the distinction
 fn aes_enc_fwd_mkey0_mtag0<O>(
-    x: &GenericArray<Field<O>, O::LENC>,
+    x: &GenericArray<u8, O::QUOTLENC8>,
     xk: &GenericArray<u8, O::PRODRUN128Bytes>,
     input: &[u8; 16],
 ) -> Box<GenericArray<Field<O>, O::SENC>>
@@ -446,7 +446,7 @@ where
             let mut x_hat = [Field::<O>::default(); 4];
             let mut x_hat_k = [Field::<O>::default(); 4];
             for r in 0..4 {
-                x_hat[r] = Field::<O>::byte_combine_slice(&x[ix + 8 * r..ix + 8 * r + 8]);
+                x_hat[r] = Field::<O>::byte_combine_bits(x[ix / 8 + r]);
                 x_hat_k[r] = Field::<O>::byte_combine_bits(xk[ik / 8 + r]);
             }
 
@@ -600,7 +600,7 @@ where
 ///
 ///One of the first path to optimize the code could be to do the distinction
 fn aes_enc_bkwd_mkey0_mtag0<O>(
-    x: &GenericArray<Field<O>, O::LENC>,
+    x: &GenericArray<u8, O::QUOTLENC8>,
     xk: &GenericArray<u8, O::PRODRUN128Bytes>,
     out: &[u8; 16],
 ) -> Box<GenericArray<Field<O>, O::SENC>>
@@ -614,22 +614,14 @@ where
             //Step 4
             for k in 0..4 {
                 let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
-                let x_t: [_; 8] = if j < O::R::USIZE - 1 {
-                    array::from_fn(|i| x[ird + i])
+                let x_t = if j < O::R::USIZE - 1 {
+                    x[ird / 8]
                 } else {
-                    let mut x_out = [Field::<O>::default(); 8];
-                    for i in 0..8 {
-                        // FIXME
-                        x_out[i] = Field::<O>::ONE
-                            * ((out[(ird - 128 * j + i) / 8] >> ((ird - 128 * j + i) % 8)) & 1);
-                    }
-                    array::from_fn(|i| x_out[i] + ((xk[(128 + ird) / 8] >> i) & 1))
+                    let x_out = out[(ird - 128 * j) / 8];
+                    x_out ^ xk[(128 + ird) / 8]
                 };
-                let mut y_t =
-                    array::from_fn(|i| x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8]);
-                y_t[0] += Field::<O>::ONE;
-                y_t[2] += Field::<O>::ONE;
-                res[k + c * 4 + j * 16] = Field::<O>::byte_combine(&y_t);
+                let y_t = x_t.rotate_right(7) ^ x_t.rotate_right(5) ^ x_t.rotate_right(2) ^ 0x5;
+                res[k + c * 4 + j * 16] = Field::<O>::byte_combine_bits(y_t);
             }
         }
     }
@@ -715,16 +707,9 @@ fn aes_enc_cstrnts_mkey0<O>(
 ) where
     O: OWFParameters,
 {
-    let mut field_w: Box<GenericArray<Field<O>, O::LENC>> = GenericArray::default_boxed();
-    for i in 0..w.len() {
-        for j in 0..8 {
-            // FIXME
-            field_w[i * 8 + j] = Field::<O>::ONE * ((w[i] >> j) & 1);
-        }
-    }
-    let s = aes_enc_fwd_mkey0_mtag0::<O>(&field_w, k, input);
+    let s = aes_enc_fwd_mkey0_mtag0::<O>(w, k, input);
     let vs = aes_enc_fwd_mkey0_mtag1::<O>(v, vk);
-    let s_b = aes_enc_bkwd_mkey0_mtag0::<O>(&field_w, k, output);
+    let s_b = aes_enc_bkwd_mkey0_mtag0::<O>(w, k, output);
     let v_s_b = aes_enc_bkwd_mkey0_mtag1::<O>(v, vk);
     for j in 0..O::SENC::USIZE {
         let a0 = vs[j] * v_s_b[j];
