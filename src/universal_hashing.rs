@@ -1,9 +1,10 @@
-use std::array;
+use std::{array, iter::zip};
 
 use generic_array::{
     typenum::{Prod, Quot, Sum, Unsigned, U16, U3, U5, U8},
     ArrayLength, GenericArray,
 };
+use itertools::izip;
 
 use crate::fields::{BigGaloisField, Field, GF128, GF192, GF256, GF64};
 
@@ -188,6 +189,10 @@ where
     type Hasher: ZKHasherProcess<F>;
 
     fn new_zk_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher;
+
+    fn new_zk_proof_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKProofHasher<F>;
+
+    fn new_zk_verify_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKVerifyHasher<F>;
 }
 
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Update and Finalize part
@@ -239,6 +244,15 @@ impl ZKHasherInit<GF128> for ZKHasher<GF128> {
             r1,
         }
     }
+
+    fn new_zk_proof_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKProofHasher<GF128> {
+        let hasher = Self::new_zk_hasher(sd);
+        ZKProofHasher::new(hasher.clone(), hasher)
+    }
+
+    fn new_zk_verify_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKVerifyHasher<GF128> {
+        ZKVerifyHasher::new(Self::new_zk_hasher(sd))
+    }
 }
 
 impl ZKHasherInit<GF192> for ZKHasher<GF192> {
@@ -265,6 +279,15 @@ impl ZKHasherInit<GF192> for ZKHasher<GF192> {
             r0,
             r1,
         }
+    }
+
+    fn new_zk_proof_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKProofHasher<GF192> {
+        let hasher = Self::new_zk_hasher(sd);
+        ZKProofHasher::new(hasher.clone(), hasher)
+    }
+
+    fn new_zk_verify_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKVerifyHasher<GF192> {
+        ZKVerifyHasher::new(Self::new_zk_hasher(sd))
     }
 }
 
@@ -293,6 +316,15 @@ impl ZKHasherInit<GF256> for ZKHasher<GF256> {
             r1,
         }
     }
+
+    fn new_zk_proof_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKProofHasher<GF256> {
+        let hasher = Self::new_zk_hasher(sd);
+        ZKProofHasher::new(hasher.clone(), hasher)
+    }
+
+    fn new_zk_verify_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKVerifyHasher<GF256> {
+        ZKVerifyHasher::new(Self::new_zk_hasher(sd))
+    }
 }
 
 impl<F> ZKHasherProcess<F> for ZKHasher<F>
@@ -306,6 +338,75 @@ where
 
     fn finalize(self, x1: &F) -> F {
         (self.r0 * self.h0) + (self.r1 * self.h1) + x1
+    }
+}
+
+pub(crate) struct ZKProofHasher<F>
+where
+    F: BigGaloisField,
+{
+    a_hasher: ZKHasher<F>,
+    b_hasher: ZKHasher<F>,
+}
+
+impl<F> ZKProofHasher<F>
+where
+    F: BigGaloisField,
+{
+    fn new(a_hasher: ZKHasher<F>, b_hasher: ZKHasher<F>) -> Self {
+        Self { a_hasher, b_hasher }
+    }
+
+    pub(crate) fn process<I1, I2, I3, I4>(&mut self, s: I1, vs: I2, s_b: I3, v_s_b: I4)
+    where
+        I1: Iterator<Item = F>,
+        I2: Iterator<Item = F>,
+        I3: Iterator<Item = F>,
+        I4: Iterator<Item = F>,
+    {
+        for (s_j, vs_j, s_b_j, v_s_b_j) in izip!(s, vs, s_b, v_s_b) {
+            let a0 = v_s_b_j * vs_j;
+            let a1 = ((s_j + vs_j) * (s_b_j + v_s_b_j)) + F::ONE + a0;
+            self.a_hasher.update(&a1);
+            self.b_hasher.update(&a0);
+        }
+    }
+
+    pub(crate) fn finalize(self, u: &F, v: &F) -> (F, F) {
+        let a = self.a_hasher.finalize(u);
+        let b = self.b_hasher.finalize(v);
+        (a, b)
+    }
+}
+
+pub(crate) struct ZKVerifyHasher<F>
+where
+    F: BigGaloisField,
+{
+    b_hasher: ZKHasher<F>,
+}
+
+impl<F> ZKVerifyHasher<F>
+where
+    F: BigGaloisField,
+{
+    fn new(b_hasher: ZKHasher<F>) -> Self {
+        Self { b_hasher }
+    }
+
+    pub(crate) fn process<I1, I2>(&mut self, qs: I1, qs_b: I2, immut: &F)
+    where
+        I1: Iterator<Item = F>,
+        I2: Iterator<Item = F>,
+    {
+        for (q, qb) in zip(qs, qs_b) {
+            let b = (q * qb) + immut;
+            self.b_hasher.update(&b);
+        }
+    }
+
+    pub(crate) fn finalize(self, v: &F) -> F {
+        self.b_hasher.finalize(v)
     }
 }
 

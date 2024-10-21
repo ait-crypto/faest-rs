@@ -1,7 +1,7 @@
 use std::{array, iter::zip, mem::size_of};
 
 use generic_array::{typenum::Unsigned, GenericArray};
-use itertools::{iproduct, izip};
+use itertools::iproduct;
 
 use crate::{
     fields::{ByteCombine, ByteCombineConstants, Field as _, SumPoly},
@@ -10,7 +10,7 @@ use crate::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     },
-    universal_hashing::{ZKHasherInit, ZKHasherProcess},
+    universal_hashing::{ZKHasherInit, ZKProofHasher, ZKVerifyHasher},
     utils::convert_gq,
 };
 
@@ -309,8 +309,7 @@ where
 }
 
 fn em_enc_cstrnts_mkey0<O>(
-    a_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
-    b_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
+    zk_hasher: &mut ZKProofHasher<Field<O>>,
     output: &GenericArray<u8, O::InputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     w: &GenericArray<u8, O::LBYTES>,
@@ -323,16 +322,11 @@ fn em_enc_cstrnts_mkey0<O>(
     let vs = em_enc_fwd_proof::<O>(v);
     let s_b = em_enc_bkwd_mkey0_mtag0::<O>(x, w, &w_out);
     let v_s_b = em_enc_bkwd_mkey0_mtag1::<O>(v);
-    for (s_j, vs_j, s_b_j, v_s_b_j) in izip!(s, vs, s_b, v_s_b) {
-        let a0 = v_s_b_j * vs_j;
-        let a1 = ((s_j + vs_j) * (s_b_j + v_s_b_j)) + Field::<O>::ONE + a0;
-        a_t_hasher.update(&a1);
-        b_t_hasher.update(&a0);
-    }
+    zk_hasher.process(s, vs, s_b, v_s_b);
 }
 
 fn em_enc_cstrnts_mkey1<O>(
-    b_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
+    zk_hasher: &mut ZKVerifyHasher<Field<O>>,
     output: &GenericArray<u8, O::InputSize>,
     x: &GenericArray<u8, O::LAMBDAR1BYTE>,
     q: &GenericArray<Field<O>, O::L>,
@@ -346,11 +340,7 @@ fn em_enc_cstrnts_mkey1<O>(
     let qs = em_enc_fwd_verify::<O>(q, x, delta);
     let qs_b = em_enc_bkwd_mkey1_mtag0::<O>(x, q, &q_out, delta);
     let immut = *delta * delta;
-
-    for (q, qb) in zip(qs, qs_b) {
-        let b = (q * qb) + immut;
-        b_t_hasher.update(&b);
-    }
+    zk_hasher.process(qs, qs_b, &immut);
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
@@ -381,18 +371,15 @@ where
         temp_v.chunks(O::LAMBDABYTES::USIZE).map(Field::<O>::from),
     );
 
-    let mut a_t_hasher =
-        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
-    let mut b_t_hasher =
-        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
+    let mut zk_hasher =
+        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_proof_hasher(chall);
 
     let (x, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(
         owf_input,
         4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE),
     );
     em_enc_cstrnts_mkey0::<O>(
-        &mut a_t_hasher,
-        &mut b_t_hasher,
+        &mut zk_hasher,
         owf_output,
         &x.chunks(8)
             .flat_map(|x| {
@@ -409,9 +396,7 @@ where
     );
     let u_s = Field::<O>::from(&u[O::LBYTES::USIZE..]);
     let v_s = Field::<O>::sum_poly(&new_v[O::L::USIZE..O::L::USIZE + O::LAMBDA::USIZE]);
-    let a_t = a_t_hasher.finalize(&u_s);
-    let b_t = b_t_hasher.finalize(&v_s);
-
+    let (a_t, b_t) = zk_hasher.finalize(&u_s, &v_s);
     (a_t.as_bytes(), b_t.as_bytes())
 }
 
@@ -434,7 +419,9 @@ where
 
     let new_q = convert_gq::<O, Tau>(d, gq, chall3);
     let mut zk_hasher =
-        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
+        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_verify_hasher(
+            chall2,
+        );
     let (x, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(
         owf_input,
         4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE),
