@@ -754,14 +754,6 @@ fn aes_enc_cstrnts_mkey1<O>(
     }
 }
 
-fn bit_to_byte(input: &[u8]) -> u8 {
-    let mut res = 0u8;
-    for (i, item) in input.iter().enumerate().take(8) {
-        res += item << i;
-    }
-    res
-}
-
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 pub(crate) fn aes_prove<O>(
     w: &GenericArray<u8, O::LBYTES>,
@@ -804,13 +796,7 @@ where
         &mut b_t_hasher,
         owf_input[..16].try_into().unwrap(),
         owf_output[..16].try_into().unwrap(),
-        //building a T out of w
-        GenericArray::from_slice(
-            &new_w[O::LKE::USIZE..(O::LKE::USIZE + O::LENC::USIZE)]
-                .chunks(8)
-                .map(bit_to_byte)
-                .collect::<Vec<u8>>()[..],
-        ),
+        GenericArray::from_slice(&w[O::LKE::USIZE / 8..(O::LKE::USIZE + O::LENC::USIZE) / 8]),
         GenericArray::from_slice(&new_v[O::LKE::USIZE..O::LKE::USIZE + O::LENC::USIZE]),
         &k,
         &vk,
@@ -822,12 +808,7 @@ where
             &mut b_t_hasher,
             owf_input[16..].try_into().unwrap(),
             owf_output[16..].try_into().unwrap(),
-            GenericArray::from_slice(
-                &new_w[(O::LKE::USIZE + O::LENC::USIZE)..O::L::USIZE]
-                    .chunks(8)
-                    .map(bit_to_byte)
-                    .collect::<Vec<u8>>()[..],
-            ),
+            GenericArray::from_slice(&w[(O::LKE::USIZE + O::LENC::USIZE) / 8..O::LBYTES::USIZE]),
             GenericArray::from_slice(&new_v[(O::LKE::USIZE + O::LENC::USIZE)..O::L::USIZE]),
             &k,
             &vk,
