@@ -10,6 +10,7 @@ pub(crate) trait Reader {
     fn read(&mut self, dst: &mut [u8]);
 }
 
+#[allow(clippy::boxed_local)]
 pub(crate) fn convert_gq<O, Tau>(
     d: &GenericArray<u8, O::LBYTES>,
     mut gq: Box<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>,

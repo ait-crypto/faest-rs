@@ -57,7 +57,6 @@
 // TODO: fix those
 #![allow(
     clippy::type_complexity,
-    clippy::boxed_local,
     clippy::too_many_arguments
 )]
 
