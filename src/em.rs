@@ -1,6 +1,7 @@
 use std::{array, iter::zip, mem::size_of};
 
 use generic_array::{typenum::Unsigned, GenericArray};
+use itertools::{iproduct, izip};
 
 use crate::{
     fields::{ByteCombine, ByteCombineConstants, Field as _, SumPoly},
@@ -88,9 +89,9 @@ where
             //Step 2-3
             Field::<O>::byte_combine_bits(z[j]) + Field::<O>::byte_combine_bits(x[j])
         })
-        .chain((1..O::R::USIZE).flat_map(move |j| {
-            (0..O::NST::USIZE)
-                .map(move |c| {
+        .chain(
+            iproduct!(1..O::R::USIZE, 0..O::NST::USIZE)
+                .map(move |(j, c)| {
                     //Step 4
                     let i: usize = 32 * O::NST::USIZE * j + 32 * c;
                     let z_hat: [_; 4] =
@@ -117,8 +118,8 @@ where
                         + z_hat[3] * Field::<O>::BYTE_COMBINE_2;
                     res
                 })
-                .flatten()
-        }))
+                .flatten(),
+        )
 }
 
 /// Implementation of `EncFwd` for `GF(\lambda)` for signing
@@ -132,9 +133,9 @@ where
             //Step 2-3
             Field::<O>::byte_combine_slice(&z[8 * j..8 * (j + 1)])
         })
-        .chain((1..O::R::USIZE).flat_map(move |j| {
-            (0..O::NST::USIZE)
-                .map(move |c| {
+        .chain(
+            iproduct!(1..O::R::USIZE, 0..O::NST::USIZE)
+                .map(move |(j, c)| {
                     //Step 4
                     let i: usize = 32 * O::NST::USIZE * j + 32 * c;
                     let z_hat: [_; 4] = array::from_fn(|r| {
@@ -161,8 +162,8 @@ where
                         + z_hat[3] * Field::<O>::BYTE_COMBINE_2;
                     res
                 })
-                .flatten()
-        }))
+                .flatten(),
+        )
 }
 
 fn bit_combine_with_delta<O>(x: u8, delta: &Field<O>) -> Field<O>
@@ -188,9 +189,9 @@ where
             Field::<O>::byte_combine_slice(&z[8 * j..8 * (j + 1)])
                 + bit_combine_with_delta::<O>(x[j], delta)
         })
-        .chain((1..O::R::USIZE).flat_map(move |j| {
-            (0..O::NST::USIZE)
-                .map(move |c| {
+        .chain(
+            iproduct!(1..O::R::USIZE, 0..O::NST::USIZE)
+                .map(move |(j, c)| {
                     //Step 4
                     let i: usize = 32 * O::NST::USIZE * j + 32 * c;
                     let z_hat: [_; 4] = array::from_fn(|r| {
@@ -218,8 +219,8 @@ where
                         + z_hat[3] * Field::<O>::BYTE_COMBINE_2;
                     res
                 })
-                .flatten()
-        }))
+                .flatten(),
+        )
 }
 
 fn em_enc_bkwd_mkey0_mtag0<'a, 'b, O>(
@@ -232,25 +233,21 @@ where
     'a: 'b,
 {
     // Step 2
-    (0..O::R::USIZE).flat_map(move |j| {
-        (0..O::NST::USIZE).flat_map(move |c| {
-            (0..4).map(move |k| {
-                // Step 4
-                let mut icol = (c + O::NST::USIZE - k) % O::NST::USIZE;
-                if O::NST::USIZE == 8 && k >= 2 {
-                    icol = (icol + O::NST::USIZE - 1) % O::NST::USIZE;
-                }
-                let ird = O::LAMBDA::USIZE + 32 * O::NST::USIZE * j + 32 * icol + 8 * k;
-                let z_t = if j < O::R::USIZE - 1 {
-                    z[ird / 8]
-                } else {
-                    let z_out_t = z_out[(ird - 32 * O::NST::USIZE * (j + 1)) / 8];
-                    z_out_t ^ x[ird / 8]
-                };
-                let y_t = z_t.rotate_right(7) ^ z_t.rotate_right(5) ^ z_t.rotate_right(2) ^ 0x5;
-                Field::<O>::byte_combine_bits(y_t)
-            })
-        })
+    iproduct!(0..O::R::USIZE, 0..O::NST::USIZE, 0..4).map(move |(j, c, k)| {
+        // Step 4
+        let mut icol = (c + O::NST::USIZE - k) % O::NST::USIZE;
+        if O::NST::USIZE == 8 && k >= 2 {
+            icol = (icol + O::NST::USIZE - 1) % O::NST::USIZE;
+        }
+        let ird = O::LAMBDA::USIZE + 32 * O::NST::USIZE * j + 32 * icol + 8 * k;
+        let z_t = if j < O::R::USIZE - 1 {
+            z[ird / 8]
+        } else {
+            let z_out_t = z_out[(ird - 32 * O::NST::USIZE * (j + 1)) / 8];
+            z_out_t ^ x[ird / 8]
+        };
+        let y_t = z_t.rotate_right(7) ^ z_t.rotate_right(5) ^ z_t.rotate_right(2) ^ 0x5;
+        Field::<O>::byte_combine_bits(y_t)
     })
 }
 
@@ -262,25 +259,20 @@ where
     'a: 'b,
 {
     // Step 2
-    (0..O::R::USIZE).flat_map(move |j| {
-        (0..O::NST::USIZE).flat_map(move |c| {
-            (0..4).map(move |k| {
-                // Step 4
-                let mut icol = (c + O::NST::USIZE - k) % O::NST::USIZE;
-                if O::NST::USIZE == 8 && k >= 2 {
-                    icol = (icol + O::NST::USIZE - 1) % O::NST::USIZE;
-                }
-                let ird = O::LAMBDA::USIZE + 32 * O::NST::USIZE * j + 32 * icol + 8 * k;
-                let z_t = if j < O::R::USIZE - 1 {
-                    &z[ird..ird + 8]
-                } else {
-                    &z[ird - 32 * O::NST::USIZE * (j + 1)..ird - 32 * O::NST::USIZE * (j + 1) + 8]
-                };
-                let y_t =
-                    array::from_fn(|i| z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]);
-                Field::<O>::byte_combine(&y_t)
-            })
-        })
+    iproduct!(0..O::R::USIZE, 0..O::NST::USIZE, 0..4).map(move |(j, c, k)| {
+        // Step 4
+        let mut icol = (c + O::NST::USIZE - k) % O::NST::USIZE;
+        if O::NST::USIZE == 8 && k >= 2 {
+            icol = (icol + O::NST::USIZE - 1) % O::NST::USIZE;
+        }
+        let ird = O::LAMBDA::USIZE + 32 * O::NST::USIZE * j + 32 * icol + 8 * k;
+        let z_t = if j < O::R::USIZE - 1 {
+            &z[ird..ird + 8]
+        } else {
+            &z[ird - 32 * O::NST::USIZE * (j + 1)..ird - 32 * O::NST::USIZE * (j + 1) + 8]
+        };
+        let y_t = array::from_fn(|i| z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]);
+        Field::<O>::byte_combine(&y_t)
     })
 }
 
@@ -295,29 +287,24 @@ where
     'a: 'b,
 {
     // Step 2
-    (0..O::R::USIZE).flat_map(move |j| {
-        (0..O::NST::USIZE).flat_map(move |c| {
-            (0..4).map(move |k| {
-                // Step 4
-                let mut icol = (c + O::NST::USIZE - k) % O::NST::USIZE;
-                if O::NST::USIZE == 8 && k >= 2 {
-                    icol = (icol + O::NST::USIZE - 1) % O::NST::USIZE;
-                }
-                let ird = O::LAMBDA::USIZE + 32 * O::NST::USIZE * j + 32 * icol + 8 * k;
-                let z_t: [_; 8] = if j < O::R::USIZE - 1 {
-                    array::from_fn(|idx| z[ird + idx])
-                } else {
-                    let z_out_t = &z_out[ird - 32 * O::NST::USIZE * (j + 1)
-                        ..ird - 32 * O::NST::USIZE * (j + 1) + 8];
-                    array::from_fn(|idx| z_out_t[idx] + *delta * ((x[(ird + idx) / 8] >> idx) & 1))
-                };
-                let mut y_t =
-                    array::from_fn(|i| z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]);
-                y_t[0] += delta;
-                y_t[2] += delta;
-                Field::<O>::byte_combine(&y_t)
-            })
-        })
+    iproduct!(0..O::R::USIZE, 0..O::NST::USIZE, 0..4).map(move |(j, c, k)| {
+        // Step 4
+        let mut icol = (c + O::NST::USIZE - k) % O::NST::USIZE;
+        if O::NST::USIZE == 8 && k >= 2 {
+            icol = (icol + O::NST::USIZE - 1) % O::NST::USIZE;
+        }
+        let ird = O::LAMBDA::USIZE + 32 * O::NST::USIZE * j + 32 * icol + 8 * k;
+        let z_t: [_; 8] = if j < O::R::USIZE - 1 {
+            array::from_fn(|idx| z[ird + idx])
+        } else {
+            let z_out_t =
+                &z_out[ird - 32 * O::NST::USIZE * (j + 1)..ird - 32 * O::NST::USIZE * (j + 1) + 8];
+            array::from_fn(|idx| z_out_t[idx] + *delta * ((x[(ird + idx) / 8] >> idx) & 1))
+        };
+        let mut y_t = array::from_fn(|i| z_t[(i + 7) % 8] + z_t[(i + 5) % 8] + z_t[(i + 2) % 8]);
+        y_t[0] += delta;
+        y_t[2] += delta;
+        Field::<O>::byte_combine(&y_t)
     })
 }
 
@@ -336,7 +323,7 @@ fn em_enc_cstrnts_mkey0<O>(
     let vs = em_enc_fwd_proof::<O>(v);
     let s_b = em_enc_bkwd_mkey0_mtag0::<O>(x, w, &w_out);
     let v_s_b = em_enc_bkwd_mkey0_mtag1::<O>(v);
-    for ((s_j, vs_j), (s_b_j, v_s_b_j)) in zip(zip(s, vs), zip(s_b, v_s_b)) {
+    for (s_j, vs_j, s_b_j, v_s_b_j) in izip!(s, vs, s_b, v_s_b) {
         let a0 = v_s_b_j * vs_j;
         let a1 = ((s_j + vs_j) * (s_b_j + v_s_b_j)) + Field::<O>::ONE + a0;
         a_t_hasher.update(&a1);
