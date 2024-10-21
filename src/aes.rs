@@ -452,10 +452,26 @@ where
             }
 
             //Step 16
-            res[index] = x_hat[0] * Field::<O>::BYTE_COMBINE_2  + x_hat[1] * Field::<O>::BYTE_COMBINE_3  + x_hat[2] /* * a */  + x_hat[3] /* * a */ + x_hat_k[0];
-            res[index + 1] = x_hat[0] /* * a */ + x_hat[1] * Field::<O>::BYTE_COMBINE_2  + x_hat[2] * Field::<O>::BYTE_COMBINE_3  + x_hat[3] /* * a */ + x_hat_k[1];
-            res[index + 2] = x_hat[0] /* * a */ + x_hat[1] /* * a */ + x_hat[2] * Field::<O>::BYTE_COMBINE_2  + x_hat[3] * Field::<O>::BYTE_COMBINE_3  + x_hat_k[2];
-            res[index + 3] = x_hat[0] * Field::<O>::BYTE_COMBINE_3  + x_hat[1] /* * a */ + x_hat[2] /* * a */ + x_hat[3] * Field::<O>::BYTE_COMBINE_2  + x_hat_k[3];
+            res[index] = x_hat[0] * Field::<O>::BYTE_COMBINE_2
+                + x_hat[1] * Field::<O>::BYTE_COMBINE_3
+                + x_hat[2]
+                + x_hat[3]
+                + x_hat_k[0];
+            res[index + 1] = x_hat[0]
+                + x_hat[1] * Field::<O>::BYTE_COMBINE_2
+                + x_hat[2] * Field::<O>::BYTE_COMBINE_3
+                + x_hat[3]
+                + x_hat_k[1];
+            res[index + 2] = x_hat[0]
+                + x_hat[1]
+                + x_hat[2] * Field::<O>::BYTE_COMBINE_2
+                + x_hat[3] * Field::<O>::BYTE_COMBINE_3
+                + x_hat_k[2];
+            res[index + 3] = x_hat[0] * Field::<O>::BYTE_COMBINE_3
+                + x_hat[1]
+                + x_hat[2]
+                + x_hat[3] * Field::<O>::BYTE_COMBINE_2
+                + x_hat_k[3];
             index += 4;
         }
     }
@@ -498,10 +514,26 @@ where
             }
 
             //Step 16
-            res[index] = x_hat[0] * Field::<O>::BYTE_COMBINE_2  + x_hat[1] * Field::<O>::BYTE_COMBINE_3  + x_hat[2] /* * a */  + x_hat[3] /* * a */ + x_hat_k[0];
-            res[index + 1] = x_hat[0] /* * a */ + x_hat[1] * Field::<O>::BYTE_COMBINE_2  + x_hat[2] * Field::<O>::BYTE_COMBINE_3  + x_hat[3] /* * a */ + x_hat_k[1];
-            res[index + 2] = x_hat[0] /* * a */ + x_hat[1] /* * a */ + x_hat[2] * Field::<O>::BYTE_COMBINE_2  + x_hat[3] * Field::<O>::BYTE_COMBINE_3  + x_hat_k[2];
-            res[index + 3] = x_hat[0] * Field::<O>::BYTE_COMBINE_3  + x_hat[1] /* * a */ + x_hat[2] /* * a */ + x_hat[3] * Field::<O>::BYTE_COMBINE_2  + x_hat_k[3];
+            res[index] = x_hat[0] * Field::<O>::BYTE_COMBINE_2
+                + x_hat[1] * Field::<O>::BYTE_COMBINE_3
+                + x_hat[2]
+                + x_hat[3]
+                + x_hat_k[0];
+            res[index + 1] = x_hat[0]
+                + x_hat[1] * Field::<O>::BYTE_COMBINE_2
+                + x_hat[2] * Field::<O>::BYTE_COMBINE_3
+                + x_hat[3]
+                + x_hat_k[1];
+            res[index + 2] = x_hat[0]
+                + x_hat[1]
+                + x_hat[2] * Field::<O>::BYTE_COMBINE_2
+                + x_hat[3] * Field::<O>::BYTE_COMBINE_3
+                + x_hat_k[2];
+            res[index + 3] = x_hat[0] * Field::<O>::BYTE_COMBINE_3
+                + x_hat[1]
+                + x_hat[2]
+                + x_hat[3] * Field::<O>::BYTE_COMBINE_2
+                + x_hat_k[3];
             index += 4;
         }
     }
@@ -535,11 +567,27 @@ where
                 x_hat_k[r] = Field::<O>::byte_combine_slice(&xk[ik + 8 * r..ik + 8 * r + 8]);
             }
 
-            //Step 16
-            res[index] = x_hat[0] * Field::<O>::BYTE_COMBINE_2  + x_hat[1] * Field::<O>::BYTE_COMBINE_3  + x_hat[2] /* * a */  + x_hat[3] /* * a */ + x_hat_k[0];
-            res[index + 1] = x_hat[0] /* * a */ + x_hat[1] * Field::<O>::BYTE_COMBINE_2  + x_hat[2] * Field::<O>::BYTE_COMBINE_3  + x_hat[3] /* * a */ + x_hat_k[1];
-            res[index + 2] = x_hat[0] /* * a */ + x_hat[1] /* * a */ + x_hat[2] * Field::<O>::BYTE_COMBINE_2  + x_hat[3] * Field::<O>::BYTE_COMBINE_3  + x_hat_k[2];
-            res[index + 3] = x_hat[0] * Field::<O>::BYTE_COMBINE_3  + x_hat[1] /* * a */ + x_hat[2] /* * a */ + x_hat[3] * Field::<O>::BYTE_COMBINE_2  + x_hat_k[3];
+            // Step 16
+            res[index] = x_hat[0] * Field::<O>::BYTE_COMBINE_2
+                + x_hat[1] * Field::<O>::BYTE_COMBINE_3
+                + x_hat[2]
+                + x_hat[3]
+                + x_hat_k[0];
+            res[index + 1] = x_hat[0]
+                + x_hat[1] * Field::<O>::BYTE_COMBINE_2
+                + x_hat[2] * Field::<O>::BYTE_COMBINE_3
+                + x_hat[3]
+                + x_hat_k[1];
+            res[index + 2] = x_hat[0]
+                + x_hat[1]
+                + x_hat[2] * Field::<O>::BYTE_COMBINE_2
+                + x_hat[3] * Field::<O>::BYTE_COMBINE_3
+                + x_hat_k[2];
+            res[index + 3] = x_hat[0] * Field::<O>::BYTE_COMBINE_3
+                + x_hat[1]
+                + x_hat[2]
+                + x_hat[3] * Field::<O>::BYTE_COMBINE_2
+                + x_hat_k[3];
             index += 4;
         }
     }
