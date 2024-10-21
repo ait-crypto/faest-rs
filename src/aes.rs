@@ -338,7 +338,7 @@ where
     ));
     let vk = aes_key_exp_fwd::<O>(v);
     // FIXME
-    let w_b = aes_key_exp_bwd_mtag0_mkey0::<O>(w, GenericArray::from_slice(&k));
+    let w_b = aes_key_exp_bwd_mtag0_mkey0::<O>(w, &k);
     let v_w_b = aes_key_exp_bwd_mtag1_mkey0::<O>(
         GenericArray::from_slice(
             &[
