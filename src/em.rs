@@ -11,10 +11,8 @@ use crate::{
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     },
     universal_hashing::{ZKHasherInit, ZKProofHasher, ZKVerifyHasher},
-    utils::convert_gq,
+    utils::{convert_gq, transpose_and_into_field, Field},
 };
-
-type Field<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
 
 pub(crate) fn em_extendedwitness<O>(
     owf_key: &GenericArray<u8, O::LAMBDABYTES>,
@@ -355,21 +353,7 @@ pub(crate) fn em_prove<O>(
 where
     O: OWFParameters,
 {
-    let mut temp_v: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
-    for i in 0..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE {
-        for k in 0..8 {
-            for j in 0..O::LAMBDABYTES::USIZE {
-                let mut temp = 0;
-                for m in 0..8 {
-                    temp += ((gv[(j * 8) + m][i] >> k) & 1) << m;
-                }
-                temp_v[j + k * O::LAMBDABYTES::USIZE + i * O::LAMBDA::USIZE] = temp;
-            }
-        }
-    }
-    let new_v = GenericArray::<Field<O>, O::LAMBDAL>::from_iter(
-        temp_v.chunks(O::LAMBDABYTES::USIZE).map(Field::<O>::from),
-    );
+    let new_v = transpose_and_into_field::<O>(gv);
 
     let mut zk_hasher =
         <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_proof_hasher(chall);

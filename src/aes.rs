@@ -14,10 +14,8 @@ use crate::{
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State, RCON_TABLE,
     },
     universal_hashing::{ZKHasherInit, ZKHasherProcess},
-    utils::convert_gq,
+    utils::{convert_gq, transpose_and_into_field, Field},
 };
-
-type Field<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
 
 type KeyCstrnts<O> = (
     Box<GenericArray<u8, <O as OWFParameters>::PRODRUN128Bytes>>,
@@ -750,18 +748,8 @@ pub(crate) fn aes_prove<O>(
 where
     O: OWFParameters,
 {
-    let mut temp_v: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
-    for i in 0..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE {
-        for k in 0..8 {
-            for j in 0..O::LAMBDABYTES::USIZE {
-                temp_v[i * O::LAMBDA::USIZE + k * O::LAMBDABYTES::USIZE + j] =
-                    (0..8).map(|l| ((gv[(j * 8) + l][i] >> k) & 1) << l).sum();
-            }
-        }
-    }
-    let new_v = Box::<GenericArray<_, O::LAMBDAL>>::from_iter(
-        temp_v.chunks(O::LAMBDABYTES::USIZE).map(Field::<O>::from),
-    );
+    let new_v = transpose_and_into_field::<O>(gv);
+
     let mut a_t_hasher =
         <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
     let mut b_t_hasher =

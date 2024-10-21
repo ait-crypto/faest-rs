@@ -1,6 +1,7 @@
 use std::iter::zip;
 
 use generic_array::{typenum::Unsigned, GenericArray};
+use itertools::iproduct;
 
 use crate::parameter::{BaseParameters, OWFParameters, TauParameters};
 
@@ -10,12 +11,30 @@ pub(crate) trait Reader {
     fn read(&mut self, dst: &mut [u8]);
 }
 
+pub(crate) type Field<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
+
+pub(crate) fn transpose_and_into_field<O>(
+    gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
+) -> Box<GenericArray<Field<O>, O::LAMBDAL>>
+where
+    O: OWFParameters,
+{
+    Box::<GenericArray<_, O::LAMBDAL>>::from_iter(
+        iproduct!(0..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE, 0..8,).map(|(i, k)| {
+            Field::<O>::from(&GenericArray::<_, O::LAMBDABYTES>::from_iter(
+                (0..O::LAMBDABYTES::USIZE)
+                    .map(|j| (0..8).map(|l| ((gv[(j * 8) + l][i] >> k) & 1) << l).sum()),
+            ))
+        }),
+    )
+}
+
 #[allow(clippy::boxed_local)]
 pub(crate) fn convert_gq<O, Tau>(
     d: &GenericArray<u8, O::LBYTES>,
     mut gq: Box<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>,
     chall3: &GenericArray<u8, O::LAMBDABYTES>,
-) -> Box<GenericArray<<O::BaseParams as BaseParameters>::Field, O::LAMBDAL>>
+) -> Box<GenericArray<Field<O>, O::LAMBDAL>>
 where
     O: OWFParameters,
     Tau: TauParameters,
@@ -48,17 +67,7 @@ where
         }
     }
 
-    let mut temp_q: Box<GenericArray<u8, O::LAMBDALBYTESLAMBDA>> = GenericArray::default_boxed();
-    for i in 0..(O::L::USIZE + O::LAMBDA::USIZE) / 8 {
-        for k in 0..8 {
-            for j in 0..O::LAMBDABYTES::USIZE {
-                temp_q[i * O::LAMBDA::USIZE + k * O::LAMBDA::USIZE / 8 + j] =
-                    (0..8).map(|l| ((gq[(j * 8) + l][i] >> k) & 1) << l).sum();
-            }
-        }
-    }
-
-    Box::<GenericArray<_, _>>::from_iter(temp_q.chunks(O::LAMBDABYTES::USIZE).map(From::from))
+    transpose_and_into_field::<O>(&gq)
 }
 
 #[cfg(test)]
