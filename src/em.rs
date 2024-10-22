@@ -337,8 +337,7 @@ fn em_enc_cstrnts_mkey1<O>(
     );
     let qs = em_enc_fwd_verify::<O>(q, x, delta);
     let qs_b = em_enc_bkwd_mkey1_mtag0::<O>(x, q, &q_out, delta);
-    let immut = *delta * delta;
-    zk_hasher.process(qs, qs_b, &immut);
+    zk_hasher.process(qs, qs_b);
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
@@ -405,6 +404,7 @@ where
     let mut zk_hasher =
         <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_verify_hasher(
             chall2,
+            delta * delta,
         );
     let (x, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(
         owf_input,

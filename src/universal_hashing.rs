@@ -192,7 +192,10 @@ where
 
     fn new_zk_proof_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKProofHasher<F>;
 
-    fn new_zk_verify_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKVerifyHasher<F>;
+    fn new_zk_verify_hasher(
+        sd: &GenericArray<u8, Self::SDLength>,
+        delta_squared: F,
+    ) -> ZKVerifyHasher<F>;
 }
 
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Update and Finalize part
@@ -250,8 +253,11 @@ impl ZKHasherInit<GF128> for ZKHasher<GF128> {
         ZKProofHasher::new(hasher.clone(), hasher)
     }
 
-    fn new_zk_verify_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKVerifyHasher<GF128> {
-        ZKVerifyHasher::new(Self::new_zk_hasher(sd))
+    fn new_zk_verify_hasher(
+        sd: &GenericArray<u8, Self::SDLength>,
+        delta_squared: GF128,
+    ) -> ZKVerifyHasher<GF128> {
+        ZKVerifyHasher::new(Self::new_zk_hasher(sd), delta_squared)
     }
 }
 
@@ -286,8 +292,11 @@ impl ZKHasherInit<GF192> for ZKHasher<GF192> {
         ZKProofHasher::new(hasher.clone(), hasher)
     }
 
-    fn new_zk_verify_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKVerifyHasher<GF192> {
-        ZKVerifyHasher::new(Self::new_zk_hasher(sd))
+    fn new_zk_verify_hasher(
+        sd: &GenericArray<u8, Self::SDLength>,
+        delta_squared: GF192,
+    ) -> ZKVerifyHasher<GF192> {
+        ZKVerifyHasher::new(Self::new_zk_hasher(sd), delta_squared)
     }
 }
 
@@ -322,8 +331,11 @@ impl ZKHasherInit<GF256> for ZKHasher<GF256> {
         ZKProofHasher::new(hasher.clone(), hasher)
     }
 
-    fn new_zk_verify_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKVerifyHasher<GF256> {
-        ZKVerifyHasher::new(Self::new_zk_hasher(sd))
+    fn new_zk_verify_hasher(
+        sd: &GenericArray<u8, Self::SDLength>,
+        delta_squared: GF256,
+    ) -> ZKVerifyHasher<GF256> {
+        ZKVerifyHasher::new(Self::new_zk_hasher(sd), delta_squared)
     }
 }
 
@@ -384,23 +396,27 @@ where
     F: BigGaloisField,
 {
     b_hasher: ZKHasher<F>,
+    delta_squared: F,
 }
 
 impl<F> ZKVerifyHasher<F>
 where
     F: BigGaloisField,
 {
-    fn new(b_hasher: ZKHasher<F>) -> Self {
-        Self { b_hasher }
+    fn new(b_hasher: ZKHasher<F>, delta_squared: F) -> Self {
+        Self {
+            b_hasher,
+            delta_squared,
+        }
     }
 
-    pub(crate) fn process<I1, I2>(&mut self, qs: I1, qs_b: I2, immut: &F)
+    pub(crate) fn process<I1, I2>(&mut self, qs: I1, qs_b: I2)
     where
         I1: Iterator<Item = F>,
         I2: Iterator<Item = F>,
     {
         for (q, qb) in zip(qs, qs_b) {
-            let b = (q * qb) + immut;
+            let b = (q * qb) + self.delta_squared;
             self.b_hasher.update(&b);
         }
     }
