@@ -77,7 +77,7 @@ where
 {
     let mut prg = VC::PRG::new_prg(r, iv);
     let mut decom = GenericArray::default_boxed();
-    let mut u = GenericArray::<GenericArray<u8, LH>, Tau::Tau>::default_boxed();
+    let mut u0 = GenericArray::<u8, LH>::default_boxed();
     let mut v = GenericArray::default_boxed();
     let mut c = GenericArray::<GenericArray<u8, LH>, Tau::TauMinus1>::default_boxed();
 
@@ -90,16 +90,21 @@ where
         let (com_i, decom_i, sd_i) = VC::commit(&r_i, iv, 1 << k);
         decom[i] = decom_i;
         hasher.update(&com_i);
-        (u[i], v[i]) = to_vole_convert::<VC::PRG, _>(Some(&sd_i[0]), sd_i.iter().skip(1), iv);
-    }
-    for i in 1..Tau::Tau::USIZE {
-        for (c, (u0, ui)) in zip(c[i - 1].iter_mut(), zip(&u[0], &u[i])) {
-            *c = u0 ^ ui;
+        let (ui, vi) = to_vole_convert::<VC::PRG, _>(Some(&sd_i[0]), sd_i.iter().skip(1), iv);
+        v[i] = vi;
+
+        if i == 0 {
+            *u0 = ui;
+        } else {
+            for (c, (u0, ui)) in zip(c[i - 1].iter_mut(), zip(u0.iter(), ui.into_iter())) {
+                *c = u0 ^ ui;
+            }
         }
     }
+
     let mut hcom = GenericArray::default();
     hasher.finish().read(&mut hcom);
-    (hcom, decom, c, Box::new(u[0].clone()), v)
+    (hcom, decom, c, u0, v)
 }
 
 #[allow(clippy::type_complexity)]
