@@ -192,10 +192,7 @@ where
 
     fn new_zk_proof_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKProofHasher<F>;
 
-    fn new_zk_verify_hasher(
-        sd: &GenericArray<u8, Self::SDLength>,
-        delta_squared: F,
-    ) -> ZKVerifyHasher<F>;
+    fn new_zk_verify_hasher(sd: &GenericArray<u8, Self::SDLength>, delta: F) -> ZKVerifyHasher<F>;
 }
 
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Update and Finalize part
@@ -255,9 +252,9 @@ impl ZKHasherInit<GF128> for ZKHasher<GF128> {
 
     fn new_zk_verify_hasher(
         sd: &GenericArray<u8, Self::SDLength>,
-        delta_squared: GF128,
+        delta: GF128,
     ) -> ZKVerifyHasher<GF128> {
-        ZKVerifyHasher::new(Self::new_zk_hasher(sd), delta_squared)
+        ZKVerifyHasher::new(Self::new_zk_hasher(sd), delta)
     }
 }
 
@@ -294,9 +291,9 @@ impl ZKHasherInit<GF192> for ZKHasher<GF192> {
 
     fn new_zk_verify_hasher(
         sd: &GenericArray<u8, Self::SDLength>,
-        delta_squared: GF192,
+        delta: GF192,
     ) -> ZKVerifyHasher<GF192> {
-        ZKVerifyHasher::new(Self::new_zk_hasher(sd), delta_squared)
+        ZKVerifyHasher::new(Self::new_zk_hasher(sd), delta)
     }
 }
 
@@ -333,9 +330,9 @@ impl ZKHasherInit<GF256> for ZKHasher<GF256> {
 
     fn new_zk_verify_hasher(
         sd: &GenericArray<u8, Self::SDLength>,
-        delta_squared: GF256,
+        delta: GF256,
     ) -> ZKVerifyHasher<GF256> {
-        ZKVerifyHasher::new(Self::new_zk_hasher(sd), delta_squared)
+        ZKVerifyHasher::new(Self::new_zk_hasher(sd), delta)
     }
 }
 
@@ -403,10 +400,10 @@ impl<F> ZKVerifyHasher<F>
 where
     F: BigGaloisField,
 {
-    fn new(b_hasher: ZKHasher<F>, delta_squared: F) -> Self {
+    fn new(b_hasher: ZKHasher<F>, delta: F) -> Self {
         Self {
             b_hasher,
-            delta_squared,
+            delta_squared: delta * delta,
         }
     }
 

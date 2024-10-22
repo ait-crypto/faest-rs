@@ -403,8 +403,7 @@ where
     let new_q = convert_gq::<O, Tau>(d, gq, chall3);
     let mut zk_hasher =
         <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_verify_hasher(
-            chall2,
-            delta * delta,
+            chall2, delta,
         );
     let (x, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(
         owf_input,

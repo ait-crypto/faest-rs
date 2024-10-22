@@ -4,16 +4,16 @@ use generic_array::{
     typenum::{Unsigned, U4},
     GenericArray,
 };
+use itertools::iproduct;
 
 use crate::{
     fields::{ByteCombine, ByteCombineConstants, Field as _, SumPoly},
-    parameter::{BaseParameters, OWFParameters},
-    parameter::{QSProof, TauParameters},
+    parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State, RCON_TABLE,
     },
-    universal_hashing::{ZKHasherInit, ZKHasherProcess},
+    universal_hashing::{ZKHasherInit, ZKHasherProcess, ZKVerifyHasher},
     utils::{convert_gq, transpose_and_into_field, Field},
 };
 
@@ -373,47 +373,35 @@ where
 }
 
 fn aes_key_exp_cstrnts_mkey1<O>(
-    b_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
+    zk_hasher: &mut ZKVerifyHasher<Field<O>>,
     q: &GenericArray<Field<O>, O::LKE>,
     delta: Field<O>,
 ) -> Box<GenericArray<Field<O>, <O as OWFParameters>::PRODRUN128>>
 where
     O: OWFParameters,
 {
-    let mut iwd = 32 * (O::NK::USIZE - 1);
-    let mut dorotword = true;
     let q_k = aes_key_exp_fwd::<O>(q);
     let q_w_b = aes_key_exp_bwd_mtag0_mkey1::<O>(q, &q_k, delta);
-    let delta_squared = delta * delta;
-    for j in 0..O::SKE::USIZE / 4 {
-        for r in 0..4 {
-            let rotated_r = inverse_rotate_word(r, dorotword);
-            let q_h_k_r = Field::<O>::byte_combine_slice(
-                &q_k[iwd + (8 * rotated_r)..iwd + (8 * rotated_r) + 8],
-            );
 
-            let q_h_w_b_r =
-                Field::<O>::byte_combine_slice(&q_w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
-            let b = q_h_k_r * q_h_w_b_r + delta_squared;
-            b_t_hasher.update(&b);
-        }
-        if O::LAMBDA::USIZE == 128 {
-            iwd += 128;
-        } else if O::LAMBDA::USIZE == 192 {
-            iwd += 192;
-        } else {
-            iwd += 128;
-            dorotword = !dorotword;
-        }
-    }
+    zk_hasher.process(
+        iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
+            Field::<O>::byte_combine_slice(&q_w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8])
+        }),
+        iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
+            let iwd = 32 * (O::NK::USIZE - 1) + j * if O::LAMBDA::USIZE == 192 { 192 } else { 128 };
+            let dorotword = if O::LAMBDA::USIZE == 256 && j % 2 == 1 {
+                false
+            } else {
+                true
+            };
+            let rotated_r = inverse_rotate_word(r, dorotword);
+            Field::<O>::byte_combine_slice(&q_k[iwd + (8 * rotated_r)..iwd + (8 * rotated_r) + 8])
+        }),
+    );
+
     q_k
 }
 
-///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
-///
-///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
-///
-///One of the first path to optimize the code could be to do the distinction
 fn aes_enc_fwd_mkey0_mtag0<O>(
     x: &GenericArray<u8, O::QUOTLENC8>,
     xk: &GenericArray<u8, O::PRODRUN128Bytes>,
@@ -702,7 +690,7 @@ fn aes_enc_cstrnts_mkey0<O>(
 }
 
 fn aes_enc_cstrnts_mkey1<O>(
-    b_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
+    zk_hasher: &mut ZKVerifyHasher<Field<O>>,
     input: &[u8; 16],
     output: &[u8; 16],
     q: &GenericArray<Field<O>, O::LENC>,
@@ -713,11 +701,7 @@ fn aes_enc_cstrnts_mkey1<O>(
 {
     let qs = aes_enc_fwd_mkey1_mtag0::<O>(q, qk, input, delta);
     let q_s_b = aes_enc_bkwd_mkey1_mtag0::<O>(q, qk, output, delta);
-    let delta_square = delta * delta;
-    for j in 0..O::SENC::USIZE {
-        let b = (qs[j] * q_s_b[j]) + delta_square;
-        b_t_hasher.update(&b);
-    }
+    zk_hasher.process(qs.into_iter(), q_s_b.into_iter());
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
@@ -796,7 +780,9 @@ where
     let delta = Field::<O>::from(chall3);
     let new_q = convert_gq::<O, Tau>(d, gq, chall3);
     let mut zk_hasher =
-        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall2);
+        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_verify_hasher(
+            chall2, delta,
+        );
 
     let qk = aes_key_exp_cstrnts_mkey1::<O>(
         &mut zk_hasher,
