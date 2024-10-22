@@ -27,6 +27,15 @@ type CstrntsVal<'a, O> = &'a GenericArray<
     <O as OWFParameters>::LAMBDA,
 >;
 
+fn inverse_rotate_word(r: usize, rotate: bool) -> usize {
+    if rotate {
+        // equivalent to (r - 3) % 4
+        (r + 1) % 4
+    } else {
+        r
+    }
+}
+
 //The first member of the tuples are the effectives witness while the second is the validity according Faest requiremenbt of the keypair at the origin of the operation
 pub(crate) fn aes_extendedwitness<O>(
     owf_key: &GenericArray<u8, O::LAMBDABYTES>,
@@ -318,11 +327,6 @@ where
     out
 }
 
-///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
-///
-///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
-///
-///One of the first path to optimize the code could be to do the distinction
 fn aes_key_exp_cstrnts_mkey0<O>(
     a_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
     b_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
@@ -339,13 +343,13 @@ where
     let w_b = aes_key_exp_bwd_mtag0_mkey0::<O>(w, &k);
     let v_w_b = aes_key_exp_bwd_mtag1_mkey0::<O>(&v[O::LAMBDA::USIZE..], &vk);
     for j in 0..O::SKE::USIZE / 4 {
-        let mut k_hat = [Field::<O>::default(); 4];
-        let mut v_k_hat = [Field::<O>::default(); 4];
-        for r in 0..4 {
-            let r_p = if dorotword { (r + 3) % 4 } else { r };
-            k_hat[r_p] = Field::<O>::byte_combine_bits(k[iwd / 8 + r]);
-            v_k_hat[r_p] = Field::<O>::byte_combine_slice(&vk[iwd + (8 * r)..iwd + (8 * r) + 8]);
-        }
+        let k_hat: [_; 4] = array::from_fn(|r| {
+            Field::<O>::byte_combine_bits(k[iwd / 8 + inverse_rotate_word(r, dorotword)])
+        });
+        let v_k_hat: [_; 4] = array::from_fn(|r| {
+            let r = inverse_rotate_word(r, dorotword);
+            Field::<O>::byte_combine_slice(&vk[iwd + (8 * r)..iwd + (8 * r) + 8])
+        });
         for r in 0..4 {
             let w_hat_r = Field::<O>::byte_combine_bits(w_b[32 / 8 * j + r]);
             let v_w_hat_r =
@@ -382,15 +386,15 @@ where
     let q_w_b = aes_key_exp_bwd_mtag0_mkey1::<O>(q, &q_k, delta);
     let delta_squared = delta * delta;
     for j in 0..O::SKE::USIZE / 4 {
-        let mut q_h_k = [Field::<O>::default(); 4];
         for r in 0..4 {
-            let r_p = if dorotword { (r + 3) % 4 } else { r };
-            q_h_k[r_p] = Field::<O>::byte_combine_slice(&q_k[iwd + (8 * r)..iwd + (8 * r) + 8]);
-        }
-        for r in 0..4 {
+            let rotated_r = inverse_rotate_word(r, dorotword);
+            let q_h_k_r = Field::<O>::byte_combine_slice(
+                &q_k[iwd + (8 * rotated_r)..iwd + (8 * rotated_r) + 8],
+            );
+
             let q_h_w_b_r =
                 Field::<O>::byte_combine_slice(&q_w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
-            let b = q_h_k[r] * q_h_w_b_r + delta_squared;
+            let b = q_h_k_r * q_h_w_b_r + delta_squared;
             b_t_hasher.update(&b);
         }
         if O::LAMBDA::USIZE == 128 {
@@ -581,11 +585,6 @@ where
     res
 }
 
-///Choice is made to treat bits as element of GFlambda (that is, m=lambda anyway, while in the paper we can have m = 1),
-///
-///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
-///
-///One of the first path to optimize the code could be to do the distinction
 fn aes_enc_bkwd_mkey0_mtag0<O>(
     x: &GenericArray<u8, O::QUOTLENC8>,
     xk: &GenericArray<u8, O::PRODRUN128Bytes>,
