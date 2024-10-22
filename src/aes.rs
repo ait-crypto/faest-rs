@@ -240,14 +240,14 @@ where
     let mut index = 0;
     let mut c = 0;
     let mut rmvrcon = true;
-    //Step 6
+    // Step 6
     for j in 0..O::SKE::USIZE {
-        //Step 7
-        let x_tilde: [Field<O>; 8] = array::from_fn(|i| x[8 * j + i] + xk[indice + 8 * c + i]);
-        //Step 15
-        let y_tilde: [Field<O>; 8] =
-            array::from_fn(|i| x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8]);
-        out[index..index + 8].copy_from_slice(&y_tilde);
+        // Step 7
+        let x_tilde: [_; 8] = array::from_fn(|i| x[8 * j + i] + xk[indice + 8 * c + i]);
+        // Step 15
+        for i in 0..8 {
+            out[index + i] = x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8];
+        }
         index += 8;
         c += 1;
         //Step 21
@@ -280,10 +280,10 @@ where
     let mut c = 0;
     let mut rmvrcon = true;
     let mut ircon = 0;
-    //Step 6
+    // Step 6
     for j in 0..O::SKE::USIZE {
         // Step 7
-        let mut x_tilde: [Field<O>; 8] =
+        let mut x_tilde: [_; 8] =
             array::from_fn(|i| x[8 * j + i + O::LAMBDA::USIZE] + xk[indice + 8 * c + i]);
         // Step 8
         if rmvrcon && (c == 0) {
@@ -294,15 +294,15 @@ where
                 *x += delta * ((rcon >> i) & 1);
             }
         }
-        //Step 15
-        let mut y_tilde: [Field<O>; 8] =
-            array::from_fn(|i| x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8]);
-        y_tilde[0] += delta;
-        y_tilde[2] += delta;
-        out[index..index + 8].copy_from_slice(&y_tilde);
+        // Step 15
+        for i in 0..8 {
+            out[index + i] = x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8];
+        }
+        out[index + 0] += delta;
+        out[index + 2] += delta;
         index += 8;
         c += 1;
-        //Step 21
+        // Step 21
         if c == 4 {
             c = 0;
             if O::LAMBDA::USIZE == 192 {
@@ -645,12 +645,10 @@ where
                 let x_t: [_; 8] = if j < O::R::USIZE - 1 {
                     array::from_fn(|i| x[ird + i])
                 } else {
-                    let mut x_out = [Field::<O>::default(); 8];
-                    for i in 0..8 {
-                        x_out[i] = delta
-                            * ((out[(ird - 128 * j + i) / 8] >> ((ird - 128 * j + i) % 8)) & 1);
-                    }
-                    array::from_fn(|i| x_out[i] + xk[128 + ird + i])
+                    array::from_fn(|i| {
+                        delta * ((out[(ird - 128 * j + i) / 8] >> ((ird - 128 * j + i) % 8)) & 1)
+                            + xk[128 + ird + i]
+                    })
                 };
                 let mut y_t =
                     array::from_fn(|i| x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8]);
@@ -682,10 +680,8 @@ where
                 } else {
                     &xk[128 + ird..136 + ird]
                 };
-                let mut y_t = [Field::<O>::default(); 8];
-                for i in 0..8 {
-                    y_t[i] = x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8];
-                }
+                let y_t =
+                    array::from_fn(|i| x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8]);
                 res[k + c * 4 + j * 16] = Field::<O>::byte_combine(&y_t);
             }
         }
