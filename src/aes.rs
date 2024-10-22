@@ -14,7 +14,7 @@ use crate::{
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State, RCON_TABLE,
     },
     universal_hashing::{ZKHasherInit, ZKProofHasher, ZKVerifyHasher},
-    utils::{convert_gq, transpose_and_into_field, Field},
+    utils::{bit_combine_with_delta, convert_gq, transpose_and_into_field, Field},
 };
 
 type KeyCstrnts<O> = (
@@ -188,20 +188,20 @@ where
     out
 }
 
-fn aes_key_exp_bwd_mtag0_mkey0<O>(
-    x: &GenericArray<u8, O::LKEBytes>,
-    xk: &GenericArray<u8, O::PRODRUN128Bytes>,
-) -> Box<GenericArray<u8, O::SKE>>
+fn aes_key_exp_bwd_mtag0_mkey0<'a, 'b, O>(
+    x: &'a GenericArray<u8, O::LKEBytes>,
+    xk: &'a GenericArray<u8, O::PRODRUN128Bytes>,
+) -> impl Iterator<Item = Field<O>> + 'b
 where
     O: OWFParameters,
+    'a: 'b,
 {
-    let mut out = GenericArray::default_boxed();
     let mut indice = 0;
     let mut c = 0;
     let mut rmvrcon = true;
     let mut ircon = 0;
     // Step 6
-    for j in 0..O::SKE::USIZE {
+    (0..O::SKE::USIZE).map(move |j| {
         // Step 7
         let mut x_tilde = xk[indice + c] ^ x[j + O::LAMBDABYTES::USIZE];
         // Step 8
@@ -211,7 +211,7 @@ where
             // Step 11
             x_tilde ^= rcon;
         }
-        out[j] = x_tilde.rotate_right(7) ^ x_tilde.rotate_right(5) ^ x_tilde.rotate_right(2) ^ 0x5;
+
         c += 1;
         // Step 21
         if c == 4 {
@@ -225,31 +225,31 @@ where
                 }
             }
         }
-    }
-    out
+
+        Field::<O>::byte_combine_bits(
+            x_tilde.rotate_right(7) ^ x_tilde.rotate_right(5) ^ x_tilde.rotate_right(2) ^ 0x5,
+        )
+    })
 }
 
-fn aes_key_exp_bwd_mtag1_mkey0<O>(
-    x: &[Field<O>],
-    xk: &GenericArray<Field<O>, O::PRODRUN128>,
-) -> Box<GenericArray<Field<O>, O::PRODSKE8>>
+fn aes_key_exp_bwd_mtag1_mkey0<'a, 'b, O>(
+    x: &'a [Field<O>],
+    xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
+) -> impl Iterator<Item = Field<O>> + 'b
 where
     O: OWFParameters,
+    'a: 'b,
 {
-    let mut out = GenericArray::default_boxed();
     let mut indice = 0;
-    let mut index = 0;
     let mut c = 0;
     let mut rmvrcon = true;
     // Step 6
-    for j in 0..O::SKE::USIZE {
+    (0..O::SKE::USIZE).map(move |j| {
         // Step 7
         let x_tilde: [_; 8] = array::from_fn(|i| x[8 * j + i] + xk[indice + 8 * c + i]);
         // Step 15
-        for i in 0..8 {
-            out[index + i] = x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8];
-        }
-        index += 8;
+        let y_tilde =
+            array::from_fn(|i| x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8]);
         c += 1;
         //Step 21
         if c == 4 {
@@ -263,26 +263,25 @@ where
                 }
             }
         }
-    }
-    out
+        Field::<O>::byte_combine(&y_tilde)
+    })
 }
 
-fn aes_key_exp_bwd_mtag0_mkey1<O>(
-    x: &GenericArray<Field<O>, O::LKE>,
-    xk: &GenericArray<Field<O>, O::PRODRUN128>,
-    delta: Field<O>,
-) -> Box<GenericArray<Field<O>, O::PRODSKE8>>
+fn aes_key_exp_bwd_mtag0_mkey1<'a, 'b, O>(
+    x: &'a GenericArray<Field<O>, O::LKE>,
+    xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
+    delta: &'a Field<O>,
+) -> impl Iterator<Item = Field<O>> + 'b
 where
     O: OWFParameters,
+    'a: 'b,
 {
-    let mut out = GenericArray::default_boxed();
     let mut indice = 0;
-    let mut index = 0;
     let mut c = 0;
     let mut rmvrcon = true;
     let mut ircon = 0;
     // Step 6
-    for j in 0..O::SKE::USIZE {
+    (0..O::SKE::USIZE).map(move |j| {
         // Step 7
         let mut x_tilde: [_; 8] =
             array::from_fn(|i| x[8 * j + i + O::LAMBDA::USIZE] + xk[indice + 8 * c + i]);
@@ -292,16 +291,14 @@ where
             ircon += 1;
             // Step 11
             for (i, x) in x_tilde.iter_mut().enumerate() {
-                *x += delta * ((rcon >> i) & 1);
+                *x += *delta * ((rcon >> i) & 1);
             }
         }
         // Step 15
-        for i in 0..8 {
-            out[index + i] = x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8];
-        }
-        out[index + 0] += delta;
-        out[index + 2] += delta;
-        index += 8;
+        let mut y_tilde =
+            array::from_fn(|i| x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8]);
+        y_tilde[0] += delta;
+        y_tilde[2] += delta;
         c += 1;
         // Step 21
         if c == 4 {
@@ -315,8 +312,8 @@ where
                 }
             }
         }
-    }
-    out
+        Field::<O>::byte_combine(&y_tilde)
+    })
 }
 
 fn aes_key_exp_cstrnts_mkey0<O>(
@@ -352,8 +349,8 @@ where
             let r = inverse_rotate_word(r, dorotword);
             Field::<O>::byte_combine_slice(&vk[iwd + (8 * r)..iwd + (8 * r) + 8])
         }),
-        w_b.into_iter().map(Field::<O>::byte_combine_bits),
-        v_w_b.chunks(8).map(Field::<O>::byte_combine_slice),
+        w_b,
+        v_w_b,
     );
 
     (k, vk)
@@ -362,7 +359,7 @@ where
 fn aes_key_exp_cstrnts_mkey1<O>(
     zk_hasher: &mut ZKVerifyHasher<Field<O>>,
     q: &GenericArray<Field<O>, O::LKE>,
-    delta: Field<O>,
+    delta: &Field<O>,
 ) -> Box<GenericArray<Field<O>, <O as OWFParameters>::PRODRUN128>>
 where
     O: OWFParameters,
@@ -371,7 +368,7 @@ where
     let q_w_b = aes_key_exp_bwd_mtag0_mkey1::<O>(q, &q_k, delta);
 
     zk_hasher.process(
-        q_w_b.chunks(8).map(Field::<O>::byte_combine_slice),
+        q_w_b,
         iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
             let iwd = 32 * (O::NK::USIZE - 1) + j * if O::LAMBDA::USIZE == 192 { 192 } else { 128 };
             let dorotword = if O::LAMBDA::USIZE == 256 && j % 2 == 1 {
@@ -387,267 +384,228 @@ where
     q_k
 }
 
-fn aes_enc_fwd_mkey0_mtag0<O>(
-    x: &GenericArray<u8, O::QUOTLENC8>,
-    xk: &GenericArray<u8, O::PRODRUN128Bytes>,
-    input: &[u8; 16],
-) -> Box<GenericArray<Field<O>, O::SENC>>
+fn aes_enc_fwd_mkey0_mtag0<'a, 'b, O>(
+    x: &'a GenericArray<u8, O::QUOTLENC8>,
+    xk: &'a GenericArray<u8, O::PRODRUN128Bytes>,
+    input: &'a [u8; 16],
+) -> impl Iterator<Item = Field<O>> + 'b
 where
     O: OWFParameters,
+    'a: 'b,
 {
-    let mut index = 0;
-    let mut res = GenericArray::default_boxed();
-    //Step 2-5
-    for i in 0..16 {
-        res[index] = Field::<O>::byte_combine_bits(input[i]) + Field::<O>::byte_combine_bits(xk[i]);
-        index += 1;
-    }
-    //Step 6
-    for j in 1..O::R::USIZE {
-        for c in 0..4 {
-            let ix: usize = 128 * (j - 1) + 32 * c;
-            let ik: usize = 128 * j + 32 * c;
-            let mut x_hat = [Field::<O>::default(); 4];
-            let mut x_hat_k = [Field::<O>::default(); 4];
-            for r in 0..4 {
-                x_hat[r] = Field::<O>::byte_combine_bits(x[ix / 8 + r]);
-                x_hat_k[r] = Field::<O>::byte_combine_bits(xk[ik / 8 + r]);
-            }
+    (0..16)
+        .map(|i| {
+            // Step 2-5
+            Field::<O>::byte_combine_bits(input[i]) + Field::<O>::byte_combine_bits(xk[i])
+        })
+        .chain(
+            iproduct!(1..O::R::USIZE, 0..4)
+                .map(move |(j, c)| {
+                    //Step 6
+                    let ix: usize = 128 * (j - 1) + 32 * c;
+                    let ik: usize = 128 * j + 32 * c;
+                    let x_hat: [_; 4] =
+                        array::from_fn(|r| Field::<O>::byte_combine_bits(x[ix / 8 + r]));
+                    let mut res: [_; 4] =
+                        array::from_fn(|r| Field::<O>::byte_combine_bits(xk[ik / 8 + r]));
 
-            //Step 16
-            res[index] = x_hat[0] * Field::<O>::BYTE_COMBINE_2
-                + x_hat[1] * Field::<O>::BYTE_COMBINE_3
-                + x_hat[2]
-                + x_hat[3]
-                + x_hat_k[0];
-            res[index + 1] = x_hat[0]
-                + x_hat[1] * Field::<O>::BYTE_COMBINE_2
-                + x_hat[2] * Field::<O>::BYTE_COMBINE_3
-                + x_hat[3]
-                + x_hat_k[1];
-            res[index + 2] = x_hat[0]
-                + x_hat[1]
-                + x_hat[2] * Field::<O>::BYTE_COMBINE_2
-                + x_hat[3] * Field::<O>::BYTE_COMBINE_3
-                + x_hat_k[2];
-            res[index + 3] = x_hat[0] * Field::<O>::BYTE_COMBINE_3
-                + x_hat[1]
-                + x_hat[2]
-                + x_hat[3] * Field::<O>::BYTE_COMBINE_2
-                + x_hat_k[3];
-            index += 4;
-        }
-    }
-
-    res
+                    //Step 16
+                    res[0] += x_hat[0] * Field::<O>::BYTE_COMBINE_2
+                        + x_hat[1] * Field::<O>::BYTE_COMBINE_3
+                        + x_hat[2]
+                        + x_hat[3];
+                    res[1] += x_hat[0]
+                        + x_hat[1] * Field::<O>::BYTE_COMBINE_2
+                        + x_hat[2] * Field::<O>::BYTE_COMBINE_3
+                        + x_hat[3];
+                    res[2] += x_hat[0]
+                        + x_hat[1]
+                        + x_hat[2] * Field::<O>::BYTE_COMBINE_2
+                        + x_hat[3] * Field::<O>::BYTE_COMBINE_3;
+                    res[3] += x_hat[0] * Field::<O>::BYTE_COMBINE_3
+                        + x_hat[1]
+                        + x_hat[2]
+                        + x_hat[3] * Field::<O>::BYTE_COMBINE_2;
+                    res
+                })
+                .flatten(),
+        )
 }
 
-fn aes_enc_fwd_mkey1_mtag0<O>(
-    x: &GenericArray<Field<O>, O::LENC>,
-    xk: &GenericArray<Field<O>, O::PRODRUN128>,
-    input: &[u8; 16],
-    delta: Field<O>,
-) -> Box<GenericArray<Field<O>, O::SENC>>
+fn aes_enc_fwd_mkey1_mtag0<'a, 'b, O>(
+    x: &'a GenericArray<Field<O>, O::LENC>,
+    xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
+    input: &'a [u8; 16],
+    delta: &'a Field<O>,
+) -> impl Iterator<Item = Field<O>> + 'b
 where
     O: OWFParameters,
+    'a: 'b,
 {
-    let mut index = 0;
-    let mut res = GenericArray::default_boxed();
-    //Step 2-5
-    for i in 0..16 {
-        let mut xin = [Field::<O>::default(); 8];
-        for (j, xin_item) in xin.iter_mut().enumerate() {
-            let bit = (input[i] >> j) & 1;
-            *xin_item = delta * bit;
-        }
-        res[index] = Field::<O>::byte_combine(&xin)
-            + Field::<O>::byte_combine_slice(&xk[8 * i..(8 * i) + 8]);
-        index += 1;
-    }
-    //Step 6
-    for j in 1..O::R::USIZE {
-        for c in 0..4 {
-            let ix: usize = 128 * (j - 1) + 32 * c;
-            let ik: usize = 128 * j + 32 * c;
-            let mut x_hat = [Field::<O>::default(); 4];
-            let mut x_hat_k = [Field::<O>::default(); 4];
-            for r in 0..4 {
-                x_hat[r] = Field::<O>::byte_combine_slice(&x[ix + 8 * r..ix + 8 * r + 8]);
-                x_hat_k[r] = Field::<O>::byte_combine_slice(&xk[ik + 8 * r..ik + 8 * r + 8]);
-            }
+    (0..16)
+        .map(|i| {
+            // Step 2-5
+            bit_combine_with_delta::<O>(input[i], delta)
+                + Field::<O>::byte_combine_slice(&xk[8 * i..(8 * i) + 8])
+        })
+        .chain(
+            iproduct!(1..O::R::USIZE, 0..4)
+                .map(move |(j, c)| {
+                    //Step 6
+                    let ix: usize = 128 * (j - 1) + 32 * c;
+                    let ik: usize = 128 * j + 32 * c;
+                    let x_hat: [_; 4] = array::from_fn(|r| {
+                        Field::<O>::byte_combine_slice(&x[ix + 8 * r..ix + 8 * r + 8])
+                    });
+                    let mut res: [_; 4] = array::from_fn(|r| {
+                        Field::<O>::byte_combine_slice(&xk[ik + 8 * r..ik + 8 * r + 8])
+                    });
 
-            //Step 16
-            res[index] = x_hat[0] * Field::<O>::BYTE_COMBINE_2
-                + x_hat[1] * Field::<O>::BYTE_COMBINE_3
-                + x_hat[2]
-                + x_hat[3]
-                + x_hat_k[0];
-            res[index + 1] = x_hat[0]
-                + x_hat[1] * Field::<O>::BYTE_COMBINE_2
-                + x_hat[2] * Field::<O>::BYTE_COMBINE_3
-                + x_hat[3]
-                + x_hat_k[1];
-            res[index + 2] = x_hat[0]
-                + x_hat[1]
-                + x_hat[2] * Field::<O>::BYTE_COMBINE_2
-                + x_hat[3] * Field::<O>::BYTE_COMBINE_3
-                + x_hat_k[2];
-            res[index + 3] = x_hat[0] * Field::<O>::BYTE_COMBINE_3
-                + x_hat[1]
-                + x_hat[2]
-                + x_hat[3] * Field::<O>::BYTE_COMBINE_2
-                + x_hat_k[3];
-            index += 4;
-        }
-    }
-
-    res
+                    //Step 16
+                    res[0] += x_hat[0] * Field::<O>::BYTE_COMBINE_2
+                        + x_hat[1] * Field::<O>::BYTE_COMBINE_3
+                        + x_hat[2]
+                        + x_hat[3];
+                    res[1] += x_hat[0]
+                        + x_hat[1] * Field::<O>::BYTE_COMBINE_2
+                        + x_hat[2] * Field::<O>::BYTE_COMBINE_3
+                        + x_hat[3];
+                    res[2] += x_hat[0]
+                        + x_hat[1]
+                        + x_hat[2] * Field::<O>::BYTE_COMBINE_2
+                        + x_hat[3] * Field::<O>::BYTE_COMBINE_3;
+                    res[3] += x_hat[0] * Field::<O>::BYTE_COMBINE_3
+                        + x_hat[1]
+                        + x_hat[2]
+                        + x_hat[3] * Field::<O>::BYTE_COMBINE_2;
+                    res
+                })
+                .flatten(),
+        )
 }
 
-fn aes_enc_fwd_mkey0_mtag1<O>(
-    x: &GenericArray<Field<O>, O::LENC>,
-    xk: &GenericArray<Field<O>, O::PRODRUN128>,
-) -> Box<GenericArray<Field<O>, O::SENC>>
+fn aes_enc_fwd_mkey0_mtag1<'a, 'b, O>(
+    x: &'a GenericArray<Field<O>, O::LENC>,
+    xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
+) -> impl Iterator<Item = Field<O>> + 'b
 where
     O: OWFParameters,
+    'a: 'b,
 {
-    let mut index = 0;
-    let mut res = GenericArray::default_boxed();
-    //Step 2-5
-    for i in 0..16 {
-        res[index] = Field::<O>::byte_combine_slice(&xk[8 * i..(8 * i) + 8]);
-        index += 1;
-    }
-    //Step 6
-    for j in 1..O::R::USIZE {
-        for c in 0..4 {
-            let ix: usize = 128 * (j - 1) + 32 * c;
-            let ik: usize = 128 * j + 32 * c;
-            let mut x_hat = [Field::<O>::default(); 4];
-            let mut x_hat_k = [Field::<O>::default(); 4];
-            for r in 0..4 {
-                x_hat[r] = Field::<O>::byte_combine_slice(&x[ix + 8 * r..ix + 8 * r + 8]);
-                x_hat_k[r] = Field::<O>::byte_combine_slice(&xk[ik + 8 * r..ik + 8 * r + 8]);
-            }
+    (0..16)
+        .map(|i| {
+            // Step 2-5
+            Field::<O>::byte_combine_slice(&xk[8 * i..(8 * i) + 8])
+        })
+        .chain(
+            iproduct!(1..O::R::USIZE, 0..4)
+                .map(move |(j, c)| {
+                    //Step 6
+                    let ix: usize = 128 * (j - 1) + 32 * c;
+                    let ik: usize = 128 * j + 32 * c;
+                    let x_hat: [_; 4] = array::from_fn(|r| {
+                        Field::<O>::byte_combine_slice(&x[ix + 8 * r..ix + 8 * r + 8])
+                    });
+                    let mut res: [_; 4] = array::from_fn(|r| {
+                        Field::<O>::byte_combine_slice(&xk[ik + 8 * r..ik + 8 * r + 8])
+                    });
 
-            // Step 16
-            res[index] = x_hat[0] * Field::<O>::BYTE_COMBINE_2
-                + x_hat[1] * Field::<O>::BYTE_COMBINE_3
-                + x_hat[2]
-                + x_hat[3]
-                + x_hat_k[0];
-            res[index + 1] = x_hat[0]
-                + x_hat[1] * Field::<O>::BYTE_COMBINE_2
-                + x_hat[2] * Field::<O>::BYTE_COMBINE_3
-                + x_hat[3]
-                + x_hat_k[1];
-            res[index + 2] = x_hat[0]
-                + x_hat[1]
-                + x_hat[2] * Field::<O>::BYTE_COMBINE_2
-                + x_hat[3] * Field::<O>::BYTE_COMBINE_3
-                + x_hat_k[2];
-            res[index + 3] = x_hat[0] * Field::<O>::BYTE_COMBINE_3
-                + x_hat[1]
-                + x_hat[2]
-                + x_hat[3] * Field::<O>::BYTE_COMBINE_2
-                + x_hat_k[3];
-            index += 4;
-        }
-    }
-
-    res
+                    //Step 16
+                    res[0] += x_hat[0] * Field::<O>::BYTE_COMBINE_2
+                        + x_hat[1] * Field::<O>::BYTE_COMBINE_3
+                        + x_hat[2]
+                        + x_hat[3];
+                    res[1] += x_hat[0]
+                        + x_hat[1] * Field::<O>::BYTE_COMBINE_2
+                        + x_hat[2] * Field::<O>::BYTE_COMBINE_3
+                        + x_hat[3];
+                    res[2] += x_hat[0]
+                        + x_hat[1]
+                        + x_hat[2] * Field::<O>::BYTE_COMBINE_2
+                        + x_hat[3] * Field::<O>::BYTE_COMBINE_3;
+                    res[3] += x_hat[0] * Field::<O>::BYTE_COMBINE_3
+                        + x_hat[1]
+                        + x_hat[2]
+                        + x_hat[3] * Field::<O>::BYTE_COMBINE_2;
+                    res
+                })
+                .flatten(),
+        )
 }
 
-fn aes_enc_bkwd_mkey0_mtag0<O>(
-    x: &GenericArray<u8, O::QUOTLENC8>,
-    xk: &GenericArray<u8, O::PRODRUN128Bytes>,
-    out: &[u8; 16],
-) -> Box<GenericArray<Field<O>, O::SENC>>
+fn aes_enc_bkwd_mkey0_mtag0<'a, 'b, O>(
+    x: &'a GenericArray<u8, O::QUOTLENC8>,
+    xk: &'a GenericArray<u8, O::PRODRUN128Bytes>,
+    out: &'a [u8; 16],
+) -> impl Iterator<Item = Field<O>> + 'b
 where
     O: OWFParameters,
+    'a: 'b,
 {
-    let mut res = GenericArray::default_boxed();
-    //Step 2
-    for j in 0..O::R::USIZE {
-        for c in 0..4 {
-            //Step 4
-            for k in 0..4 {
-                let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
-                let x_t = if j < O::R::USIZE - 1 {
-                    x[ird / 8]
-                } else {
-                    let x_out = out[(ird - 128 * j) / 8];
-                    x_out ^ xk[(128 + ird) / 8]
-                };
-                let y_t = x_t.rotate_right(7) ^ x_t.rotate_right(5) ^ x_t.rotate_right(2) ^ 0x5;
-                res[k + c * 4 + j * 16] = Field::<O>::byte_combine_bits(y_t);
-            }
-        }
-    }
-    res
+    // Step 2
+    iproduct!(0..O::R::USIZE, 0..4, 0..4).map(move |(j, c, k)| {
+        // Step 4
+        let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
+        let x_t = if j < O::R::USIZE - 1 {
+            x[ird / 8]
+        } else {
+            let x_out = out[(ird - 128 * j) / 8];
+            x_out ^ xk[(128 + ird) / 8]
+        };
+        let y_t = x_t.rotate_right(7) ^ x_t.rotate_right(5) ^ x_t.rotate_right(2) ^ 0x5;
+        Field::<O>::byte_combine_bits(y_t)
+    })
 }
 
-fn aes_enc_bkwd_mkey1_mtag0<O>(
-    x: &GenericArray<Field<O>, O::LENC>,
-    xk: &GenericArray<Field<O>, O::PRODRUN128>,
-    out: &[u8; 16],
-    delta: Field<O>,
-) -> Box<GenericArray<Field<O>, O::SENC>>
+fn aes_enc_bkwd_mkey1_mtag0<'a, 'b, O>(
+    x: &'a GenericArray<Field<O>, O::LENC>,
+    xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
+    out: &'a [u8; 16],
+    delta: &'a Field<O>,
+) -> impl Iterator<Item = Field<O>> + 'b
 where
     O: OWFParameters,
+    'a: 'b,
 {
-    let mut res = GenericArray::default_boxed();
-    //Step 2
-    for j in 0..O::R::USIZE {
-        for c in 0..4 {
-            //Step 4
-            for k in 0..4 {
-                let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
-                let x_t: [_; 8] = if j < O::R::USIZE - 1 {
-                    array::from_fn(|i| x[ird + i])
-                } else {
-                    array::from_fn(|i| {
-                        delta * ((out[(ird - 128 * j + i) / 8] >> ((ird - 128 * j + i) % 8)) & 1)
-                            + xk[128 + ird + i]
-                    })
-                };
-                let mut y_t =
-                    array::from_fn(|i| x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8]);
-                y_t[0] += delta;
-                y_t[2] += delta;
-                res[k + c * 4 + j * 16] = Field::<O>::byte_combine(&y_t);
-            }
-        }
-    }
-    res
+    // Step 2
+    iproduct!(0..O::R::USIZE, 0..4, 0..4).map(move |(j, c, k)| {
+        // Step 4
+        let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
+        let x_t: [_; 8] = if j < O::R::USIZE - 1 {
+            array::from_fn(|i| x[ird + i])
+        } else {
+            array::from_fn(|i| {
+                *delta * ((out[(ird - 128 * j + i) / 8] >> ((ird - 128 * j + i) % 8)) & 1)
+                    + xk[128 + ird + i]
+            })
+        };
+        let mut y_t = array::from_fn(|i| x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8]);
+        y_t[0] += delta;
+        y_t[2] += delta;
+        Field::<O>::byte_combine(&y_t)
+    })
 }
 
-fn aes_enc_bkwd_mkey0_mtag1<O>(
-    x: &GenericArray<Field<O>, O::LENC>,
-    xk: &GenericArray<Field<O>, O::PRODRUN128>,
-) -> Box<GenericArray<Field<O>, O::SENC>>
+fn aes_enc_bkwd_mkey0_mtag1<'a, 'b, O>(
+    x: &'a GenericArray<Field<O>, O::LENC>,
+    xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
+) -> impl Iterator<Item = Field<O>> + 'b
 where
     O: OWFParameters,
+    'a: 'b,
 {
-    let mut res = GenericArray::default_boxed();
-    //Step 2
-    for j in 0..O::R::USIZE {
-        for c in 0..4 {
-            //Step 4
-            for k in 0..4 {
-                let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
-                let x_t = if j < O::R::USIZE - 1 {
-                    &x[ird..ird + 8]
-                } else {
-                    &xk[128 + ird..136 + ird]
-                };
-                let y_t =
-                    array::from_fn(|i| x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8]);
-                res[k + c * 4 + j * 16] = Field::<O>::byte_combine(&y_t);
-            }
-        }
-    }
-    res
+    // Step 2
+    iproduct!(0..O::R::USIZE, 0..4, 0..4).map(move |(j, c, k)| {
+        // Step 4
+        let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
+        let x_t = if j < O::R::USIZE - 1 {
+            &x[ird..ird + 8]
+        } else {
+            &xk[128 + ird..136 + ird]
+        };
+        let y_t = array::from_fn(|i| x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8]);
+        Field::<O>::byte_combine(&y_t)
+    })
 }
 
 fn aes_enc_cstrnts_mkey0<O>(
@@ -665,13 +623,7 @@ fn aes_enc_cstrnts_mkey0<O>(
     let vs = aes_enc_fwd_mkey0_mtag1::<O>(v, vk);
     let s_b = aes_enc_bkwd_mkey0_mtag0::<O>(w, k, output);
     let v_s_b = aes_enc_bkwd_mkey0_mtag1::<O>(v, vk);
-
-    zk_hasher.process(
-        s.into_iter(),
-        vs.into_iter(),
-        s_b.into_iter(),
-        v_s_b.into_iter(),
-    );
+    zk_hasher.process(s, vs, s_b, v_s_b);
 }
 
 fn aes_enc_cstrnts_mkey1<O>(
@@ -680,13 +632,13 @@ fn aes_enc_cstrnts_mkey1<O>(
     output: &[u8; 16],
     q: &GenericArray<Field<O>, O::LENC>,
     qk: &GenericArray<Field<O>, O::PRODRUN128>,
-    delta: Field<O>,
+    delta: &Field<O>,
 ) where
     O: OWFParameters,
 {
     let qs = aes_enc_fwd_mkey1_mtag0::<O>(q, qk, input, delta);
     let q_s_b = aes_enc_bkwd_mkey1_mtag0::<O>(q, qk, output, delta);
-    zk_hasher.process(qs.into_iter(), q_s_b.into_iter());
+    zk_hasher.process(qs, q_s_b);
 }
 
 ///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
@@ -766,7 +718,7 @@ where
     let qk = aes_key_exp_cstrnts_mkey1::<O>(
         &mut zk_hasher,
         GenericArray::from_slice(&new_q[..O::LKE::USIZE]),
-        delta,
+        &delta,
     );
 
     aes_enc_cstrnts_mkey1::<O>(
@@ -775,7 +727,7 @@ where
         owf_output[..16].try_into().unwrap(),
         GenericArray::from_slice(&new_q[O::LKE::USIZE..(O::LKE::USIZE + O::LENC::USIZE)]),
         &qk,
-        delta,
+        &delta,
     );
     if O::LAMBDA::USIZE > 128 {
         aes_enc_cstrnts_mkey1::<O>(
@@ -784,7 +736,7 @@ where
             owf_output[16..].try_into().unwrap(),
             GenericArray::from_slice(&new_q[O::LKE::USIZE + O::LENC::USIZE..O::L::USIZE]),
             &qk,
-            delta,
+            &delta,
         );
     }
 

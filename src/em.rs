@@ -11,7 +11,7 @@ use crate::{
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State,
     },
     universal_hashing::{ZKHasherInit, ZKProofHasher, ZKVerifyHasher},
-    utils::{convert_gq, transpose_and_into_field, Field},
+    utils::{bit_combine_with_delta, convert_gq, transpose_and_into_field, Field},
 };
 
 pub(crate) fn em_extendedwitness<O>(
@@ -162,14 +162,6 @@ where
                 })
                 .flatten(),
         )
-}
-
-fn bit_combine_with_delta<O>(x: u8, delta: &Field<O>) -> Field<O>
-where
-    O: OWFParameters,
-{
-    let tmp = array::from_fn(|index| *delta * ((x >> (index % 8)) & 1));
-    Field::<O>::byte_combine(&tmp)
 }
 
 fn em_enc_fwd_verify<'a, 'b, O>(

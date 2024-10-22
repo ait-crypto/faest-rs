@@ -1,9 +1,12 @@
-use std::iter::zip;
+use std::{array, iter::zip};
 
 use generic_array::{typenum::Unsigned, GenericArray};
 use itertools::iproduct;
 
-use crate::parameter::{BaseParameters, OWFParameters, TauParameters};
+use crate::{
+    fields::ByteCombine,
+    parameter::{BaseParameters, OWFParameters, TauParameters},
+};
 
 /// Reader interface for PRGs and random oracles
 pub(crate) trait Reader {
@@ -68,6 +71,14 @@ where
     }
 
     transpose_and_into_field::<O>(&gq)
+}
+
+pub(crate) fn bit_combine_with_delta<O>(x: u8, delta: &Field<O>) -> Field<O>
+where
+    O: OWFParameters,
+{
+    let tmp = array::from_fn(|index| *delta * ((x >> (index % 8)) & 1));
+    Field::<O>::byte_combine(&tmp)
 }
 
 #[cfg(test)]
