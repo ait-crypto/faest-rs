@@ -13,7 +13,7 @@ use crate::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State, RCON_TABLE,
     },
-    universal_hashing::{ZKHasherInit, ZKHasherProcess, ZKVerifyHasher},
+    universal_hashing::{ZKHasherInit, ZKProofHasher, ZKVerifyHasher},
     utils::{convert_gq, transpose_and_into_field, Field},
 };
 
@@ -328,47 +328,42 @@ where
 }
 
 fn aes_key_exp_cstrnts_mkey0<O>(
-    a_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
-    b_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
+    zk_hasher: &mut ZKProofHasher<Field<O>>,
     w: &GenericArray<u8, O::LKEBytes>,
     v: &GenericArray<Field<O>, O::LKE>,
 ) -> KeyCstrnts<O>
 where
     O: OWFParameters,
 {
-    let mut iwd = 32 * (O::NK::USIZE - 1);
-    let mut dorotword = true;
     let k = aes_key_exp_fwd_1::<O>(w);
     let vk = aes_key_exp_fwd::<O>(v);
     let w_b = aes_key_exp_bwd_mtag0_mkey0::<O>(w, &k);
     let v_w_b = aes_key_exp_bwd_mtag1_mkey0::<O>(&v[O::LAMBDA::USIZE..], &vk);
-    for j in 0..O::SKE::USIZE / 4 {
-        let k_hat: [_; 4] = array::from_fn(|r| {
+
+    zk_hasher.process(
+        iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
+            let iwd = 32 * (O::NK::USIZE - 1) + j * if O::LAMBDA::USIZE == 192 { 192 } else { 128 };
+            let dorotword = if O::LAMBDA::USIZE == 256 && j % 2 == 1 {
+                false
+            } else {
+                true
+            };
             Field::<O>::byte_combine_bits(k[iwd / 8 + inverse_rotate_word(r, dorotword)])
-        });
-        let v_k_hat: [_; 4] = array::from_fn(|r| {
+        }),
+        iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
+            let iwd = 32 * (O::NK::USIZE - 1) + j * if O::LAMBDA::USIZE == 192 { 192 } else { 128 };
+            let dorotword = if O::LAMBDA::USIZE == 256 && j % 2 == 1 {
+                false
+            } else {
+                true
+            };
             let r = inverse_rotate_word(r, dorotword);
             Field::<O>::byte_combine_slice(&vk[iwd + (8 * r)..iwd + (8 * r) + 8])
-        });
-        for r in 0..4 {
-            let w_hat_r = Field::<O>::byte_combine_bits(w_b[32 / 8 * j + r]);
-            let v_w_hat_r =
-                Field::<O>::byte_combine_slice(&v_w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8]);
+        }),
+        w_b.into_iter().map(Field::<O>::byte_combine_bits),
+        v_w_b.chunks(8).map(Field::<O>::byte_combine_slice),
+    );
 
-            let a0 = v_k_hat[r] * v_w_hat_r;
-            let a1 = ((k_hat[r] + v_k_hat[r]) * (w_hat_r + v_w_hat_r)) + Field::<O>::ONE + a0;
-            a_t_hasher.update(&a1);
-            b_t_hasher.update(&a0);
-        }
-        if O::LAMBDA::USIZE == 256 {
-            dorotword = !dorotword;
-            iwd += 128;
-        } else if O::LAMBDA::USIZE == 192 {
-            iwd += 192;
-        } else {
-            iwd += 128;
-        }
-    }
     (k, vk)
 }
 
@@ -384,9 +379,7 @@ where
     let q_w_b = aes_key_exp_bwd_mtag0_mkey1::<O>(q, &q_k, delta);
 
     zk_hasher.process(
-        iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
-            Field::<O>::byte_combine_slice(&q_w_b[(32 * j) + (8 * r)..(32 * j) + (8 * r) + 8])
-        }),
+        q_w_b.chunks(8).map(Field::<O>::byte_combine_slice),
         iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
             let iwd = 32 * (O::NK::USIZE - 1) + j * if O::LAMBDA::USIZE == 192 { 192 } else { 128 };
             let dorotword = if O::LAMBDA::USIZE == 256 && j % 2 == 1 {
@@ -666,8 +659,7 @@ where
 }
 
 fn aes_enc_cstrnts_mkey0<O>(
-    a_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
-    b_t_hasher: &mut impl ZKHasherProcess<Field<O>>,
+    zk_hasher: &mut ZKProofHasher<Field<O>>,
     input: &[u8; 16],
     output: &[u8; 16],
     w: &GenericArray<u8, O::QUOTLENC8>,
@@ -681,12 +673,13 @@ fn aes_enc_cstrnts_mkey0<O>(
     let vs = aes_enc_fwd_mkey0_mtag1::<O>(v, vk);
     let s_b = aes_enc_bkwd_mkey0_mtag0::<O>(w, k, output);
     let v_s_b = aes_enc_bkwd_mkey0_mtag1::<O>(v, vk);
-    for j in 0..O::SENC::USIZE {
-        let a0 = vs[j] * v_s_b[j];
-        let a1 = (s[j] + vs[j]) * (s_b[j] + v_s_b[j]) + Field::<O>::ONE + a0;
-        a_t_hasher.update(&a1);
-        b_t_hasher.update(&a0);
-    }
+
+    zk_hasher.process(
+        s.into_iter(),
+        vs.into_iter(),
+        s_b.into_iter(),
+        v_s_b.into_iter(),
+    );
 }
 
 fn aes_enc_cstrnts_mkey1<O>(
@@ -718,21 +711,17 @@ where
 {
     let new_v = transpose_and_into_field::<O>(gv);
 
-    let mut a_t_hasher =
-        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
-    let mut b_t_hasher =
-        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall);
+    let mut zk_hasher =
+        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_proof_hasher(chall);
 
     let (k, vk) = aes_key_exp_cstrnts_mkey0::<O>(
-        &mut a_t_hasher,
-        &mut b_t_hasher,
+        &mut zk_hasher,
         GenericArray::from_slice(&w[..O::LKE::USIZE / 8]),
         GenericArray::from_slice(&new_v[..O::LKE::USIZE]),
     );
 
     aes_enc_cstrnts_mkey0::<O>(
-        &mut a_t_hasher,
-        &mut b_t_hasher,
+        &mut zk_hasher,
         owf_input[..16].try_into().unwrap(),
         owf_output[..16].try_into().unwrap(),
         GenericArray::from_slice(&w[O::LKE::USIZE / 8..(O::LKE::USIZE + O::LENC::USIZE) / 8]),
@@ -743,8 +732,7 @@ where
 
     if O::LAMBDA::USIZE > 128 {
         aes_enc_cstrnts_mkey0::<O>(
-            &mut a_t_hasher,
-            &mut b_t_hasher,
+            &mut zk_hasher,
             owf_input[16..].try_into().unwrap(),
             owf_output[16..].try_into().unwrap(),
             GenericArray::from_slice(&w[(O::LKE::USIZE + O::LENC::USIZE) / 8..O::LBYTES::USIZE]),
@@ -756,8 +744,7 @@ where
 
     let u_s = Field::<O>::from(&u[O::LBYTES::USIZE..]);
     let v_s = Field::<O>::sum_poly(&new_v[O::L::USIZE..O::L::USIZE + O::LAMBDA::USIZE]);
-    let a_t = a_t_hasher.finalize(&u_s);
-    let b_t = b_t_hasher.finalize(&v_s);
+    let (a_t, b_t) = zk_hasher.finalize(&u_s, &v_s);
 
     (a_t.as_bytes(), b_t.as_bytes())
 }
