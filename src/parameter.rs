@@ -142,7 +142,6 @@ pub(crate) trait OWFParameters: Sized {
     type SK: ArrayLength;
     type LHATBYTES: ArrayLength;
     type LAMBDAPLUS2: ArrayLength;
-    type LPRIMEBYTE: ArrayLength;
     type KBLENGTH: ArrayLength;
     type PRODRUN128: ArrayLength;
     type PRODRUN128Bytes: ArrayLength;
@@ -242,7 +241,6 @@ impl OWFParameters for OWF128 {
     type SK = U32;
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
-    type LPRIMEBYTE = U256;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
@@ -317,7 +315,6 @@ impl OWFParameters for OWF192 {
     type SK = U56;
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
-    type LPRIMEBYTE = U384;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
@@ -396,7 +393,6 @@ impl OWFParameters for OWF256 {
     type SK = U64;
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
-    type LPRIMEBYTE = U512;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
@@ -475,7 +471,6 @@ impl OWFParameters for OWF128EM {
     type SK = U32;
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
-    type LPRIMEBYTE = U256;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
@@ -553,7 +548,6 @@ impl OWFParameters for OWF192EM {
     type SK = U48;
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
-    type LPRIMEBYTE = U384;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
@@ -631,7 +625,6 @@ impl OWFParameters for OWF256EM {
     type SK = U64;
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
     type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
-    type LPRIMEBYTE = U512;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
