@@ -55,10 +55,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 // TODO: fix those
-#![allow(
-    clippy::type_complexity,
-    clippy::too_many_arguments
-)]
+#![allow(clippy::type_complexity)]
 
 use generic_array::{typenum::Unsigned, GenericArray};
 use paste::paste;

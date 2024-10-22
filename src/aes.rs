@@ -326,20 +326,12 @@ where
     zk_hasher.process(
         iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
             let iwd = 32 * (O::NK::USIZE - 1) + j * if O::LAMBDA::USIZE == 192 { 192 } else { 128 };
-            let dorotword = if O::LAMBDA::USIZE == 256 && j % 2 == 1 {
-                false
-            } else {
-                true
-            };
+            let dorotword = !(O::LAMBDA::USIZE == 256 && j % 2 == 1);
             Field::<O>::byte_combine_bits(k[iwd / 8 + inverse_rotate_word(r, dorotword)])
         }),
         iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
             let iwd = 32 * (O::NK::USIZE - 1) + j * if O::LAMBDA::USIZE == 192 { 192 } else { 128 };
-            let dorotword = if O::LAMBDA::USIZE == 256 && j % 2 == 1 {
-                false
-            } else {
-                true
-            };
+            let dorotword = !(O::LAMBDA::USIZE == 256 && j % 2 == 1);
             let r = inverse_rotate_word(r, dorotword);
             Field::<O>::byte_combine_slice(&vk[iwd + (8 * r)..iwd + (8 * r) + 8])
         }),
@@ -365,11 +357,7 @@ where
         q_w_b,
         iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
             let iwd = 32 * (O::NK::USIZE - 1) + j * if O::LAMBDA::USIZE == 192 { 192 } else { 128 };
-            let dorotword = if O::LAMBDA::USIZE == 256 && j % 2 == 1 {
-                false
-            } else {
-                true
-            };
+            let dorotword = !(O::LAMBDA::USIZE == 256 && j % 2 == 1);
             let rotated_r = inverse_rotate_word(r, dorotword);
             Field::<O>::byte_combine_slice(&q_k[iwd + (8 * rotated_r)..iwd + (8 * rotated_r) + 8])
         }),

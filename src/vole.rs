@@ -102,7 +102,6 @@ where
     (hcom, decom, c, Box::new(u[0].clone()), v)
 }
 
-#[allow(clippy::too_many_arguments)]
 #[allow(clippy::type_complexity)]
 ///# Panics
 ///
