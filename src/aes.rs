@@ -86,15 +86,9 @@ where
         }
     }
     //step 5
-    for b in 0..O::BETA::USIZE {
-        round_with_save(
-            &input[16 * b..16 * (b + 1)],
-            &kb,
-            O::R::U8,
-            &mut w,
-            &mut index,
-            &mut valid,
-        );
+    round_with_save(&input[..16], &kb, O::R::U8, &mut w, &mut index, &mut valid);
+    if O::LAMBDA::USIZE > 128 {
+        round_with_save(&input[16..], &kb, O::R::U8, &mut w, &mut index, &mut valid);
     }
     if valid {
         Some(w)

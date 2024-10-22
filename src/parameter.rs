@@ -5,9 +5,9 @@ use aes::{
 use generic_array::{
     typenum::{
         Diff, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1024, U11, U112, U12, U128, U14, U142, U152,
-        U16, U160, U16384, U192, U2, U200, U2048, U22, U224, U24, U256, U288, U3, U32, U384, U4,
-        U40, U408, U4096, U448, U470, U476, U48, U5, U500, U511, U512, U52, U56, U576, U584, U596,
-        U6, U600, U64, U640, U672, U7, U752, U8, U8192, U832, U96,
+        U16, U160, U16384, U192, U2, U200, U2048, U22, U24, U256, U288, U3, U32, U384, U4, U40,
+        U408, U4096, U448, U470, U476, U48, U5, U500, U511, U512, U52, U56, U576, U584, U596, U6,
+        U600, U64, U640, U672, U7, U752, U8, U8192, U832, U96,
     },
     ArrayLength, GenericArray,
 };
@@ -135,7 +135,6 @@ pub(crate) trait OWFParameters: Sized {
     type LKEBytes: ArrayLength;
     type LENC: ArrayLength;
     type QUOTLENC8: ArrayLength;
-    type BETA: ArrayLength;
     type NST: ArrayLength;
     type LAMBDALBYTES: ArrayLength;
     type LAMBDAL: ArrayLength;
@@ -238,7 +237,6 @@ impl OWFParameters for OWF128 {
     type LKE = U448;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = Sum<U1024, U128>;
-    type BETA = U1;
     type NST = U0;
     type PK = U32;
     type SK = U32;
@@ -314,7 +312,6 @@ impl OWFParameters for OWF192 {
     type LKE = U448;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = Sum<U1024, U384>;
-    type BETA = U2;
     type NST = U0;
     type PK = U64;
     type SK = U56;
@@ -394,7 +391,6 @@ impl OWFParameters for OWF256 {
     type LKE = U672;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = Sum<U1024, U640>;
-    type BETA = U2;
     type NST = U0;
     type PK = U64;
     type SK = U64;
@@ -474,7 +470,6 @@ impl OWFParameters for OWF128EM {
     type LKE = U448;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = Sum<U1024, U128>;
-    type BETA = U1;
     type NST = U4;
     type PK = U32;
     type SK = U32;
@@ -553,7 +548,6 @@ impl OWFParameters for OWF192EM {
     type LKE = U448;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = Sum<U1024, U384>;
-    type BETA = U2;
     type NST = U6;
     type PK = U48;
     type SK = U48;
@@ -632,7 +626,6 @@ impl OWFParameters for OWF256EM {
     type LKE = U672;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = Sum<U1024, U640>;
-    type BETA = U2;
     type NST = U8;
     type PK = U64;
     type SK = U64;
