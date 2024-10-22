@@ -229,7 +229,7 @@ where
 }
 
 fn aes_key_exp_bwd_mtag1_mkey0<O>(
-    x: &GenericArray<Field<O>, O::LKE>,
+    x: &[Field<O>],
     xk: &GenericArray<Field<O>, O::PRODRUN128>,
 ) -> Box<GenericArray<Field<O>, O::PRODSKE8>>
 where
@@ -336,18 +336,8 @@ where
     let mut dorotword = true;
     let k = aes_key_exp_fwd_1::<O>(w);
     let vk = aes_key_exp_fwd::<O>(v);
-    // FIXME
     let w_b = aes_key_exp_bwd_mtag0_mkey0::<O>(w, &k);
-    let v_w_b = aes_key_exp_bwd_mtag1_mkey0::<O>(
-        GenericArray::from_slice(
-            &[
-                &v[O::LAMBDA::USIZE..],
-                &vec![Field::<O>::default(); O::LAMBDA::USIZE],
-            ]
-            .concat(),
-        ),
-        GenericArray::from_slice(&vk),
-    );
+    let v_w_b = aes_key_exp_bwd_mtag1_mkey0::<O>(&v[O::LAMBDA::USIZE..], &vk);
     for j in 0..O::SKE::USIZE / 4 {
         let mut k_hat = [Field::<O>::default(); 4];
         let mut v_k_hat = [Field::<O>::default(); 4];
@@ -389,7 +379,6 @@ where
     let mut iwd = 32 * (O::NK::USIZE - 1);
     let mut dorotword = true;
     let q_k = aes_key_exp_fwd::<O>(q);
-    // FIXME
     let q_w_b = aes_key_exp_bwd_mtag0_mkey1::<O>(q, &q_k, delta);
     let delta_squared = delta * delta;
     for j in 0..O::SKE::USIZE / 4 {
