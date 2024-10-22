@@ -188,12 +188,6 @@ where
     out
 }
 
-///Choice is made to treat bits as element of GFlambda(that is, m=lambda anyway, while in the paper we can have m = 1),
-///
-///since the set {GFlambda::0, GFlambda::1} is stable with the operations used on it in the program and that is much more convenient to write
-///
-///One of the first path to optimize the code could be to do the distinction
-///Beware when calling it : if Mtag = 1 ∧ Mkey = 1 or Mkey = 1 ∧ ∆ = ⊥ return ⊥
 fn aes_key_exp_bwd_mtag0_mkey0<O>(
     x: &GenericArray<u8, O::LKEBytes>,
     xk: &GenericArray<u8, O::PRODRUN128Bytes>,
@@ -217,9 +211,7 @@ where
             // Step 11
             x_tilde ^= rcon;
         }
-        let y_tilde =
-            x_tilde.rotate_right(7) ^ x_tilde.rotate_right(5) ^ x_tilde.rotate_right(2) ^ 0x5;
-        out[j] = y_tilde;
+        out[j] = x_tilde.rotate_right(7) ^ x_tilde.rotate_right(5) ^ x_tilde.rotate_right(2) ^ 0x5;
         c += 1;
         // Step 21
         if c == 4 {
