@@ -438,16 +438,12 @@ where
 
     let new_u = GenericArray::from_slice(&u[..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE]);
     let new_gv = Box::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>::from_iter(
-        // FIXME: this requires quite a bunch of memory on the stack
-        gv.iter().flat_map(|x| {
-            x.iter()
-                .map(|y| {
-                    y.iter()
-                        .take(O::LBYTES::USIZE + O::LAMBDABYTES::USIZE)
-                        .copied()
-                        .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
-                })
-                .collect::<Vec<GenericArray<u8, O::LAMBDALBYTES>>>()
+        gv.into_iter().flat_map(|x| {
+            x.into_iter().map(|y| {
+                y.into_iter()
+                    .take(O::LBYTES::USIZE + O::LAMBDABYTES::USIZE)
+                    .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
+            })
         }),
     );
 
