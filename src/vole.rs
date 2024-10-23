@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[allow(clippy::type_complexity)]
-fn to_vole_convert<'a, PRG, LH>(
+fn convert_to_vole<'a, PRG, LH>(
     sd_0: Option<&GenericArray<u8, PRG::Lambda>>,
     sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, PRG::Lambda>>,
     iv: &IV,
@@ -20,17 +20,15 @@ where
     PRG: PseudoRandomGenerator,
     LH: ArrayLength,
 {
-    // this parameters are known upfront!
+    // these parameters are known upfront!
     let n = sd.len() + 1;
     let d = (64 - (n as u64).leading_zeros() - 1) as usize;
     let mut r = vec![GenericArray::<u8, LH>::default(); n * 2];
     if let Some(sd0) = sd_0 {
-        let mut prg = PRG::new_prg(sd0, iv);
-        prg.read(&mut r[0]);
+        PRG::new_prg(sd0, iv).read(&mut r[0]);
     }
-    for (i, sdi) in sd.enumerate() {
-        let mut prg = PRG::new_prg(sdi, iv);
-        prg.read(&mut r[i + 1]);
+    for (ri, sdi) in zip(&mut r[1..], sd) {
+        PRG::new_prg(sdi, iv).read(ri);
     }
 
     // FIXME
@@ -90,7 +88,7 @@ where
         let (com_i, decom_i, sd_i) = VC::commit(&r_i, iv, 1 << k);
         decom[i] = decom_i;
         hasher.update(&com_i);
-        let (ui, vi) = to_vole_convert::<VC::PRG, _>(Some(&sd_i[0]), sd_i.iter().skip(1), iv);
+        let (ui, vi) = convert_to_vole::<VC::PRG, _>(Some(&sd_i[0]), sd_i.iter().skip(1), iv);
         v[i] = vi;
 
         if i == 0 {
@@ -154,7 +152,7 @@ where
             .map(|(j, d)| usize::from(d) << j)
             .sum();
 
-        (_, q[i]) = to_vole_convert::<VC::PRG, _>(None, (1..(1 << k)).map(|j| &s_i[j ^ delta]), iv);
+        (_, q[i]) = convert_to_vole::<VC::PRG, _>(None, (1..(1 << k)).map(|j| &s_i[j ^ delta]), iv);
     }
     let mut hcom = GenericArray::default();
     hasher.finish().read(&mut hcom);
