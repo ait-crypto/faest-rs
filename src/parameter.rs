@@ -27,7 +27,7 @@ use crate::{
 
 /// Base parameters per security level
 pub(crate) trait BaseParameters {
-    /// The field that is of size `2^λ` which is defined as [Self::Lambda]
+    /// The field that is of size `2^λ` which is defined as [`Self::Lambda`]
     type Field: BigGaloisField<Length = Self::LambdaBytes> + std::fmt::Debug;
     /// Hasher implementation of `ZKHash`
     type ZKHasher: ZKHasherInit<Self::Field, SDLength = Self::Chall>;

@@ -48,7 +48,7 @@ where
     (r[(d % 2) * n].clone(), v)
 }
 
-#[allow(clippy::type_complexity, clippy::many_single_char_names)]
+#[allow(clippy::type_complexity)]
 pub fn volecommit<VC, Tau, LH>(
     r: &GenericArray<u8, VC::Lambda>,
     iv: &IV,
@@ -106,9 +106,6 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-///# Panics
-///
-/// if i is too big for being a u16
 pub fn volereconstruct<VC, Tau, LH>(
     chal: &[u8],
     pdecom: &[u8],

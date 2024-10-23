@@ -111,7 +111,7 @@ fn round_with_save(
     rijndael_add_round_key(&mut state, &kb[..8]);
     for j in 1..r as usize {
         for i in &inv_bitslice(&state)[0][..] {
-            *valid &= *i != 0
+            *valid &= *i != 0;
         }
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
@@ -127,7 +127,7 @@ fn round_with_save(
         rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
     }
     for i in &inv_bitslice(&state)[0][..] {
-        *valid &= *i != 0
+        *valid &= *i != 0;
     }
 }
 

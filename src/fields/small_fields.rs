@@ -71,7 +71,7 @@ where
 {
     #[inline(always)]
     fn default() -> Self {
-        Self(Default::default())
+        Self(Wrapping::default())
     }
 }
 
@@ -104,7 +104,7 @@ where
     #[inline(always)]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: Self) {
-        self.0 ^= rhs.0
+        self.0 ^= rhs.0;
     }
 }
 
@@ -128,7 +128,7 @@ where
     #[inline(always)]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: Self) {
-        self.0 ^= rhs.0
+        self.0 ^= rhs.0;
     }
 }
 

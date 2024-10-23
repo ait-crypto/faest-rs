@@ -118,7 +118,7 @@ where
 
 /// Byte-based encoding of signing and verification keys
 ///
-/// This is similar to [signature::SignatureEncoding] but for keys.
+/// This is similar to [`signature::SignatureEncoding`] but for keys.
 pub trait ByteEncoding: Clone + Sized + for<'a> TryFrom<&'a [u8]> + TryInto<Self::Repr> {
     /// Byte representation of a key.
     type Repr: 'static + AsRef<[u8]> + Clone + Send + Sync;

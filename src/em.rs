@@ -33,39 +33,37 @@ where
     bitslice(&mut state, &owf_key[..16], &owf_key[16..]);
     rijndael_add_round_key(&mut state, &kb[..8]);
     for j in 1..O::R::USIZE {
-        for i in inv_bitslice(&state)[0][..].iter() {
+        for i in &inv_bitslice(&state)[0][..] {
             valid &= *i != 0;
         }
         if O::NST::USIZE == 6 {
-            for i in inv_bitslice(&state)[1][..8].iter() {
+            for i in &inv_bitslice(&state)[1][..8] {
                 valid &= *i != 0;
             }
         } else if O::NST::USIZE == 8 {
-            for i in inv_bitslice(&state)[1][..].iter() {
+            for i in &inv_bitslice(&state)[1][..] {
                 valid &= *i != 0;
             }
         }
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1::<O::NST>(&mut state);
-        for i in
-            convert_from_batchblocks(inv_bitslice(&state))[..O::NK::USIZE][..O::NK::USIZE].iter()
-        {
+        for i in &convert_from_batchblocks(inv_bitslice(&state))[..O::NK::USIZE][..O::NK::USIZE] {
             res[index..index + size_of::<u32>()].copy_from_slice(&i.to_le_bytes());
             index += size_of::<u32>();
         }
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
     }
-    for i in inv_bitslice(&state)[0][..].iter() {
+    for i in &inv_bitslice(&state)[0][..] {
         valid &= *i != 0;
     }
     if O::NST::USIZE == 6 {
-        for i in inv_bitslice(&state)[1][..8].iter() {
+        for i in &inv_bitslice(&state)[1][..8] {
             valid &= *i != 0;
         }
     } else if O::NST::USIZE == 8 {
-        for i in inv_bitslice(&state)[1][..].iter() {
+        for i in &inv_bitslice(&state)[1][..] {
             valid &= *i != 0;
         }
     }

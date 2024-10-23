@@ -53,17 +53,17 @@ pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
     for rcon in RCON_TABLE.iter().take(ske / 4) {
         if NK::USIZE == 8 {
             if count < ske / 4 {
-                for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][12..].iter() {
+                for i in &inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][12..] {
                     valid &= 0 != *i;
                 }
-                count += 1
+                count += 1;
             }
         } else if NK::USIZE == 6 {
-            for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][4..8].iter() {
+            for i in &inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][4..8] {
                 valid &= 0 != *i;
             }
         } else {
-            for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..].iter() {
+            for i in &inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..] {
                 valid &= 0 != *i;
             }
         }
@@ -87,10 +87,10 @@ pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
 
         xor_columns::<NK>(&mut rkeys, rk_off);
         if NK::USIZE == 8 && count < ske / 4 {
-            for i in inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..].iter() {
+            for i in &inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..] {
                 valid &= 0 != *i;
             }
-            count += 1
+            count += 1;
         }
     }
 
@@ -398,7 +398,7 @@ pub(crate) fn sub_bytes_nots(state: &mut [u32]) {
 /// Computation of the MixColumns transformation in the fixsliced representation, with different
 /// rotations used according to the round number mod 4.
 ///
-/// Based on Käsper-Schwabe, similar to https://github.com/Ko-/aes-armcortexm.
+/// Based on Käsper-Schwabe, similar to <https://github.com/Ko-/aes-armcortexm>.
 pub(crate) fn mix_columns_0(state: &mut State) {
     let (a0, a1, a2, a3, a4, a5, a6, a7) = (
         state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7],
@@ -534,15 +534,15 @@ pub(crate) fn bitslice(output: &mut [u32], input0: &[u8], input1: &[u8]) {
     let mut t2 = u32::from_le_bytes(input0[0x04..0x08].try_into().unwrap());
     let mut t4 = u32::from_le_bytes(input0[0x08..0x0c].try_into().unwrap());
     let mut t6 = u32::from_le_bytes(input0[0x0c..0x10].try_into().unwrap());
-    let mut t1 = if !input1.is_empty() {
+    let mut t1 = if input1.is_empty() {
+        0
+    } else {
         u32::from_le_bytes(input1[0x00..0x04].try_into().unwrap())
-    } else {
-        0
     };
-    let mut t3 = if !input1.is_empty() {
-        u32::from_le_bytes(input1[0x04..0x08].try_into().unwrap())
-    } else {
+    let mut t3 = if input1.is_empty() {
         0
+    } else {
+        u32::from_le_bytes(input1[0x04..0x08].try_into().unwrap())
     };
     let mut t5 = if input1.len() > 8 {
         u32::from_le_bytes(input1[0x08..0x0c].try_into().unwrap())

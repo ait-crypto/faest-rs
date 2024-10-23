@@ -380,7 +380,7 @@ pub(crate) fn faest_sign<P>(
 ) where
     P: FAESTParameters,
 {
-    sign::<P, P::OWF>(msg, sk, rho, signature)
+    sign::<P, P::OWF>(msg, sk, rho, signature);
 }
 
 #[allow(clippy::type_complexity)]
@@ -405,7 +405,7 @@ where
         &mut chall1,
         &mu,
         &hcom,
-        c.iter().map(|ci| ci.as_slice()),
+        c.iter().map(GenericArray::as_slice),
         &iv,
     );
 
@@ -482,7 +482,7 @@ where
         &chall3,
         &iv,
         signature,
-    )
+    );
 }
 
 #[inline(always)]
@@ -538,7 +538,7 @@ where
     > = GenericArray::default_boxed();
     let mut gd_t: Box<GenericArray<Vec<&GenericArray<u8, O::LAMBDAPLUS2>>, O::LAMBDALBYTES>> =
         GenericArray::default_boxed();
-    gq[0] = gq_p[0].clone();
+    gq[0].clone_from(&gq_p[0]);
     let delta0 = P::Tau::decode_challenge(chall3, 0);
     let u_t = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
         ..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)

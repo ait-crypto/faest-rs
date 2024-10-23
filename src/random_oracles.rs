@@ -77,7 +77,7 @@ pub(crate) struct Hasher128Reader(Shake128Reader);
 
 impl Reader for Hasher128Reader {
     fn read(&mut self, dst: &mut [u8]) {
-        self.0.read(dst)
+        self.0.read(dst);
     }
 }
 
@@ -123,7 +123,7 @@ pub(crate) struct Hasher256Reader(Shake256Reader);
 
 impl Reader for Hasher256Reader {
     fn read(&mut self, dst: &mut [u8]) {
-        self.0.read(dst)
+        self.0.read(dst);
     }
 }
 
