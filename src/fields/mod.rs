@@ -28,7 +28,7 @@ pub(crate) trait Field:
     /// Representation of `0`
     const ZERO: Self;
 
-    /// Representation of `0`
+    /// Representation of `1`
     const ONE: Self;
 
     /// Length of the byte representation of the field
