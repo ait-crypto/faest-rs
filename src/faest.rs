@@ -376,7 +376,7 @@ pub(crate) fn faest_sign<P>(
     msg: &[u8],
     sk: &SecretKey<P::OWF>,
     rho: &[u8],
-    signature: &mut GenericArray<u8, P::SIG>,
+    signature: &mut GenericArray<u8, P::SignatureSize>,
 ) where
     P: FAESTParameters,
 {
@@ -384,8 +384,12 @@ pub(crate) fn faest_sign<P>(
 }
 
 #[allow(clippy::type_complexity)]
-fn sign<P, O>(msg: &[u8], sk: &SecretKey<O>, rho: &[u8], signature: &mut GenericArray<u8, P::SIG>)
-where
+fn sign<P, O>(
+    msg: &[u8],
+    sk: &SecretKey<O>,
+    rho: &[u8],
+    signature: &mut GenericArray<u8, P::SignatureSize>,
+) where
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
@@ -489,7 +493,7 @@ where
 pub(crate) fn faest_verify<P>(
     msg: &[u8],
     pk: &PublicKey<P::OWF>,
-    sigma: &GenericArray<u8, P::SIG>,
+    sigma: &GenericArray<u8, P::SignatureSize>,
 ) -> Result<(), Error>
 where
     P: FAESTParameters,
@@ -501,16 +505,17 @@ where
 fn verify<P, O>(
     msg: &[u8],
     pk: &PublicKey<O>,
-    sigma: &GenericArray<u8, P::SIG>,
+    sigma: &GenericArray<u8, P::SignatureSize>,
 ) -> Result<(), Error>
 where
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
     let chall3 = GenericArray::from_slice(
-        &sigma[P::SIG::USIZE - (16 + O::LAMBDABYTES::USIZE)..P::SIG::USIZE - 16],
+        &sigma
+            [P::SignatureSize::USIZE - (16 + O::LAMBDABYTES::USIZE)..P::SignatureSize::USIZE - 16],
     );
-    let iv = &sigma[P::SIG::USIZE - 16..];
+    let iv = &sigma[P::SignatureSize::USIZE - 16..];
 
     let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
         GenericArray::default();
@@ -521,7 +526,7 @@ where
         &sigma[(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1))
             + (2 * O::LAMBDABYTES::USIZE)
             + O::LBYTES::USIZE
-            + 2..P::SIG::USIZE - (16 + O::LAMBDABYTES::USIZE)],
+            + 2..P::SignatureSize::USIZE - (16 + O::LAMBDABYTES::USIZE)],
         &iv.try_into().unwrap(),
     );
 

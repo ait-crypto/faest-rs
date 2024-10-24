@@ -786,7 +786,8 @@ pub(crate) trait FAESTParameters {
     type N1: ArrayLength;
     type POWK0: ArrayLength;
     type POWK1: ArrayLength;
-    type SIG: ArrayLength;
+    /// Size of the signature (in bytes)
+    type SignatureSize: ArrayLength;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -801,7 +802,7 @@ impl FAESTParameters for FAEST128sParameters {
     type N1 = U2048;
     type POWK1 = Diff<U4096, U1>;
 
-    type SIG = Sum<U142, Sum<U256, Sum<U512, U4096>>>;
+    type SignatureSize = Sum<U142, Sum<U256, Sum<U512, U4096>>>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -815,7 +816,7 @@ impl FAESTParameters for FAEST128fParameters {
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type SIG = Sum<U192, Sum<U2048, U4096>>;
+    type SignatureSize = Sum<U192, Sum<U2048, U4096>>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -829,7 +830,7 @@ impl FAESTParameters for FAEST192sParameters {
     type POWK0 = Diff<U8192, U1>;
     type N1 = U4096;
     type POWK1 = Diff<U8192, U1>;
-    type SIG = Sum<U200, Sum<U256, Sum<U8192, U4096>>>;
+    type SignatureSize = Sum<U200, Sum<U256, Sum<U8192, U4096>>>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -843,7 +844,7 @@ impl FAESTParameters for FAEST192fParameters {
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type SIG = Sum<U152, Sum<U256, U16384>>;
+    type SignatureSize = Sum<U152, Sum<U256, U16384>>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -857,7 +858,7 @@ impl FAESTParameters for FAEST256sParameters {
     type POWK0 = Diff<U8192, U1>;
     type N1 = U2048;
     type POWK1 = Diff<U4096, U1>;
-    type SIG = Sum<U596, Sum<U1024, Sum<U4096, U16384>>>;
+    type SignatureSize = Sum<U596, Sum<U1024, Sum<U4096, U16384>>>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -871,7 +872,7 @@ impl FAESTParameters for FAEST256fParameters {
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type SIG = Sum<U752, Sum<U1024, Sum<U2048, Sum<U8192, U16384>>>>;
+    type SignatureSize = Sum<U752, Sum<U1024, Sum<U2048, Sum<U8192, U16384>>>>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -885,7 +886,7 @@ impl FAESTParameters for FAESTEM128sParameters {
     type POWK0 = Diff<U8192, U1>;
     type N1 = U2048;
     type POWK1 = Diff<U4096, U1>;
-    type SIG = Sum<U470, U4096>;
+    type SignatureSize = Sum<U470, U4096>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -899,7 +900,7 @@ impl FAESTParameters for FAESTEM128fParameters {
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type SIG = Sum<U576, Sum<U1024, U4096>>;
+    type SignatureSize = Sum<U576, Sum<U1024, U4096>>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -913,7 +914,7 @@ impl FAESTParameters for FAESTEM192sParameters {
     type POWK0 = Diff<U8192, U1>;
     type N1 = U4096;
     type POWK1 = Diff<U8192, U1>;
-    type SIG = Sum<U584, Sum<U2048, U8192>>;
+    type SignatureSize = Sum<U584, Sum<U2048, U8192>>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -927,7 +928,7 @@ impl FAESTParameters for FAESTEM192fParameters {
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type SIG = Sum<U600, Sum<U1024, Sum<U4096, U8192>>>;
+    type SignatureSize = Sum<U600, Sum<U1024, Sum<U4096, U8192>>>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -941,7 +942,7 @@ impl FAESTParameters for FAESTEM256sParameters {
     type POWK0 = Diff<U8192, U1>;
     type N1 = U2048;
     type POWK1 = Diff<U4096, U1>;
-    type SIG = Sum<U476, Sum<U4096, U16384>>;
+    type SignatureSize = Sum<U476, Sum<U4096, U16384>>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -955,7 +956,7 @@ impl FAESTParameters for FAESTEM256fParameters {
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type SIG = Sum<U112, Sum<U2048, Sum<U8192, U16384>>>;
+    type SignatureSize = Sum<U112, Sum<U2048, Sum<U8192, U16384>>>;
 }
 
 #[cfg(test)]

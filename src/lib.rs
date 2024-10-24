@@ -253,7 +253,7 @@ macro_rules! define_impl {
             #[doc = "Signature for " $param]
             #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-            pub struct [<$param Signature>](GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SIG>);
+            pub struct [<$param Signature>](GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>);
 
             impl Signer<[<$param Signature>]> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
@@ -371,18 +371,18 @@ macro_rules! define_impl {
                 }
             }
 
-            impl From<[<$param Signature>]> for [u8; <[<$param Parameters>] as FAESTParameters>::SIG::USIZE] {
+            impl From<[<$param Signature>]> for [u8; <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE] {
                 fn from(value: [<$param Signature>]) -> Self {
                     value.to_bytes()
                 }
             }
 
             impl SignatureEncoding for [<$param Signature>] {
-                type Repr = [u8; <[<$param Parameters>] as FAESTParameters>::SIG::USIZE];
+                type Repr = [u8; <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE];
 
                 fn to_bytes(&self) -> Self::Repr {
                     // NOTE: this could be done with Into if it would be supported
-                    let mut ret = [0; <[<$param Parameters>] as FAESTParameters>::SIG::USIZE];
+                    let mut ret = [0; <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE];
                     ret.copy_from_slice(self.0.as_slice());
                     ret
                 }
@@ -392,7 +392,7 @@ macro_rules! define_impl {
                 }
 
                 fn encoded_len(&self) -> usize {
-                    <[<$param Parameters>] as FAESTParameters>::SIG::USIZE
+                    <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE
                 }
             }
         }
