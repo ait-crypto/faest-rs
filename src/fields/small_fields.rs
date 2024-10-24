@@ -5,10 +5,7 @@ use std::{
     },
 };
 
-use generic_array::{
-    typenum::{U1, U8},
-    GenericArray,
-};
+use generic_array::{typenum::U8, GenericArray};
 
 use super::Field;
 
@@ -48,13 +45,6 @@ impl<T> From<T> for SmallGF<T> {
     #[inline(always)]
     fn from(value: T) -> Self {
         Self(Wrapping(value))
-    }
-}
-
-impl From<SmallGF<u8>> for u8 {
-    #[inline(always)]
-    fn from(value: SmallGF<u8>) -> Self {
-        value.0 .0
     }
 }
 
@@ -141,12 +131,6 @@ impl<T> Neg for SmallGF<T> {
     }
 }
 
-impl GaloisFieldHelper<u8> for SmallGF<u8> {
-    const BITS: usize = u8::BITS as usize;
-    const ONE: Wrapping<u8> = Wrapping(1u8);
-    const MODULUS: Wrapping<u8> = Wrapping(0b11011u8);
-}
-
 impl GaloisFieldHelper<u64> for SmallGF<u64> {
     const BITS: usize = u64::BITS as usize;
     const MODULUS: Wrapping<u64> = Wrapping(0b00011011u64);
@@ -189,21 +173,8 @@ where
     }
 }
 
-/// Binary field `2^8`
-pub type GF8 = SmallGF<u8>;
 /// Binary field `2^64`
 pub type GF64 = SmallGF<u64>;
-
-impl Field for GF8 {
-    const ZERO: Self = Self(Wrapping(0));
-    const ONE: Self = Self(Wrapping(1));
-
-    type Length = U1;
-
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        GenericArray::from([self.0 .0])
-    }
-}
 
 impl Field for GF64 {
     const ZERO: Self = Self(Wrapping(0));
@@ -230,42 +201,6 @@ mod test {
     use rand::{rngs::SmallRng, Rng, SeedableRng};
 
     use super::*;
-
-    #[test]
-    fn gf8_test_mul() {
-        let mut rng = SmallRng::from_entropy();
-
-        let pol_2 = GF8::from(2u8);
-        let pol_135 = GF8::from(135u8);
-        let pol_21 = GF8::from(21u8);
-        let anything: u8 = rng.gen();
-        let pol_anything = GF8::from(anything);
-        let pol_0 = GF8::from(0u8);
-        let pol_1 = GF8::from(1u8);
-        assert_eq!(pol_2 * pol_135, pol_21);
-        assert_eq!(pol_135 * pol_2, pol_21);
-        assert_eq!(pol_0 * pol_anything, pol_0);
-        assert_eq!(pol_anything * pol_0, pol_0);
-        assert_eq!(pol_1 * pol_anything, pol_anything);
-        assert_eq!(pol_anything * pol_1, pol_anything);
-        //Some datas obtained from the refrence implementation :
-        let database = [
-            (0xc5u8, 0xa0u8, 0xb2u8),
-            (0x4bu8, 0xb2u8, 0x53u8),
-            (0xfcu8, 0xa0u8, 0x4cu8),
-            (0x2cu8, 0x4cu8, 0x3eu8),
-            (0xa1u8, 0xf7u8, 0x37u8),
-        ];
-        for (left, right, result) in database {
-            let left = GF8::from(left);
-            let right = GF8::from(right);
-            let result = GF8::from(result);
-            let res = left * right;
-            let res_rev = right * left;
-            assert_eq!(res, result);
-            assert_eq!(res, res_rev);
-        }
-    }
 
     #[test]
     fn gf64_test_mul() {
