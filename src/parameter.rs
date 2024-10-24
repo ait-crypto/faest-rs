@@ -1006,13 +1006,28 @@ mod test {
     }
 
     #[generic_tests::define]
-    mod parameters {
+    mod owf_parameters {
         use super::*;
+
+        #[test]
+        fn lambda<O: OWFParameters>() {
+            assert!(O::LAMBDA::USIZE == 128 || O::LAMBDA::USIZE == 192 || O::LAMBDA::USIZE == 256);
+            assert_eq!(O::LAMBDABYTES::USIZE * 8, O::LAMBDA::USIZE);
+        }
 
         #[test]
         fn pk_sk_size<O: OWFParameters>() {
             assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LAMBDABYTES::USIZE);
             assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::InputSize::USIZE);
+        }
+
+        #[test]
+        fn owf_parameters<O: OWFParameters>() {
+            assert_eq!(O::LKE::USIZE % 8, 0);
+            assert_eq!(O::LKEBytes::USIZE * 8, O::LKE::USIZE);
+            assert_eq!(O::LENC::USIZE % 8, 0);
+            assert_eq!(O::L::USIZE % 8, 0);
+            assert_eq!(O::LBYTES::USIZE * 8, O::L::USIZE);
         }
 
         #[instantiate_tests(<OWF128>)]
@@ -1032,5 +1047,55 @@ mod test {
 
         #[instantiate_tests(<OWF256EM>)]
         mod owf_em_256 {}
+    }
+
+    #[generic_tests::define]
+    mod faest_parameters {
+        use super::*;
+
+        #[test]
+        fn tau_config<P: FAESTParameters>() {
+            assert_eq!(
+                <P::OWF as OWFParameters>::LAMBDA::USIZE,
+                <P::Tau as TauParameters>::K0::USIZE * <P::Tau as TauParameters>::Tau0::USIZE
+                    + <P::Tau as TauParameters>::K1::USIZE * <P::Tau as TauParameters>::Tau1::USIZE
+            );
+        }
+
+        #[instantiate_tests(<FAEST128fParameters>)]
+        mod faest_128f {}
+
+        #[instantiate_tests(<FAEST128sParameters>)]
+        mod faest_128s {}
+
+        #[instantiate_tests(<FAEST192fParameters>)]
+        mod faest_192f {}
+
+        #[instantiate_tests(<FAEST192sParameters>)]
+        mod faest_192s {}
+
+        #[instantiate_tests(<FAEST256fParameters>)]
+        mod faest_256f {}
+
+        #[instantiate_tests(<FAEST256sParameters>)]
+        mod faest_256s {}
+
+        #[instantiate_tests(<FAESTEM128fParameters>)]
+        mod faest_em_128f {}
+
+        #[instantiate_tests(<FAESTEM128sParameters>)]
+        mod faest_em_128s {}
+
+        #[instantiate_tests(<FAESTEM192fParameters>)]
+        mod faest_em_192f {}
+
+        #[instantiate_tests(<FAESTEM192sParameters>)]
+        mod faest_em_192s {}
+
+        #[instantiate_tests(<FAESTEM256fParameters>)]
+        mod faest_em_256f {}
+
+        #[instantiate_tests(<FAESTEM256sParameters>)]
+        mod faest_em_256s {}
     }
 }
