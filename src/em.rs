@@ -75,10 +75,9 @@ where
 }
 
 /// Implementation of `EncFwd` with `GF(2)`
-fn em_enc_fwd_1<'a, 'b, O>(z: &'a [u8], x: &'a [u8]) -> impl Iterator<Item = Field<O>> + 'b
+fn em_enc_fwd_1<'a, O>(z: &'a [u8], x: &'a [u8]) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     (0..4 * O::NST::USIZE)
         .map(|j| {
@@ -119,10 +118,9 @@ where
 }
 
 /// Implementation of `EncFwd` for `GF(\lambda)` for signing
-fn em_enc_fwd_proof<'a, 'b, O>(z: &'a [Field<O>]) -> impl Iterator<Item = Field<O>> + 'b
+fn em_enc_fwd_proof<'a, O>(z: &'a [Field<O>]) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     (0..4 * O::NST::USIZE)
         .map(|j| {
@@ -162,14 +160,13 @@ where
         )
 }
 
-fn em_enc_fwd_verify<'a, 'b, O>(
+fn em_enc_fwd_verify<'a, O>(
     z: &'a [Field<O>],
     x: &'a [u8],
     delta: &'a Field<O>,
-) -> impl Iterator<Item = Field<O>> + 'b
+) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     (0..4 * O::NST::USIZE)
         .map(|j| {
@@ -211,14 +208,13 @@ where
         )
 }
 
-fn em_enc_bkwd_mkey0_mtag0<'a, 'b, O>(
+fn em_enc_bkwd_mkey0_mtag0<'a, O>(
     x: &'a GenericArray<u8, O::LAMBDAR1BYTE>,
     z: &'a GenericArray<u8, O::LBYTES>,
     z_out: &'a GenericArray<u8, O::LAMBDABYTES>,
-) -> impl Iterator<Item = Field<O>> + 'b
+) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     // Step 2
     iproduct!(0..O::R::USIZE, 0..O::NST::USIZE, 0..4).map(move |(j, c, k)| {
@@ -239,12 +235,11 @@ where
     })
 }
 
-fn em_enc_bkwd_mkey0_mtag1<'a, 'b, O>(
+fn em_enc_bkwd_mkey0_mtag1<'a, O>(
     z: &'a GenericArray<Field<O>, O::L>,
-) -> impl Iterator<Item = Field<O>> + 'b
+) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     // Step 2
     iproduct!(0..O::R::USIZE, 0..O::NST::USIZE, 0..4).map(move |(j, c, k)| {
@@ -264,15 +259,14 @@ where
     })
 }
 
-fn em_enc_bkwd_mkey1_mtag0<'a, 'b, O>(
+fn em_enc_bkwd_mkey1_mtag0<'a, O>(
     x: &'a GenericArray<u8, O::LAMBDAR1BYTE>,
     z: &'a GenericArray<Field<O>, O::L>,
     z_out: &'a GenericArray<Field<O>, O::LAMBDA>,
     delta: &'a Field<O>,
-) -> impl Iterator<Item = Field<O>> + 'b
+) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     // Step 2
     iproduct!(0..O::R::USIZE, 0..O::NST::USIZE, 0..4).map(move |(j, c, k)| {

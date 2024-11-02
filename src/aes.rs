@@ -182,13 +182,12 @@ where
     out
 }
 
-fn aes_key_exp_bwd_mtag0_mkey0<'a, 'b, O>(
+fn aes_key_exp_bwd_mtag0_mkey0<'a, O>(
     x: &'a GenericArray<u8, O::LKEBytes>,
     xk: &'a GenericArray<u8, O::PRODRUN128Bytes>,
-) -> impl Iterator<Item = Field<O>> + 'b
+) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     let mut indice = 0;
     let mut c = 0;
@@ -226,13 +225,12 @@ where
     })
 }
 
-fn aes_key_exp_bwd_mtag1_mkey0<'a, 'b, O>(
+fn aes_key_exp_bwd_mtag1_mkey0<'a, O>(
     x: &'a [Field<O>],
     xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
-) -> impl Iterator<Item = Field<O>> + 'b
+) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     let mut indice = 0;
     let mut c = 0;
@@ -261,14 +259,13 @@ where
     })
 }
 
-fn aes_key_exp_bwd_mtag0_mkey1<'a, 'b, O>(
+fn aes_key_exp_bwd_mtag0_mkey1<'a, O>(
     x: &'a GenericArray<Field<O>, O::LKE>,
     xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
     delta: &'a Field<O>,
-) -> impl Iterator<Item = Field<O>> + 'b
+) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     let mut indice = 0;
     let mut c = 0;
@@ -366,14 +363,13 @@ where
     q_k
 }
 
-fn aes_enc_fwd_mkey0_mtag0<'a, 'b, O>(
+fn aes_enc_fwd_mkey0_mtag0<'a, O>(
     x: &'a GenericArray<u8, O::QUOTLENC8>,
     xk: &'a GenericArray<u8, O::PRODRUN128Bytes>,
     input: &'a [u8; 16],
-) -> impl Iterator<Item = Field<O>> + 'b
+) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     (0..16)
         .map(|i| {
@@ -414,15 +410,14 @@ where
         )
 }
 
-fn aes_enc_fwd_mkey1_mtag0<'a, 'b, O>(
+fn aes_enc_fwd_mkey1_mtag0<'a, O>(
     x: &'a GenericArray<Field<O>, O::LENC>,
     xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
     input: &'a [u8; 16],
     delta: &'a Field<O>,
-) -> impl Iterator<Item = Field<O>> + 'b
+) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     (0..16)
         .map(|i| {
@@ -466,13 +461,12 @@ where
         )
 }
 
-fn aes_enc_fwd_mkey0_mtag1<'a, 'b, O>(
+fn aes_enc_fwd_mkey0_mtag1<'a, O>(
     x: &'a GenericArray<Field<O>, O::LENC>,
     xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
-) -> impl Iterator<Item = Field<O>> + 'b
+) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     (0..16)
         .map(|i| {
@@ -515,14 +509,13 @@ where
         )
 }
 
-fn aes_enc_bkwd_mkey0_mtag0<'a, 'b, O>(
+fn aes_enc_bkwd_mkey0_mtag0<'a, O>(
     x: &'a GenericArray<u8, O::QUOTLENC8>,
     xk: &'a GenericArray<u8, O::PRODRUN128Bytes>,
     out: &'a [u8; 16],
-) -> impl Iterator<Item = Field<O>> + 'b
+) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     // Step 2
     iproduct!(0..O::R::USIZE, 0..4, 0..4).map(move |(j, c, k)| {
@@ -539,15 +532,14 @@ where
     })
 }
 
-fn aes_enc_bkwd_mkey1_mtag0<'a, 'b, O>(
+fn aes_enc_bkwd_mkey1_mtag0<'a, O>(
     x: &'a GenericArray<Field<O>, O::LENC>,
     xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
     out: &'a [u8; 16],
     delta: &'a Field<O>,
-) -> impl Iterator<Item = Field<O>> + 'b
+) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     // Step 2
     iproduct!(0..O::R::USIZE, 0..4, 0..4).map(move |(j, c, k)| {
@@ -568,13 +560,12 @@ where
     })
 }
 
-fn aes_enc_bkwd_mkey0_mtag1<'a, 'b, O>(
+fn aes_enc_bkwd_mkey0_mtag1<'a, O>(
     x: &'a GenericArray<Field<O>, O::LENC>,
     xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
-) -> impl Iterator<Item = Field<O>> + 'b
+) -> impl Iterator<Item = Field<O>> + 'a
 where
     O: OWFParameters,
-    'a: 'b,
 {
     // Step 2
     iproduct!(0..O::R::USIZE, 0..4, 0..4).map(move |(j, c, k)| {
