@@ -81,20 +81,20 @@ where
 {
     (0..4 * O::NST::USIZE)
         .map(|j| {
-            //Step 2-3
+            // Step 2-3
             Field::<O>::byte_combine_bits(z[j]) + Field::<O>::byte_combine_bits(x[j])
         })
         .chain(
             iproduct!(1..O::R::USIZE, 0..O::NST::USIZE)
                 .map(move |(j, c)| {
-                    //Step 4
+                    // Step 4
                     let i: usize = 32 * O::NST::USIZE * j + 32 * c;
                     let z_hat: [_; 4] =
                         array::from_fn(|r| Field::<O>::byte_combine_bits(z[i / 8 + r]));
                     let mut res: [_; 4] =
                         array::from_fn(|r| Field::<O>::byte_combine_bits(x[i / 8 + r]));
 
-                    //Step 16
+                    // Step 16
                     res[0] += z_hat[0] * Field::<O>::BYTE_COMBINE_2
                         + z_hat[1] * Field::<O>::BYTE_COMBINE_3
                         + z_hat[2]
@@ -124,19 +124,19 @@ where
 {
     (0..4 * O::NST::USIZE)
         .map(|j| {
-            //Step 2-3
+            // Step 2-3
             Field::<O>::byte_combine_slice(&z[8 * j..8 * (j + 1)])
         })
         .chain(
             iproduct!(1..O::R::USIZE, 0..O::NST::USIZE)
                 .map(move |(j, c)| {
-                    //Step 4
+                    // Step 4
                     let i: usize = 32 * O::NST::USIZE * j + 32 * c;
                     let z_hat: [_; 4] = array::from_fn(|r| {
                         Field::<O>::byte_combine_slice(&z[i + 8 * r..i + 8 * r + 8])
                     });
 
-                    //Step 16
+                    // Step 16
                     let mut res: [_; 4] = [Field::<O>::default(); 4];
                     res[0] = z_hat[0] * Field::<O>::BYTE_COMBINE_2
                         + z_hat[1] * Field::<O>::BYTE_COMBINE_3
@@ -177,7 +177,7 @@ where
         .chain(
             iproduct!(1..O::R::USIZE, 0..O::NST::USIZE)
                 .map(move |(j, c)| {
-                    //Step 4
+                    // Step 4
                     let i: usize = 32 * O::NST::USIZE * j + 32 * c;
                     let z_hat: [_; 4] = array::from_fn(|r| {
                         Field::<O>::byte_combine_slice(&z[i + 8 * r..i + 8 * r + 8])
@@ -185,7 +185,7 @@ where
                     let mut res: [_; 4] =
                         array::from_fn(|r| bit_combine_with_delta::<O>(x[(i + 8 * r) / 8], delta));
 
-                    //Step 16
+                    // Step 16
                     res[0] += z_hat[0] * Field::<O>::BYTE_COMBINE_2
                         + z_hat[1] * Field::<O>::BYTE_COMBINE_3
                         + z_hat[2]
@@ -324,7 +324,6 @@ fn em_enc_cstrnts_mkey1<O>(
     zk_hasher.process(qs, qs_b);
 }
 
-///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 pub(crate) fn em_prove<O>(
     w: &GenericArray<u8, O::LBYTES>,
     u: &GenericArray<u8, O::LAMBDALBYTES>,
@@ -367,7 +366,6 @@ where
     (a_t.as_bytes(), b_t.as_bytes())
 }
 
-///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn em_verify<O, Tau>(
     d: &GenericArray<u8, O::LBYTES>,

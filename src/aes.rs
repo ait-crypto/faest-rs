@@ -36,7 +36,6 @@ fn inverse_rotate_word(r: usize, rotate: bool) -> usize {
     }
 }
 
-//The first member of the tuples are the effectives witness while the second is the validity according Faest requiremenbt of the keypair at the origin of the operation
 pub(crate) fn aes_extendedwitness<O>(
     owf_key: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
@@ -45,13 +44,13 @@ where
     O: OWFParameters,
 {
     let mut input = [0u8; 32];
-    //step 0
+    // Step 0
     input[..O::InputSize::USIZE].clone_from_slice(owf_input);
     let mut w: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
     let mut index = 0;
-    //step 3
+    // Step 3
     let (kb, mut valid) = rijndael_key_schedule::<U4, O::NK, O::R>(owf_key, O::SKE::USIZE);
-    //step 4
+    // Step 4
     for i in convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4]
         .iter()
         .map(|x| x.to_le_bytes())
@@ -85,7 +84,7 @@ where
             index += size_of::<u32>();
         }
     }
-    //step 5
+    // Step 5
     round_with_save(&input[..16], &kb, O::R::U8, &mut w, &mut index, &mut valid);
     if O::LAMBDA::USIZE > 128 {
         round_with_save(&input[16..], &kb, O::R::U8, &mut w, &mut index, &mut valid);
@@ -162,7 +161,7 @@ fn aes_key_exp_fwd<O>(
 where
     O: OWFParameters,
 {
-    //Step 1 is ok by construction
+    // Step 1 is ok by construction
     let mut out = GenericArray::default_boxed();
     out[..O::LAMBDA::USIZE].copy_from_slice(&x[..O::LAMBDA::USIZE]);
     let mut index = O::LAMBDA::USIZE;
@@ -243,7 +242,7 @@ where
         let y_tilde =
             array::from_fn(|i| x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8]);
         c += 1;
-        //Step 21
+        // Step 21
         if c == 4 {
             c = 0;
             if O::LAMBDA::USIZE == 192 {
@@ -379,7 +378,7 @@ where
         .chain(
             iproduct!(1..O::R::USIZE, 0..4)
                 .map(move |(j, c)| {
-                    //Step 6
+                    // Step 6
                     let ix: usize = 128 * (j - 1) + 32 * c;
                     let ik: usize = 128 * j + 32 * c;
                     let x_hat: [_; 4] =
@@ -387,7 +386,7 @@ where
                     let mut res: [_; 4] =
                         array::from_fn(|r| Field::<O>::byte_combine_bits(xk[ik / 8 + r]));
 
-                    //Step 16
+                    // Step 16
                     res[0] += x_hat[0] * Field::<O>::BYTE_COMBINE_2
                         + x_hat[1] * Field::<O>::BYTE_COMBINE_3
                         + x_hat[2]
@@ -428,7 +427,7 @@ where
         .chain(
             iproduct!(1..O::R::USIZE, 0..4)
                 .map(move |(j, c)| {
-                    //Step 6
+                    // Step 6
                     let ix: usize = 128 * (j - 1) + 32 * c;
                     let ik: usize = 128 * j + 32 * c;
                     let x_hat: [_; 4] = array::from_fn(|r| {
@@ -438,7 +437,7 @@ where
                         Field::<O>::byte_combine_slice(&xk[ik + 8 * r..ik + 8 * r + 8])
                     });
 
-                    //Step 16
+                    // Step 16
                     res[0] += x_hat[0] * Field::<O>::BYTE_COMBINE_2
                         + x_hat[1] * Field::<O>::BYTE_COMBINE_3
                         + x_hat[2]
@@ -476,7 +475,7 @@ where
         .chain(
             iproduct!(1..O::R::USIZE, 0..4)
                 .map(move |(j, c)| {
-                    //Step 6
+                    // Step 6
                     let ix: usize = 128 * (j - 1) + 32 * c;
                     let ik: usize = 128 * j + 32 * c;
                     let x_hat: [_; 4] = array::from_fn(|r| {
@@ -486,7 +485,7 @@ where
                         Field::<O>::byte_combine_slice(&xk[ik + 8 * r..ik + 8 * r + 8])
                     });
 
-                    //Step 16
+                    // Step 16
                     res[0] += x_hat[0] * Field::<O>::BYTE_COMBINE_2
                         + x_hat[1] * Field::<O>::BYTE_COMBINE_3
                         + x_hat[2]
@@ -614,7 +613,7 @@ fn aes_enc_cstrnts_mkey1<O>(
     zk_hasher.process(qs, q_s_b);
 }
 
-///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
+// Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 pub(crate) fn aes_prove<O>(
     w: &GenericArray<u8, O::LBYTES>,
     u: &GenericArray<u8, O::LAMBDALBYTES>,
@@ -666,7 +665,7 @@ where
     (a_t.as_bytes(), b_t.as_bytes())
 }
 
-///Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
+// Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn aes_verify<O, Tau>(
     d: &GenericArray<u8, O::LBYTES>,
