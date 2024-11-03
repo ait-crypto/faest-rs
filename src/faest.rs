@@ -419,17 +419,22 @@ fn sign<P, O>(
         signature.write_all(&x).unwrap();
     });
 
-    let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
-    let u_t = vole_hasher.process(&u);
+    let (u_t, hv) = {
+        let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
+        let u_t = vole_hasher.process(&u);
 
-    let mut h1_hasher = RO::<P>::h1_init();
-    for v in gv.iter() {
-        v.iter()
-            .for_each(|v| h1_hasher.update(&vole_hasher.process(v)));
-    }
-    let mut hv: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
-        GenericArray::default();
-    h1_hasher.finish().read(&mut hv);
+        let mut h1_hasher = RO::<P>::h1_init();
+        for v in gv.iter() {
+            v.iter()
+                .for_each(|v| h1_hasher.update(&vole_hasher.process(v)));
+        }
+
+        let mut hv: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
+            GenericArray::default();
+        h1_hasher.finish().read(&mut hv);
+
+        (u_t, hv)
+    };
 
     let w = P::OWF::witness(&sk.owf_key, &sk.pk.owf_input);
     let d = Box::<GenericArray<u8, O::LBYTES>>::from_iter(
