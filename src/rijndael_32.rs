@@ -50,20 +50,21 @@ pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
 
     let mut rk_off = 0;
     let mut count = 0;
-    for rcon in RCON_TABLE.iter().take(ske / 4) {
+    for rcon in RCON_TABLE.iter().take(ske / 4).copied() {
+        let inv = inv_bitslice(&rkeys[rk_off..(rk_off + 8)]);
         if NK::USIZE == 8 {
             if count < ske / 4 {
-                for i in &inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][12..] {
+                for i in &inv[1][12..] {
                     valid &= 0 != *i;
                 }
                 count += 1;
             }
         } else if NK::USIZE == 6 {
-            for i in &inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[1][4..8] {
+            for i in &inv[1][4..8] {
                 valid &= 0 != *i;
             }
         } else {
-            for i in &inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..] {
+            for i in &inv[0][12..] {
                 valid &= 0 != *i;
             }
         }
@@ -76,7 +77,7 @@ pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
         let mut rcon_0 = [0u8; 16];
         let mut rcon_1 = [0u8; 16];
         rcon_0[13] = rcon * (1 - ind / 17);
-        rcon_1[5] = (*rcon as u16 * (((ind / 8) % 2) as u16)) as u8;
+        rcon_1[5] = (rcon as u16 * (((ind / 8) % 2) as u16)) as u8;
         rcon_1[13] = rcon * (ind / 32);
         let mut bitsliced_rcon = [0u32; 8];
         bitslice(&mut bitsliced_rcon, &rcon_0, &rcon_1);
@@ -87,7 +88,8 @@ pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
 
         xor_columns::<NK>(&mut rkeys, rk_off);
         if NK::USIZE == 8 && count < ske / 4 {
-            for i in &inv_bitslice(&rkeys[rk_off..(rk_off + 8)])[0][12..] {
+            let inv = inv_bitslice(&rkeys[rk_off..(rk_off + 8)]);
+            for i in &inv[0][12..] {
                 valid &= 0 != *i;
             }
             count += 1;
@@ -466,7 +468,7 @@ pub(crate) fn rijndael_shift_rows_1<BC: Unsigned>(state: &mut [u32]) {
 fn xor_columns<NK: Unsigned>(rkeys: &mut [u32], offset: usize) {
     if NK::USIZE == 4 {
         for i in 0..8 {
-            let off_i: usize = offset + i;
+            let off_i = offset + i;
             let rk = rkeys[off_i - 8] ^ (0x03030303 & rkeys[off_i].rotate_right(14));
             rkeys[off_i] =
                 rk ^ (0xfcfcfcfc & (rk << 2)) ^ (0xf0f0f0f0 & (rk << 4)) ^ (0xc0c0c0c0 & (rk << 6));

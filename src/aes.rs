@@ -46,7 +46,7 @@ where
     let mut input = [0u8; 32];
     // Step 0
     input[..O::InputSize::USIZE].clone_from_slice(owf_input);
-    let mut witness: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
+    let mut witness = GenericArray::default_boxed();
     let mut index = 0;
     // Step 3
     let (kb, mut valid) = rijndael_key_schedule::<U4, O::NK, O::R>(owf_key, O::SKE::USIZE);
