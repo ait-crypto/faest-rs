@@ -22,6 +22,7 @@ use generic_array::{
     typenum::{Unsigned, U12, U14, U2, U6, U8},
     GenericArray,
 };
+use itertools::iproduct;
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
@@ -650,13 +651,9 @@ pub(crate) fn inv_bitslice(input: &[u32]) -> BatchBlocks {
 }
 
 pub(crate) fn convert_from_batchblocks(input: BatchBlocks) -> Vec<[u8; 4]> {
-    let mut output = Vec::new();
-    for i in 0..2 {
-        for j in 0..4 {
-            output.push(input[i][j * 4..(j + 1) * 4].try_into().unwrap());
-        }
-    }
-    output
+    iproduct!(0..2, 0..4)
+        .map(|(i, j)| input[i][j * 4..(j + 1) * 4].try_into().unwrap())
+        .collect()
 }
 
 /// Copy 32-bytes within the provided slice to an 8-byte offset
