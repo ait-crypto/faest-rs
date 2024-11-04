@@ -425,9 +425,9 @@ fn sign<P, O>(
 
     // write c and drop it
     let mut signature = signature.as_mut_slice();
-    c.into_iter().for_each(|x| {
+    for x in c.into_iter() {
         signature.write_all(&x).unwrap();
-    });
+    }
 
     let (u_t, hv) = {
         let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
