@@ -48,8 +48,8 @@ where
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1::<O::NST>(&mut state);
-        for i in &convert_from_batchblocks(inv_bitslice(&state))[..O::NK::USIZE][..O::NK::USIZE] {
-            res[index..index + size_of::<u32>()].copy_from_slice(i);
+        for i in convert_from_batchblocks(inv_bitslice(&state)).take(O::NK::USIZE) {
+            res[index..index + size_of::<u32>()].copy_from_slice(&i);
             index += size_of::<u32>();
         }
         mix_columns_0(&mut state);
@@ -350,11 +350,8 @@ where
         &x.chunks(8)
             .flat_map(|x| {
                 convert_from_batchblocks(inv_bitslice(x))
-                    .iter()
                     .flatten()
-                    .copied()
                     .take(O::LAMBDABYTES::USIZE)
-                    .collect::<Vec<u8>>()
             })
             .take(O::LAMBDABYTES::USIZE * (O::R::USIZE + 1))
             .collect::<GenericArray<u8, _>>(),
@@ -398,11 +395,8 @@ where
         &x.chunks(8)
             .flat_map(|x| {
                 convert_from_batchblocks(inv_bitslice(x))
-                    .iter()
                     .flatten()
                     .take(O::LAMBDABYTES::USIZE)
-                    .copied()
-                    .collect::<Vec<_>>()
             })
             .take(O::LAMBDABYTES::USIZE * (O::R::USIZE + 1))
             .collect::<GenericArray<u8, _>>(),

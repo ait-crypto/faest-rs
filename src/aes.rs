@@ -51,22 +51,23 @@ where
     // Step 3
     let (kb, mut valid) = rijndael_key_schedule::<U4, O::NK, O::R>(owf_key, O::SKE::USIZE);
     // Step 4
-    for i in convert_from_batchblocks(inv_bitslice(&kb[..8]))[..4].iter() {
-        w[index..index + size_of::<u32>()].copy_from_slice(i);
+    for i in convert_from_batchblocks(inv_bitslice(&kb[..8])).take(4) {
+        w[index..index + size_of::<u32>()].copy_from_slice(&i);
         index += size_of::<u32>();
     }
     for i in convert_from_batchblocks(inv_bitslice(&kb[8..16]))
-        [..O::NK::USIZE / 2 - (4 - (O::NK::USIZE / 2))]
-        .iter()
+        .take(O::NK::USIZE / 2 - (4 - (O::NK::USIZE / 2)))
     {
-        w[index..index + size_of::<u32>()].copy_from_slice(i);
+        w[index..index + size_of::<u32>()].copy_from_slice(&i);
         index += size_of::<u32>();
     }
     for j in 1 + (O::NK::USIZE / 8)
         ..1 + (O::NK::USIZE / 8)
             + (O::SKE::USIZE * ((2 - (O::NK::USIZE % 4)) * 2 + (O::NK::USIZE % 4) * 3)) / 16
     {
-        let inside = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]));
+        let inside: Vec<_> = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]))
+            .take(3)
+            .collect();
         if O::NK::USIZE == 6 {
             if j % 3 == 1 {
                 w[index..index + size_of::<u32>()].copy_from_slice(&inside[2]);
@@ -111,8 +112,8 @@ fn round_with_save(
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1::<U4>(&mut state);
-        for i in convert_from_batchblocks(inv_bitslice(&state))[..4][..4].iter() {
-            w[*index..*index + size_of::<u32>()].copy_from_slice(i);
+        for i in convert_from_batchblocks(inv_bitslice(&state)).take(4) {
+            w[*index..*index + size_of::<u32>()].copy_from_slice(&i);
             *index += size_of::<u32>();
         }
         mix_columns_0(&mut state);
