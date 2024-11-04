@@ -649,13 +649,11 @@ pub(crate) fn inv_bitslice(input: &[u32]) -> BatchBlocks {
     output
 }
 
-pub(crate) fn convert_from_batchblocks(input: BatchBlocks) -> Vec<u32> {
-    let mut output = Vec::<u32>::new();
+pub(crate) fn convert_from_batchblocks(input: BatchBlocks) -> Vec<[u8; 4]> {
+    let mut output = Vec::new();
     for i in 0..2 {
         for j in 0..4 {
-            output.push(u32::from_le_bytes(
-                input[i][j * 4..(j + 1) * 4].try_into().unwrap(),
-            ));
+            output.push(input[i][j * 4..(j + 1) * 4].try_into().unwrap());
         }
     }
     output

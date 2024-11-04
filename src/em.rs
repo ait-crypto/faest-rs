@@ -49,7 +49,7 @@ where
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1::<O::NST>(&mut state);
         for i in &convert_from_batchblocks(inv_bitslice(&state))[..O::NK::USIZE][..O::NK::USIZE] {
-            res[index..index + size_of::<u32>()].copy_from_slice(&i.to_le_bytes());
+            res[index..index + size_of::<u32>()].copy_from_slice(i);
             index += size_of::<u32>();
         }
         mix_columns_0(&mut state);
@@ -351,7 +351,8 @@ where
             .flat_map(|x| {
                 convert_from_batchblocks(inv_bitslice(x))
                     .iter()
-                    .flat_map(|x| u32::to_le_bytes(*x))
+                    .flatten()
+                    .copied()
                     .take(O::LAMBDABYTES::USIZE)
                     .collect::<Vec<u8>>()
             })
@@ -398,8 +399,9 @@ where
             .flat_map(|x| {
                 convert_from_batchblocks(inv_bitslice(x))
                     .iter()
-                    .flat_map(|x| u32::to_le_bytes(*x))
+                    .flatten()
                     .take(O::LAMBDABYTES::USIZE)
+                    .copied()
                     .collect::<Vec<_>>()
             })
             .take(O::LAMBDABYTES::USIZE * (O::R::USIZE + 1))
