@@ -301,65 +301,75 @@ type RO<P> =
 type VoleHasher<P> =
     <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::VoleHasher;
 
-fn hash_mu<R>(mu: &mut [u8], input: &[u8], output: &[u8], msg: &[u8])
-where
-    R: RandomOracle,
-{
-    let mut h1_hasher = R::h1_init();
-    h1_hasher.update(input);
-    h1_hasher.update(output);
-    h1_hasher.update(msg);
-    h1_hasher.finish().read(mu);
+/// Hashes required for FAEST implementation
+trait FaestHash {
+    /// Generate `µ`
+    fn hash_mu(mu: &mut [u8], input: &[u8], output: &[u8], msg: &[u8]);
+    /// Generate `r` and `iv`
+    fn hash_r_iv(r: &mut [u8], iv: &mut IV, key: &[u8], mu: &[u8], rho: &[u8]);
+    /// Generate first challange
+    fn hash_challenge_1<'a, I>(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: I, iv: &[u8])
+    where
+        I: Iterator<Item = &'a [u8]>;
+    /// Generate second challenge
+    fn hash_challenge_2(chall2: &mut [u8], chall1: &[u8], u_t: &[u8], hv: &[u8], d: &[u8]);
+    /// Generate third challenge
+    fn hash_challenge_3(chall3: &mut [u8], chall2: &[u8], a_t: &[u8], b_t: &[u8]);
 }
 
-fn hash_r_iv<R>(r: &mut [u8], iv: &mut IV, key: &[u8], mu: &[u8], rho: &[u8])
+impl<RO> FaestHash for RO
 where
-    R: RandomOracle,
+    RO: RandomOracle,
 {
-    let mut h3_hasher = R::h3_init();
-    h3_hasher.update(key);
-    h3_hasher.update(mu);
-    h3_hasher.update(rho);
+    fn hash_mu(mu: &mut [u8], input: &[u8], output: &[u8], msg: &[u8]) {
+        let mut h1_hasher = Self::h1_init();
+        h1_hasher.update(input);
+        h1_hasher.update(output);
+        h1_hasher.update(msg);
+        h1_hasher.finish().read(mu);
+    }
 
-    let mut h3_reader = h3_hasher.finish();
-    h3_reader.read(r);
-    h3_reader.read(iv);
-}
+    fn hash_r_iv(r: &mut [u8], iv: &mut IV, key: &[u8], mu: &[u8], rho: &[u8]) {
+        let mut h3_hasher = Self::h3_init();
+        h3_hasher.update(key);
+        h3_hasher.update(mu);
+        h3_hasher.update(rho);
 
-fn hash_challenge_1<'a, R, I>(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: I, iv: &[u8])
-where
-    R: RandomOracle,
-    I: Iterator<Item = &'a [u8]>,
-{
-    let mut h2_hasher = R::h2_init();
-    h2_hasher.update(mu);
-    h2_hasher.update(hcom);
-    c.for_each(|buf| h2_hasher.update(buf));
-    h2_hasher.update(iv);
-    h2_hasher.finish().read(chall1);
-}
+        let mut h3_reader = h3_hasher.finish();
+        h3_reader.read(r);
+        h3_reader.read(iv);
+    }
 
-fn hash_challenge_2<R>(chall2: &mut [u8], chall1: &[u8], u_t: &[u8], hv: &[u8], d: &[u8])
-where
-    R: RandomOracle,
-{
-    let mut h2_hasher = R::h2_init();
-    h2_hasher.update(chall1);
-    h2_hasher.update(u_t);
-    h2_hasher.update(hv);
-    h2_hasher.update(d);
-    h2_hasher.finish().read(chall2);
-}
+    fn hash_challenge_1<'a, I>(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: I, iv: &[u8])
+    where
+        I: Iterator<Item = &'a [u8]>,
+    {
+        let mut h2_hasher = Self::h2_init();
+        h2_hasher.update(mu);
+        h2_hasher.update(hcom);
+        for buf in c {
+            h2_hasher.update(buf);
+        }
+        h2_hasher.update(iv);
+        h2_hasher.finish().read(chall1);
+    }
 
-fn hash_challenge_3<R>(chall3: &mut [u8], chall2: &[u8], a_t: &[u8], b_t: &[u8])
-where
-    R: RandomOracle,
-{
-    let mut h2_hasher = R::h2_init();
-    h2_hasher.update(chall2);
-    h2_hasher.update(a_t);
-    h2_hasher.update(b_t);
-    h2_hasher.finish().read(chall3);
+    fn hash_challenge_2(chall2: &mut [u8], chall1: &[u8], u_t: &[u8], hv: &[u8], d: &[u8]) {
+        let mut h2_hasher = Self::h2_init();
+        h2_hasher.update(chall1);
+        h2_hasher.update(u_t);
+        h2_hasher.update(hv);
+        h2_hasher.update(d);
+        h2_hasher.finish().read(chall2);
+    }
+
+    fn hash_challenge_3(chall3: &mut [u8], chall2: &[u8], a_t: &[u8], b_t: &[u8]) {
+        let mut h2_hasher = Self::h2_init();
+        h2_hasher.update(chall2);
+        h2_hasher.update(a_t);
+        h2_hasher.update(b_t);
+        h2_hasher.finish().read(chall3);
+    }
 }
 
 #[inline]
@@ -395,17 +405,17 @@ fn sign<P, O>(
 {
     let mut mu =
         GenericArray::<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2>::default();
-    hash_mu::<RO<P>>(&mut mu, &sk.pk.owf_input, &sk.pk.owf_output, msg);
+    RO::<P>::hash_mu(&mut mu, &sk.pk.owf_input, &sk.pk.owf_output, msg);
 
     let mut r = GenericArray::<u8, O::LAMBDABYTES>::default();
     let mut iv = IV::default();
-    hash_r_iv::<RO<P>>(&mut r, &mut iv, &sk.owf_key, &mu, rho);
+    RO::<P>::hash_r_iv(&mut r, &mut iv, &sk.owf_key, &mu, rho);
 
     let (hcom, decom, c, u, gv) =
         volecommit::<<O::BaseParams as BaseParameters>::VC, P::Tau, O::LHATBYTES>(&r, &iv);
     let mut chall1 =
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
-    hash_challenge_1::<RO<P>, _>(
+    RO::<P>::hash_challenge_1(
         &mut chall1,
         &mu,
         &hcom,
@@ -443,7 +453,7 @@ fn sign<P, O>(
 
     let mut chall2 =
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>::default();
-    hash_challenge_2::<RO<P>>(&mut chall2, &chall1, &u_t, &hv, &d);
+    RO::<P>::hash_challenge_2(&mut chall2, &chall1, &u_t, &hv, &d);
 
     let new_u = GenericArray::from_slice(&u[..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE]);
     let new_gv = Box::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>::from_iter(
@@ -466,7 +476,7 @@ fn sign<P, O>(
     );
 
     let mut chall3 = GenericArray::<u8, O::LAMBDABYTES>::default();
-    hash_challenge_3::<RO<P>>(&mut chall3, &chall2, &a_t, &b_t);
+    RO::<P>::hash_challenge_3(&mut chall3, &chall2, &a_t, &b_t);
 
     sigma_to_signature(
         &u_t,
@@ -524,7 +534,7 @@ where
 
     let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
         GenericArray::default();
-    hash_mu::<RO<P>>(&mut mu, &pk.owf_input, &pk.owf_output, msg);
+    RO::<P>::hash_mu(&mut mu, &pk.owf_input, &pk.owf_output, msg);
 
     let (hcom, gq_p) = volereconstruct::<<O::BaseParams as BaseParameters>::VC, P::Tau, O::LHATBYTES>(
         chall3,
@@ -538,7 +548,7 @@ where
     let mut chall1 =
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
     let c = &sigma[..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)];
-    hash_challenge_1::<RO<P>, _>(&mut chall1, &mu, &hcom, [c].into_iter(), iv);
+    RO::<P>::hash_challenge_1(&mut chall1, &mu, &hcom, [c].into_iter(), iv);
 
     let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
     let def = GenericArray::default();
@@ -613,7 +623,7 @@ where
             + O::LBYTES::USIZE];
     let mut chall2 =
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>::default();
-    hash_challenge_2::<RO<P>>(&mut chall2, &chall1, u_t, &hv, d);
+    RO::<P>::hash_challenge_2(&mut chall2, &chall1, u_t, &hv, d);
 
     let a_t = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
         + O::LAMBDABYTES::USIZE
@@ -642,7 +652,7 @@ where
     );
 
     let mut chall3_p = GenericArray::default();
-    hash_challenge_3::<RO<P>>(&mut chall3_p, &chall2, a_t, &b_t);
+    RO::<P>::hash_challenge_3(&mut chall3_p, &chall2, a_t, &b_t);
     if *chall3 == chall3_p {
         Ok(())
     } else {
