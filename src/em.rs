@@ -1,7 +1,7 @@
 use std::{array, iter::zip, mem::size_of};
 
 use generic_array::{typenum::Unsigned, GenericArray};
-use itertools::iproduct;
+use itertools::{chain, iproduct};
 
 use crate::{
     fields::{ByteCombine, ByteCombineConstants, Field as _, SumPoly},
@@ -33,18 +33,11 @@ where
     bitslice(&mut state, &owf_key[..16], &owf_key[16..]);
     rijndael_add_round_key(&mut state, &kb[..8]);
     for j in 1..O::R::USIZE {
-        for i in &inv_bitslice(&state)[0][..] {
-            valid &= *i != 0;
+        let inv_state = inv_bitslice(&state);
+        for i in chain(inv_state[0], inv_state[1]).take(O::NST::USIZE * 4) {
+            valid &= i != 0;
         }
-        if O::NST::USIZE == 6 {
-            for i in &inv_bitslice(&state)[1][..8] {
-                valid &= *i != 0;
-            }
-        } else if O::NST::USIZE == 8 {
-            for i in &inv_bitslice(&state)[1][..] {
-                valid &= *i != 0;
-            }
-        }
+
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1::<O::NST>(&mut state);
@@ -55,17 +48,10 @@ where
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
     }
-    for i in &inv_bitslice(&state)[0][..] {
-        valid &= *i != 0;
-    }
-    if O::NST::USIZE == 6 {
-        for i in &inv_bitslice(&state)[1][..8] {
-            valid &= *i != 0;
-        }
-    } else if O::NST::USIZE == 8 {
-        for i in &inv_bitslice(&state)[1][..] {
-            valid &= *i != 0;
-        }
+
+    let inv_state = inv_bitslice(&state);
+    for i in chain(inv_state[0], inv_state[1]).take(O::NST::USIZE * 4) {
+        valid &= i != 0;
     }
     if valid {
         Some(res)

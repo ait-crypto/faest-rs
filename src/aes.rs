@@ -1,7 +1,7 @@
 use std::{array, mem::size_of};
 
 use generic_array::{
-    typenum::{Unsigned, U4},
+    typenum::{Unsigned, U3, U4},
     GenericArray,
 };
 use itertools::iproduct;
@@ -65,9 +65,9 @@ where
         ..1 + (O::NK::USIZE / 8)
             + (O::SKE::USIZE * ((2 - (O::NK::USIZE % 4)) * 2 + (O::NK::USIZE % 4) * 3)) / 16
     {
-        let inside: Vec<_> = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]))
-            .take(3)
-            .collect();
+        let inside = GenericArray::<_, U3>::from_iter(
+            convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)])).take(3),
+        );
         if O::NK::USIZE == 6 {
             if j % 3 == 1 {
                 w[index..index + size_of::<u32>()].copy_from_slice(&inside[2]);
@@ -106,8 +106,8 @@ fn round_with_save(
     bitslice(&mut state, input1, &[]);
     rijndael_add_round_key(&mut state, &kb[..8]);
     for j in 1..r as usize {
-        for i in &inv_bitslice(&state)[0][..] {
-            *valid &= *i != 0;
+        for i in inv_bitslice(&state)[0] {
+            *valid &= i != 0;
         }
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
@@ -119,8 +119,8 @@ fn round_with_save(
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
     }
-    for i in &inv_bitslice(&state)[0][..] {
-        *valid &= *i != 0;
+    for i in inv_bitslice(&state)[0] {
+        *valid &= i != 0;
     }
 }
 
