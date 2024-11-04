@@ -46,19 +46,19 @@ where
     let mut input = [0u8; 32];
     // Step 0
     input[..O::InputSize::USIZE].clone_from_slice(owf_input);
-    let mut w: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
+    let mut witness: Box<GenericArray<u8, O::LBYTES>> = GenericArray::default_boxed();
     let mut index = 0;
     // Step 3
     let (kb, mut valid) = rijndael_key_schedule::<U4, O::NK, O::R>(owf_key, O::SKE::USIZE);
     // Step 4
     for i in convert_from_batchblocks(inv_bitslice(&kb[..8])).take(4) {
-        w[index..index + size_of::<u32>()].copy_from_slice(&i);
+        witness[index..index + size_of::<u32>()].copy_from_slice(&i);
         index += size_of::<u32>();
     }
     for i in convert_from_batchblocks(inv_bitslice(&kb[8..16]))
         .take(O::NK::USIZE / 2 - (4 - (O::NK::USIZE / 2)))
     {
-        w[index..index + size_of::<u32>()].copy_from_slice(&i);
+        witness[index..index + size_of::<u32>()].copy_from_slice(&i);
         index += size_of::<u32>();
     }
     for j in 1 + (O::NK::USIZE / 8)
@@ -70,24 +70,38 @@ where
         );
         if O::NK::USIZE == 6 {
             if j % 3 == 1 {
-                w[index..index + size_of::<u32>()].copy_from_slice(&inside[2]);
+                witness[index..index + size_of::<u32>()].copy_from_slice(&inside[2]);
                 index += size_of::<u32>();
             } else if j % 3 == 0 {
-                w[index..index + size_of::<u32>()].copy_from_slice(&inside[0]);
+                witness[index..index + size_of::<u32>()].copy_from_slice(&inside[0]);
                 index += size_of::<u32>();
             }
         } else {
-            w[index..index + size_of::<u32>()].copy_from_slice(&inside[0]);
+            witness[index..index + size_of::<u32>()].copy_from_slice(&inside[0]);
             index += size_of::<u32>();
         }
     }
     // Step 5
-    round_with_save(&input[..16], &kb, O::R::U8, &mut w, &mut index, &mut valid);
+    round_with_save(
+        &input[..16],
+        &kb,
+        O::R::U8,
+        &mut witness,
+        &mut index,
+        &mut valid,
+    );
     if O::LAMBDA::USIZE > 128 {
-        round_with_save(&input[16..], &kb, O::R::U8, &mut w, &mut index, &mut valid);
+        round_with_save(
+            &input[16..],
+            &kb,
+            O::R::U8,
+            &mut witness,
+            &mut index,
+            &mut valid,
+        );
     }
     if valid {
-        Some(w)
+        Some(witness)
     } else {
         None
     }
@@ -98,7 +112,7 @@ fn round_with_save(
     input1: &[u8],
     kb: &[u32],
     r: u8,
-    w: &mut [u8],
+    witness: &mut [u8],
     index: &mut usize,
     valid: &mut bool,
 ) {
@@ -113,7 +127,7 @@ fn round_with_save(
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1::<U4>(&mut state);
         for i in convert_from_batchblocks(inv_bitslice(&state)).take(4) {
-            w[*index..*index + size_of::<u32>()].copy_from_slice(&i);
+            witness[*index..*index + size_of::<u32>()].copy_from_slice(&i);
             *index += size_of::<u32>();
         }
         mix_columns_0(&mut state);

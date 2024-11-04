@@ -190,18 +190,13 @@ fn rijndael_encrypt<NST: Unsigned, R: Unsigned>(rkeys: &[u32], input: &[u8]) -> 
     let mut state = State::default();
     bitslice(&mut state, &input[..16], &input[16..]);
     rijndael_add_round_key(&mut state, &rkeys[..8]);
-    let mut rk_off = 8;
-    loop {
+
+    for round_key in rkeys[8..8 * R::USIZE].chunks_exact(8) {
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1::<NST>(&mut state);
         mix_columns_0(&mut state);
-        rijndael_add_round_key(&mut state, &rkeys[rk_off..(rk_off + 8)]);
-        rk_off += 8;
-
-        if rk_off == 8 * R::USIZE {
-            break;
-        }
+        rijndael_add_round_key(&mut state, round_key);
     }
 
     sub_bytes(&mut state);
