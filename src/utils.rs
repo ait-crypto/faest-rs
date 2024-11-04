@@ -26,7 +26,7 @@ where
         iproduct!(0..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE, 0..8,).map(|(i, k)| {
             Field::<O>::from(&GenericArray::<_, O::LAMBDABYTES>::from_iter(
                 (0..O::LAMBDABYTES::USIZE)
-                    .map(|j| (0..8).map(|l| ((gv[(j * 8) + l][i] >> k) & 1) << l).sum()),
+                    .map(|j| (0..8).map(|l| ((gv[j * 8 + l][i] >> k) & 1) << l).sum()),
             ))
         }),
     )
