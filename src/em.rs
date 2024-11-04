@@ -118,7 +118,7 @@ where
 }
 
 /// Implementation of `EncFwd` for `GF(\lambda)` for signing
-fn em_enc_fwd_proof<'a, O>(z: &'a [Field<O>]) -> impl Iterator<Item = Field<O>> + 'a
+fn em_enc_fwd_proof<O>(z: &[Field<O>]) -> impl Iterator<Item = Field<O>> + '_
 where
     O: OWFParameters,
 {
@@ -235,9 +235,9 @@ where
     })
 }
 
-fn em_enc_bkwd_mkey0_mtag1<'a, O>(
-    z: &'a GenericArray<Field<O>, O::L>,
-) -> impl Iterator<Item = Field<O>> + 'a
+fn em_enc_bkwd_mkey0_mtag1<O>(
+    z: &GenericArray<Field<O>, O::L>,
+) -> impl Iterator<Item = Field<O>> + '_
 where
     O: OWFParameters,
 {

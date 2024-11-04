@@ -691,7 +691,7 @@ pub(crate) trait TauParameters {
         Self::decode_challenge_as_iter(chal, i).collect()
     }
 
-    fn decode_challenge_as_iter<'a>(chal: &'a [u8], i: usize) -> impl Iterator<Item = u8> + 'a {
+    fn decode_challenge_as_iter(chal: &[u8], i: usize) -> impl Iterator<Item = u8> + '_ {
         let (lo, hi) = if i < Self::Tau0::USIZE {
             let lo = i * Self::K0::USIZE;
             let hi = (i + 1) * Self::K0::USIZE - 1;
