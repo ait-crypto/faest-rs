@@ -555,10 +555,8 @@ where
             + O::LAMBDABYTES::USIZE
             + 2];
 
-    let delta0 = P::Tau::decode_challenge(chall3, 0);
     gq[0].clone_from(&gq_p[0]);
-    gd_t[0] = delta0
-        .into_iter()
+    gd_t[0] = P::Tau::decode_challenge_as_iter(chall3, 0)
         .map(|d| {
             if d == 1 {
                 GenericArray::from_slice(u_t)

@@ -688,6 +688,10 @@ pub(crate) trait TauParameters {
     type Tau1: ArrayLength;
 
     fn decode_challenge(chal: &[u8], i: usize) -> Vec<u8> {
+        Self::decode_challenge_as_iter(chal, i).collect()
+    }
+
+    fn decode_challenge_as_iter<'a>(chal: &'a [u8], i: usize) -> impl Iterator<Item = u8> + 'a {
         let (lo, hi) = if i < Self::Tau0::USIZE {
             let lo = i * Self::K0::USIZE;
             let hi = (i + 1) * Self::K0::USIZE - 1;
@@ -700,9 +704,7 @@ pub(crate) trait TauParameters {
             (lo, hi)
         };
 
-        (0..=(hi - lo))
-            .map(|j| (chal[(lo + j) / 8] >> ((lo + j) % 8)) & 1)
-            .collect()
+        (lo..=hi).map(move |j| (chal[j / 8] >> (j % 8)) & 1)
     }
 }
 
