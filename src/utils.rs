@@ -80,6 +80,10 @@ where
     Field::<O>::byte_combine(&tmp)
 }
 
+pub(crate) fn contains_zeros(buf: &[u8]) -> bool {
+    buf.contains(&0)
+}
+
 #[cfg(test)]
 pub(crate) mod test {
     use std::{fs::File, path::Path};

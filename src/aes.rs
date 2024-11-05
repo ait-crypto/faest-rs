@@ -14,7 +14,7 @@ use crate::{
         rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State, RCON_TABLE,
     },
     universal_hashing::{ZKHasherInit, ZKProofHasher, ZKVerifyHasher},
-    utils::{bit_combine_with_delta, convert_gq, transpose_and_into_field, Field},
+    utils::{bit_combine_with_delta, contains_zeros, convert_gq, transpose_and_into_field, Field},
 };
 
 type KeyCstrnts<O> = (
@@ -49,7 +49,7 @@ where
     let mut witness = GenericArray::default_boxed();
     let mut index = 0;
     // Step 3
-    let (kb, mut valid) = rijndael_key_schedule::<U4, O::NK, O::R>(owf_key, O::SKE::USIZE);
+    let (kb, mut zeros) = rijndael_key_schedule::<U4, O::NK, O::R>(owf_key, O::SKE::USIZE);
     // Step 4
     for i in convert_from_batchblocks(inv_bitslice(&kb[..8])).take(4) {
         witness[index..index + size_of::<u32>()].copy_from_slice(&i);
@@ -82,28 +82,14 @@ where
         }
     }
     // Step 5
-    round_with_save(
-        &input[..16],
-        &kb,
-        O::R::U8,
-        &mut witness,
-        &mut index,
-        &mut valid,
-    );
+    zeros |= round_with_save(&input[..16], &kb, O::R::U8, &mut witness, &mut index);
     if O::LAMBDA::USIZE > 128 {
-        round_with_save(
-            &input[16..],
-            &kb,
-            O::R::U8,
-            &mut witness,
-            &mut index,
-            &mut valid,
-        );
+        zeros |= round_with_save(&input[16..], &kb, O::R::U8, &mut witness, &mut index);
     }
-    if valid {
-        Some(witness)
-    } else {
+    if zeros {
         None
+    } else {
+        Some(witness)
     }
 }
 
@@ -114,15 +100,13 @@ fn round_with_save(
     r: u8,
     witness: &mut [u8],
     index: &mut usize,
-    valid: &mut bool,
-) {
+) -> bool {
+    let mut zeros = false;
     let mut state = State::default();
     bitslice(&mut state, input1, &[]);
     rijndael_add_round_key(&mut state, &kb[..8]);
     for j in 1..r as usize {
-        for i in inv_bitslice(&state)[0] {
-            *valid &= i != 0;
-        }
+        zeros |= contains_zeros(&inv_bitslice(&state)[0]);
         sub_bytes(&mut state);
         sub_bytes_nots(&mut state);
         rijndael_shift_rows_1::<U4>(&mut state);
@@ -133,9 +117,7 @@ fn round_with_save(
         mix_columns_0(&mut state);
         rijndael_add_round_key(&mut state, &kb[8 * j..8 * (j + 1)]);
     }
-    for i in inv_bitslice(&state)[0] {
-        *valid &= i != 0;
-    }
+    zeros | contains_zeros(&inv_bitslice(&state)[0])
 }
 
 fn aes_key_exp_fwd_1<O>(

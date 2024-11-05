@@ -25,6 +25,8 @@ use generic_array::{
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
+use crate::utils::contains_zeros;
+
 /// AES block batch size for this implementation
 pub(crate) type FixsliceBlocks = U2;
 
@@ -43,7 +45,7 @@ pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
     key: &[u8],
     ske: usize,
 ) -> (Vec<u32>, bool) {
-    let mut valid = true;
+    let mut zeros = false;
     let mut rkeys = vec![0u32; (NST::USIZE.div_ceil(NK::USIZE) * 8 * (R::USIZE + 1)) + 8];
 
     bitslice(&mut rkeys[..8], &key[..16], &key[16..]);
@@ -54,20 +56,15 @@ pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
         let inv = inv_bitslice(&rkeys[rk_off..(rk_off + 8)]);
         if NK::USIZE == 8 {
             if count < ske / 4 {
-                for i in &inv[1][12..] {
-                    valid &= 0 != *i;
-                }
+                zeros |= contains_zeros(&inv[1][12..]);
                 count += 1;
             }
         } else if NK::USIZE == 6 {
-            for i in &inv[1][4..8] {
-                valid &= 0 != *i;
-            }
+            zeros |= contains_zeros(&inv[1][4..8]);
         } else {
-            for i in &inv[0][12..] {
-                valid &= 0 != *i;
-            }
+            zeros |= contains_zeros(&inv[0][12..]);
         }
+
         memshift32(&mut rkeys, rk_off);
         rk_off += 8;
         sub_bytes(&mut rkeys[rk_off..(rk_off + 8)]);
@@ -89,9 +86,7 @@ pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
         xor_columns::<NK>(&mut rkeys, rk_off);
         if NK::USIZE == 8 && count < ske / 4 {
             let inv = inv_bitslice(&rkeys[rk_off..(rk_off + 8)]);
-            for i in &inv[0][12..] {
-                valid &= 0 != *i;
-            }
+            zeros |= contains_zeros(&inv[0][12..]);
             count += 1;
         }
     }
@@ -182,7 +177,7 @@ pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
             &final_res[(32 * i) + 16..32 * (i + 1)],
         );
     }
-    (final_bitsliced_res, valid)
+    (final_bitsliced_res, zeros)
 }
 
 /// Fully-fixsliced AES-128 encryption (the ShiftRows is completely omitted).
