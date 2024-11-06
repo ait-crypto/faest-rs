@@ -42,30 +42,28 @@ where
     O: OWFParameters,
     Tau: TauParameters,
 {
-    for i in 0..Tau::Tau0::USIZE {
-        for (j, delta_j) in Tau::decode_challenge_as_iter(chall3, i).enumerate() {
-            if delta_j != 0 {
-                for (gq_k, d_k) in
-                    zip(gq[Tau::K0::USIZE * i + j].iter_mut(), d).take(O::L::USIZE / 8)
-                {
-                    *gq_k ^= d_k;
-                }
-            }
-        }
-    }
-    for i in 0..Tau::Tau1::USIZE {
-        for (j, delta_j) in Tau::decode_challenge_as_iter(chall3, Tau::Tau0::USIZE + i).enumerate()
-        {
-            if delta_j != 0 {
-                for (gq_k, d_k) in zip(
-                    gq[Tau::Tau0::USIZE * Tau::K0::USIZE + Tau::K1::USIZE * i + j].iter_mut(),
-                    d,
-                )
-                .take(O::L::USIZE / 8)
-                {
-                    *gq_k ^= d_k;
-                }
-            }
+    for index in (0..Tau::Tau::USIZE)
+        .map(|i| {
+            Tau::decode_challenge_as_iter(chall3, i)
+                .enumerate()
+                .filter_map(move |(j, delta_j)| {
+                    if delta_j != 0 {
+                        Some(if i < Tau::Tau0::USIZE {
+                            Tau::K0::USIZE * i + j
+                        } else {
+                            Tau::Tau0::USIZE * Tau::K0::USIZE
+                                + Tau::K1::USIZE * (i - Tau::Tau0::USIZE)
+                                + j
+                        })
+                    } else {
+                        None
+                    }
+                })
+        })
+        .flatten()
+    {
+        for (gq_k, d_k) in zip(gq[index].iter_mut(), d).take(O::LBYTES::USIZE) {
+            *gq_k ^= d_k;
         }
     }
 
@@ -80,6 +78,11 @@ where
     Field::<O>::byte_combine(&tmp)
 }
 
+/// Check for `0` in buffers for key validity.
+///
+/// This function does not need to be constant time. It may only return early
+/// during key generation. During witness extension it always returns `false`
+/// and iterates over all bytes of the buffer.
 pub(crate) fn contains_zeros(buf: &[u8]) -> bool {
     buf.contains(&0)
 }
