@@ -4,7 +4,7 @@ use generic_array::{
     typenum::{Prod, Quot, Sum, Unsigned, U16, U3, U5, U8},
     ArrayLength, GenericArray,
 };
-use itertools::izip;
+use itertools::{chain, izip};
 
 use crate::fields::{BigGaloisField, Field, GF128, GF192, GF256, GF64};
 
@@ -21,7 +21,15 @@ where
     type OutputLength: ArrayLength;
     type Hasher: VoleHasherProcess<F, Self::OutputLength>;
 
-    fn new_vole_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher;
+    fn new_vole_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher {
+        let r = array::from_fn(|i| F::from(&sd[i * F::Length::USIZE..(i + 1) * F::Length::USIZE]));
+        let s = F::from(&sd[4 * F::Length::USIZE..5 * F::Length::USIZE]);
+        let t = GF64::from(
+            &sd[5 * F::Length::USIZE..5 * F::Length::USIZE + <GF64 as Field>::Length::USIZE],
+        );
+
+        Self::Hasher::from_r_s_t(r, s, t)
+    }
 }
 
 /// Process the input to VOLE hash and produce the hash
@@ -45,6 +53,8 @@ where
 
         self.process_split(x0, GenericArray::from_slice(x1))
     }
+
+    fn from_r_s_t(r: [F; 4], s: F, t: GF64) -> Self;
 }
 
 /// The VOLE hasher
@@ -62,69 +72,18 @@ impl VoleHasherInit<GF128> for VoleHasher<GF128> {
     type SDLength = Sum<Prod<<GF128 as Field>::Length, U5>, <GF64 as Field>::Length>;
     type OutputLength = Sum<<GF128 as Field>::Length, B>;
     type Hasher = VoleHasher<GF128>;
-
-    fn new_vole_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher {
-        let r = array::from_fn(|i| {
-            GF128::from(
-                &sd[i * <GF128 as Field>::Length::USIZE..(i + 1) * <GF128 as Field>::Length::USIZE],
-            )
-        });
-        let s = GF128::from(
-            &sd[4 * <GF128 as Field>::Length::USIZE..5 * <GF128 as Field>::Length::USIZE],
-        );
-        let t = GF64::from(
-            &sd[5 * <GF128 as Field>::Length::USIZE
-                ..5 * <GF128 as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
-        );
-
-        Self { r, s, t }
-    }
 }
 
 impl VoleHasherInit<GF192> for VoleHasher<GF192> {
     type SDLength = Sum<Prod<<GF192 as Field>::Length, U5>, <GF64 as Field>::Length>;
     type OutputLength = Sum<<GF192 as Field>::Length, B>;
     type Hasher = VoleHasher<GF192>;
-
-    fn new_vole_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher {
-        let r = array::from_fn(|i| {
-            GF192::from(
-                &sd[i * <GF192 as Field>::Length::USIZE..(i + 1) * <GF192 as Field>::Length::USIZE],
-            )
-        });
-        let s = GF192::from(
-            &sd[4 * <GF192 as Field>::Length::USIZE..5 * <GF192 as Field>::Length::USIZE],
-        );
-        let t = GF64::from(
-            &sd[5 * <GF192 as Field>::Length::USIZE
-                ..5 * <GF192 as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
-        );
-
-        Self { r, s, t }
-    }
 }
 
 impl VoleHasherInit<GF256> for VoleHasher<GF256> {
     type SDLength = Sum<Prod<<GF256 as Field>::Length, U5>, <GF64 as Field>::Length>;
     type OutputLength = Sum<<GF256 as Field>::Length, B>;
     type Hasher = VoleHasher<GF256>;
-
-    fn new_vole_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher {
-        let r = array::from_fn(|i| {
-            GF256::from(
-                &sd[i * <GF256 as Field>::Length::USIZE..(i + 1) * <GF256 as Field>::Length::USIZE],
-            )
-        });
-        let s = GF256::from(
-            &sd[4 * <GF256 as Field>::Length::USIZE..5 * <GF256 as Field>::Length::USIZE],
-        );
-        let t = GF64::from(
-            &sd[5 * <GF256 as Field>::Length::USIZE
-                ..5 * <GF256 as Field>::Length::USIZE + <GF64 as Field>::Length::USIZE],
-        );
-
-        Self { r, s, t }
-    }
 }
 
 impl<F> VoleHasherProcess<F, <Self as VoleHasherInit<F>>::OutputLength> for VoleHasher<F>
@@ -150,14 +109,17 @@ where
         let h2 = self.r[0] * h0 + self.r[1] * h1;
         let h3 = self.r[2] * h0 + self.r[3] * h1;
 
-        let mut ret = GenericArray::default();
-        ret[..<F as Field>::Length::USIZE].copy_from_slice(&h2.as_bytes());
-        ret[<F as Field>::Length::USIZE..<F as Field>::Length::USIZE + B::USIZE]
-            .copy_from_slice(&h3.as_bytes()[0..B::USIZE]);
-        ret.iter_mut()
-            .zip(x1.iter())
-            .for_each(|(x1, x2)| *x1 ^= *x2);
-        ret
+        GenericArray::from_iter(
+            izip!(
+                chain(h2.as_bytes(), h3.as_bytes().into_iter().take(B::USIZE),),
+                x1
+            )
+            .map(|(x1, x2)| x1 ^ x2),
+        )
+    }
+
+    fn from_r_s_t(r: [F; 4], s: F, t: GF64) -> Self {
+        Self { r, s, t }
     }
 }
 
