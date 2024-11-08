@@ -146,8 +146,7 @@ where
         let delta: usize = delta_p
             .into_iter()
             .enumerate()
-            .map(|(j, d)| usize::from(d) << j)
-            .sum();
+            .fold(0, |a, (j, d)| a ^ (usize::from(d) << j));
 
         (_, q[i]) = convert_to_vole::<VC::PRG, _>(None, (1..(1 << k)).map(|j| &s_i[j ^ delta]), iv);
     }
