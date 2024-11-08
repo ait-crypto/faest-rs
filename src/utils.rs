@@ -1,6 +1,6 @@
 use std::{array, iter::zip};
 
-use generic_array::{typenum::Unsigned, GenericArray};
+use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use itertools::iproduct;
 
 use crate::{
@@ -12,6 +12,16 @@ use crate::{
 pub(crate) trait Reader {
     /// Read bytes from PRG/random oracle
     fn read(&mut self, dst: &mut [u8]);
+
+    /// Read into array and consume the reader
+    fn read_into<Length: ArrayLength>(mut self) -> GenericArray<u8, Length>
+    where
+        Self: Sized,
+    {
+        let mut dst = GenericArray::default();
+        self.read(&mut dst);
+        dst
+    }
 }
 
 pub(crate) type Field<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;

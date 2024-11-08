@@ -101,10 +101,7 @@ where
             h1_hasher.update(&com[j]);
         }
         //step 6
-        let mut h = GenericArray::default();
-        let mut reader = h1_hasher.finish();
-        reader.read(&mut h);
-        (h, (k, com), sd)
+        (h1_hasher.finish().read_into(), (k, com), sd)
     }
 
     fn open<DPOW /*2N - 1 */, D, N>(
@@ -164,16 +161,13 @@ where
                 h0_hasher.update(iv);
                 let mut reader = h0_hasher.finish();
                 reader.read(&mut sd[j]);
-                let mut com_j = GenericArray::<u8, Self::LambdaTimes2>::default();
-                reader.read(&mut com_j);
+                let com_j: GenericArray<_, Self::LambdaTimes2> = reader.read_into();
                 h1_hasher.update(&com_j);
             } else {
                 h1_hasher.update(&pdecom[pdecom.len() - 2 * Self::Lambda::USIZE..]);
             }
         }
-        let mut h = GenericArray::default();
-        h1_hasher.finish().read(&mut h);
-        (h, sd)
+        (h1_hasher.finish().read_into(), sd)
     }
 }
 

@@ -100,9 +100,7 @@ where
         }
     }
 
-    let mut hcom = GenericArray::default();
-    hasher.finish().read(&mut hcom);
-    (hcom, decom, c, u0, v)
+    (hasher.finish().read_into(), decom, c, u0, v)
 }
 
 #[allow(clippy::type_complexity)]
@@ -150,9 +148,7 @@ where
 
         (_, q[i]) = convert_to_vole::<VC::PRG, _>(None, (1..(1 << k)).map(|j| &s_i[j ^ delta]), iv);
     }
-    let mut hcom = GenericArray::default();
-    hasher.finish().read(&mut hcom);
-    (hcom, q)
+    (hasher.finish().read_into(), q)
 }
 
 #[cfg(test)]

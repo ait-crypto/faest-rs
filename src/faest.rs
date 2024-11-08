@@ -439,10 +439,8 @@ fn sign<P, O>(
                 .for_each(|v| h1_hasher.update(&vole_hasher.process(v)));
         }
 
-        let mut hv: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
-            GenericArray::default();
-        h1_hasher.finish().read(&mut hv);
-
+        let hv: GenericArray<_, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
+            h1_hasher.finish().read_into();
         (u_t, hv)
     };
 
@@ -610,9 +608,8 @@ where
     zip(gq_t, gd_t.into_iter().flatten())
         .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d))
         .for_each(|v| h1_hasher.update(&[v]));
-    let mut hv =
-        GenericArray::<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2>::default();
-    h1_hasher.finish().read(&mut hv);
+    let hv: GenericArray<_, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
+        h1_hasher.finish().read_into();
 
     let d = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
         + O::LAMBDABYTES::USIZE
