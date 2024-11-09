@@ -4,7 +4,7 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
+use generic_array::{sequence::GenericSequence, typenum::Unsigned, ArrayLength, GenericArray};
 
 use crate::{
     parameter::TauParameters,
@@ -49,7 +49,7 @@ where
             }
         }
     }
-    (r[(d % 2) * n].clone(), v)
+    (r.swap_remove((d % 2) * n), v)
 }
 
 /// Reference to storage area in signature for all `c`s.
@@ -152,28 +152,20 @@ where
     VC: VectorCommitment,
     LH: ArrayLength,
 {
-    let mut q = GenericArray::default_boxed();
     let mut hasher = VC::RO::h1_init();
-    for i in 0..Tau::Tau::USIZE {
-        let b = usize::from(i < Tau::Tau0::USIZE);
-        let k = b * Tau::K0::USIZE + (1 - b) * Tau::K1::USIZE;
-        let pad = b * (Tau::K0::USIZE * i)
-            + (1 - b)
-                * (Tau::K0::USIZE * Tau::Tau0::USIZE
-                    + (i - Tau::Tau0::USIZE * (1 - b)) * Tau::K1::USIZE);
-        let delta_p: Vec<u8> = Tau::decode_challenge(chal, i);
-
-        let (com_i, s_i) = VC::reconstruct(
-            &pdecom[pad * VC::Lambda::USIZE + i * 2 * VC::Lambda::USIZE
-                ..(b * (Tau::K0::USIZE * (i + 1))
-                    + (1 - b)
-                        * (Tau::K0::USIZE * Tau::Tau0::USIZE
-                            + ((i + 1) - Tau::Tau0::USIZE * (1 - b)) * Tau::K1::USIZE))
-                    * VC::Lambda::USIZE
-                    + (i + 1) * 2 * VC::Lambda::USIZE],
-            &delta_p,
-            iv,
-        );
+    let q = Box::generate(|i| {
+        let delta_p = Tau::decode_challenge(chal, i);
+        let pdecom = if i < Tau::Tau0::USIZE {
+            let start = Tau::K0::USIZE * i * VC::Lambda::USIZE + i * 2 * VC::Lambda::USIZE;
+            &pdecom[start..start + Tau::K0::USIZE * VC::Lambda::USIZE + 2 * VC::Lambda::USIZE]
+        } else {
+            let start = (Tau::K0::USIZE * Tau::Tau0::USIZE
+                + (i - Tau::Tau0::USIZE) * Tau::K1::USIZE)
+                * VC::Lambda::USIZE
+                + i * 2 * VC::Lambda::USIZE;
+            &pdecom[start..start + Tau::K1::USIZE * VC::Lambda::USIZE + 2 * VC::Lambda::USIZE]
+        };
+        let (com_i, s_i) = VC::reconstruct(pdecom, &delta_p, iv);
         hasher.update(&com_i);
 
         let delta: usize = delta_p
@@ -181,8 +173,13 @@ where
             .enumerate()
             .fold(0, |a, (j, d)| a ^ (usize::from(d) << j));
 
-        (_, q[i]) = convert_to_vole::<VC::PRG, _>(None, (1..(1 << k)).map(|j| &s_i[j ^ delta]), iv);
-    }
+        let k = if i < Tau::Tau0::USIZE {
+            Tau::K0::USIZE
+        } else {
+            Tau::K1::USIZE
+        };
+        convert_to_vole::<VC::PRG, _>(None, (1..(1 << k)).map(|j| &s_i[j ^ delta]), iv).1
+    });
     (hasher.finish().read_into(), q)
 }
 
