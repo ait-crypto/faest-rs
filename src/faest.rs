@@ -11,7 +11,7 @@ use crate::{
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
     utils::Reader,
     vc::VectorCommitment,
-    vole::{volecommit, volereconstruct},
+    vole::{volecommit, volereconstruct, VoleCommitmentCRef},
     ByteEncoding, Error,
 };
 
@@ -308,10 +308,7 @@ trait FaestHash {
     /// Generate `r` and `iv`
     fn hash_r_iv(r: &mut [u8], iv: &mut IV, key: &[u8], mu: &[u8], rho: &[u8]);
     /// Generate first challange
-    fn hash_challenge_1<I, T>(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: I, iv: &[u8])
-    where
-        I: Iterator<Item = T>,
-        T: AsRef<[u8]>;
+    fn hash_challenge_1(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: &[u8], iv: &[u8]);
     /// Generate second challenge
     fn hash_challenge_2(chall2: &mut [u8], chall1: &[u8], u_t: &[u8], hv: &[u8], d: &[u8]);
     /// Generate third challenge
@@ -341,17 +338,11 @@ where
         h3_reader.read(iv);
     }
 
-    fn hash_challenge_1<I, T>(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: I, iv: &[u8])
-    where
-        I: Iterator<Item = T>,
-        T: AsRef<[u8]>,
-    {
+    fn hash_challenge_1(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: &[u8], iv: &[u8]) {
         let mut h2_hasher = Self::h2_init();
         h2_hasher.update(mu);
         h2_hasher.update(hcom);
-        for buf in c {
-            h2_hasher.update(buf.as_ref());
-        }
+        h2_hasher.update(c);
         h2_hasher.update(iv);
         h2_hasher.finish().read(chall1);
     }
@@ -413,18 +404,19 @@ fn sign<P, O>(
     let mut iv = IV::default();
     RO::<P>::hash_r_iv(&mut r, &mut iv, &sk.owf_key, &mu, rho);
 
-    let (hcom, decom, c, u, gv) =
-        volecommit::<<O::BaseParams as BaseParameters>::VC, P::Tau, O::LHATBYTES>(&r, &iv);
+    let volecommit_cs =
+        &mut signature[..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)];
+    let (hcom, decom, u, gv) = volecommit::<
+        <O::BaseParams as BaseParameters>::VC,
+        P::Tau,
+        O::LHATBYTES,
+    >(VoleCommitmentCRef::new(volecommit_cs), &r, &iv);
     let mut chall1 =
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
-    RO::<P>::hash_challenge_1(&mut chall1, &mu, &hcom, c.iter(), &iv);
+    RO::<P>::hash_challenge_1(&mut chall1, &mu, &hcom, volecommit_cs, &iv);
 
-    // write c and drop it
-    let mut signature = signature.as_mut_slice();
-    for x in c.into_iter() {
-        signature.write_all(&x).unwrap();
-    }
-
+    let signature =
+        &mut signature[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)..];
     let (u_t, hv) = {
         let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
         let u_t = vole_hasher.process(&u);
@@ -542,7 +534,7 @@ where
     let mut chall1 =
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
     let c = &sigma[..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)];
-    RO::<P>::hash_challenge_1(&mut chall1, &mu, &hcom, [c].into_iter(), iv);
+    RO::<P>::hash_challenge_1(&mut chall1, &mu, &hcom, c, iv);
 
     let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
     let def = GenericArray::default();

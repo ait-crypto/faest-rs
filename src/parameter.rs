@@ -681,7 +681,6 @@ impl OWFParameters for OWF256EM {
 
 pub(crate) trait TauParameters {
     type Tau: ArrayLength;
-    type TauMinus1: ArrayLength;
     type K0: ArrayLength;
     type K1: ArrayLength;
     type Tau0: ArrayLength;
@@ -713,7 +712,6 @@ pub(crate) struct Tau128Small;
 
 impl TauParameters for Tau128Small {
     type Tau = U11;
-    type TauMinus1 = Diff<Self::Tau, U1>;
     type K0 = U12;
     type K1 = U11;
     type Tau0 = U7;
@@ -725,7 +723,6 @@ pub(crate) struct Tau128Fast;
 
 impl TauParameters for Tau128Fast {
     type Tau = U16;
-    type TauMinus1 = Diff<Self::Tau, U1>;
     type K0 = U8;
     type K1 = U8;
     type Tau0 = U8;
@@ -737,7 +734,6 @@ pub(crate) struct Tau192Small;
 
 impl TauParameters for Tau192Small {
     type Tau = U16;
-    type TauMinus1 = Diff<Self::Tau, U1>;
     type K0 = U12;
     type K1 = U12;
     type Tau0 = U8;
@@ -749,7 +745,6 @@ pub(crate) struct Tau192Fast;
 
 impl TauParameters for Tau192Fast {
     type Tau = U24;
-    type TauMinus1 = Diff<Self::Tau, U1>;
     type K0 = U8;
     type K1 = U8;
     type Tau0 = U12;
@@ -761,7 +756,6 @@ pub(crate) struct Tau256Small;
 
 impl TauParameters for Tau256Small {
     type Tau = U22;
-    type TauMinus1 = Diff<Self::Tau, U1>;
     type K0 = U12;
     type K1 = U11;
     type Tau0 = U14;
@@ -773,7 +767,6 @@ pub(crate) struct Tau256Fast;
 
 impl TauParameters for Tau256Fast {
     type Tau = U32;
-    type TauMinus1 = Diff<Self::Tau, U1>;
     type K0 = U8;
     type K1 = U8;
     type Tau0 = U16;

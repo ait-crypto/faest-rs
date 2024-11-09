@@ -1,4 +1,8 @@
-use std::iter::zip;
+use std::{
+    iter::zip,
+    marker::PhantomData,
+    ops::{Index, IndexMut},
+};
 
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
@@ -48,8 +52,41 @@ where
     (r[(d % 2) * n].clone(), v)
 }
 
+/// Reference to storage area in signature for all `c`s.
+pub(crate) struct VoleCommitmentCRef<'a, LH>(&'a mut [u8], PhantomData<LH>);
+
+impl<'a, LH> Index<usize> for VoleCommitmentCRef<'a, LH>
+where
+    LH: ArrayLength,
+{
+    type Output = [u8];
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index * LH::USIZE..(index + 1) * LH::USIZE]
+    }
+}
+
+impl<'a, LH> IndexMut<usize> for VoleCommitmentCRef<'a, LH>
+where
+    LH: ArrayLength,
+{
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index * LH::USIZE..(index + 1) * LH::USIZE]
+    }
+}
+
+impl<'a, LH> VoleCommitmentCRef<'a, LH>
+where
+    LH: ArrayLength,
+{
+    pub(crate) fn new(buffer: &'a mut [u8]) -> Self {
+        Self(buffer, PhantomData)
+    }
+}
+
 #[allow(clippy::type_complexity)]
 pub fn volecommit<VC, Tau, LH>(
+    mut c: VoleCommitmentCRef<LH>,
     r: &GenericArray<u8, VC::Lambda>,
     iv: &IV,
 ) -> (
@@ -64,7 +101,6 @@ pub fn volecommit<VC, Tau, LH>(
             Tau::Tau,
         >,
     >,
-    Box<GenericArray<GenericArray<u8, LH>, Tau::TauMinus1>>,
     Box<GenericArray<u8, LH>>,
     Box<GenericArray<Vec<GenericArray<u8, LH>>, Tau::Tau>>,
 )
@@ -77,7 +113,6 @@ where
     let mut decom = GenericArray::default_boxed();
     let mut u0 = GenericArray::<u8, LH>::default_boxed();
     let mut v = GenericArray::default_boxed();
-    let mut c = GenericArray::<GenericArray<u8, LH>, Tau::TauMinus1>::default_boxed();
 
     let mut hasher = VC::RO::h1_init();
     for i in 0..Tau::Tau::USIZE {
@@ -100,7 +135,7 @@ where
         }
     }
 
-    (hasher.finish().read_into(), decom, c, u0, v)
+    (hasher.finish().read_into(), decom, u0, v)
 }
 
 #[allow(clippy::type_complexity)]
@@ -181,6 +216,24 @@ mod test {
         u: Vec<u8>,
     }
 
+    fn volecommit<VC, Tau, LH>(
+        r: &GenericArray<u8, VC::Lambda>,
+        iv: &IV,
+    ) -> (
+        GenericArray<u8, VC::LambdaTimes2>,
+        Box<GenericArray<u8, LH>>,
+    )
+    where
+        Tau: TauParameters,
+        VC: VectorCommitment,
+        LH: ArrayLength,
+    {
+        let mut c = vec![0; LH::USIZE * (Tau::Tau::USIZE - 1)];
+        let ret =
+            super::volecommit::<VC, Tau, LH>(VoleCommitmentCRef::new(c.as_mut_slice()), r, iv);
+        (ret.0, ret.2)
+    }
+
     #[test]
     fn volecommit_test() {
         let database: Vec<DataVoleCommit> = read_test_data("DataVoleCommit.json");
@@ -196,7 +249,7 @@ mod test {
                             &GenericArray::generate(|idx| idx as u8), &IV::default()
                         );
                         assert_eq!(res.0.as_slice(), &data.hcom);
-                        assert_eq!(res.3.as_slice(), &data.u);
+                        assert_eq!(res.1.as_slice(), &data.u);
                     } else {
                         let res = volecommit::<
                             VC<FAEST128fParameters>,
@@ -206,7 +259,7 @@ mod test {
                             &GenericArray::generate(|idx| idx as u8), &IV::default()
                         );
                         assert_eq!(res.0.as_slice(), &data.hcom);
-                        assert_eq!(res.3.as_slice(), &data.u);
+                        assert_eq!(res.1.as_slice(), &data.u);
                     }
                 } else if data.k0[0] == 12 {
                     let res = volecommit::<
@@ -217,7 +270,7 @@ mod test {
                         &GenericArray::generate(|idx| idx as u8), &IV::default()
                     );
                     assert_eq!(res.0.as_slice(), &data.hcom);
-                    assert_eq!(res.3.as_slice(), &data.u);
+                    assert_eq!(res.1.as_slice(), &data.u);
                 } else {
                     let res = volecommit::<
                         VC<FAESTEM128fParameters>,
@@ -227,7 +280,7 @@ mod test {
                         &GenericArray::generate(|idx| idx as u8), &IV::default()
                     );
                     assert_eq!(res.0.as_slice(), &data.hcom);
-                    assert_eq!(res.3.as_slice(), &data.u);
+                    assert_eq!(res.1.as_slice(), &data.u);
                 }
             } else if data.lambdabytes[0] == 24 {
                 if data.u.len() == 458 {
@@ -240,7 +293,7 @@ mod test {
                             &GenericArray::generate(|idx| idx as u8), &IV::default()
                         );
                         assert_eq!(res.0.as_slice(), &data.hcom);
-                        assert_eq!(res.3.as_slice(), &data.u);
+                        assert_eq!(res.1.as_slice(), &data.u);
                     } else {
                         let res = volecommit::<
                             VC<FAEST192fParameters>,
@@ -250,7 +303,7 @@ mod test {
                             &GenericArray::generate(|idx| idx as u8), &IV::default()
                         );
                         assert_eq!(res.0.as_slice(), &data.hcom);
-                        assert_eq!(res.3.as_slice(), &data.u);
+                        assert_eq!(res.1.as_slice(), &data.u);
                     }
                 } else if data.k0[0] == 12 {
                     let res = volecommit::<
@@ -261,7 +314,7 @@ mod test {
                         &GenericArray::generate(|idx| idx as u8), &IV::default()
                     );
                     assert_eq!(res.0.as_slice(), &data.hcom);
-                    assert_eq!(res.3.as_slice(), &data.u);
+                    assert_eq!(res.1.as_slice(), &data.u);
                 } else {
                     let res = volecommit::<
                         VC<FAESTEM192fParameters>,
@@ -271,7 +324,7 @@ mod test {
                         &GenericArray::generate(|idx| idx as u8), &IV::default()
                     );
                     assert_eq!(res.0.as_slice(), &data.hcom);
-                    assert_eq!(res.3.as_slice(), &data.u);
+                    assert_eq!(res.1.as_slice(), &data.u);
                 }
             } else if data.u.len() == 566 {
                 if data.k0[0] == 12 {
@@ -283,7 +336,7 @@ mod test {
                         &GenericArray::generate(|idx| idx as u8), &IV::default()
                     );
                     assert_eq!(res.0.as_slice(), &data.hcom);
-                    assert_eq!(res.3.as_slice(), &data.u);
+                    assert_eq!(res.1.as_slice(), &data.u);
                 } else {
                     let res = volecommit::<
                         VC<FAEST256fParameters>,
@@ -293,7 +346,7 @@ mod test {
                         &GenericArray::generate(|idx| idx as u8), &IV::default()
                     );
                     assert_eq!(res.0.as_slice(), &data.hcom);
-                    assert_eq!(res.3.as_slice(), &data.u);
+                    assert_eq!(res.1.as_slice(), &data.u);
                 }
             } else if data.k0[0] == 12 {
                 let res =
@@ -303,7 +356,7 @@ mod test {
                         LH<FAESTEM256sParameters>,
                     >(&GenericArray::generate(|idx| idx as u8), &IV::default());
                 assert_eq!(res.0.as_slice(), &data.hcom);
-                assert_eq!(res.3.as_slice(), &data.u);
+                assert_eq!(res.1.as_slice(), &data.u);
             } else {
                 let res =
                     volecommit::<
@@ -312,7 +365,7 @@ mod test {
                         LH<FAESTEM256fParameters>,
                     >(&GenericArray::generate(|idx| idx as u8), &IV::default());
                 assert_eq!(res.0.as_slice(), &data.hcom);
-                assert_eq!(res.3.as_slice(), &data.u);
+                assert_eq!(res.1.as_slice(), &data.u);
             }
         }
     }
