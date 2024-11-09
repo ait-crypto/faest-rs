@@ -308,9 +308,10 @@ trait FaestHash {
     /// Generate `r` and `iv`
     fn hash_r_iv(r: &mut [u8], iv: &mut IV, key: &[u8], mu: &[u8], rho: &[u8]);
     /// Generate first challange
-    fn hash_challenge_1<'a, I>(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: I, iv: &[u8])
+    fn hash_challenge_1<I, T>(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: I, iv: &[u8])
     where
-        I: Iterator<Item = &'a [u8]>;
+        I: Iterator<Item = T>,
+        T: AsRef<[u8]>;
     /// Generate second challenge
     fn hash_challenge_2(chall2: &mut [u8], chall1: &[u8], u_t: &[u8], hv: &[u8], d: &[u8]);
     /// Generate third challenge
@@ -340,15 +341,16 @@ where
         h3_reader.read(iv);
     }
 
-    fn hash_challenge_1<'a, I>(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: I, iv: &[u8])
+    fn hash_challenge_1<I, T>(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: I, iv: &[u8])
     where
-        I: Iterator<Item = &'a [u8]>,
+        I: Iterator<Item = T>,
+        T: AsRef<[u8]>,
     {
         let mut h2_hasher = Self::h2_init();
         h2_hasher.update(mu);
         h2_hasher.update(hcom);
         for buf in c {
-            h2_hasher.update(buf);
+            h2_hasher.update(buf.as_ref());
         }
         h2_hasher.update(iv);
         h2_hasher.finish().read(chall1);
@@ -415,13 +417,7 @@ fn sign<P, O>(
         volecommit::<<O::BaseParams as BaseParameters>::VC, P::Tau, O::LHATBYTES>(&r, &iv);
     let mut chall1 =
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
-    RO::<P>::hash_challenge_1(
-        &mut chall1,
-        &mu,
-        &hcom,
-        c.iter().map(GenericArray::as_slice),
-        &iv,
-    );
+    RO::<P>::hash_challenge_1(&mut chall1, &mu, &hcom, c.iter(), &iv);
 
     // write c and drop it
     let mut signature = signature.as_mut_slice();
