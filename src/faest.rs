@@ -15,7 +15,7 @@ use crate::{
     ByteEncoding, Error,
 };
 
-use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
+use generic_array::{typenum::Unsigned, GenericArray};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -645,17 +645,15 @@ where
     }
 }
 
-fn sigma_to_signature<Lambda>(
+fn sigma_to_signature<'a>(
     u_t: &[u8],
     d: &[u8],
     a_t: &[u8],
-    pdecom: impl Iterator<Item = (Vec<GenericArray<u8, Lambda>>, Vec<u8>)>,
+    pdecom: impl Iterator<Item = (Vec<&'a [u8]>, &'a [u8])>,
     chall3: &[u8],
     iv: &IV,
     mut signature: &mut [u8],
-) where
-    Lambda: ArrayLength,
-{
+) {
     signature.write_all(u_t).unwrap();
     signature.write_all(d).unwrap();
     signature.write_all(a_t).unwrap();

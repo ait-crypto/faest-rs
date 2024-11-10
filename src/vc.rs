@@ -32,10 +32,10 @@ pub(crate) trait VectorCommitment {
         Vec<GenericArray<u8, Self::Lambda>>,
     );
 
-    fn open<DPOW /*2N - 1 */, D, N>(
-        decom: &Decom<Self::Lambda, Self::LambdaTimes2>,
+    fn open<'a, DPOW /*2N - 1 */, D, N>(
+        decom: &'a Decom<Self::Lambda, Self::LambdaTimes2>,
         b: &GenericArray<u8, D>,
-    ) -> (Vec<GenericArray<u8, Self::Lambda>>, Vec<u8>)
+    ) -> (Vec<&'a [u8]>, &'a [u8])
     where
         D: ArrayLength;
 
@@ -104,10 +104,10 @@ where
         (h1_hasher.finish().read_into(), (k, com), sd)
     }
 
-    fn open<DPOW /*2N - 1 */, D, N>(
-        decom: &Decom<Self::Lambda, Self::LambdaTimes2>,
+    fn open<'a, DPOW /*2N - 1 */, D, N>(
+        decom: &'a Decom<Self::Lambda, Self::LambdaTimes2>,
         b: &GenericArray<u8, D>,
-    ) -> (Vec<GenericArray<u8, Self::Lambda>>, Vec<u8>)
+    ) -> (Vec<&'a [u8]>, &'a [u8])
     where
         D: ArrayLength,
     {
@@ -117,10 +117,10 @@ where
         //step 4
 
         for i in 0..d {
-            cop.push(decom.0[(1 << (i + 1)) + 2 * a + (1 - b[d - i - 1] as usize) - 1].clone());
+            cop.push(decom.0[(1 << (i + 1)) + 2 * a + (1 - b[d - i - 1] as usize) - 1].as_ref());
             a = 2 * a + b[d - i - 1] as usize;
         }
-        (cop, decom.1[a].to_vec())
+        (cop, decom.1[a].as_ref())
     }
 
     fn reconstruct(
@@ -133,8 +133,7 @@ where
     ) {
         let mut a = 0;
         let d = b.len();
-        let def = GenericArray::default();
-        let mut k = vec![def; (1 << (d + 1)) - 1];
+        let mut k = vec![GenericArray::default(); (1 << (d + 1)) - 1];
         //step 4
         for i in 1..=d {
             let b_d_i = b[d - i] as usize;
@@ -287,84 +286,88 @@ mod test {
                 type D = U4;
                 type Dpow = U31;
                 type N = U16;
+                let decom = (
+                    data.k
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec<GenericArray<u8, _>>>(),
+                    data.com
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec<GenericArray<u8, _>>>(),
+                );
                 let res = VC::<PRG128, RandomOracleShake128>::open::<Dpow, D, N>(
-                    &(
-                        data.k
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
-                        data.com
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
-                    ),
+                    &decom,
                     GenericArray::from_slice(&data.b),
                 );
                 for (res_0, expected) in zip(&res.0, &data.cop) {
-                    assert_eq!(res_0.as_slice(), expected);
+                    assert_eq!(res_0, expected);
                 }
                 assert_eq!(res.1, data.com_j);
             } else if data.k[0].len() == 24 {
                 type D = U4;
                 type Dpow = U31;
                 type N = U16;
+                let decom = (
+                    data.k
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec<GenericArray<u8, _>>>(),
+                    data.com
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec<GenericArray<u8, _>>>(),
+                );
                 let res = VC::<PRG192, RandomOracleShake256>::open::<Dpow, D, N>(
-                    &(
-                        data.k
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
-                        data.com
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
-                    ),
+                    &decom,
                     GenericArray::from_slice(&data.b),
                 );
                 for (res_0, expected) in zip(&res.0, &data.cop) {
-                    assert_eq!(res_0.as_slice(), expected);
+                    assert_eq!(res_0, expected);
                 }
                 assert_eq!(res.1, data.com_j);
             } else if data.b.len() == 4 {
                 type D = U4;
                 type Dpow = U31;
                 type N = U16;
+                let decom = (
+                    data.k
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec<GenericArray<u8, _>>>(),
+                    data.com
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec<GenericArray<u8, _>>>(),
+                );
                 let res = VC::<PRG256, RandomOracleShake256>::open::<Dpow, D, N>(
-                    &(
-                        data.k
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
-                        data.com
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
-                    ),
+                    &decom,
                     GenericArray::from_slice(&data.b),
                 );
                 for (res_0, expected) in zip(&res.0, &data.cop) {
-                    assert_eq!(res_0.as_slice(), expected);
+                    assert_eq!(res_0, expected);
                 }
                 assert_eq!(res.1, data.com_j);
             } else {
                 type D = U5;
                 type Dpow = U63;
                 type N = U32;
+                let decom = (
+                    data.k
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec<GenericArray<u8, _>>>(),
+                    data.com
+                        .iter()
+                        .map(|x| *GenericArray::from_slice(x))
+                        .collect::<Vec<GenericArray<u8, _>>>(),
+                );
                 let res = VC::<PRG256, RandomOracleShake256>::open::<Dpow, D, N>(
-                    &(
-                        data.k
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
-                        data.com
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
-                    ),
+                    &decom,
                     GenericArray::from_slice(&data.b),
                 );
                 for (res_0, expected) in zip(&res.0, &data.cop) {
-                    assert_eq!(res_0.as_slice(), expected);
+                    assert_eq!(res_0, expected);
                 }
                 assert_eq!(res.1, data.com_j);
             }
