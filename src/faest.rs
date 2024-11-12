@@ -16,6 +16,7 @@ use crate::{
 };
 
 use generic_array::{typenum::Unsigned, GenericArray};
+use itertools::izip;
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -404,8 +405,8 @@ fn sign<P, O>(
     let mut iv = IV::default();
     RO::<P>::hash_r_iv(&mut r, &mut iv, &sk.owf_key, &mu, rho);
 
-    let volecommit_cs =
-        &mut signature[..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)];
+    let (volecommit_cs, signature) =
+        signature.split_at_mut(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
     let (hcom, decom, u, gv) = volecommit::<
         <O::BaseParams as BaseParameters>::VC,
         P::Tau,
@@ -415,11 +416,13 @@ fn sign<P, O>(
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
     RO::<P>::hash_challenge_1(&mut chall1, &mu, &hcom, volecommit_cs, &iv);
 
-    let signature =
-        &mut signature[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)..];
-    let (u_t, hv) = {
+    let (signature, u_t, hv) = {
         let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
         let u_t = vole_hasher.process(&u);
+
+        // write u_t to signature
+        let (u_t_d, signature) = signature.split_at_mut(u_t.len());
+        u_t_d.copy_from_slice(u_t.as_slice());
 
         let mut h1_hasher = RO::<P>::h1_init();
         for v in gv.iter() {
@@ -429,20 +432,21 @@ fn sign<P, O>(
 
         let hv: GenericArray<_, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
             h1_hasher.finish().read_into();
-        (u_t, hv)
+        (signature, u_t_d, hv)
     };
 
     let w = P::OWF::witness(&sk.owf_key, &sk.pk.owf_input);
-    let d = Box::<GenericArray<u8, O::LBYTES>>::from_iter(
-        zip(w.iter(), &u[..O::LBYTES::USIZE]).map(|(w, u)| w ^ *u),
-    );
+    // compute and write d to signature
+    let (d, signature) = signature.split_at_mut(O::LBYTES::USIZE);
+    for (dj, wj, uj) in izip!(d.iter_mut(), w.iter(), &u[..O::LBYTES::USIZE]) {
+        *dj = wj ^ *uj
+    }
 
     let mut chall2 =
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>::default();
-    RO::<P>::hash_challenge_2(&mut chall2, &chall1, &u_t, &hv, &d);
+    RO::<P>::hash_challenge_2(&mut chall2, &chall1, &u_t, &hv, d);
 
-    let new_u = GenericArray::from_slice(&u[..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE]);
-    let new_gv = Box::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>::from_iter(
+    let gv = Box::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>::from_iter(
         gv.into_iter().flat_map(|x| {
             x.into_iter().map(|y| {
                 y.into_iter()
@@ -454,8 +458,8 @@ fn sign<P, O>(
 
     let (a_t, b_t) = P::OWF::prove(
         &w,
-        new_u,
-        &new_gv,
+        GenericArray::from_slice(&u[..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE]),
+        &gv,
         &sk.pk.owf_input,
         &sk.pk.owf_output,
         &chall2,
@@ -465,9 +469,7 @@ fn sign<P, O>(
     RO::<P>::hash_challenge_3(&mut chall3, &chall2, &a_t, &b_t);
 
     sigma_to_signature(
-        &u_t,
-        &d,
-        a_t.as_slice(),
+        &a_t,
         (0..<P::Tau as TauParameters>::Tau::USIZE).map(|i| {
             let s = P::Tau::decode_challenge(&chall3, i);
             if i < <P::Tau as TauParameters>::Tau0::USIZE {
@@ -488,6 +490,24 @@ fn sign<P, O>(
         &iv,
         signature,
     );
+}
+
+fn sigma_to_signature<'a>(
+    a_t: &[u8],
+    pdecom: impl Iterator<Item = (Vec<&'a [u8]>, &'a [u8])>,
+    chall3: &[u8],
+    iv: &IV,
+    mut signature: &mut [u8],
+) {
+    signature.write_all(a_t).unwrap();
+    pdecom.for_each(|x| {
+        x.0.iter().for_each(|v| {
+            signature.write_all(v).unwrap();
+        });
+        signature.write_all(&x.1).unwrap();
+    });
+    signature.write_all(chall3).unwrap();
+    signature.write_all(iv).unwrap();
 }
 
 #[inline(always)]
@@ -643,28 +663,6 @@ where
     } else {
         Err(Error::new())
     }
-}
-
-fn sigma_to_signature<'a>(
-    u_t: &[u8],
-    d: &[u8],
-    a_t: &[u8],
-    pdecom: impl Iterator<Item = (Vec<&'a [u8]>, &'a [u8])>,
-    chall3: &[u8],
-    iv: &IV,
-    mut signature: &mut [u8],
-) {
-    signature.write_all(u_t).unwrap();
-    signature.write_all(d).unwrap();
-    signature.write_all(a_t).unwrap();
-    pdecom.for_each(|x| {
-        x.0.iter().for_each(|v| {
-            signature.write_all(v).unwrap();
-        });
-        signature.write_all(&x.1).unwrap();
-    });
-    signature.write_all(chall3).unwrap();
-    signature.write_all(iv).unwrap();
 }
 
 #[cfg(test)]
