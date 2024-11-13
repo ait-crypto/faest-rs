@@ -87,22 +87,22 @@ where
 #[allow(clippy::type_complexity)]
 pub fn volecommit<VC, Tau, LH>(
     mut c: VoleCommitmentCRef<LH>,
-    r: &GenericArray<u8, VC::Lambda>,
+    r: &GenericArray<u8, VC::LambdaBytes>,
     iv: &IV,
 ) -> (
-    GenericArray<u8, VC::LambdaTimes2>,
+    GenericArray<u8, VC::LambdaBytesTimes2>,
     //Here decom can have two diferent length, depending on if it's a i < t0 or > 0 so we use vectors
     Box<
         GenericArray<
             (
-                Vec<GenericArray<u8, VC::Lambda>>,
-                Vec<GenericArray<u8, VC::LambdaTimes2>>,
+                Vec<GenericArray<u8, VC::LambdaBytes>>,
+                Vec<GenericArray<u8, VC::LambdaBytesTimes2>>,
             ),
             Tau::Tau,
         >,
     >,
     Box<GenericArray<u8, LH>>,
-    Box<GenericArray<GenericArray<u8, LH>, VC::LambdaTimes8>>,
+    Box<GenericArray<GenericArray<u8, LH>, VC::Lambda>>,
 )
 where
     Tau: TauParameters,
@@ -154,8 +154,8 @@ pub fn volereconstruct<VC, Tau, LH>(
     pdecom: &[u8],
     iv: &IV,
 ) -> (
-    GenericArray<u8, VC::LambdaTimes2>,
-    Box<GenericArray<GenericArray<u8, LH>, VC::LambdaTimes8>>,
+    GenericArray<u8, VC::LambdaBytesTimes2>,
+    Box<GenericArray<GenericArray<u8, LH>, VC::Lambda>>,
 )
 where
     Tau: TauParameters,
@@ -166,14 +166,17 @@ where
     let q = Box::from_iter((0..Tau::Tau::USIZE).flat_map(|i| {
         let delta_p = Tau::decode_challenge(chal, i);
         let pdecom = if i < Tau::Tau0::USIZE {
-            let start = Tau::K0::USIZE * i * VC::Lambda::USIZE + i * 2 * VC::Lambda::USIZE;
-            &pdecom[start..start + Tau::K0::USIZE * VC::Lambda::USIZE + 2 * VC::Lambda::USIZE]
+            let start =
+                Tau::K0::USIZE * i * VC::LambdaBytes::USIZE + i * 2 * VC::LambdaBytes::USIZE;
+            &pdecom[start
+                ..start + Tau::K0::USIZE * VC::LambdaBytes::USIZE + 2 * VC::LambdaBytes::USIZE]
         } else {
             let start = (Tau::K0::USIZE * Tau::Tau0::USIZE
                 + (i - Tau::Tau0::USIZE) * Tau::K1::USIZE)
-                * VC::Lambda::USIZE
-                + i * 2 * VC::Lambda::USIZE;
-            &pdecom[start..start + Tau::K1::USIZE * VC::Lambda::USIZE + 2 * VC::Lambda::USIZE]
+                * VC::LambdaBytes::USIZE
+                + i * 2 * VC::LambdaBytes::USIZE;
+            &pdecom[start
+                ..start + Tau::K1::USIZE * VC::LambdaBytes::USIZE + 2 * VC::LambdaBytes::USIZE]
         };
         let (com_i, s_i) = VC::reconstruct(pdecom, &delta_p, iv);
         hasher.update(&com_i);
@@ -232,10 +235,10 @@ mod test {
     }
 
     fn volecommit<VC, Tau, LH>(
-        r: &GenericArray<u8, VC::Lambda>,
+        r: &GenericArray<u8, VC::LambdaBytes>,
         iv: &IV,
     ) -> (
-        GenericArray<u8, VC::LambdaTimes2>,
+        GenericArray<u8, VC::LambdaBytesTimes2>,
         Box<GenericArray<u8, LH>>,
     )
     where

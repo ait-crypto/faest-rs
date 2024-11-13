@@ -17,27 +17,27 @@ use crate::{
 type Decom<L, L2> = (Vec<GenericArray<u8, L>>, Vec<GenericArray<u8, L2>>);
 
 pub(crate) trait VectorCommitment {
+    type LambdaBytes: ArrayLength;
+    type LambdaBytesTimes2: ArrayLength;
     type Lambda: ArrayLength;
-    type LambdaTimes2: ArrayLength;
-    type LambdaTimes8: ArrayLength;
-    type PRG: PseudoRandomGenerator<Lambda = Self::Lambda>;
+    type PRG: PseudoRandomGenerator<Lambda = Self::LambdaBytes>;
     type RO: RandomOracle;
 
     fn commit(
-        r: &GenericArray<u8, Self::Lambda>,
+        r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
         n: usize,
     ) -> (
-        GenericArray<u8, Self::LambdaTimes2>,
+        GenericArray<u8, Self::LambdaBytesTimes2>,
         (
-            Vec<GenericArray<u8, Self::Lambda>>,
-            Vec<GenericArray<u8, Self::LambdaTimes2>>,
+            Vec<GenericArray<u8, Self::LambdaBytes>>,
+            Vec<GenericArray<u8, Self::LambdaBytesTimes2>>,
         ),
-        Vec<GenericArray<u8, Self::Lambda>>,
+        Vec<GenericArray<u8, Self::LambdaBytes>>,
     );
 
     fn open<'a, DPOW /*2N - 1 */, D, N>(
-        decom: &'a Decom<Self::Lambda, Self::LambdaTimes2>,
+        decom: &'a Decom<Self::LambdaBytes, Self::LambdaBytesTimes2>,
         b: &GenericArray<u8, D>,
     ) -> (Vec<&'a [u8]>, &'a [u8])
     where
@@ -48,8 +48,8 @@ pub(crate) trait VectorCommitment {
         b: &[u8],
         iv: &IV,
     ) -> (
-        GenericArray<u8, Self::LambdaTimes2>,
-        Vec<GenericArray<u8, Self::Lambda>>,
+        GenericArray<u8, Self::LambdaBytesTimes2>,
+        Vec<GenericArray<u8, Self::LambdaBytes>>,
     );
 }
 
@@ -66,23 +66,23 @@ where
     <PRG::Lambda as Mul<U8>>::Output: ArrayLength,
     R: RandomOracle,
 {
-    type Lambda = PRG::Lambda;
-    type LambdaTimes2 = Sum<PRG::Lambda, PRG::Lambda>;
-    type LambdaTimes8 = Prod<PRG::Lambda, U8>;
+    type LambdaBytes = PRG::Lambda;
+    type LambdaBytesTimes2 = Sum<PRG::Lambda, PRG::Lambda>;
+    type Lambda = Prod<PRG::Lambda, U8>;
     type PRG = PRG;
     type RO = R;
 
     fn commit(
-        r: &GenericArray<u8, Self::Lambda>,
+        r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
         n: usize,
     ) -> (
-        GenericArray<u8, Self::LambdaTimes2>,
+        GenericArray<u8, Self::LambdaBytesTimes2>,
         (
-            Vec<GenericArray<u8, Self::Lambda>>,
-            Vec<GenericArray<u8, Self::LambdaTimes2>>,
+            Vec<GenericArray<u8, Self::LambdaBytes>>,
+            Vec<GenericArray<u8, Self::LambdaBytesTimes2>>,
         ),
-        Vec<GenericArray<u8, Self::Lambda>>,
+        Vec<GenericArray<u8, Self::LambdaBytes>>,
     ) {
         let mut k = vec![GenericArray::default(); 2 * n - 1];
         //step 2..3
@@ -111,7 +111,7 @@ where
     }
 
     fn open<'a, DPOW /*2N - 1 */, D, N>(
-        decom: &'a Decom<Self::Lambda, Self::LambdaTimes2>,
+        decom: &'a Decom<Self::LambdaBytes, Self::LambdaBytesTimes2>,
         b: &GenericArray<u8, D>,
     ) -> (Vec<&'a [u8]>, &'a [u8])
     where
@@ -134,8 +134,8 @@ where
         b: &[u8],
         iv: &IV,
     ) -> (
-        GenericArray<u8, Self::LambdaTimes2>,
-        Vec<GenericArray<u8, Self::Lambda>>,
+        GenericArray<u8, Self::LambdaBytesTimes2>,
+        Vec<GenericArray<u8, Self::LambdaBytes>>,
     ) {
         let mut a = 0;
         let d = b.len();
@@ -143,8 +143,9 @@ where
         //step 4
         for i in 1..=d {
             let b_d_i = b[d - i] as usize;
-            k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)]
-                .copy_from_slice(&pdecom[(i - 1) * Self::Lambda::USIZE..i * Self::Lambda::USIZE]);
+            k[(1 << (i)) - 1 + (2 * a) + (1 - b_d_i)].copy_from_slice(
+                &pdecom[(i - 1) * Self::LambdaBytes::USIZE..i * Self::LambdaBytes::USIZE],
+            );
             //step 7
             for j in 0..1 << (i - 1) {
                 if j != a {
@@ -166,10 +167,10 @@ where
                 h0_hasher.update(iv);
                 let mut reader = h0_hasher.finish();
                 reader.read(&mut sd[j]);
-                let com_j: GenericArray<_, Self::LambdaTimes2> = reader.read_into();
+                let com_j: GenericArray<_, Self::LambdaBytesTimes2> = reader.read_into();
                 h1_hasher.update(&com_j);
             } else {
-                h1_hasher.update(&pdecom[pdecom.len() - 2 * Self::Lambda::USIZE..]);
+                h1_hasher.update(&pdecom[pdecom.len() - 2 * Self::LambdaBytes::USIZE..]);
             }
         }
         (h1_hasher.finish().read_into(), sd)

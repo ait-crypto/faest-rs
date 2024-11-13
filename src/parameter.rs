@@ -42,9 +42,9 @@ pub(crate) trait BaseParameters {
     /// Associated PRG
     type PRG: PseudoRandomGenerator<Lambda = Self::LambdaBytes>;
     type VC: VectorCommitment<
-        Lambda = Self::LambdaBytes,
-        LambdaTimes2 = Self::LambdaBytesTimes2,
-        LambdaTimes8 = Self::Lambda,
+        LambdaBytes = Self::LambdaBytes,
+        LambdaBytesTimes2 = Self::LambdaBytesTimes2,
+        Lambda = Self::Lambda,
     >;
 
     /// Security parameter (in bits)
