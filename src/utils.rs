@@ -53,23 +53,18 @@ where
     Tau: TauParameters,
 {
     for index in (0..Tau::Tau::USIZE).flat_map(|i| {
+        let converted_index = Tau::convert_index(i);
         Tau::decode_challenge_as_iter(chall3, i)
             .enumerate()
             .filter_map(move |(j, delta_j)| {
                 if delta_j != 0 {
-                    Some(if i < Tau::Tau0::USIZE {
-                        Tau::K0::USIZE * i + j
-                    } else {
-                        Tau::Tau0::USIZE * Tau::K0::USIZE
-                            + Tau::K1::USIZE * (i - Tau::Tau0::USIZE)
-                            + j
-                    })
+                    Some(converted_index + j)
                 } else {
                     None
                 }
             })
     }) {
-        for (gq_k, d_k) in zip(gq[index].iter_mut(), d).take(O::LBYTES::USIZE) {
+        for (gq_k, d_k) in zip(gq[index].iter_mut(), d) {
             *gq_k ^= d_k;
         }
     }

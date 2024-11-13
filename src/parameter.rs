@@ -709,6 +709,25 @@ pub(crate) trait TauParameters {
 
         (lo..=hi).map(move |j| (chal[j / 8] >> (j % 8)) & 1)
     }
+
+    fn convert_index(i: usize) -> usize {
+        if i < Self::Tau0::USIZE {
+            Self::K0::USIZE * i
+        } else {
+            Self::Tau0::USIZE * Self::K0::USIZE + Self::K1::USIZE * (i - Self::Tau0::USIZE)
+        }
+    }
+
+    fn convert_index_and_size(i: usize) -> (usize, usize) {
+        if i < Self::Tau0::USIZE {
+            (Self::K0::USIZE * i, Self::K0::USIZE)
+        } else {
+            (
+                Self::Tau0::USIZE * Self::K0::USIZE + Self::K1::USIZE * (i - Self::Tau0::USIZE),
+                Self::K1::USIZE,
+            )
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

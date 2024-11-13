@@ -124,12 +124,9 @@ where
         decom[i] = decom_i;
         hasher.update(&com_i);
         let ui = convert_to_vole::<VC::PRG, _>(
-            if i < Tau::Tau0::USIZE {
-                &mut v[i * Tau::K0::USIZE..(i + 1) * Tau::K0::USIZE]
-            } else {
-                let i_base = i - Tau::Tau0::USIZE;
-                &mut v[i_base * Tau::K1::USIZE + Tau::K0::USIZE * Tau::Tau0::USIZE
-                    ..(i_base + 1) * Tau::K1::USIZE + Tau::K0::USIZE * Tau::Tau0::USIZE]
+            {
+                let (index, size) = Tau::convert_index_and_size(i);
+                &mut v[index..index + size]
             },
             Some(&sd_i[0]),
             sd_i.iter().skip(1),

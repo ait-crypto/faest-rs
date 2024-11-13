@@ -589,17 +589,7 @@ where
                 }
             })
             .collect();
-        let (index, size) = if i < <P::Tau as TauParameters>::Tau0::USIZE {
-            let size = <P::Tau as TauParameters>::K0::USIZE;
-            (i * size, size)
-        } else {
-            let size = <P::Tau as TauParameters>::K1::USIZE;
-            (
-                (i - <P::Tau as TauParameters>::Tau0::USIZE) * size
-                    + <P::Tau as TauParameters>::Tau0::USIZE * <P::Tau as TauParameters>::K0::USIZE,
-                size,
-            )
-        };
+        let (index, size) = <P::Tau as TauParameters>::convert_index_and_size(i);
         gq[i] = gq_p[index..index + size]
             .iter()
             .zip(delta.into_iter().map(|d| {
