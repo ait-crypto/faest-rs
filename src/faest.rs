@@ -94,7 +94,7 @@ where
     O::keygen_with_rng(rng)
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn faest_sign<P>(
     msg: &[u8],
     sk: &SecretKey<P::OWF>,
@@ -106,7 +106,6 @@ pub(crate) fn faest_sign<P>(
     sign::<P, P::OWF>(msg, sk, rho, signature);
 }
 
-#[allow(clippy::type_complexity)]
 fn sign<P, O>(
     msg: &[u8],
     sk: &SecretKey<O>,
@@ -157,7 +156,7 @@ fn sign<P, O>(
     // compute and write d to signature
     let (d, signature) = signature.split_at_mut(O::LBYTES::USIZE);
     for (dj, wj, uj) in izip!(d.iter_mut(), w.iter(), &u[..O::LBYTES::USIZE]) {
-        *dj = wj ^ *uj
+        *dj = wj ^ *uj;
     }
 
     let mut chall2 =
@@ -224,7 +223,7 @@ fn sigma_to_signature<'a>(
     signature.write_all(iv).unwrap();
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn faest_verify<P>(
     msg: &[u8],
     pk: &PublicKey<P::OWF>,
@@ -236,7 +235,6 @@ where
     verify::<P, P::OWF>(msg, pk, sigma)
 }
 
-#[allow(clippy::type_complexity)]
 fn verify<P, O>(
     msg: &[u8],
     pk: &PublicKey<O>,
