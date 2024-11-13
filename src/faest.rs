@@ -443,7 +443,7 @@ fn sign<P, O>(
 
     let mut chall2 =
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>::default();
-    RO::<P>::hash_challenge_2(&mut chall2, &chall1, &u_t, &hv, d);
+    RO::<P>::hash_challenge_2(&mut chall2, &chall1, u_t, &hv, d);
 
     // FIXME: this is only re-shapping gv
     let gv = Box::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>::from_iter(
@@ -499,7 +499,7 @@ fn sigma_to_signature<'a>(
         x.0.iter().for_each(|v| {
             signature.write_all(v).unwrap();
         });
-        signature.write_all(&x.1).unwrap();
+        signature.write_all(x.1).unwrap();
     });
     signature.write_all(chall3).unwrap();
     signature.write_all(iv).unwrap();
@@ -566,10 +566,7 @@ where
             + O::LAMBDABYTES::USIZE
             + 2];
 
-    gq[0] = gq_p[0..<P::Tau as TauParameters>::K0::USIZE]
-        .iter()
-        .cloned()
-        .collect();
+    gq[0] = gq_p[0..<P::Tau as TauParameters>::K0::USIZE].to_vec();
     gd_t[0] = P::Tau::decode_challenge_as_iter(chall3, 0)
         .map(|d| {
             if d == 1 {
