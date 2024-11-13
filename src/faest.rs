@@ -269,66 +269,64 @@ where
     RO::<P>::hash_challenge_1(&mut chall1, &mu, &hcom, c, iv);
 
     let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
-    let def = GenericArray::default();
-    let def2 = GenericArray::<u8, O::LHATBYTES>::default();
-    let mut gq =
-        GenericArray::<Vec<GenericArray<u8, O::LHATBYTES>>, <P::Tau as TauParameters>::Tau>::default_boxed();
-    let mut gd_t = GenericArray::<
-        Vec<&GenericArray<u8, O::LAMBDAPLUS2>>,
-        <P::Tau as TauParameters>::Tau,
-    >::default_boxed();
+    let mut gq = GenericArray::<GenericArray<u8, O::LHATBYTES>, O::LAMBDA>::default_boxed();
+    let mut gd_t =
+        GenericArray::<Option<&GenericArray<u8, O::LAMBDAPLUS2>>, O::LAMBDA>::default_boxed();
 
-    let u_t = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
-        ..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
-            + O::LAMBDABYTES::USIZE
-            + 2];
+    let u_t = GenericArray::from_slice(
+        &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+            ..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+                + O::LAMBDABYTES::USIZE
+                + 2],
+    );
 
-    gq[0] = gq_p[0..<P::Tau as TauParameters>::K0::USIZE].to_vec();
-    gd_t[0] = P::Tau::decode_challenge_as_iter(chall3, 0)
-        .map(|d| {
-            if d == 1 {
-                GenericArray::from_slice(u_t)
-            } else {
-                &def
-            }
-        })
-        .collect();
+    for j in 0..<P::Tau as TauParameters>::K0::USIZE {
+        gq[j] = gq_p[j].clone();
+    }
+    for (t, d) in zip(gd_t.iter_mut(), P::Tau::decode_challenge_as_iter(chall3, 0)) {
+        if d == 1 {
+            *t = Some(u_t);
+        }
+    }
 
     for i in 1..<P::Tau as TauParameters>::Tau::USIZE {
         let delta = P::Tau::decode_challenge(chall3, i);
-        gd_t[i] = delta
-            .iter()
-            .map(|d| {
-                if *d == 1 {
-                    GenericArray::from_slice(u_t)
-                } else {
-                    &def
-                }
-            })
-            .collect();
         let (index, size) = <P::Tau as TauParameters>::convert_index_and_size(i);
-        gq[i] = gq_p[index..index + size]
-            .iter()
-            .zip(delta.into_iter().map(|d| {
-                if d == 1 {
-                    GenericArray::from_slice(
-                        &c[O::LHATBYTES::USIZE * (i - 1)..O::LHATBYTES::USIZE * i],
-                    )
-                } else {
-                    &def2
+        for (t, d) in zip(&mut gd_t[index..index + size], delta.iter()) {
+            if *d == 1 {
+                *t = Some(u_t);
+            }
+        }
+
+        for (gq_i, gq_p_i, d) in izip!(
+            &mut gq[index..index + size],
+            &gq_p[index..index + size],
+            delta
+        ) {
+            if d == 1 {
+                for (t, l, r) in izip!(
+                    gq_i,
+                    gq_p_i,
+                    &c[O::LHATBYTES::USIZE * (i - 1)..O::LHATBYTES::USIZE * i]
+                ) {
+                    *t = l ^ r;
                 }
-            }))
-            .map(|(q, d)| zip(q, d).map(|(q, d)| (q ^ d)).collect())
-            .collect::<Vec<GenericArray<u8, O::LHATBYTES>>>();
+            } else {
+                *gq_i = gq_p_i.clone();
+            }
+        }
     }
-    let gq_t = gq
-        .iter()
-        .flat_map(|q| q.iter().map(|q| vole_hasher.process(q)));
+    let gq_t = gq.iter().map(|q| vole_hasher.process(q));
 
     let mut h1_hasher = RO::<P>::h1_init();
-    zip(gq_t, gd_t.into_iter().flatten())
-        .flat_map(|(q, d)| zip(q, d).map(|(q, d)| q ^ d))
-        .for_each(|v| h1_hasher.update(&[v]));
+    zip(gq_t, gd_t.into_iter()).for_each(|(q, d)| {
+        if let Some(d) = d {
+            let t = GenericArray::<_, O::LAMBDAPLUS2>::from_iter(zip(q, d).map(|(q, d)| q ^ d));
+            h1_hasher.update(&t);
+        } else {
+            h1_hasher.update(&q[..O::LAMBDAPLUS2::USIZE]);
+        }
+    });
     let hv: GenericArray<_, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
         h1_hasher.finish().read_into();
 
@@ -353,14 +351,10 @@ where
             + O::LBYTES::USIZE];
     let b_t = P::OWF::verify::<P::Tau>(
         GenericArray::from_slice(d),
-        Box::<GenericArray<_, _>>::from_iter(gq.into_iter().flat_map(|x| {
+        Box::<GenericArray<_, _>>::from_iter(gq.into_iter().map(|x| {
             x.into_iter()
-                .map(|y| {
-                    y.into_iter()
-                        .take(O::LBYTES::USIZE + O::LAMBDABYTES::USIZE)
-                        .collect::<GenericArray<u8, _>>()
-                })
-                .collect::<Vec<GenericArray<u8, _>>>()
+                .take(O::LBYTES::USIZE + O::LAMBDABYTES::USIZE)
+                .collect::<GenericArray<u8, _>>()
         })),
         GenericArray::from_slice(a_t),
         &chall2,
