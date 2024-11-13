@@ -73,6 +73,7 @@ mod aes;
 mod em;
 mod faest;
 mod fields;
+mod internal_keys;
 mod parameter;
 mod prg;
 mod random_oracles;
@@ -83,7 +84,8 @@ mod vc;
 mod vole;
 
 use crate::{
-    faest::{faest_keygen, faest_sign, faest_verify, PublicKey, SecretKey},
+    faest::{faest_keygen, faest_sign, faest_verify},
+    internal_keys::{PublicKey, SecretKey},
     parameter::{
         FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
         FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters, FAESTEM128sParameters,

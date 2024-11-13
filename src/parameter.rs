@@ -16,8 +16,8 @@ use rand_core::RngCore;
 use crate::{
     aes::{aes_extendedwitness, aes_prove, aes_verify},
     em::{em_extendedwitness, em_prove, em_verify},
-    faest::{PublicKey, SecretKey},
     fields::{BigGaloisField, GF128, GF192, GF256},
+    internal_keys::{PublicKey, SecretKey},
     prg::{PseudoRandomGenerator, PRG128, PRG192, PRG256},
     random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake256},
     rijndael_32::{Rijndael192, Rijndael256},
