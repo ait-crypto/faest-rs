@@ -426,8 +426,7 @@ fn sign<P, O>(
 
         let mut h1_hasher = RO::<P>::h1_init();
         for v in gv.iter() {
-            v.iter()
-                .for_each(|v| h1_hasher.update(&vole_hasher.process(v)));
+            h1_hasher.update(&vole_hasher.process(v));
         }
 
         let hv: GenericArray<_, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
@@ -446,14 +445,10 @@ fn sign<P, O>(
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>::default();
     RO::<P>::hash_challenge_2(&mut chall2, &chall1, &u_t, &hv, d);
 
+    // FIXME: this is only re-shapping gv
     let gv = Box::<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>::from_iter(
-        gv.into_iter().flat_map(|x| {
-            x.into_iter().map(|y| {
-                y.into_iter()
-                    .take(O::LBYTES::USIZE + O::LAMBDABYTES::USIZE)
-                    .collect::<GenericArray<u8, O::LAMBDALBYTES>>()
-            })
-        }),
+        gv.into_iter()
+            .map(|x| GenericArray::from_slice(&x[..O::LAMBDALBYTES::USIZE]).clone()),
     );
 
     let (a_t, b_t) = P::OWF::prove(
@@ -571,7 +566,10 @@ where
             + O::LAMBDABYTES::USIZE
             + 2];
 
-    gq[0].clone_from(&gq_p[0]);
+    gq[0] = gq_p[0..<P::Tau as TauParameters>::K0::USIZE]
+        .iter()
+        .cloned()
+        .collect();
     gd_t[0] = P::Tau::decode_challenge_as_iter(chall3, 0)
         .map(|d| {
             if d == 1 {
@@ -594,7 +592,18 @@ where
                 }
             })
             .collect();
-        gq[i] = gq_p[i]
+        let (index, size) = if i < <P::Tau as TauParameters>::Tau0::USIZE {
+            let size = <P::Tau as TauParameters>::K0::USIZE;
+            (i * size, size)
+        } else {
+            let size = <P::Tau as TauParameters>::K1::USIZE;
+            (
+                (i - <P::Tau as TauParameters>::Tau0::USIZE) * size
+                    + <P::Tau as TauParameters>::Tau0::USIZE * <P::Tau as TauParameters>::K0::USIZE,
+                size,
+            )
+        };
+        gq[i] = gq_p[index..index + size]
             .iter()
             .zip(delta.into_iter().map(|d| {
                 if d == 1 {

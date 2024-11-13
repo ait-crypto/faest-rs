@@ -41,7 +41,11 @@ pub(crate) trait BaseParameters {
     type RandomOracle: RandomOracle;
     /// Associated PRG
     type PRG: PseudoRandomGenerator<Lambda = Self::LambdaBytes>;
-    type VC: VectorCommitment<Lambda = Self::LambdaBytes, LambdaTimes2 = Self::LambdaBytesTimes2>;
+    type VC: VectorCommitment<
+        Lambda = Self::LambdaBytes,
+        LambdaTimes2 = Self::LambdaBytesTimes2,
+        LambdaTimes8 = Self::Lambda,
+    >;
 
     /// Security parameter (in bits)
     type Lambda: ArrayLength;

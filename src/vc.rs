@@ -1,7 +1,10 @@
-use std::{marker::PhantomData, ops::Add};
+use std::{
+    marker::PhantomData,
+    ops::{Add, Mul},
+};
 
 use generic_array::{
-    typenum::{Sum, Unsigned},
+    typenum::{Prod, Sum, Unsigned, U8},
     ArrayLength, GenericArray,
 };
 
@@ -16,6 +19,7 @@ type Decom<L, L2> = (Vec<GenericArray<u8, L>>, Vec<GenericArray<u8, L2>>);
 pub(crate) trait VectorCommitment {
     type Lambda: ArrayLength;
     type LambdaTimes2: ArrayLength;
+    type LambdaTimes8: ArrayLength;
     type PRG: PseudoRandomGenerator<Lambda = Self::Lambda>;
     type RO: RandomOracle;
 
@@ -57,12 +61,14 @@ where
 impl<PRG, R> VectorCommitment for VC<PRG, R>
 where
     PRG: PseudoRandomGenerator,
-    PRG::Lambda: Add<PRG::Lambda>,
+    PRG::Lambda: Add<PRG::Lambda> + Mul<U8>,
     <PRG::Lambda as Add<PRG::Lambda>>::Output: ArrayLength,
+    <PRG::Lambda as Mul<U8>>::Output: ArrayLength,
     R: RandomOracle,
 {
     type Lambda = PRG::Lambda;
     type LambdaTimes2 = Sum<PRG::Lambda, PRG::Lambda>;
+    type LambdaTimes8 = Prod<PRG::Lambda, U8>;
     type PRG = PRG;
     type RO = R;
 

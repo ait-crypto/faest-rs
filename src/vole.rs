@@ -4,7 +4,7 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use generic_array::{sequence::GenericSequence, typenum::Unsigned, ArrayLength, GenericArray};
+use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
 use crate::{
     parameter::TauParameters,
@@ -16,10 +16,11 @@ use crate::{
 
 #[allow(clippy::type_complexity)]
 fn convert_to_vole<'a, PRG, LH>(
+    v: &mut [GenericArray<u8, LH>],
     sd_0: Option<&GenericArray<u8, PRG::Lambda>>,
     sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, PRG::Lambda>>,
     iv: &IV,
-) -> (GenericArray<u8, LH>, Vec<GenericArray<u8, LH>>)
+) -> GenericArray<u8, LH>
 where
     PRG: PseudoRandomGenerator,
     LH: ArrayLength,
@@ -36,7 +37,6 @@ where
     }
 
     // FIXME
-    let mut v = vec![GenericArray::default(); d];
     for (j, item) in v.iter_mut().enumerate() {
         let j_offset = (j % 2) * n;
         let j1_offset = ((j + 1) % 2) * n;
@@ -49,7 +49,7 @@ where
             }
         }
     }
-    (r.swap_remove((d % 2) * n), v)
+    r.swap_remove((d % 2) * n)
 }
 
 /// Reference to storage area in signature for all `c`s.
@@ -102,7 +102,7 @@ pub fn volecommit<VC, Tau, LH>(
         >,
     >,
     Box<GenericArray<u8, LH>>,
-    Box<GenericArray<Vec<GenericArray<u8, LH>>, Tau::Tau>>,
+    Box<GenericArray<GenericArray<u8, LH>, VC::LambdaTimes8>>,
 )
 where
     Tau: TauParameters,
@@ -123,8 +123,18 @@ where
         let (com_i, decom_i, sd_i) = VC::commit(&r_i, iv, 1 << k);
         decom[i] = decom_i;
         hasher.update(&com_i);
-        let (ui, vi) = convert_to_vole::<VC::PRG, _>(Some(&sd_i[0]), sd_i.iter().skip(1), iv);
-        v[i] = vi;
+        let ui = convert_to_vole::<VC::PRG, _>(
+            if i < Tau::Tau0::USIZE {
+                &mut v[i * Tau::K0::USIZE..(i + 1) * Tau::K0::USIZE]
+            } else {
+                let i_base = i - Tau::Tau0::USIZE;
+                &mut v[i_base * Tau::K1::USIZE + Tau::K0::USIZE * Tau::Tau0::USIZE
+                    ..(i_base + 1) * Tau::K1::USIZE + Tau::K0::USIZE * Tau::Tau0::USIZE]
+            },
+            Some(&sd_i[0]),
+            sd_i.iter().skip(1),
+            iv,
+        );
 
         if i == 0 {
             *u0 = ui;
@@ -145,7 +155,7 @@ pub fn volereconstruct<VC, Tau, LH>(
     iv: &IV,
 ) -> (
     GenericArray<u8, VC::LambdaTimes2>,
-    Box<GenericArray<Vec<GenericArray<u8, LH>>, Tau::Tau>>,
+    Box<GenericArray<GenericArray<u8, LH>, VC::LambdaTimes8>>,
 )
 where
     Tau: TauParameters,
@@ -153,7 +163,7 @@ where
     LH: ArrayLength,
 {
     let mut hasher = VC::RO::h1_init();
-    let q = Box::generate(|i| {
+    let q = Box::from_iter((0..Tau::Tau::USIZE).flat_map(|i| {
         let delta_p = Tau::decode_challenge(chal, i);
         let pdecom = if i < Tau::Tau0::USIZE {
             let start = Tau::K0::USIZE * i * VC::Lambda::USIZE + i * 2 * VC::Lambda::USIZE;
@@ -178,8 +188,16 @@ where
         } else {
             Tau::K1::USIZE
         };
-        convert_to_vole::<VC::PRG, _>(None, (1..(1 << k)).map(|j| &s_i[j ^ delta]), iv).1
-    });
+
+        let mut buf = vec![GenericArray::default(); k];
+        convert_to_vole::<VC::PRG, _>(
+            buf.as_mut_slice(),
+            None,
+            (1..(1 << k)).map(|j| &s_i[j ^ delta]),
+            iv,
+        );
+        buf.into_iter()
+    }));
     (hasher.finish().read_into(), q)
 }
 
@@ -397,9 +415,6 @@ mod test {
                         LH<FAEST128fParameters>,
                     >(&data.chal, pdecom, &IV::default());
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                    for i in 0..res.1.len() {
-                        assert_eq!(res.1[i].len(), data.q[i].len());
-                    }
                 } else {
                     let pdecom = &data
                         .pdec
@@ -415,9 +430,6 @@ mod test {
                         LH<FAEST128sParameters>,
                     >(&data.chal, pdecom, &IV::default());
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                    for i in 0..res.1.len() {
-                        assert_eq!(res.1[i].len(), data.q[i].len());
-                    }
                 }
             } else if data.chal.len() == 24 {
                 if data.q[0].len() == 8 {
@@ -435,9 +447,6 @@ mod test {
                         LH<FAEST192fParameters>,
                     >(&data.chal, pdecom, &IV::default());
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                    for i in 0..res.1.len() {
-                        assert_eq!(res.1[i].len(), data.q[i].len());
-                    }
                 } else {
                     let pdecom = &data
                         .pdec
@@ -453,9 +462,6 @@ mod test {
                         LH<FAEST192sParameters>,
                     >(&data.chal, pdecom, &IV::default());
                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                    for i in 0..res.1.len() {
-                        assert_eq!(res.1[i].len(), data.q[i].len());
-                    }
                 }
             } else if data.q[0].len() == 8 {
                 let pdecom = &data
@@ -472,9 +478,6 @@ mod test {
                     LH<FAEST256fParameters>,
                 >(&data.chal, pdecom, &IV::default());
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                for i in 0..res.1.len() {
-                    assert_eq!(res.1[i].len(), data.q[i].len());
-                }
             } else {
                 let pdecom = &data
                     .pdec
@@ -490,9 +493,6 @@ mod test {
                     LH<FAEST256sParameters>,
                 >(&data.chal, pdecom, &IV::default());
                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                for i in 0..res.1.len() {
-                    assert_eq!(res.1[i].len(), data.q[i].len());
-                }
             }
         }
     }
