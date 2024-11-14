@@ -71,19 +71,19 @@ where
 impl VoleHasherInit<GF128> for VoleHasher<GF128> {
     type SDLength = Sum<Prod<<GF128 as Field>::Length, U5>, <GF64 as Field>::Length>;
     type OutputLength = Sum<<GF128 as Field>::Length, B>;
-    type Hasher = VoleHasher<GF128>;
+    type Hasher = Self;
 }
 
 impl VoleHasherInit<GF192> for VoleHasher<GF192> {
     type SDLength = Sum<Prod<<GF192 as Field>::Length, U5>, <GF64 as Field>::Length>;
     type OutputLength = Sum<<GF192 as Field>::Length, B>;
-    type Hasher = VoleHasher<GF192>;
+    type Hasher = Self;
 }
 
 impl VoleHasherInit<GF256> for VoleHasher<GF256> {
     type SDLength = Sum<Prod<<GF256 as Field>::Length, U5>, <GF64 as Field>::Length>;
     type OutputLength = Sum<<GF256 as Field>::Length, B>;
-    type Hasher = VoleHasher<GF256>;
+    type Hasher = Self;
 }
 
 impl<F> VoleHasherProcess<F, <Self as VoleHasherInit<F>>::OutputLength> for VoleHasher<F>
@@ -197,7 +197,7 @@ impl ZKHasherInit<GF128> for ZKHasher<GF128> {
         let r1 =
             GF128::from(&sd[<GF128 as Field>::Length::USIZE..2 * <GF128 as Field>::Length::USIZE]);
 
-        ZKHasher {
+        Self {
             h0: GF128::ZERO,
             h1: GF128::ZERO,
             s,
@@ -236,7 +236,7 @@ impl ZKHasherInit<GF192> for ZKHasher<GF192> {
         let r1 =
             GF192::from(&sd[<GF192 as Field>::Length::USIZE..2 * <GF192 as Field>::Length::USIZE]);
 
-        ZKHasher {
+        Self {
             h0: GF192::ZERO,
             h1: GF192::ZERO,
             s,
@@ -275,7 +275,7 @@ impl ZKHasherInit<GF256> for ZKHasher<GF256> {
         let r1 =
             GF256::from(&sd[<GF256 as Field>::Length::USIZE..2 * <GF256 as Field>::Length::USIZE]);
 
-        ZKHasher {
+        Self {
             h0: GF256::ZERO,
             h1: GF256::ZERO,
             s,
@@ -324,7 +324,7 @@ impl<F> ZKProofHasher<F>
 where
     F: BigGaloisField,
 {
-    fn new(a_hasher: ZKHasher<F>, b_hasher: ZKHasher<F>) -> Self {
+    const fn new(a_hasher: ZKHasher<F>, b_hasher: ZKHasher<F>) -> Self {
         Self { a_hasher, b_hasher }
     }
 

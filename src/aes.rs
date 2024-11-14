@@ -27,7 +27,7 @@ type CstrntsVal<'a, O> = &'a GenericArray<
     <O as OWFParameters>::LAMBDA,
 >;
 
-fn inverse_rotate_word(r: usize, rotate: bool) -> usize {
+const fn inverse_rotate_word(r: usize, rotate: bool) -> usize {
     if rotate {
         // equivalent to (r - 3) % 4
         (r + 1) % 4
