@@ -355,6 +355,8 @@ mod test {
 
     use generic_array::GenericArray;
     use rand::RngCore;
+    #[cfg(feature = "serde")]
+    use serde::{Deserialize, Serialize};
 
     use crate::parameter::{
         FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
