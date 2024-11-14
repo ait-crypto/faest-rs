@@ -271,11 +271,11 @@ where
 
     for (i, c_chunk) in c.chunks(O::LHATBYTES::USIZE).enumerate() {
         let (index, size) = <P::Tau as TauParameters>::convert_index_and_size(i + 1);
-        for (gq_i, _) in izip!(
+        for gq_i in zip(
             &mut gq[index..index + size],
-            P::Tau::decode_challenge_as_iter(chall3, i + 1)
+            P::Tau::decode_challenge_as_iter(chall3, i + 1),
         )
-        .filter(|(_, d)| *d == 1)
+        .filter_map(|(gq_i, d)| if d == 1 { Some(gq_i) } else { None })
         {
             for (t, r) in izip!(gq_i, c_chunk) {
                 *t ^= r;
