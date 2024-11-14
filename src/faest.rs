@@ -170,22 +170,25 @@ fn sign<P, O>(
             .map(|x| GenericArray::from_slice(&x[..O::LAMBDALBYTES::USIZE]).clone()),
     );
 
-    let (a_t, b_t) = P::OWF::prove(
-        &w,
-        GenericArray::from_slice(&u[..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE]),
-        &gv,
-        &sk.pk.owf_input,
-        &sk.pk.owf_output,
-        &chall2,
-    );
+    let (signature, chall3) = {
+        let (a_t, b_t) = P::OWF::prove(
+            &w,
+            GenericArray::from_slice(&u[..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE]),
+            &gv,
+            &sk.pk.owf_input,
+            &sk.pk.owf_output,
+            &chall2,
+        );
+        let (a_t_d, signature) = signature.split_at_mut(O::LAMBDABYTES::USIZE);
+        a_t_d.copy_from_slice(&a_t);
 
-    let (signature, chall3) = signature.split_at_mut(signature.len() - O::LAMBDABYTES::USIZE);
-    let chall3 = GenericArray::<_, O::LAMBDABYTES>::from_mut_slice(chall3);
+        let (signature, chall3) = signature.split_at_mut(signature.len() - O::LAMBDABYTES::USIZE);
+        let chall3 = GenericArray::<_, O::LAMBDABYTES>::from_mut_slice(chall3);
+        RO::<P>::hash_challenge_3(chall3, &chall2, &a_t, &b_t);
+        (signature, chall3)
+    };
 
-    RO::<P>::hash_challenge_3(chall3, &chall2, &a_t, &b_t);
-
-    sigma_to_signature(
-        &a_t,
+    opening_to_signature(
         (0..<P::Tau as TauParameters>::Tau::USIZE).map(|i| {
             let s = P::Tau::decode_challenge(chall3, i);
             if i < <P::Tau as TauParameters>::Tau0::USIZE {
@@ -206,12 +209,10 @@ fn sign<P, O>(
     );
 }
 
-fn sigma_to_signature<'a>(
-    a_t: &[u8],
+fn opening_to_signature<'a>(
     pdecom: impl Iterator<Item = (Vec<&'a [u8]>, &'a [u8])>,
     mut signature: &mut [u8],
 ) {
-    signature.write_all(a_t).unwrap();
     pdecom.for_each(|x| {
         x.0.iter().for_each(|v| {
             signature.write_all(v).unwrap();
