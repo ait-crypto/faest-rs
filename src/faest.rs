@@ -179,13 +179,15 @@ fn sign<P, O>(
         &chall2,
     );
 
-    let mut chall3 = GenericArray::<u8, O::LAMBDABYTES>::default();
-    RO::<P>::hash_challenge_3(&mut chall3, &chall2, &a_t, &b_t);
+    let (signature, chall3) = signature.split_at_mut(signature.len() - O::LAMBDABYTES::USIZE);
+    let chall3 = GenericArray::<_, O::LAMBDABYTES>::from_mut_slice(chall3);
+
+    RO::<P>::hash_challenge_3(chall3, &chall2, &a_t, &b_t);
 
     sigma_to_signature(
         &a_t,
         (0..<P::Tau as TauParameters>::Tau::USIZE).map(|i| {
-            let s = P::Tau::decode_challenge(&chall3, i);
+            let s = P::Tau::decode_challenge(chall3, i);
             if i < <P::Tau as TauParameters>::Tau0::USIZE {
                 <O::BaseParams as BaseParameters>::VC::open::<
                     P::POWK0,
@@ -200,7 +202,6 @@ fn sign<P, O>(
                 >(&decom[i], GenericArray::from_slice(&s))
             }
         }),
-        &chall3,
         signature,
     );
 }
@@ -208,7 +209,6 @@ fn sign<P, O>(
 fn sigma_to_signature<'a>(
     a_t: &[u8],
     pdecom: impl Iterator<Item = (Vec<&'a [u8]>, &'a [u8])>,
-    chall3: &[u8],
     mut signature: &mut [u8],
 ) {
     signature.write_all(a_t).unwrap();
@@ -218,7 +218,6 @@ fn sigma_to_signature<'a>(
         });
         signature.write_all(x.1).unwrap();
     });
-    signature.write_all(chall3).unwrap();
 }
 
 #[inline]
