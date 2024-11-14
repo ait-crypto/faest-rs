@@ -254,37 +254,31 @@ where
         GenericArray::default();
     RO::<P>::hash_mu(&mut mu, &pk.owf_input, &pk.owf_output, msg);
 
-    let (hcom, gq_p) = volereconstruct::<<O::BaseParams as BaseParameters>::VC, P::Tau, O::LHATBYTES>(
-        chall3,
-        &sigma[(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1))
-            + (2 * O::LAMBDABYTES::USIZE)
-            + O::LBYTES::USIZE
-            + 2..P::SignatureSize::USIZE - (16 + O::LAMBDABYTES::USIZE)],
-        &iv.try_into().unwrap(),
-    );
+    let (hcom, mut gq) =
+        volereconstruct::<<O::BaseParams as BaseParameters>::VC, P::Tau, O::LHATBYTES>(
+            chall3,
+            &sigma[(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1))
+                + (2 * O::LAMBDABYTES::USIZE)
+                + O::LBYTES::USIZE
+                + 2..P::SignatureSize::USIZE - (16 + O::LAMBDABYTES::USIZE)],
+            &iv.try_into().unwrap(),
+        );
 
     let mut chall1 =
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
     let c = &sigma[..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)];
     RO::<P>::hash_challenge_1(&mut chall1, &mu, &hcom, c, iv);
 
-    let mut gq = GenericArray::<GenericArray<u8, O::LHATBYTES>, O::LAMBDA>::default_boxed();
-    for j in 0..<P::Tau as TauParameters>::K0::USIZE {
-        gq[j] = gq_p[j].clone();
-    }
     for (i, c_chunk) in c.chunks(O::LHATBYTES::USIZE).enumerate() {
         let (index, size) = <P::Tau as TauParameters>::convert_index_and_size(i + 1);
-        for (gq_i, gq_p_i, d) in izip!(
+        for (gq_i, _) in izip!(
             &mut gq[index..index + size],
-            &gq_p[index..index + size],
             P::Tau::decode_challenge_as_iter(chall3, i + 1)
-        ) {
-            if d == 1 {
-                for (t, l, r) in izip!(gq_i, gq_p_i, c_chunk) {
-                    *t = l ^ r;
-                }
-            } else {
-                *gq_i = gq_p_i.clone();
+        )
+        .filter(|(_, d)| *d == 1)
+        {
+            for (t, r) in izip!(gq_i, c_chunk) {
+                *t ^= r;
             }
         }
     }
