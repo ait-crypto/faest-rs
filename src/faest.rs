@@ -3,7 +3,7 @@ use std::{io::Write, iter::zip};
 use crate::{
     internal_keys::{PublicKey, SecretKey},
     parameter::{BaseParameters, FAESTParameters, OWFParameters, TauParameters},
-    prg::IV,
+    prg::{IVSize, IV},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
     utils::Reader,
@@ -120,8 +120,9 @@ fn sign<P, O>(
     RO::<P>::hash_mu(&mut mu, &sk.pk.owf_input, &sk.pk.owf_output, msg);
 
     let mut r = GenericArray::<u8, O::LAMBDABYTES>::default();
-    let mut iv = IV::default();
-    RO::<P>::hash_r_iv(&mut r, &mut iv, &sk.owf_key, &mu, rho);
+    let (signature, iv) = signature.split_at_mut(P::SignatureSize::USIZE - IVSize::USIZE);
+    let iv = GenericArray::from_mut_slice(iv);
+    RO::<P>::hash_r_iv(&mut r, iv, &sk.owf_key, &mu, rho);
 
     let (volecommit_cs, signature) =
         signature.split_at_mut(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
@@ -129,10 +130,10 @@ fn sign<P, O>(
         <O::BaseParams as BaseParameters>::VC,
         P::Tau,
         O::LHATBYTES,
-    >(VoleCommitmentCRef::new(volecommit_cs), &r, &iv);
+    >(VoleCommitmentCRef::new(volecommit_cs), &r, iv);
     let mut chall1 =
         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
-    RO::<P>::hash_challenge_1(&mut chall1, &mu, &hcom, volecommit_cs, &iv);
+    RO::<P>::hash_challenge_1(&mut chall1, &mu, &hcom, volecommit_cs, iv);
 
     let (signature, u_t, hv) = {
         let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
@@ -200,7 +201,6 @@ fn sign<P, O>(
             }
         }),
         &chall3,
-        &iv,
         signature,
     );
 }
@@ -209,7 +209,6 @@ fn sigma_to_signature<'a>(
     a_t: &[u8],
     pdecom: impl Iterator<Item = (Vec<&'a [u8]>, &'a [u8])>,
     chall3: &[u8],
-    iv: &IV,
     mut signature: &mut [u8],
 ) {
     signature.write_all(a_t).unwrap();
@@ -220,7 +219,6 @@ fn sigma_to_signature<'a>(
         signature.write_all(x.1).unwrap();
     });
     signature.write_all(chall3).unwrap();
-    signature.write_all(iv).unwrap();
 }
 
 #[inline]
@@ -245,10 +243,10 @@ where
     O: OWFParameters,
 {
     let chall3 = GenericArray::from_slice(
-        &sigma
-            [P::SignatureSize::USIZE - (16 + O::LAMBDABYTES::USIZE)..P::SignatureSize::USIZE - 16],
+        &sigma[P::SignatureSize::USIZE - (IVSize::USIZE + O::LAMBDABYTES::USIZE)
+            ..P::SignatureSize::USIZE - IVSize::USIZE],
     );
-    let iv = &sigma[P::SignatureSize::USIZE - 16..];
+    let iv = IV::from_slice(&sigma[P::SignatureSize::USIZE - IVSize::USIZE..]);
 
     let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
         GenericArray::default();
@@ -261,7 +259,7 @@ where
                 + (2 * O::LAMBDABYTES::USIZE)
                 + O::LBYTES::USIZE
                 + 2..P::SignatureSize::USIZE - (16 + O::LAMBDABYTES::USIZE)],
-            &iv.try_into().unwrap(),
+            iv,
         );
 
     let mut chall1 =

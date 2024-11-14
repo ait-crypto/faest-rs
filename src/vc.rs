@@ -192,7 +192,7 @@ mod test {
     use serde::Deserialize;
 
     use crate::{
-        prg::{PRG128, PRG192, PRG256},
+        prg::{IVSize, PRG128, PRG192, PRG256},
         random_oracles::{RandomOracleShake128, RandomOracleShake256},
         utils::test::read_test_data,
     };
@@ -201,7 +201,7 @@ mod test {
     #[serde(rename_all = "camelCase")]
     struct DataCommit {
         keyroot: Vec<u8>,
-        iv: IV,
+        iv: [u8; IVSize::USIZE],
         depth: u8,
         h: Vec<u8>,
         k: Vec<Vec<u8>>,
@@ -260,24 +260,25 @@ mod test {
         let database: Vec<DataCommit> = read_test_data("vc_com.json");
         for data in database {
             let lamdabytes = data.keyroot.len();
+            let iv = IV::from_slice(&data.iv);
             if lamdabytes == 16 {
                 let res = VC::<PRG128, RandomOracleShake128>::commit(
                     GenericArray::from_slice(&data.keyroot),
-                    &data.iv,
+                    iv,
                     1 << data.depth,
                 );
                 compare_expected_with_result(&data, res);
             } else if lamdabytes == 24 {
                 let res = VC::<PRG192, RandomOracleShake256>::commit(
                     GenericArray::from_slice(&data.keyroot),
-                    &data.iv,
+                    iv,
                     1 << data.depth,
                 );
                 compare_expected_with_result(&data, res);
             } else {
                 let res = VC::<PRG256, RandomOracleShake256>::commit(
                     GenericArray::from_slice(&data.keyroot),
-                    &data.iv,
+                    iv,
                     1 << data.depth,
                 );
                 compare_expected_with_result(&data, res);
@@ -399,6 +400,7 @@ mod test {
     fn reconstruct_test() {
         let database: Vec<DataReconstruct> = read_test_data("vc_reconstruct.json");
         for data in database {
+            let iv = IV::from_slice(&data.iv);
             let lambdabyte = data.com_j.len();
             if lambdabyte == 32 {
                 let res = VC::<PRG128, RandomOracleShake128>::reconstruct(
@@ -408,7 +410,7 @@ mod test {
                     ]
                     .concat(),
                     &data.b,
-                    &data.iv,
+                    iv,
                 );
                 compare_expected_with_reconstruct_result(&data, res);
             } else if lambdabyte == 48 {
@@ -419,7 +421,7 @@ mod test {
                     ]
                     .concat(),
                     &data.b,
-                    &data.iv,
+                    iv,
                 );
                 compare_expected_with_reconstruct_result(&data, res);
             } else {
@@ -430,7 +432,7 @@ mod test {
                     ]
                     .concat(),
                     &data.b,
-                    &data.iv,
+                    iv,
                 );
                 compare_expected_with_reconstruct_result(&data, res);
             }
