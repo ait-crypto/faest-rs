@@ -37,7 +37,7 @@ where
 }
 
 /// Small binary fields to a size up to 64 bits
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(transparent)]
 pub struct SmallGF<T>(Wrapping<T>);
 
