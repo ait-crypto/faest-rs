@@ -260,6 +260,7 @@ impl OWFParameters for OWF128 {
         );
     }
 
+    #[inline]
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
@@ -267,6 +268,7 @@ impl OWFParameters for OWF128 {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
+    #[inline]
     fn prove(
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
@@ -277,6 +279,7 @@ impl OWFParameters for OWF128 {
         aes_prove::<Self>(w, u, gv, pk, chall)
     }
 
+    #[inline]
     fn verify<Tau>(
         d: &GenericArray<u8, Self::LBYTES>,
         gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
@@ -336,6 +339,7 @@ impl OWFParameters for OWF192 {
         );
     }
 
+    #[inline]
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
@@ -343,6 +347,7 @@ impl OWFParameters for OWF192 {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
+    #[inline]
     fn prove(
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
@@ -353,6 +358,7 @@ impl OWFParameters for OWF192 {
         aes_prove::<Self>(w, u, gv, pk, chall)
     }
 
+    #[inline]
     fn verify<Tau>(
         d: &GenericArray<u8, Self::LBYTES>,
         gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
@@ -412,6 +418,7 @@ impl OWFParameters for OWF256 {
         );
     }
 
+    #[inline]
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
@@ -419,6 +426,7 @@ impl OWFParameters for OWF256 {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
+    #[inline]
     fn prove(
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
@@ -429,6 +437,7 @@ impl OWFParameters for OWF256 {
         aes_prove::<Self>(w, u, gv, pk, chall)
     }
 
+    #[inline]
     fn verify<Tau>(
         d: &GenericArray<u8, Self::LBYTES>,
         gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
@@ -487,6 +496,7 @@ impl OWFParameters for OWF128EM {
         }
     }
 
+    #[inline]
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
@@ -494,6 +504,7 @@ impl OWFParameters for OWF128EM {
         em_extendedwitness::<Self>(owf_key, owf_input)
     }
 
+    #[inline]
     fn prove(
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
@@ -504,6 +515,7 @@ impl OWFParameters for OWF128EM {
         em_prove::<Self>(w, u, gv, pk, chall)
     }
 
+    #[inline]
     fn verify<Tau>(
         d: &GenericArray<u8, Self::LBYTES>,
         gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
@@ -562,6 +574,7 @@ impl OWFParameters for OWF192EM {
         }
     }
 
+    #[inline]
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
@@ -569,6 +582,7 @@ impl OWFParameters for OWF192EM {
         em_extendedwitness::<Self>(owf_key, owf_input)
     }
 
+    #[inline]
     fn prove(
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
@@ -579,6 +593,7 @@ impl OWFParameters for OWF192EM {
         em_prove::<Self>(w, u, gv, pk, chall)
     }
 
+    #[inline]
     fn verify<Tau>(
         d: &GenericArray<u8, Self::LBYTES>,
         gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
@@ -637,6 +652,7 @@ impl OWFParameters for OWF256EM {
         }
     }
 
+    #[inline]
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
         owf_input: &GenericArray<u8, Self::InputSize>,
@@ -644,6 +660,7 @@ impl OWFParameters for OWF256EM {
         em_extendedwitness::<Self>(owf_key, owf_input)
     }
 
+    #[inline]
     fn prove(
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
@@ -654,6 +671,7 @@ impl OWFParameters for OWF256EM {
         em_prove::<Self>(w, u, gv, pk, chall)
     }
 
+    #[inline]
     fn verify<Tau>(
         d: &GenericArray<u8, Self::LBYTES>,
         gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
