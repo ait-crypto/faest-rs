@@ -967,35 +967,6 @@ impl Distribution<GF256> for Standard {
 }
 
 #[cfg(test)]
-/// Construct fields from `u128` representations
-///
-/// Only for tests!
-pub(crate) trait NewFromU128 {
-    fn new(first_value: u128, second_value: u128) -> Self;
-}
-
-#[cfg(test)]
-impl NewFromU128 for GF128 {
-    fn new(first_value: u128, _second_value: u128) -> Self {
-        Self([first_value])
-    }
-}
-
-#[cfg(test)]
-impl NewFromU128 for GF192 {
-    fn new(first_value: u128, second_value: u128) -> Self {
-        Self([first_value, second_value]).clear_high_bits()
-    }
-}
-
-#[cfg(test)]
-impl NewFromU128 for GF256 {
-    fn new(first_value: u128, second_value: u128) -> Self {
-        Self([first_value, second_value])
-    }
-}
-
-#[cfg(test)]
 mod test {
     use super::*;
 

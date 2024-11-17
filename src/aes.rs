@@ -712,7 +712,7 @@ mod test {
     use super::*;
 
     use crate::{
-        fields::{large_fields::NewFromU128, GF128, GF192, GF256},
+        fields::{GF128, GF192, GF256},
         parameter::{
             FAEST128sParameters, FAEST192sParameters, FAEST256sParameters, FAESTParameters,
             OWFParameters, OWF128, OWF192, OWF256,
@@ -853,6 +853,12 @@ mod test {
         res: Vec<u64>,
     }
 
+    impl AesVerify {
+        fn res_as_u8(&self) -> Vec<u8> {
+            self.res.iter().flat_map(|x| x.to_le_bytes()).collect()
+        }
+    }
+
     fn aes_verify<O, Tau>(
         d: &GenericArray<u8, O::LBYTES>,
         gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
@@ -900,7 +906,7 @@ mod test {
                     GenericArray::from_slice(&data.output),
                 );
                 assert_eq!(
-                    GF128::new(data.res[0] as u128 + ((data.res[1] as u128) << 64), 0),
+                    GF128::from(data.res_as_u8().as_slice()),
                     GF128::from(&out[..])
                 );
             } else if data.lambda == 192 {
@@ -920,10 +926,7 @@ mod test {
                     GenericArray::from_slice(&data.output),
                 );
                 assert_eq!(
-                    GF192::new(
-                        data.res[0] as u128 + ((data.res[1] as u128) << 64),
-                        data.res[2] as u128
-                    ),
+                    GF192::from(data.res_as_u8().as_slice()),
                     GF192::from(&out[..])
                 );
             } else {
@@ -943,10 +946,7 @@ mod test {
                     GenericArray::from_slice(&data.output),
                 );
                 assert_eq!(
-                    GF256::new(
-                        data.res[0] as u128 + ((data.res[1] as u128) << 64),
-                        data.res[2] as u128 + ((data.res[3] as u128) << 64)
-                    ),
+                    GF256::from(data.res_as_u8().as_slice()),
                     GF256::from(&out[..])
                 );
             }
