@@ -37,3 +37,24 @@ pub(crate) trait Field:
     /// Obtain byte representation of the field element
     fn as_bytes(&self) -> GenericArray<u8, Self::Length>;
 }
+
+/// Double a field element
+///
+/// This operation is not equivalent to `self + self` but corresponds to a the
+/// multiplication with the element representing `2`.
+pub(crate) trait Double {
+    /// Output type
+    type Output;
+
+    /// Double a field element
+    fn double(self) -> Self::Output;
+}
+
+/// Square a field element
+pub(crate) trait Square {
+    /// Output type
+    type Output;
+
+    /// Square an element
+    fn square(self) -> Self::Output;
+}

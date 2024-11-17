@@ -337,7 +337,7 @@ where
     {
         for (s_j, vs_j, s_b_j, v_s_b_j) in izip!(s, vs, s_b, v_s_b) {
             let a0 = v_s_b_j * vs_j;
-            let a1 = ((s_j + vs_j) * (s_b_j + v_s_b_j)) + F::ONE + a0;
+            let a1 = (s_j + vs_j) * (s_b_j + v_s_b_j) + F::ONE + a0;
             self.a_hasher.update(&a1);
             self.b_hasher.update(&a0);
         }
@@ -365,7 +365,7 @@ where
     fn new(b_hasher: ZKHasher<F>, delta: F) -> Self {
         Self {
             b_hasher,
-            delta_squared: delta * delta,
+            delta_squared: delta.square(),
         }
     }
 
@@ -375,7 +375,7 @@ where
         I2: Iterator<Item = F>,
     {
         for (q, qb) in zip(qs, qs_b) {
-            let b = (q * qb) + self.delta_squared;
+            let b = q * qb + self.delta_squared;
             self.b_hasher.update(&b);
         }
     }

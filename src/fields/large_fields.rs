@@ -7,7 +7,7 @@ use std::{
     },
 };
 
-use super::{Field, GF64};
+use super::{Double, Field, Square, GF64};
 
 use generic_array::{
     typenum::{U16, U24, U32},
@@ -34,8 +34,10 @@ pub trait BigGaloisField:
     + Copy
     + Add<u8, Output = Self>
     + AddAssign<u8>
+    + Double<Output = Self>
     + Mul<u8, Output = Self>
     + Mul<GF64, Output = Self>
+    + Square<Output = Self>
     + ByteCombine
     + ByteCombineConstants
     + SumPoly
@@ -76,12 +78,6 @@ pub trait ByteCombineConstants: Field {
     const BYTE_COMBINE_3: Self;
 }
 
-/// Helper trait for blanket implementations of [`SumPoly`]
-trait Double: Sized {
-    /// Double a field element
-    fn double(self) -> Self;
-}
-
 /// Trait providing a polynomial sum
 pub trait SumPoly: Field {
     /// Compute polynomial sum
@@ -90,7 +86,7 @@ pub trait SumPoly: Field {
 
 impl<T> SumPoly for T
 where
-    T: Copy + Field + Double + for<'a> Add<&'a Self, Output = Self>,
+    T: Copy + Field + Double<Output = Self> + for<'a> Add<&'a Self, Output = Self>,
 {
     fn sum_poly(v: &[Self]) -> Self {
         v.iter()
@@ -569,11 +565,42 @@ where
     T: BitAnd<Output = T>,
     T: BitXorAssign,
 {
-    fn double(mut self) -> Self {
+    type Output = Self;
+
+    fn double(mut self) -> Self::Output {
         let mask = self.to_mask();
         self = self.shift_left_1();
         self.0[0] ^= mask & Self::MODULUS;
         self
+    }
+}
+
+// generic implementation of Square
+
+impl<T, const N: usize, const LENGTH: usize> Square for BigGF<T, N, LENGTH>
+where
+    Self: Copy,
+    Self: Modulus<T>,
+    Self: ToMask<T>,
+    Self: ApplyMask<T, Output = Self>,
+    Self: AddAssign,
+    Self: ShiftLeft1<Output = Self>,
+    T: BitAnd<Output = T>,
+    T: BitXorAssign,
+{
+    type Output = Self;
+
+    fn square(self) -> Self::Output {
+        let mut other = self;
+        let mut result = other.copy_apply_mask(self.to_mask_bit(0));
+        for idx in 1..LENGTH {
+            let mask = other.to_mask();
+            other = other.shift_left_1();
+            other.0[0] ^= mask & Self::MODULUS;
+
+            result += other.copy_apply_mask(self.to_mask_bit(idx));
+        }
+        result
     }
 }
 
@@ -1124,6 +1151,17 @@ mod test {
             let bytes = element.as_bytes();
             assert_eq!(element, F::from(&bytes));
             assert_eq!(element, F::from(bytes.as_slice()));
+        }
+
+        #[test]
+        fn square<F: BigGaloisField + Debug + Eq>()
+        where
+            Standard: Distribution<F>,
+        {
+            let mut rng = SmallRng::from_entropy();
+
+            let element = rng.gen();
+            assert_eq!(element * element, element.square());
         }
 
         #[instantiate_tests(<GF128>)]
