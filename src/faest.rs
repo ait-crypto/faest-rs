@@ -153,7 +153,9 @@ fn sign<P, O>(
         (signature, u_t_d, hv)
     };
 
-    let w = P::OWF::witness(&sk.owf_key, &sk.pk.owf_input);
+    // compute witness
+    // TODO: compute once and store in SecretKey
+    let w = P::OWF::witness(sk);
     // compute and write d to signature
     let (d, signature) = signature.split_at_mut(O::LBYTES::USIZE);
     for (dj, wj, uj) in izip!(d.iter_mut(), w.iter(), &u[..O::LBYTES::USIZE]) {

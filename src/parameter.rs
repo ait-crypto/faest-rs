@@ -160,12 +160,9 @@ pub(crate) trait OWFParameters: Sized {
         owf_input: &GenericArray<u8, Self::InputSize>,
     ) -> Option<Box<GenericArray<u8, Self::LBYTES>>>;
 
-    fn witness(
-        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> Box<GenericArray<u8, Self::LBYTES>> {
+    fn witness(sk: &SecretKey<Self>) -> Box<GenericArray<u8, Self::LBYTES>> {
         // SAFETY: only ever called on valid inputs
-        Self::extendwitness(owf_key, owf_input).unwrap()
+        Self::extendwitness(&sk.owf_key, &sk.pk.owf_input).unwrap()
     }
 
     ///input : witness of l bits, masking values (l+lambda in aes, lambda in em), Vole tag ((l + lambda) *lambda bits), public key, chall(3lambda + 64)
