@@ -175,8 +175,7 @@ fn sign<P, O>(
             &w,
             GenericArray::from_slice(&u[..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE]),
             &gv,
-            &sk.pk.owf_input,
-            &sk.pk.owf_output,
+            &sk.pk,
             &chall2,
         );
         let (a_t_d, signature) = signature.split_at_mut(O::LAMBDABYTES::USIZE);
@@ -333,8 +332,7 @@ where
         GenericArray::from_slice(a_t),
         &chall2,
         chall3,
-        &pk.owf_input,
-        &pk.owf_output,
+        pk,
     );
 
     let mut chall3_p = GenericArray::default();

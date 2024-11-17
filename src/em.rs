@@ -5,6 +5,7 @@ use itertools::{chain, iproduct};
 
 use crate::{
     fields::{ByteCombine, ByteCombineConstants, Field as _, SumPoly},
+    internal_keys::PublicKey,
     parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
@@ -314,8 +315,7 @@ pub(crate) fn em_prove<O>(
     w: &GenericArray<u8, O::LBYTES>,
     u: &GenericArray<u8, O::LAMBDALBYTES>,
     gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-    owf_input: &GenericArray<u8, O::InputSize>,
-    owf_output: &GenericArray<u8, O::InputSize>,
+    pk: &PublicKey<O>,
     chall: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
 ) -> QSProof<O>
 where
@@ -327,12 +327,12 @@ where
         <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_proof_hasher(chall);
 
     let (x, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(
-        owf_input,
+        &pk.owf_input,
         4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE),
     );
     em_enc_cstrnts_mkey0::<O>(
         &mut zk_hasher,
-        owf_output,
+        &pk.owf_output,
         &x.chunks(8)
             .flat_map(|x| {
                 convert_from_batchblocks(inv_bitslice(x))
@@ -357,8 +357,7 @@ pub(crate) fn em_verify<O, Tau>(
     a_t: &GenericArray<u8, O::LAMBDABYTES>,
     chall2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
     chall3: &GenericArray<u8, O::LAMBDABYTES>,
-    owf_input: &GenericArray<u8, O::InputSize>,
-    owf_output: &GenericArray<u8, O::InputSize>,
+    pk: &PublicKey<O>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
 where
     O: OWFParameters,
@@ -372,12 +371,12 @@ where
             chall2, delta,
         );
     let (x, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(
-        owf_input,
+        &pk.owf_input,
         4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE),
     );
     em_enc_cstrnts_mkey1::<O>(
         &mut zk_hasher,
-        owf_output,
+        &pk.owf_output,
         &x.chunks(8)
             .flat_map(|x| {
                 convert_from_batchblocks(inv_bitslice(x))
@@ -480,8 +479,10 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
-                    GenericArray::from_slice(&data.input),
-                    GenericArray::from_slice(&data.output),
+                    &PublicKey {
+                        owf_input: GenericArray::from_slice(&data.input).clone(),
+                        owf_output: GenericArray::from_slice(&data.output).clone(),
+                    },
                     GenericArray::from_slice(&data.chall),
                 );
                 assert_eq!(
@@ -503,8 +504,10 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
-                    GenericArray::from_slice(&data.input),
-                    GenericArray::from_slice(&data.output),
+                    &PublicKey {
+                        owf_input: GenericArray::from_slice(&data.input).clone(),
+                        owf_output: GenericArray::from_slice(&data.output).clone(),
+                    },
                     GenericArray::from_slice(&data.chall),
                 );
                 assert_eq!(
@@ -525,8 +528,10 @@ mod test {
                             .map(|x| *GenericArray::from_slice(x))
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
-                    GenericArray::from_slice(&data.input),
-                    GenericArray::from_slice(&data.output),
+                    &PublicKey {
+                        owf_input: GenericArray::from_slice(&data.input).clone(),
+                        owf_output: GenericArray::from_slice(&data.output).clone(),
+                    },
                     GenericArray::from_slice(&data.chall),
                 );
                 assert_eq!(
@@ -574,8 +579,10 @@ mod test {
             a_t,
             chall2,
             chall3,
-            owf_input,
-            owf_output,
+            &PublicKey {
+                owf_input: owf_input.clone(),
+                owf_output: owf_output.clone(),
+            },
         )
     }
 

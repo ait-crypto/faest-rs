@@ -8,6 +8,7 @@ use itertools::iproduct;
 
 use crate::{
     fields::{ByteCombine, ByteCombineConstants, Field as _, SumPoly},
+    internal_keys::PublicKey,
     parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
@@ -608,8 +609,7 @@ pub(crate) fn aes_prove<O>(
     w: &GenericArray<u8, O::LBYTES>,
     u: &GenericArray<u8, O::LAMBDALBYTES>,
     gv: CstrntsVal<O>,
-    owf_input: &GenericArray<u8, O::InputSize>,
-    owf_output: &GenericArray<u8, O::InputSize>,
+    pk: &PublicKey<O>,
     chall: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
 ) -> QSProof<O>
 where
@@ -628,8 +628,8 @@ where
 
     aes_enc_cstrnts_mkey0::<O>(
         &mut zk_hasher,
-        owf_input[..16].try_into().unwrap(),
-        owf_output[..16].try_into().unwrap(),
+        pk.owf_input[..16].try_into().unwrap(),
+        pk.owf_output[..16].try_into().unwrap(),
         GenericArray::from_slice(&w[O::LKE::USIZE / 8..(O::LKE::USIZE + O::LENC::USIZE) / 8]),
         GenericArray::from_slice(&new_v[O::LKE::USIZE..O::LKE::USIZE + O::LENC::USIZE]),
         &k,
@@ -639,8 +639,8 @@ where
     if O::LAMBDA::USIZE > 128 {
         aes_enc_cstrnts_mkey0::<O>(
             &mut zk_hasher,
-            owf_input[16..].try_into().unwrap(),
-            owf_output[16..].try_into().unwrap(),
+            pk.owf_input[16..].try_into().unwrap(),
+            pk.owf_output[16..].try_into().unwrap(),
             GenericArray::from_slice(&w[(O::LKE::USIZE + O::LENC::USIZE) / 8..O::LBYTES::USIZE]),
             GenericArray::from_slice(&new_v[(O::LKE::USIZE + O::LENC::USIZE)..O::L::USIZE]),
             &k,
@@ -663,8 +663,7 @@ pub(crate) fn aes_verify<O, Tau>(
     a_t: &GenericArray<u8, O::LAMBDABYTES>,
     chall2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
     chall3: &GenericArray<u8, O::LAMBDABYTES>,
-    owf_input: &GenericArray<u8, O::InputSize>,
-    owf_output: &GenericArray<u8, O::InputSize>,
+    pk: &PublicKey<O>,
 ) -> GenericArray<u8, O::LAMBDABYTES>
 where
     O: OWFParameters,
@@ -685,8 +684,8 @@ where
 
     aes_enc_cstrnts_mkey1::<O>(
         &mut zk_hasher,
-        owf_input[..16].try_into().unwrap(),
-        owf_output[..16].try_into().unwrap(),
+        pk.owf_input[..16].try_into().unwrap(),
+        pk.owf_output[..16].try_into().unwrap(),
         GenericArray::from_slice(&new_q[O::LKE::USIZE..(O::LKE::USIZE + O::LENC::USIZE)]),
         &qk,
         &delta,
@@ -694,8 +693,8 @@ where
     if O::LAMBDA::USIZE > 128 {
         aes_enc_cstrnts_mkey1::<O>(
             &mut zk_hasher,
-            owf_input[16..].try_into().unwrap(),
-            owf_output[16..].try_into().unwrap(),
+            pk.owf_input[16..].try_into().unwrap(),
+            pk.owf_output[16..].try_into().unwrap(),
             GenericArray::from_slice(&new_q[O::LKE::USIZE + O::LENC::USIZE..O::L::USIZE]),
             &qk,
             &delta,
@@ -789,8 +788,10 @@ mod test {
                     GenericArray::from_slice(&data.w),
                     &GenericArray::generate(|_| 19),
                     &GenericArray::generate(|_| GenericArray::generate(|_| 55)),
-                    GenericArray::from_slice(&data.input),
-                    GenericArray::from_slice(&data.output),
+                    &PublicKey {
+                        owf_input: GenericArray::from_slice(&data.input).clone(),
+                        owf_output: GenericArray::from_slice(&data.output).clone(),
+                    },
                     &GenericArray::generate(|_| 47),
                 );
 
@@ -807,8 +808,10 @@ mod test {
                     GenericArray::from_slice(&data.w),
                     &GenericArray::generate(|_| 19),
                     &GenericArray::generate(|_| GenericArray::generate(|_| 55)),
-                    GenericArray::from_slice(&data.input),
-                    GenericArray::from_slice(&data.output),
+                    &PublicKey {
+                        owf_input: GenericArray::from_slice(&data.input).clone(),
+                        owf_output: GenericArray::from_slice(&data.output).clone(),
+                    },
                     &GenericArray::generate(|_| 47),
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.at));
@@ -824,8 +827,10 @@ mod test {
                     GenericArray::from_slice(&data.w),
                     &GenericArray::generate(|_| 19),
                     &GenericArray::generate(|_| GenericArray::generate(|_| 55)),
-                    GenericArray::from_slice(&data.input),
-                    GenericArray::from_slice(&data.output),
+                    &PublicKey {
+                        owf_input: GenericArray::from_slice(&data.input).clone(),
+                        owf_output: GenericArray::from_slice(&data.output).clone(),
+                    },
                     &GenericArray::generate(|_| 47),
                 );
                 assert_eq!(res.0, *GenericArray::from_slice(&data.at));
@@ -867,8 +872,10 @@ mod test {
             a_t,
             chall2,
             chall3,
-            owf_input,
-            owf_output,
+            &PublicKey {
+                owf_input: owf_input.clone(),
+                owf_output: owf_output.clone(),
+            },
         )
     }
 

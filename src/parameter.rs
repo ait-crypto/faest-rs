@@ -174,8 +174,7 @@ pub(crate) trait OWFParameters: Sized {
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
         chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self>;
 
@@ -187,8 +186,7 @@ pub(crate) trait OWFParameters: Sized {
         a_t: &GenericArray<u8, Self::LAMBDABYTES>,
         chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
     ) -> GenericArray<u8, Self::LAMBDABYTES>
     where
         Tau: TauParameters;
@@ -273,11 +271,10 @@ impl OWFParameters for OWF128 {
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
         chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self> {
-        aes_prove::<Self>(w, u, gv, owf_input, owf_output, chall)
+        aes_prove::<Self>(w, u, gv, pk, chall)
     }
 
     fn verify<Tau>(
@@ -286,13 +283,12 @@ impl OWFParameters for OWF128 {
         a_t: &GenericArray<u8, Self::LAMBDABYTES>,
         chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
     ) -> GenericArray<u8, Self::LAMBDABYTES>
     where
         Tau: TauParameters,
     {
-        aes_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
+        aes_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, pk)
     }
 }
 
@@ -351,11 +347,10 @@ impl OWFParameters for OWF192 {
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
         chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self> {
-        aes_prove::<Self>(w, u, gv, owf_input, owf_output, chall)
+        aes_prove::<Self>(w, u, gv, pk, chall)
     }
 
     fn verify<Tau>(
@@ -364,13 +359,12 @@ impl OWFParameters for OWF192 {
         a_t: &GenericArray<u8, Self::LAMBDABYTES>,
         chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
     ) -> GenericArray<u8, Self::LAMBDABYTES>
     where
         Tau: TauParameters,
     {
-        aes_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
+        aes_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, pk)
     }
 }
 
@@ -429,11 +423,10 @@ impl OWFParameters for OWF256 {
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
         chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self> {
-        aes_prove::<Self>(w, u, gv, owf_input, owf_output, chall)
+        aes_prove::<Self>(w, u, gv, pk, chall)
     }
 
     fn verify<Tau>(
@@ -442,13 +435,12 @@ impl OWFParameters for OWF256 {
         a_t: &GenericArray<u8, Self::LAMBDABYTES>,
         chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
     ) -> GenericArray<u8, Self::LAMBDABYTES>
     where
         Tau: TauParameters,
     {
-        aes_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
+        aes_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, pk)
     }
 }
 
@@ -506,11 +498,10 @@ impl OWFParameters for OWF128EM {
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
         chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self> {
-        em_prove::<Self>(w, u, gv, owf_input, owf_output, chall)
+        em_prove::<Self>(w, u, gv, pk, chall)
     }
 
     fn verify<Tau>(
@@ -519,13 +510,12 @@ impl OWFParameters for OWF128EM {
         a_t: &GenericArray<u8, Self::LAMBDABYTES>,
         chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
     ) -> GenericArray<u8, Self::LAMBDABYTES>
     where
         Tau: TauParameters,
     {
-        em_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
+        em_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, pk)
     }
 }
 
@@ -583,11 +573,10 @@ impl OWFParameters for OWF192EM {
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
         chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self> {
-        em_prove::<Self>(w, u, gv, owf_input, owf_output, chall)
+        em_prove::<Self>(w, u, gv, pk, chall)
     }
 
     fn verify<Tau>(
@@ -596,13 +585,12 @@ impl OWFParameters for OWF192EM {
         a_t: &GenericArray<u8, Self::LAMBDABYTES>,
         chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
     ) -> GenericArray<u8, Self::LAMBDABYTES>
     where
         Tau: TauParameters,
     {
-        em_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
+        em_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, pk)
     }
 }
 
@@ -660,11 +648,10 @@ impl OWFParameters for OWF256EM {
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
         gv: &GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
         chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self> {
-        em_prove::<Self>(w, u, gv, owf_input, owf_output, chall)
+        em_prove::<Self>(w, u, gv, pk, chall)
     }
 
     fn verify<Tau>(
@@ -673,13 +660,12 @@ impl OWFParameters for OWF256EM {
         a_t: &GenericArray<u8, Self::LAMBDABYTES>,
         chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, Self::InputSize>,
-        owf_output: &GenericArray<u8, Self::InputSize>,
+        pk: &PublicKey<Self>,
     ) -> GenericArray<u8, Self::LAMBDABYTES>
     where
         Tau: TauParameters,
     {
-        em_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, owf_input, owf_output)
+        em_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, pk)
     }
 }
 
