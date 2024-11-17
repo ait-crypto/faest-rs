@@ -406,7 +406,7 @@ mod test {
         utils::test::read_test_data,
     };
 
-    use generic_array::GenericArray;
+    use generic_array::{ArrayLength, GenericArray};
     use serde::Deserialize;
 
     #[derive(Debug, Deserialize)]
@@ -429,7 +429,7 @@ mod test {
                         &data.input[..<OWF128EM as OWFParameters>::InputSize::USIZE],
                     ),
                 );
-                assert_eq!(res.unwrap(), Box::new(*GenericArray::from_slice(&data.w)));
+                assert_eq!(res.unwrap().as_slice(), &data.w);
             } else if data.lambda == 192 {
                 let res = em_extendedwitness::<OWF192EM>(
                     GenericArray::from_slice(&data.key),
@@ -437,7 +437,7 @@ mod test {
                         &data.input[..<OWF192EM as OWFParameters>::InputSize::USIZE],
                     ),
                 );
-                assert_eq!(res.unwrap(), Box::new(*GenericArray::from_slice(&data.w)));
+                assert_eq!(res.unwrap().as_slice(), &data.w);
             } else {
                 let res = em_extendedwitness::<OWF256EM>(
                     GenericArray::from_slice(&data.key),
@@ -445,7 +445,7 @@ mod test {
                         &data.input[..<OWF256EM as OWFParameters>::InputSize::USIZE],
                     ),
                 );
-                assert_eq!(res.unwrap(), Box::new(*GenericArray::from_slice(&data.w)));
+                assert_eq!(res.unwrap().as_slice(), &data.w);
             }
         }
     }
@@ -464,6 +464,29 @@ mod test {
         bt: Vec<u8>,
     }
 
+    impl EmProve {
+        fn as_pk<O>(&self) -> PublicKey<O>
+        where
+            O: OWFParameters,
+        {
+            PublicKey {
+                owf_input: GenericArray::from_slice(&self.input).clone(),
+                owf_output: GenericArray::from_slice(&self.output).clone(),
+            }
+        }
+
+        fn as_gv<LHI, LHO>(&self) -> GenericArray<GenericArray<u8, LHI>, LHO>
+        where
+            LHI: ArrayLength,
+            LHO: ArrayLength,
+        {
+            self.gv
+                .iter()
+                .map(|x| GenericArray::from_slice(x).clone())
+                .collect()
+        }
+    }
+
     #[test]
     fn em_prove_test() {
         let database: Vec<EmProve> = read_test_data("EmProve.json");
@@ -471,18 +494,9 @@ mod test {
             if data.lambda == 128 {
                 let res = em_prove::<OWF128EM>(
                     GenericArray::from_slice(&data.w),
-                    GenericArray::from_slice(&[[0u8; 160].to_vec(), data.u].concat()),
-                    GenericArray::from_slice(
-                        &data
-                            .gv
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
-                    ),
-                    &PublicKey {
-                        owf_input: *GenericArray::from_slice(&data.input),
-                        owf_output: *GenericArray::from_slice(&data.output),
-                    },
+                    GenericArray::from_slice(&[[0u8; 160].to_vec(), data.u.clone()].concat()),
+                    &data.as_gv(),
+                    &data.as_pk(),
                     GenericArray::from_slice(&data.chall),
                 );
                 assert_eq!(
@@ -496,18 +510,9 @@ mod test {
             } else if data.lambda == 192 {
                 let res = em_prove::<OWF192EM>(
                     GenericArray::from_slice(&data.w),
-                    GenericArray::from_slice(&[[0u8; 288].to_vec(), data.u].concat()),
-                    GenericArray::from_slice(
-                        &data
-                            .gv
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
-                    ),
-                    &PublicKey {
-                        owf_input: *GenericArray::from_slice(&data.input),
-                        owf_output: *GenericArray::from_slice(&data.output),
-                    },
+                    GenericArray::from_slice(&[[0u8; 288].to_vec(), data.u.clone()].concat()),
+                    &data.as_gv(),
+                    &data.as_pk(),
                     GenericArray::from_slice(&data.chall),
                 );
                 assert_eq!(
@@ -520,18 +525,11 @@ mod test {
             } else {
                 let res = em_prove::<OWF256EM>(
                     GenericArray::from_slice(&data.w),
-                    GenericArray::from_slice(&([[0u8; 448].to_vec(), data.u].concat()).to_vec()),
                     GenericArray::from_slice(
-                        &data
-                            .gv
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
+                        &([[0u8; 448].to_vec(), data.u.clone()].concat()).to_vec(),
                     ),
-                    &PublicKey {
-                        owf_input: *GenericArray::from_slice(&data.input),
-                        owf_output: *GenericArray::from_slice(&data.output),
-                    },
+                    &data.as_gv(),
+                    &data.as_pk(),
                     GenericArray::from_slice(&data.chall),
                 );
                 assert_eq!(
@@ -560,14 +558,36 @@ mod test {
         qt: Vec<u8>,
     }
 
+    impl EmVerify {
+        fn as_pk<O>(&self) -> PublicKey<O>
+        where
+            O: OWFParameters,
+        {
+            PublicKey {
+                owf_input: GenericArray::from_slice(&self.input).clone(),
+                owf_output: GenericArray::from_slice(&self.output).clone(),
+            }
+        }
+
+        fn as_gq<LHI, LHO>(&self) -> GenericArray<GenericArray<u8, LHI>, LHO>
+        where
+            LHI: ArrayLength,
+            LHO: ArrayLength,
+        {
+            self.gq
+                .iter()
+                .map(|x| GenericArray::from_slice(x).clone())
+                .collect()
+        }
+    }
+
     fn em_verify<O, Tau>(
         d: &GenericArray<u8, O::LBYTES>,
         gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
         a_t: &GenericArray<u8, O::LAMBDABYTES>,
         chall2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
         chall3: &GenericArray<u8, O::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::InputSize>,
+        pk: &PublicKey<O>,
     ) -> GenericArray<u8, O::LAMBDABYTES>
     where
         O: OWFParameters,
@@ -579,10 +599,7 @@ mod test {
             a_t,
             chall2,
             chall3,
-            &PublicKey {
-                owf_input: owf_input.clone(),
-                owf_output: owf_output.clone(),
-            },
+            pk,
         )
     }
 
@@ -594,34 +611,20 @@ mod test {
                 let res = if data.tau == 11 {
                     em_verify::<OWF128EM, <FAESTEM128sParameters as FAESTParameters>::Tau>(
                         GenericArray::from_slice(&data.d),
-                        GenericArray::from_slice(
-                            &data
-                                .gq
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>(),
-                        ),
+                        &data.as_gq(),
                         GenericArray::from_slice(&data.at),
                         GenericArray::from_slice(&data.chall2),
                         GenericArray::from_slice(&data.chall3),
-                        GenericArray::from_slice(&data.input),
-                        GenericArray::from_slice(&data.output),
+                        &data.as_pk(),
                     )
                 } else {
                     em_verify::<OWF128EM, <FAESTEM128fParameters as FAESTParameters>::Tau>(
                         GenericArray::from_slice(&data.d),
-                        GenericArray::from_slice(
-                            &data
-                                .gq
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>(),
-                        ),
+                        &data.as_gq(),
                         GenericArray::from_slice(&data.at),
                         GenericArray::from_slice(&data.chall2),
                         GenericArray::from_slice(&data.chall3),
-                        GenericArray::from_slice(&data.input),
-                        GenericArray::from_slice(&data.output),
+                        &data.as_pk(),
                     )
                 };
                 assert_eq!(res, *GenericArray::from_slice(&data.qt));
@@ -629,34 +632,20 @@ mod test {
                 let res = if data.tau == 16 {
                     em_verify::<OWF192EM, <FAESTEM192sParameters as FAESTParameters>::Tau>(
                         GenericArray::from_slice(&data.d),
-                        GenericArray::from_slice(
-                            &data
-                                .gq
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>(),
-                        ),
+                        &data.as_gq(),
                         GenericArray::from_slice(&data.at),
                         GenericArray::from_slice(&data.chall2),
                         GenericArray::from_slice(&data.chall3),
-                        GenericArray::from_slice(&data.input),
-                        GenericArray::from_slice(&data.output),
+                        &data.as_pk(),
                     )
                 } else {
                     em_verify::<OWF192EM, <FAESTEM192fParameters as FAESTParameters>::Tau>(
                         GenericArray::from_slice(&data.d),
-                        GenericArray::from_slice(
-                            &data
-                                .gq
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>(),
-                        ),
+                        &data.as_gq(),
                         GenericArray::from_slice(&data.at),
                         GenericArray::from_slice(&data.chall2),
                         GenericArray::from_slice(&data.chall3),
-                        GenericArray::from_slice(&data.input),
-                        GenericArray::from_slice(&data.output),
+                        &data.as_pk(),
                     )
                 };
                 assert_eq!(res, *GenericArray::from_slice(&data.qt));
@@ -664,34 +653,20 @@ mod test {
                 let res = if data.tau == 22 {
                     em_verify::<OWF256EM, <FAESTEM256sParameters as FAESTParameters>::Tau>(
                         GenericArray::from_slice(&data.d),
-                        GenericArray::from_slice(
-                            &data
-                                .gq
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>(),
-                        ),
+                        &data.as_gq(),
                         GenericArray::from_slice(&data.at),
                         GenericArray::from_slice(&data.chall2),
                         GenericArray::from_slice(&data.chall3),
-                        GenericArray::from_slice(&data.input),
-                        GenericArray::from_slice(&data.output),
+                        &data.as_pk(),
                     )
                 } else {
                     em_verify::<OWF256EM, <FAESTEM256fParameters as FAESTParameters>::Tau>(
                         GenericArray::from_slice(&data.d),
-                        GenericArray::from_slice(
-                            &data
-                                .gq
-                                .iter()
-                                .map(|x| *GenericArray::from_slice(x))
-                                .collect::<Vec<GenericArray<u8, _>>>(),
-                        ),
+                        &data.as_gq(),
                         GenericArray::from_slice(&data.at),
                         GenericArray::from_slice(&data.chall2),
                         GenericArray::from_slice(&data.chall3),
-                        GenericArray::from_slice(&data.input),
-                        GenericArray::from_slice(&data.output),
+                        &data.as_pk(),
                     )
                 };
                 assert_eq!(res, *GenericArray::from_slice(&data.qt));

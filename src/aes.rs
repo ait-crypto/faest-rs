@@ -720,12 +720,8 @@ mod test {
         utils::test::read_test_data,
     };
 
-    use generic_array::{sequence::GenericSequence, GenericArray};
+    use generic_array::{sequence::GenericSequence, ArrayLength, GenericArray};
     use serde::Deserialize;
-
-    type ZkHash256 = GenericArray<u8, <OWF256 as OWFParameters>::LAMBDABYTES>;
-    type ZkHash192 = GenericArray<u8, <OWF192 as OWFParameters>::LAMBDABYTES>;
-    type ZkHash128 = GenericArray<u8, <OWF128 as OWFParameters>::LAMBDABYTES>;
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -747,7 +743,7 @@ mod test {
                         &data.input[..<OWF128 as OWFParameters>::InputSize::USIZE],
                     ),
                 );
-                assert_eq!(res.unwrap(), Box::new(*GenericArray::from_slice(&data.w)));
+                assert_eq!(res.unwrap().as_slice(), &data.w);
             } else if data.lambda == 192 {
                 let res = aes_extendedwitness::<OWF192>(
                     GenericArray::from_slice(&data.key),
@@ -755,7 +751,7 @@ mod test {
                         &data.input[..<OWF192 as OWFParameters>::InputSize::USIZE],
                     ),
                 );
-                assert_eq!(res.unwrap(), Box::new(*GenericArray::from_slice(&data.w)));
+                assert_eq!(res.unwrap().as_slice(), &data.w);
             } else {
                 let res = aes_extendedwitness::<OWF256>(
                     GenericArray::from_slice(&data.key),
@@ -763,7 +759,7 @@ mod test {
                         &data.input[..<OWF256 as OWFParameters>::InputSize::USIZE],
                     ),
                 );
-                assert_eq!(res.unwrap(), Box::new(*GenericArray::from_slice(&data.w)));
+                assert_eq!(res.unwrap().as_slice(), &data.w);
             }
         }
     }
@@ -779,62 +775,52 @@ mod test {
         bt: Vec<u8>,
     }
 
+    impl AesProve {
+        fn as_pk<O>(&self) -> PublicKey<O>
+        where
+            O: OWFParameters,
+        {
+            PublicKey {
+                owf_input: GenericArray::from_slice(&self.input).clone(),
+                owf_output: GenericArray::from_slice(&self.output).clone(),
+            }
+        }
+    }
+
     #[test]
     fn aes_prove_test() {
         let database: Vec<AesProve> = read_test_data("AesProve.json");
         for data in database {
             if data.lambda == 128 {
-                let res: (ZkHash128, ZkHash128) = aes_prove::<OWF128>(
+                let res = aes_prove::<OWF128>(
                     GenericArray::from_slice(&data.w),
                     &GenericArray::generate(|_| 19),
                     &GenericArray::generate(|_| GenericArray::generate(|_| 55)),
-                    &PublicKey {
-                        owf_input: *GenericArray::from_slice(&data.input),
-                        owf_output: *GenericArray::from_slice(&data.output),
-                    },
+                    &data.as_pk(),
                     &GenericArray::generate(|_| 47),
                 );
-
-                assert_eq!((res).0, *GenericArray::from_slice(&data.at));
-                assert_eq!((res).1, *GenericArray::from_slice(&data.bt));
+                assert_eq!(res.0.as_slice(), &data.at);
+                assert_eq!(res.1.as_slice(), &data.bt);
             } else if data.lambda == 192 {
-                let mut bitw: Vec<u8> = vec![0; 3264];
-                for i in 0..data.w.len() {
-                    for j in 0..8 {
-                        bitw[8 * i + j] = (data.w[i] >> j) & 1;
-                    }
-                }
-                let res: (ZkHash192, ZkHash192) = aes_prove::<OWF192>(
+                let res = aes_prove::<OWF192>(
                     GenericArray::from_slice(&data.w),
                     &GenericArray::generate(|_| 19),
                     &GenericArray::generate(|_| GenericArray::generate(|_| 55)),
-                    &PublicKey {
-                        owf_input: *GenericArray::from_slice(&data.input),
-                        owf_output: *GenericArray::from_slice(&data.output),
-                    },
+                    &data.as_pk(),
                     &GenericArray::generate(|_| 47),
                 );
-                assert_eq!(res.0, *GenericArray::from_slice(&data.at));
-                assert_eq!(res.1, *GenericArray::from_slice(&data.bt));
+                assert_eq!(res.0.as_slice(), &data.at);
+                assert_eq!(res.1.as_slice(), &data.bt);
             } else {
-                let mut bitw: Vec<u8> = vec![0; 4000];
-                for i in 0..data.w.len() {
-                    for j in 0..8 {
-                        bitw[8 * i + j] = (data.w[i] >> j) & 1;
-                    }
-                }
-                let res: (ZkHash256, ZkHash256) = aes_prove::<OWF256>(
+                let res = aes_prove::<OWF256>(
                     GenericArray::from_slice(&data.w),
                     &GenericArray::generate(|_| 19),
                     &GenericArray::generate(|_| GenericArray::generate(|_| 55)),
-                    &PublicKey {
-                        owf_input: *GenericArray::from_slice(&data.input),
-                        owf_output: *GenericArray::from_slice(&data.output),
-                    },
+                    &data.as_pk(),
                     &GenericArray::generate(|_| 47),
                 );
-                assert_eq!(res.0, *GenericArray::from_slice(&data.at));
-                assert_eq!(res.1, *GenericArray::from_slice(&data.bt));
+                assert_eq!(res.0.as_slice(), &data.at);
+                assert_eq!(res.1.as_slice(), &data.bt);
             }
         }
     }
@@ -857,6 +843,27 @@ mod test {
         fn res_as_u8(&self) -> Vec<u8> {
             self.res.iter().flat_map(|x| x.to_le_bytes()).collect()
         }
+
+        fn as_pk<O>(&self) -> PublicKey<O>
+        where
+            O: OWFParameters,
+        {
+            PublicKey {
+                owf_input: GenericArray::from_slice(&self.input).clone(),
+                owf_output: GenericArray::from_slice(&self.output).clone(),
+            }
+        }
+
+        fn as_gq<LHI, LHO>(&self) -> GenericArray<GenericArray<u8, LHI>, LHO>
+        where
+            LHI: ArrayLength,
+            LHO: ArrayLength,
+        {
+            self.gq
+                .iter()
+                .map(|x| GenericArray::from_slice(x).clone())
+                .collect()
+        }
     }
 
     fn aes_verify<O, Tau>(
@@ -865,8 +872,7 @@ mod test {
         a_t: &GenericArray<u8, O::LAMBDABYTES>,
         chall2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
         chall3: &GenericArray<u8, O::LAMBDABYTES>,
-        owf_input: &GenericArray<u8, O::InputSize>,
-        owf_output: &GenericArray<u8, O::InputSize>,
+        pk: &PublicKey<O>,
     ) -> GenericArray<u8, O::LAMBDABYTES>
     where
         O: OWFParameters,
@@ -878,10 +884,7 @@ mod test {
             a_t,
             chall2,
             chall3,
-            &PublicKey {
-                owf_input: owf_input.clone(),
-                owf_output: owf_output.clone(),
-            },
+            pk,
         )
     }
 
@@ -892,18 +895,11 @@ mod test {
             if data.lambda == 128 {
                 let out = aes_verify::<OWF128, <FAEST128sParameters as FAESTParameters>::Tau>(
                     GenericArray::from_slice(&data.d[..]),
-                    GenericArray::from_slice(
-                        &data
-                            .gq
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
-                    ),
+                    &data.as_gq(),
                     GenericArray::from_slice(&data.at),
                     GenericArray::from_slice(&data.chall2[..]),
                     GenericArray::from_slice(&data.chall3[..]),
-                    GenericArray::from_slice(&data.input),
-                    GenericArray::from_slice(&data.output),
+                    &data.as_pk(),
                 );
                 assert_eq!(
                     GF128::from(data.res_as_u8().as_slice()),
@@ -912,18 +908,11 @@ mod test {
             } else if data.lambda == 192 {
                 let out = aes_verify::<OWF192, <FAEST192sParameters as FAESTParameters>::Tau>(
                     GenericArray::from_slice(&data.d[..]),
-                    GenericArray::from_slice(
-                        &data
-                            .gq
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
-                    ),
+                    &data.as_gq(),
                     GenericArray::from_slice(&data.at),
                     GenericArray::from_slice(&data.chall2[..]),
                     GenericArray::from_slice(&data.chall3[..]),
-                    GenericArray::from_slice(&data.input),
-                    GenericArray::from_slice(&data.output),
+                    &data.as_pk(),
                 );
                 assert_eq!(
                     GF192::from(data.res_as_u8().as_slice()),
@@ -932,18 +921,11 @@ mod test {
             } else {
                 let out = aes_verify::<OWF256, <FAEST256sParameters as FAESTParameters>::Tau>(
                     GenericArray::from_slice(&data.d[..]),
-                    GenericArray::from_slice(
-                        &data
-                            .gq
-                            .iter()
-                            .map(|x| *GenericArray::from_slice(x))
-                            .collect::<Vec<GenericArray<u8, _>>>(),
-                    ),
+                    &data.as_gq(),
                     GenericArray::from_slice(&data.at),
                     GenericArray::from_slice(&data.chall2[..]),
                     GenericArray::from_slice(&data.chall3[..]),
-                    GenericArray::from_slice(&data.input),
-                    GenericArray::from_slice(&data.output),
+                    &data.as_pk(),
                 );
                 assert_eq!(
                     GF256::from(data.res_as_u8().as_slice()),
