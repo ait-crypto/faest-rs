@@ -1006,7 +1006,8 @@ mod test {
                 assert_eq!(res_bytes, expected);
                 assert_eq!(random_2 + random_1, res);
 
-                let ref_res = random_1 + &random_2;
+                let r_random_2 = &random_2;
+                let ref_res = random_1 + r_random_2;
                 assert_eq!(res, ref_res);
 
                 random_1 += random_2;
@@ -1027,7 +1028,7 @@ mod test {
                 rng.fill_bytes(&mut rhs[..8]);
 
                 let rhs_f = F::from(&rhs);
-                let rhs_64 = GF64::try_from(&rhs[..8]).unwrap();
+                let rhs_64 = GF64::from(&rhs[..8]);
 
                 assert_eq!(lhs * rhs_64, lhs * rhs_f);
             }
@@ -1042,6 +1043,7 @@ mod test {
 
             for _ in 0..RUNS {
                 let anything: F = rng.gen();
+                #[allow(clippy::erasing_op)]
                 let res = anything * 0u8;
                 assert_eq!(res, F::ZERO);
                 let res = anything * 1u8;
@@ -1063,7 +1065,7 @@ mod test {
             let all_ones = vec![F::ONE; F::Length::USIZE * 8];
             assert_eq!(
                 F::sum_poly(&all_ones),
-                F::try_from(vec![0xff; F::Length::USIZE].as_slice()).unwrap()
+                F::from(vec![0xff; F::Length::USIZE].as_slice())
             );
         }
 
@@ -1136,9 +1138,9 @@ mod test {
 
     fn mul<F: BigGaloisField + Debug + Eq>(test_data: &[(&str, &str, &str)]) {
         for (lhs, rhs, expected) in test_data {
-            let mut lhs = F::try_from(hex::decode(*lhs).unwrap().as_slice()).unwrap();
-            let rhs = F::try_from(hex::decode(*rhs).unwrap().as_slice()).unwrap();
-            let expected = F::try_from(hex::decode(*expected).unwrap().as_slice()).unwrap();
+            let mut lhs = F::from(hex::decode(*lhs).unwrap().as_slice());
+            let rhs = F::from(hex::decode(*rhs).unwrap().as_slice());
+            let expected = F::from(hex::decode(*expected).unwrap().as_slice());
             assert_eq!(lhs * rhs, expected);
             assert_eq!(rhs * lhs, expected);
             lhs *= rhs;
@@ -1244,7 +1246,7 @@ mod test {
 
     fn byte_combine_bits<F: BigGaloisField + Debug + Eq>(test_data: &[(u8, &str)]) {
         for (x, data) in test_data {
-            let result = F::try_from(hex::decode(*data).unwrap().as_slice()).unwrap();
+            let result = F::from(hex::decode(*data).unwrap().as_slice());
             assert_eq!(F::byte_combine_bits(*x), result);
         }
     }
@@ -1293,16 +1295,16 @@ mod test {
     ) {
         for data in test_data {
             let tab = [
-                F::try_from(hex::decode(data.0).unwrap().as_slice()).unwrap(),
-                F::try_from(hex::decode(data.1).unwrap().as_slice()).unwrap(),
-                F::try_from(hex::decode(data.2).unwrap().as_slice()).unwrap(),
-                F::try_from(hex::decode(data.3).unwrap().as_slice()).unwrap(),
-                F::try_from(hex::decode(data.4).unwrap().as_slice()).unwrap(),
-                F::try_from(hex::decode(data.5).unwrap().as_slice()).unwrap(),
-                F::try_from(hex::decode(data.6).unwrap().as_slice()).unwrap(),
-                F::try_from(hex::decode(data.7).unwrap().as_slice()).unwrap(),
+                F::from(hex::decode(data.0).unwrap().as_slice()),
+                F::from(hex::decode(data.1).unwrap().as_slice()),
+                F::from(hex::decode(data.2).unwrap().as_slice()),
+                F::from(hex::decode(data.3).unwrap().as_slice()),
+                F::from(hex::decode(data.4).unwrap().as_slice()),
+                F::from(hex::decode(data.5).unwrap().as_slice()),
+                F::from(hex::decode(data.6).unwrap().as_slice()),
+                F::from(hex::decode(data.7).unwrap().as_slice()),
             ];
-            let result = F::try_from(hex::decode(data.8).unwrap().as_slice()).unwrap();
+            let result = F::from(hex::decode(data.8).unwrap().as_slice());
             assert_eq!(F::byte_combine(&tab), result);
         }
     }

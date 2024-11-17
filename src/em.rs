@@ -480,8 +480,8 @@ mod test {
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
                     &PublicKey {
-                        owf_input: GenericArray::from_slice(&data.input).clone(),
-                        owf_output: GenericArray::from_slice(&data.output).clone(),
+                        owf_input: *GenericArray::from_slice(&data.input),
+                        owf_output: *GenericArray::from_slice(&data.output),
                     },
                     GenericArray::from_slice(&data.chall),
                 );
@@ -505,8 +505,8 @@ mod test {
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
                     &PublicKey {
-                        owf_input: GenericArray::from_slice(&data.input).clone(),
-                        owf_output: GenericArray::from_slice(&data.output).clone(),
+                        owf_input: *GenericArray::from_slice(&data.input),
+                        owf_output: *GenericArray::from_slice(&data.output),
                     },
                     GenericArray::from_slice(&data.chall),
                 );
@@ -529,8 +529,8 @@ mod test {
                             .collect::<Vec<GenericArray<u8, _>>>(),
                     ),
                     &PublicKey {
-                        owf_input: GenericArray::from_slice(&data.input).clone(),
-                        owf_output: GenericArray::from_slice(&data.output).clone(),
+                        owf_input: *GenericArray::from_slice(&data.input),
+                        owf_output: *GenericArray::from_slice(&data.output),
                     },
                     GenericArray::from_slice(&data.chall),
                 );

@@ -789,8 +789,8 @@ mod test {
                     &GenericArray::generate(|_| 19),
                     &GenericArray::generate(|_| GenericArray::generate(|_| 55)),
                     &PublicKey {
-                        owf_input: GenericArray::from_slice(&data.input).clone(),
-                        owf_output: GenericArray::from_slice(&data.output).clone(),
+                        owf_input: *GenericArray::from_slice(&data.input),
+                        owf_output: *GenericArray::from_slice(&data.output),
                     },
                     &GenericArray::generate(|_| 47),
                 );
@@ -809,8 +809,8 @@ mod test {
                     &GenericArray::generate(|_| 19),
                     &GenericArray::generate(|_| GenericArray::generate(|_| 55)),
                     &PublicKey {
-                        owf_input: GenericArray::from_slice(&data.input).clone(),
-                        owf_output: GenericArray::from_slice(&data.output).clone(),
+                        owf_input: *GenericArray::from_slice(&data.input),
+                        owf_output: *GenericArray::from_slice(&data.output),
                     },
                     &GenericArray::generate(|_| 47),
                 );
@@ -828,8 +828,8 @@ mod test {
                     &GenericArray::generate(|_| 19),
                     &GenericArray::generate(|_| GenericArray::generate(|_| 55)),
                     &PublicKey {
-                        owf_input: GenericArray::from_slice(&data.input).clone(),
-                        owf_output: GenericArray::from_slice(&data.output).clone(),
+                        owf_input: *GenericArray::from_slice(&data.input),
+                        owf_output: *GenericArray::from_slice(&data.output),
                     },
                     &GenericArray::generate(|_| 47),
                 );

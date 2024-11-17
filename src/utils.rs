@@ -108,6 +108,6 @@ pub(crate) mod test {
             },
             serde_json::from_reader,
         )
-        .expect(&format!("Failed to read JSON test data from {}", path))
+        .unwrap_or_else(|_| panic!("Failed to read JSON test data from {}", path))
     }
 }
