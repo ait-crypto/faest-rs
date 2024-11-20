@@ -441,9 +441,7 @@ mod test {
             } else {
                 let res = em_extendedwitness::<OWF256EM>(
                     GenericArray::from_slice(&data.key),
-                    GenericArray::from_slice(
-                        &data.input[..<OWF256EM as OWFParameters>::InputSize::USIZE],
-                    ),
+                    GenericArray::from_slice(&data.input),
                 );
                 assert_eq!(res.unwrap().as_slice(), &data.w);
             }
@@ -499,14 +497,8 @@ mod test {
                     &data.as_pk(),
                     GenericArray::from_slice(&data.chall),
                 );
-                assert_eq!(
-                    (
-                        *GenericArray::from_slice(&data.at),
-                        *GenericArray::from_slice(&data.bt)
-                    ),
-                    res
-                );
-                break;
+                assert_eq!(data.at.as_slice(), res.0.as_slice());
+                assert_eq!(data.bt.as_slice(), res.1.as_slice());
             } else if data.lambda == 192 {
                 let res = em_prove::<OWF192EM>(
                     GenericArray::from_slice(&data.w),
@@ -515,13 +507,8 @@ mod test {
                     &data.as_pk(),
                     GenericArray::from_slice(&data.chall),
                 );
-                assert_eq!(
-                    (
-                        *GenericArray::from_slice(&data.at),
-                        *GenericArray::from_slice(&data.bt)
-                    ),
-                    res
-                );
+                assert_eq!(data.at.as_slice(), res.0.as_slice());
+                assert_eq!(data.bt.as_slice(), res.1.as_slice());
             } else {
                 let res = em_prove::<OWF256EM>(
                     GenericArray::from_slice(&data.w),
@@ -532,13 +519,8 @@ mod test {
                     &data.as_pk(),
                     GenericArray::from_slice(&data.chall),
                 );
-                assert_eq!(
-                    (
-                        *GenericArray::from_slice(&data.at),
-                        *GenericArray::from_slice(&data.bt)
-                    ),
-                    res
-                );
+                assert_eq!(data.at.as_slice(), res.0.as_slice());
+                assert_eq!(data.bt.as_slice(), res.1.as_slice());
             }
         }
     }
@@ -569,7 +551,7 @@ mod test {
             }
         }
 
-        fn as_gq<LHI, LHO>(&self) -> GenericArray<GenericArray<u8, LHI>, LHO>
+        fn as_gq<LHI, LHO>(&self) -> Box<GenericArray<GenericArray<u8, LHI>, LHO>>
         where
             LHI: ArrayLength,
             LHO: ArrayLength,
@@ -581,25 +563,18 @@ mod test {
         }
     }
 
-    fn em_verify<O, Tau>(
-        d: &GenericArray<u8, O::LBYTES>,
-        gq: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-        a_t: &GenericArray<u8, O::LAMBDABYTES>,
-        chall2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
-        chall3: &GenericArray<u8, O::LAMBDABYTES>,
-        pk: &PublicKey<O>,
-    ) -> GenericArray<u8, O::LAMBDABYTES>
+    fn em_verify<O, Tau>(data: &EmVerify) -> GenericArray<u8, O::LAMBDABYTES>
     where
         O: OWFParameters,
         Tau: TauParameters,
     {
         super::em_verify::<O, Tau>(
-            d,
-            Box::<GenericArray<_, _>>::from_iter(gq.iter().cloned()),
-            a_t,
-            chall2,
-            chall3,
-            pk,
+            GenericArray::from_slice(&data.d),
+            data.as_gq(),
+            GenericArray::from_slice(&data.at),
+            GenericArray::from_slice(&data.chall2),
+            GenericArray::from_slice(&data.chall3),
+            &data.as_pk(),
         )
     }
 
@@ -609,67 +584,25 @@ mod test {
         for data in database {
             if data.lambda == 128 {
                 let res = if data.tau == 11 {
-                    em_verify::<OWF128EM, <FAESTEM128sParameters as FAESTParameters>::Tau>(
-                        GenericArray::from_slice(&data.d),
-                        &data.as_gq(),
-                        GenericArray::from_slice(&data.at),
-                        GenericArray::from_slice(&data.chall2),
-                        GenericArray::from_slice(&data.chall3),
-                        &data.as_pk(),
-                    )
+                    em_verify::<OWF128EM, <FAESTEM128sParameters as FAESTParameters>::Tau>(&data)
                 } else {
-                    em_verify::<OWF128EM, <FAESTEM128fParameters as FAESTParameters>::Tau>(
-                        GenericArray::from_slice(&data.d),
-                        &data.as_gq(),
-                        GenericArray::from_slice(&data.at),
-                        GenericArray::from_slice(&data.chall2),
-                        GenericArray::from_slice(&data.chall3),
-                        &data.as_pk(),
-                    )
+                    em_verify::<OWF128EM, <FAESTEM128fParameters as FAESTParameters>::Tau>(&data)
                 };
-                assert_eq!(res, *GenericArray::from_slice(&data.qt));
+                assert_eq!(res.as_slice(), data.qt.as_slice());
             } else if data.lambda == 192 {
                 let res = if data.tau == 16 {
-                    em_verify::<OWF192EM, <FAESTEM192sParameters as FAESTParameters>::Tau>(
-                        GenericArray::from_slice(&data.d),
-                        &data.as_gq(),
-                        GenericArray::from_slice(&data.at),
-                        GenericArray::from_slice(&data.chall2),
-                        GenericArray::from_slice(&data.chall3),
-                        &data.as_pk(),
-                    )
+                    em_verify::<OWF192EM, <FAESTEM192sParameters as FAESTParameters>::Tau>(&data)
                 } else {
-                    em_verify::<OWF192EM, <FAESTEM192fParameters as FAESTParameters>::Tau>(
-                        GenericArray::from_slice(&data.d),
-                        &data.as_gq(),
-                        GenericArray::from_slice(&data.at),
-                        GenericArray::from_slice(&data.chall2),
-                        GenericArray::from_slice(&data.chall3),
-                        &data.as_pk(),
-                    )
+                    em_verify::<OWF192EM, <FAESTEM192fParameters as FAESTParameters>::Tau>(&data)
                 };
-                assert_eq!(res, *GenericArray::from_slice(&data.qt));
+                assert_eq!(res.as_slice(), data.qt.as_slice());
             } else {
                 let res = if data.tau == 22 {
-                    em_verify::<OWF256EM, <FAESTEM256sParameters as FAESTParameters>::Tau>(
-                        GenericArray::from_slice(&data.d),
-                        &data.as_gq(),
-                        GenericArray::from_slice(&data.at),
-                        GenericArray::from_slice(&data.chall2),
-                        GenericArray::from_slice(&data.chall3),
-                        &data.as_pk(),
-                    )
+                    em_verify::<OWF256EM, <FAESTEM256sParameters as FAESTParameters>::Tau>(&data)
                 } else {
-                    em_verify::<OWF256EM, <FAESTEM256fParameters as FAESTParameters>::Tau>(
-                        GenericArray::from_slice(&data.d),
-                        &data.as_gq(),
-                        GenericArray::from_slice(&data.at),
-                        GenericArray::from_slice(&data.chall2),
-                        GenericArray::from_slice(&data.chall3),
-                        &data.as_pk(),
-                    )
+                    em_verify::<OWF256EM, <FAESTEM256fParameters as FAESTParameters>::Tau>(&data)
                 };
-                assert_eq!(res, *GenericArray::from_slice(&data.qt));
+                assert_eq!(res.as_slice(), data.qt.as_slice());
             }
         }
     }
