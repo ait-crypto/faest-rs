@@ -165,8 +165,6 @@ pub(crate) trait OWFParameters: Sized {
         Self::extendwitness(&sk.owf_key, &sk.pk.owf_input).unwrap()
     }
 
-    ///input : witness of l bits, masking values (l+lambda in aes, lambda in em), Vole tag ((l + lambda) *lambda bits), public key, chall(3lambda + 64)
-    ///Output : QuickSilver response (Lambda bytes)
     fn prove(
         w: &GenericArray<u8, Self::LBYTES>,
         u: &GenericArray<u8, Self::LAMBDALBYTES>,
@@ -175,8 +173,6 @@ pub(crate) trait OWFParameters: Sized {
         chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self>;
 
-    ///input : Masked witness (l bits), Vole Key ((l + lambda) * Lambda bits), hash of constrints values (lambda bits), chall2 (3*lambda + 64 bits), chall3 (lambda bits), public key
-    ///output q_tilde - delta * a_tilde (lambda bytes)
     fn verify<Tau>(
         d: &GenericArray<u8, Self::LBYTES>,
         gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
@@ -188,8 +184,6 @@ pub(crate) trait OWFParameters: Sized {
     where
         Tau: TauParameters;
 
-    ///input : a random number generator
-    /// output = pk : input, output; sk : input, key
     fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<Self> {
         loop {
             // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
