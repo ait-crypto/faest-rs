@@ -20,7 +20,7 @@ use rand::{
 };
 
 /// Helper trait that define "alphas" for calculating embedings as part of [`ByteCombine`]
-trait Alphas: Sized {
+pub(crate) trait Alphas: Sized {
     const ALPHA: [Self; 7];
 }
 
@@ -98,7 +98,7 @@ where
 
 /// Binary galois field for larger sizes (e.g., 128 bits and above)
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
-pub struct BigGF<T, const N: usize, const LENGTH: usize>([T; N]);
+pub struct BigGF<T, const N: usize, const LENGTH: usize>(pub(crate) [T; N]);
 
 impl<T, const N: usize, const LENGTH: usize> Default for BigGF<T, N, LENGTH>
 where
@@ -297,7 +297,7 @@ impl<T, const N: usize, const LENGTH: usize> Neg for BigGF<T, N, LENGTH> {
 // generic implementations of Mul and MulAssign
 
 /// Modulus of a binary Galois field
-trait Modulus<T> {
+pub(crate) trait Modulus<T> {
     const MODULUS: T;
 }
 

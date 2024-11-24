@@ -52,7 +52,7 @@
 //! # }
 //! ```
 
-#![forbid(unsafe_code)]
+// #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 // TODO: fix those
 #![allow(clippy::type_complexity)]
