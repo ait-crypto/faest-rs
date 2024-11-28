@@ -55,7 +55,7 @@ where
 /// Reference to storage area in signature for all `c`s.
 pub(crate) struct VoleCommitmentCRef<'a, LH>(&'a mut [u8], PhantomData<LH>);
 
-impl<'a, LH> Index<usize> for VoleCommitmentCRef<'a, LH>
+impl<LH> Index<usize> for VoleCommitmentCRef<'_, LH>
 where
     LH: ArrayLength,
 {
@@ -66,7 +66,7 @@ where
     }
 }
 
-impl<'a, LH> IndexMut<usize> for VoleCommitmentCRef<'a, LH>
+impl<LH> IndexMut<usize> for VoleCommitmentCRef<'_, LH>
 where
     LH: ArrayLength,
 {
