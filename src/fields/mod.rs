@@ -1,6 +1,6 @@
 pub(crate) mod large_fields;
 pub(crate) mod small_fields;
-#[cfg(all(target_feature = "avx2", target_feature = "pclmulqdq"))]
+#[cfg(target_arch = "x86_64")]
 pub(crate) mod x86_simd_large_fields;
 
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};

@@ -82,7 +82,11 @@ mod universal_hashing;
 mod utils;
 mod vc;
 mod vole;
+#[cfg(target_arch = "x86_64")]
+mod x86_simd_parameters;
 
+#[cfg(target_arch = "x86_64")]
+use crate::faest::{faest_keygen_avx2, faest_sign_avx2, faest_verify_avx2};
 use crate::{
     faest::{faest_keygen, faest_sign, faest_verify},
     internal_keys::{PublicKey, SecretKey},
@@ -138,6 +142,39 @@ pub trait ByteEncoding: Clone + Sized + for<'a> TryFrom<&'a [u8]> + TryInto<Self
 macro_rules! define_impl {
     ($param:ident) => {
         paste! {
+            struct $param;
+
+            impl $param {
+                #[inline(always)]
+                fn sign(
+                    msg: &[u8],
+                    sk: &SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
+                    rho: &[u8],
+                    signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
+                ) {
+                    #[cfg(target_arch = "x86_64")]
+                    if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
+                        unsafe { faest_sign_avx2::<x86_simd_parameters::[<$param Parameters>]>(msg, &sk.into(), rho, signature); }
+                        return;
+                    }
+                    faest_sign::<[<$param Parameters>]>(msg, sk, rho, signature);
+                }
+
+                #[inline(always)]
+                fn verify(
+                    msg: &[u8],
+                    pk: &PublicKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
+                    sigma: &GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
+                ) -> Result<(), Error>
+                {
+                    #[cfg(target_arch = "x86_64")]
+                    if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
+                        return unsafe { faest_verify_avx2::<x86_simd_parameters::[<$param Parameters>]>(msg, &pk.into(), sigma) };
+                    }
+                    faest_verify::<[<$param Parameters>]>(msg, pk, sigma)
+                }
+            }
+
             #[doc = "Signing key for " $param]
             /// ```
             #[doc = "use faest::{" $param "SigningKey as SK, " $param "Signature as Sig};"]
@@ -248,6 +285,11 @@ macro_rules! define_impl {
                 where
                     R: CryptoRngCore,
                 {
+                    #[cfg(target_arch = "x86_64")]
+                    if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
+                        return Self((&unsafe { faest_keygen_avx2::<<x86_simd_parameters::[<$param Parameters>] as FAESTParameters>::OWF, R>(rng) }).into());
+                    }
+
                     Self(faest_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng))
                 }
             }
@@ -264,7 +306,7 @@ macro_rules! define_impl {
 
                 fn sign(&self, msg: &[u8]) -> [<$param Signature>] {
                     let mut signature = GenericArray::default();
-                    faest_sign::<[<$param Parameters>]>(msg, &self.0, &[], &mut signature);
+                    $param::sign(msg, &self.0, &[], &mut signature);
                     [<$param Signature>](signature)
                 }
             }
@@ -276,20 +318,20 @@ macro_rules! define_impl {
 
                 fn sign(&self, msg: &[u8]) -> Box<[<$param Signature>]> {
                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));
-                    faest_sign::<[<$param Parameters>]>(msg, &self.0, &[], &mut signature.0);
+                    $param::sign(msg, &self.0, &[], &mut signature.0);
                     signature
                 }
             }
 
             impl Verifier<[<$param Signature>]> for [<$param VerificationKey>] {
                 fn verify(&self, msg: &[u8], signature: &[<$param Signature>]) -> Result<(), Error> {
-                    faest_verify::<[<$param Parameters>]>(msg, &self.0, &signature.0)
+                    $param::verify(msg, &self.0, &signature.0)
                 }
             }
 
             impl Verifier<Box<[<$param Signature>]>> for [<$param VerificationKey>] {
                 fn verify(&self, msg: &[u8], signature: &Box<[<$param Signature>]>) -> Result<(), Error> {
-                    faest_verify::<[<$param Parameters>]>(msg, &self.0, &signature.0)
+                    $param::verify(msg, &self.0, &signature.0)
                 }
             }
 
@@ -297,19 +339,19 @@ macro_rules! define_impl {
                 fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
                     GenericArray::try_from_slice(signature.0)
                         .map_err(|_| Error::new())
-                        .and_then(|sig| faest_verify::<[<$param Parameters>]>(msg, &self.0, sig))
+                        .and_then(|sig| $param::verify(msg, &self.0, sig))
                 }
             }
 
             impl Verifier<[<$param Signature>]> for [<$param SigningKey>] {
                 fn verify(&self, msg: &[u8], signature: &[<$param Signature>]) -> Result<(), Error> {
-                    faest_verify::<[<$param Parameters>]>(msg, &self.0.pk, &signature.0)
+                    $param::verify(msg, &self.0.pk, &signature.0)
                 }
             }
 
             impl Verifier<Box<[<$param Signature>]>> for [<$param SigningKey>] {
                 fn verify(&self, msg: &[u8], signature: &Box<[<$param Signature>]>) -> Result<(), Error> {
-                    faest_verify::<[<$param Parameters>]>(msg, &self.0.pk, &signature.0)
+                    $param::verify(msg, &self.0.pk, &signature.0)
                 }
             }
 
@@ -317,7 +359,7 @@ macro_rules! define_impl {
                 fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
                     GenericArray::try_from_slice(signature.0)
                         .map_err(|_| Error::new())
-                        .and_then(|sig| faest_verify::<[<$param Parameters>]>(msg, &self.0.pk, sig))
+                        .and_then(|sig| $param::verify(msg, &self.0.pk, sig))
                 }
             }
 
@@ -334,7 +376,7 @@ macro_rules! define_impl {
                     >::default();
                     rng.fill_bytes(&mut rho);
                     let mut signature = GenericArray::default();
-                    faest_sign::<[<$param Parameters>]>(msg, &self.0, &rho, &mut signature);
+                    $param::sign(msg, &self.0, &rho, &mut signature);
                     Ok([<$param Signature>](signature))
                 }
             }
@@ -352,7 +394,7 @@ macro_rules! define_impl {
                     >::default();
                     rng.fill_bytes(&mut rho);
                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));
-                    faest_sign::<[<$param Parameters>]>(msg, &self.0, &rho, &mut signature.0);
+                    $param::sign(msg, &self.0, &rho, &mut signature.0);
                     Ok(signature)
                 }
             }

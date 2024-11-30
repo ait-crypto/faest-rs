@@ -4,13 +4,13 @@ use std::{
         _mm256_castsi128_si256, _mm256_extracti128_si256, _mm256_inserti128_si256,
         _mm256_loadu_si256, _mm256_or_si256, _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32,
         _mm256_set1_epi32, _mm256_set1_epi64x, _mm256_setr_epi64x, _mm256_setzero_si256,
-        _mm256_shufflehi_epi16, _mm256_slli_epi64, _mm256_srai_epi32, _mm256_srl_epi16,
-        _mm256_srli_epi64, _mm256_store_si256, _mm256_testz_si256, _mm256_xor_si256,
-        _mm_alignr_epi8, _mm_and_si128, _mm_andnot_si128, _mm_bslli_si128, _mm_clmulepi64_si128,
-        _mm_loadu_si128, _mm_or_si128, _mm_set1_epi8, _mm_set_epi64x, _mm_set_epi8, _mm_setr_epi32,
-        _mm_setr_epi8, _mm_setzero_si128, _mm_shuffle_epi32, _mm_shuffle_epi8, _mm_slli_epi32,
-        _mm_slli_epi64, _mm_slli_si128, _mm_srli_epi32, _mm_srli_epi64, _mm_srli_si128,
-        _mm_store_si128, _mm_test_all_zeros, _mm_xor_si128,
+        _mm256_slli_epi64, _mm256_srai_epi32, _mm256_srli_epi64, _mm256_storeu_si256,
+        _mm256_testz_si256, _mm256_xor_si256, _mm_alignr_epi8, _mm_and_si128, _mm_andnot_si128,
+        _mm_bslli_si128, _mm_clmulepi64_si128, _mm_loadu_si128, _mm_or_si128, _mm_set1_epi8,
+        _mm_set_epi64x, _mm_set_epi8, _mm_setr_epi32, _mm_setr_epi8, _mm_setzero_si128,
+        _mm_shuffle_epi32, _mm_shuffle_epi8, _mm_slli_epi32, _mm_slli_epi64, _mm_slli_si128,
+        _mm_srli_epi32, _mm_srli_epi64, _mm_srli_si128, _mm_storeu_si128, _mm_test_all_zeros,
+        _mm_xor_si128,
     },
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
@@ -40,50 +40,50 @@ unsafe fn m128_clmul_lh(x: __m128i, y: __m128i) -> __m128i {
     _mm_clmulepi64_si128(x, y, 0x10)
 }
 
-#[inline(always)]
-unsafe fn m128_clmul_hl(x: __m128i, y: __m128i) -> __m128i {
-    _mm_clmulepi64_si128(x, y, 0x01)
-}
+// #[inline(always)]
+// unsafe fn m128_clmul_hl(x: __m128i, y: __m128i) -> __m128i {
+//     _mm_clmulepi64_si128(x, y, 0x01)
+// }
 
 #[inline(always)]
 unsafe fn m128_clmul_hh(x: __m128i, y: __m128i) -> __m128i {
     _mm_clmulepi64_si128(x, y, 0x11)
 }
 
-#[inline]
-unsafe fn m256_clmulepi64_epi128<const IMM8: i32>(x: __m256i, y: __m256i) -> __m256i {
-    let low = _mm_clmulepi64_si128(
-        _mm256_extracti128_si256(x, 0),
-        _mm256_extracti128_si256(y, 0),
-        IMM8,
-    );
-    let high = _mm_clmulepi64_si128(
-        _mm256_extracti128_si256(x, 1),
-        _mm256_extracti128_si256(y, 1),
-        IMM8,
-    );
-    _mm256_inserti128_si256(_mm256_castsi128_si256(low), high, 1)
-}
+// #[inline]
+// unsafe fn m256_clmulepi64_epi128<const IMM8: i32>(x: __m256i, y: __m256i) -> __m256i {
+//     let low = _mm_clmulepi64_si128(
+//         _mm256_extracti128_si256(x, 0),
+//         _mm256_extracti128_si256(y, 0),
+//         IMM8,
+//     );
+//     let high = _mm_clmulepi64_si128(
+//         _mm256_extracti128_si256(x, 1),
+//         _mm256_extracti128_si256(y, 1),
+//         IMM8,
+//     );
+//     _mm256_inserti128_si256(_mm256_castsi128_si256(low), high, 1)
+// }
 
-#[inline(always)]
-unsafe fn m256_clmul_ll(x: __m256i, y: __m256i) -> __m256i {
-    m256_clmulepi64_epi128::<0x00>(x, y)
-}
+// #[inline(always)]
+// unsafe fn m256_clmul_ll(x: __m256i, y: __m256i) -> __m256i {
+//     m256_clmulepi64_epi128::<0x00>(x, y)
+// }
 
-#[inline(always)]
-unsafe fn m256_clmul_lh(x: __m256i, y: __m256i) -> __m256i {
-    m256_clmulepi64_epi128::<0x10>(x, y)
-}
+// #[inline(always)]
+// unsafe fn m256_clmul_lh(x: __m256i, y: __m256i) -> __m256i {
+//     m256_clmulepi64_epi128::<0x10>(x, y)
+// }
 
-#[inline(always)]
-unsafe fn m256_clmul_hl(x: __m256i, y: __m256i) -> __m256i {
-    m256_clmulepi64_epi128::<0x01>(x, y)
-}
+// #[inline(always)]
+// unsafe fn m256_clmul_hl(x: __m256i, y: __m256i) -> __m256i {
+//     m256_clmulepi64_epi128::<0x01>(x, y)
+// }
 
-#[inline(always)]
-unsafe fn m256_clmul_hh(x: __m256i, y: __m256i) -> __m256i {
-    m256_clmulepi64_epi128::<0x11>(x, y)
-}
+// #[inline(always)]
+// unsafe fn m256_clmul_hh(x: __m256i, y: __m256i) -> __m256i {
+//     m256_clmulepi64_epi128::<0x11>(x, y)
+// }
 
 /// Helper to convert values to `__m128i`
 union GF128ConstHelper {
@@ -105,6 +105,7 @@ const fn gfu128_as_m128(v: GFu128) -> __m128i {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[repr(transparent)]
 pub(crate) struct GF128(__m128i);
 
 impl Default for GF128 {
@@ -489,7 +490,7 @@ impl Field for GF128 {
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::<u8, Self::Length>::default();
-        unsafe { _mm_store_si128(ret.as_mut_ptr().cast(), self.0) };
+        unsafe { _mm_storeu_si128(ret.as_mut_ptr().cast(), self.0) };
         ret
     }
 }
@@ -589,6 +590,7 @@ const fn gfu256_as_m256(v: GFu256) -> __m256i {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[repr(transparent)]
 pub(crate) struct GF256(__m256i);
 
 impl Default for GF256 {
@@ -910,41 +912,7 @@ impl MulAssign<&Self> for GF256 {
     }
 }
 
-/* unsafe fn all_ones() -> __m128i {
-    let zero = _mm_setzero_si128();
-    _mm_cmpeq_epi32(zero, zero)
-}
-
-unsafe fn to_mask(v: __m128i) -> __m128i {
-    let mask = _mm_setr_epi8(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-    println!("v = {:?}, mask = {:?}", v, mask);
-    let v = _mm_and_si128(v, mask);
-    let v = _mm_shuffle_epi8(v, _mm_setzero_si128());
-    let v = _mm_slli_epi32(v, 7);
-    v
-    // _mm_slli_epi64(v, 7)
-} */
-
-/*
-unsafe fn apply_mask(v: __m128i, m: __m128i) -> __m128i {
-    let mask = _mm_setr_epi8(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-    let m = _mm_and_si128(m, mask);
-    let m = _mm_shuffle_epi8(m, _mm_setzero_si128());
-    let m = _mm_slli_epi32(m, 7);
-    let m = _mm_andnot_si128(
-        m,
-        // FIXME
-        _mm_or_si128(
-            _mm_slli_epi32(
-                _mm_setr_epi8(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
-                7,
-            ),
-            _mm_set_epi8(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
-        ),
-    );
-    _mm_shuffle_epi8(v, m)
-}
-*/
+// implementation of Double
 
 unsafe fn mm256_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
     let mask = _mm256_setr_epi64x(0, 0, 0, i64::MIN);
@@ -953,8 +921,6 @@ unsafe fn mm256_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
     let m = _mm256_permutevar8x32_epi32(m, _mm256_set1_epi32(7));
     _mm256_blendv_epi8(_mm256_setzero_si256(), v, m)
 }
-
-// implementation of Double
 
 const GF256_MODULUS: __m256i = u128_as_m256([GFu256::MODULUS, 0]);
 
@@ -999,7 +965,7 @@ impl Field for GF256 {
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::<u8, Self::Length>::default();
-        unsafe { _mm256_store_si256(ret.as_mut_ptr().cast(), self.0) };
+        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
         ret
     }
 }

@@ -35,6 +35,22 @@ where
     }
 }
 
+impl<O1, O2> From<&SecretKey<O2>> for SecretKey<O1>
+where
+    O1: OWFParameters,
+    O2: OWFParameters<LAMBDABYTES = O1::LAMBDABYTES, InputSize = O1::InputSize>,
+{
+    fn from(value: &SecretKey<O2>) -> Self {
+        Self {
+            owf_key: value.owf_key.clone(),
+            pk: PublicKey {
+                owf_input: value.pk.owf_input.clone(),
+                owf_output: value.pk.owf_output.clone(),
+            },
+        }
+    }
+}
+
 impl<O> TryFrom<&[u8]> for SecretKey<O>
 where
     O: OWFParameters,
@@ -178,6 +194,19 @@ where
         Self {
             owf_input: self.owf_input.clone(),
             owf_output: self.owf_output.clone(),
+        }
+    }
+}
+
+impl<O1, O2> From<&PublicKey<O2>> for PublicKey<O1>
+where
+    O1: OWFParameters,
+    O2: OWFParameters<LAMBDABYTES = O1::LAMBDABYTES, InputSize = O1::InputSize>,
+{
+    fn from(value: &PublicKey<O2>) -> Self {
+        Self {
+            owf_input: value.owf_input.clone(),
+            owf_output: value.owf_output.clone(),
         }
     }
 }

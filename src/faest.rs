@@ -94,8 +94,33 @@ where
     O::keygen_with_rng(rng)
 }
 
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+#[inline]
+pub(crate) unsafe fn faest_keygen_avx2<O, R>(rng: R) -> SecretKey<O>
+where
+    O: OWFParameters,
+    R: CryptoRngCore,
+{
+    O::keygen_with_rng(rng)
+}
+
 #[inline]
 pub(crate) fn faest_sign<P>(
+    msg: &[u8],
+    sk: &SecretKey<P::OWF>,
+    rho: &[u8],
+    signature: &mut GenericArray<u8, P::SignatureSize>,
+) where
+    P: FAESTParameters,
+{
+    sign::<P, P::OWF>(msg, sk, rho, signature);
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+#[inline]
+pub(crate) unsafe fn faest_sign_avx2<P>(
     msg: &[u8],
     sk: &SecretKey<P::OWF>,
     rho: &[u8],
@@ -224,6 +249,20 @@ fn opening_to_signature<'a>(
 
 #[inline]
 pub(crate) fn faest_verify<P>(
+    msg: &[u8],
+    pk: &PublicKey<P::OWF>,
+    sigma: &GenericArray<u8, P::SignatureSize>,
+) -> Result<(), Error>
+where
+    P: FAESTParameters,
+{
+    verify::<P, P::OWF>(msg, pk, sigma)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+#[inline]
+pub(crate) unsafe fn faest_verify_avx2<P>(
     msg: &[u8],
     pk: &PublicKey<P::OWF>,
     sigma: &GenericArray<u8, P::SignatureSize>,
