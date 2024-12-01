@@ -113,15 +113,13 @@ impl OWFParameters for OWF128 {
     type PK = U32;
     type SK = U32;
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
-    type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
     type QUOTLENC8 = Quot<Self::LENC, U8>;
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-    type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
-    type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
+    type LAMBDAR1BYTE = Quot<Prod<Self::LAMBDA, Sum<Self::R, U1>>, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes128Enc::new(GenericArray_AES::from_slice(key));
@@ -188,15 +186,13 @@ impl OWFParameters for OWF192 {
     type PK = U64;
     type SK = U56;
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
-    type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
     type QUOTLENC8 = Quot<Self::LENC, U8>;
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-    type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
-    type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
+    type LAMBDAR1BYTE = Quot<Prod<Self::LAMBDA, Sum<Self::R, U1>>, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes192Enc::new(GenericArray_AES::from_slice(key));
@@ -267,15 +263,13 @@ impl OWFParameters for OWF256 {
     type PK = U64;
     type SK = U64;
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
-    type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
     type QUOTLENC8 = Quot<Self::LENC, U8>;
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-    type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
-    type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
+    type LAMBDAR1BYTE = Quot<Prod<Self::LAMBDA, Sum<Self::R, U1>>, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes256Enc::new(GenericArray_AES::from_slice(key));
@@ -346,15 +340,13 @@ impl OWFParameters for OWF128EM {
     type PK = U32;
     type SK = U32;
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
-    type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
     type QUOTLENC8 = Quot<Self::LENC, U8>;
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-    type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
-    type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
+    type LAMBDAR1BYTE = Quot<Prod<Self::LAMBDA, Sum<Self::R, U1>>, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes128Enc::new(GenericArray_AES::from_slice(input));
@@ -424,15 +416,13 @@ impl OWFParameters for OWF192EM {
     type PK = U48;
     type SK = U48;
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
-    type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
     type QUOTLENC8 = Quot<Self::LENC, U8>;
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-    type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
-    type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
+    type LAMBDAR1BYTE = Quot<Prod<Self::LAMBDA, Sum<Self::R, U1>>, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Rijndael192::new(GenericArray_AES::from_slice(input));
@@ -502,15 +492,13 @@ impl OWFParameters for OWF256EM {
     type PK = U64;
     type SK = U64;
     type LHATBYTES = Sum<Self::LBYTES, Sum<Prod<U2, Self::LAMBDABYTES>, U2>>;
-    type LAMBDAPLUS2 = Sum<Self::LAMBDABYTES, U2>;
     type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
     type QUOTLENC8 = Quot<Self::LENC, U8>;
     type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-    type LAMBDAR1 = Prod<Self::LAMBDA, Sum<Self::R, U1>>;
-    type LAMBDAR1BYTE = Quot<Self::LAMBDAR1, U8>;
+    type LAMBDAR1BYTE = Quot<Prod<Self::LAMBDA, Sum<Self::R, U1>>, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Rijndael256::new(GenericArray_AES::from_slice(input));
