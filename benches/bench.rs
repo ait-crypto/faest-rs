@@ -20,20 +20,15 @@ where
     let mut c = c.benchmark_group(name);
 
     c.bench_function("keygen", |b| b.iter(|| black_box(KP::generate(&mut rng))));
-
     let kp = KP::generate(&mut rng);
     c.bench_function("sign", |b| {
         let message = random_message(&mut rng);
         b.iter(|| black_box(kp.sign(&message)));
     });
-    c.bench_function("sign (randomized)", |b| {
-        let message = random_message(&mut rng);
-        b.iter(|| black_box(kp.sign_with_rng(&mut rng, &message)));
-    });
+    let vk = kp.verifying_key();
     c.bench_function("verify", |b| {
         let message = random_message(&mut rng);
         let signature = kp.sign(&message);
-        let vk = kp.verifying_key();
         b.iter(|| black_box(vk.verify(&message, &signature)))
     });
 }

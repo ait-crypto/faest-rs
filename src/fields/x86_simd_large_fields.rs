@@ -385,42 +385,6 @@ impl MulAssign<&Self> for GF128 {
     }
 }
 
-/* unsafe fn all_ones() -> __m128i {
-    let zero = _mm_setzero_si128();
-    _mm_cmpeq_epi32(zero, zero)
-}
-
-unsafe fn to_mask(v: __m128i) -> __m128i {
-    let mask = _mm_setr_epi8(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-    println!("v = {:?}, mask = {:?}", v, mask);
-    let v = _mm_and_si128(v, mask);
-    let v = _mm_shuffle_epi8(v, _mm_setzero_si128());
-    let v = _mm_slli_epi32(v, 7);
-    v
-    // _mm_slli_epi64(v, 7)
-} */
-
-/*
-unsafe fn apply_mask(v: __m128i, m: __m128i) -> __m128i {
-    let mask = _mm_setr_epi8(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-    let m = _mm_and_si128(m, mask);
-    let m = _mm_shuffle_epi8(m, _mm_setzero_si128());
-    let m = _mm_slli_epi32(m, 7);
-    let m = _mm_andnot_si128(
-        m,
-        // FIXME
-        _mm_or_si128(
-            _mm_slli_epi32(
-                _mm_setr_epi8(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
-                7,
-            ),
-            _mm_set_epi8(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
-        ),
-    );
-    _mm_shuffle_epi8(v, m)
-}
-*/
-
 unsafe fn mm128_apply_mask_msb(v: __m128i, m: __m128i) -> __m128i {
     // extract MSB
     let mask = _mm_setr_epi8(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, i8::MIN);
