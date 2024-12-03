@@ -1,3 +1,5 @@
+//! Implementation of the PRGs for security levels 128, 192 and 256
+
 use aes::cipher::{generic_array::GenericArray as GenericArray_0_14, KeyIvInit, StreamCipher};
 use generic_array::{
     typenum::{U16, U24, U32},
@@ -12,25 +14,27 @@ type Aes128Ctr128BE = ctr::Ctr128BE<aes::Aes128>;
 type Aes192Ctr128BE = ctr::Ctr128BE<aes::Aes192>;
 type Aes256Ctr128BE = ctr::Ctr128BE<aes::Aes256>;
 
+/// Size of the IV
 pub(crate) type IVSize = U16;
+/// IV of the PRG
 pub(crate) type IV = GenericArray<u8, IVSize>;
 
 /// Interface for the PRG
 pub(crate) trait PseudoRandomGenerator: Sized + Reader {
     /// Size of the PRG key
-    type Lambda: ArrayLength;
+    type KeySize: ArrayLength;
 
     /// Instantiate new PRG instance
-    fn new_prg(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> Self;
+    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV) -> Self;
 }
 
 #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
 pub(crate) struct PRG128(Aes128Ctr128BE);
 
 impl PseudoRandomGenerator for PRG128 {
-    type Lambda = U16;
+    type KeySize = U16;
 
-    fn new_prg(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> Self {
+    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV) -> Self {
         Self(Aes128Ctr128BE::new(
             GenericArray_0_14::from_slice(k.as_slice()),
             GenericArray_0_14::from_slice(iv.as_slice()),
@@ -48,9 +52,9 @@ impl Reader for PRG128 {
 pub(crate) struct PRG192(Aes192Ctr128BE);
 
 impl PseudoRandomGenerator for PRG192 {
-    type Lambda = U24;
+    type KeySize = U24;
 
-    fn new_prg(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> Self {
+    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV) -> Self {
         Self(Aes192Ctr128BE::new(
             GenericArray_0_14::from_slice(k.as_slice()),
             GenericArray_0_14::from_slice(iv.as_slice()),
@@ -68,9 +72,9 @@ impl Reader for PRG192 {
 pub(crate) struct PRG256(Aes256Ctr128BE);
 
 impl PseudoRandomGenerator for PRG256 {
-    type Lambda = U32;
+    type KeySize = U32;
 
-    fn new_prg(k: &GenericArray<u8, Self::Lambda>, iv: &IV) -> Self {
+    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV) -> Self {
         Self(Aes256Ctr128BE::new(
             GenericArray_0_14::from_slice(k.as_slice()),
             GenericArray_0_14::from_slice(iv.as_slice()),

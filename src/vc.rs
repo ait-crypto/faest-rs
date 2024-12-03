@@ -20,7 +20,7 @@ pub(crate) trait VectorCommitment {
     type LambdaBytes: ArrayLength;
     type LambdaBytesTimes2: ArrayLength;
     type Lambda: ArrayLength;
-    type PRG: PseudoRandomGenerator<Lambda = Self::LambdaBytes>;
+    type PRG: PseudoRandomGenerator<KeySize = Self::LambdaBytes>;
     type RO: RandomOracle;
 
     fn commit(
@@ -61,14 +61,14 @@ where
 impl<PRG, R> VectorCommitment for VC<PRG, R>
 where
     PRG: PseudoRandomGenerator,
-    PRG::Lambda: Add<PRG::Lambda> + Mul<U8>,
-    <PRG::Lambda as Add<PRG::Lambda>>::Output: ArrayLength,
-    <PRG::Lambda as Mul<U8>>::Output: ArrayLength,
+    PRG::KeySize: Add<PRG::KeySize> + Mul<U8>,
+    <PRG::KeySize as Add<PRG::KeySize>>::Output: ArrayLength,
+    <PRG::KeySize as Mul<U8>>::Output: ArrayLength,
     R: RandomOracle,
 {
-    type LambdaBytes = PRG::Lambda;
-    type LambdaBytesTimes2 = Sum<PRG::Lambda, PRG::Lambda>;
-    type Lambda = Prod<PRG::Lambda, U8>;
+    type LambdaBytes = PRG::KeySize;
+    type LambdaBytesTimes2 = Sum<PRG::KeySize, PRG::KeySize>;
+    type Lambda = Prod<PRG::KeySize, U8>;
     type PRG = PRG;
     type RO = R;
 

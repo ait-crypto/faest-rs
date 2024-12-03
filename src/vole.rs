@@ -17,8 +17,8 @@ use crate::{
 #[allow(clippy::type_complexity)]
 fn convert_to_vole<'a, PRG, LH>(
     v: &mut [GenericArray<u8, LH>],
-    sd_0: Option<&GenericArray<u8, PRG::Lambda>>,
-    sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, PRG::Lambda>>,
+    sd_0: Option<&GenericArray<u8, PRG::KeySize>>,
+    sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, PRG::KeySize>>,
     iv: &IV,
 ) -> GenericArray<u8, LH>
 where
