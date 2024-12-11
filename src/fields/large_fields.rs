@@ -128,7 +128,6 @@ where
         debug_assert_eq!(x.len(), 8);
         let (x0, x) = x.split_at(1);
         x.iter()
-            .take(7)
             .zip(Self::ALPHA)
             .fold(x0[0], |sum, (xi, alphai)| sum + (alphai * xi))
     }
