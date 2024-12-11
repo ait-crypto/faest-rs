@@ -782,6 +782,12 @@ unsafe fn poly512_reduce256(x: [__m128i; 4]) -> __m256i {
     )
 }
 
+#[inline]
+unsafe fn poly320_reduce256(x: [__m128i; 3]) -> __m256i {
+    let tmp = _mm_xor_si128(x[0], m128_clmul_ll(POLY_MOD, x[2]));
+    _mm256_inserti128_si256(_mm256_castsi128_si256(tmp), x[1], 1)
+}
+
 fn mul_gf256(lhs: __m256i, rhs: __m256i) -> __m256i {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs, 0);
@@ -808,7 +814,15 @@ fn mul_gf256(lhs: __m256i, rhs: __m256i) -> __m256i {
 fn mul_gf256_u64(lhs: __m256i, rhs: u64) -> __m256i {
     unsafe {
         let rhs = _mm_set_epi64x(0, rhs as i64);
-        mul_gf256(lhs, _mm256_castsi128_si256(rhs))
+        let x0 = _mm256_extracti128_si256(lhs, 0);
+        let x1 = _mm256_extracti128_si256(lhs, 1);
+        let xy = [
+            m128_clmul_ll(rhs, x0),
+            m128_clmul_lh(rhs, x0),
+            m128_clmul_ll(rhs, x1),
+            m128_clmul_lh(rhs, x1),
+        ];
+        poly320_reduce256(combine_poly128s_4(xy))
     }
 }
 
