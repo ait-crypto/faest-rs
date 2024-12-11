@@ -15,7 +15,6 @@ use generic_array::{ArrayLength, GenericArray};
 pub(crate) use large_fields::{BigGaloisField, ByteCombine, ByteCombineConstants, SumPoly, GF192};
 #[cfg(not(all(
     feature = "opt-simd",
-    target_arch = "x86_64",
     target_feature = "avx2",
     target_feature = "pclmulqdq"
 )))]
@@ -23,7 +22,6 @@ pub(crate) use large_fields::{GF128, GF256};
 pub(crate) use small_fields::GF64;
 #[cfg(all(
     feature = "opt-simd",
-    target_arch = "x86_64",
     target_feature = "avx2",
     target_feature = "pclmulqdq"
 ))]

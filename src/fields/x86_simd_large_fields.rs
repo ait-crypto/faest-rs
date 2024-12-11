@@ -1,18 +1,19 @@
-use std::{
-    arch::x86_64::{
-        __m128i, __m256i, _mm256_and_si256, _mm256_blend_epi32, _mm256_blendv_epi8,
-        _mm256_castsi128_si256, _mm256_extracti128_si256, _mm256_inserti128_si256,
-        _mm256_loadu_si256, _mm256_or_si256, _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32,
-        _mm256_set1_epi32, _mm256_set1_epi64x, _mm256_setr_epi64x, _mm256_setzero_si256,
-        _mm256_slli_epi64, _mm256_srai_epi32, _mm256_srli_epi64, _mm256_storeu_si256,
-        _mm256_testz_si256, _mm256_xor_si256, _mm_alignr_epi8, _mm_and_si128, _mm_andnot_si128,
-        _mm_bslli_si128, _mm_clmulepi64_si128, _mm_loadu_si128, _mm_or_si128, _mm_set1_epi8,
-        _mm_set_epi64x, _mm_set_epi8, _mm_setr_epi32, _mm_setr_epi8, _mm_setzero_si128,
-        _mm_shuffle_epi32, _mm_shuffle_epi8, _mm_slli_epi32, _mm_slli_epi64, _mm_slli_si128,
-        _mm_srli_epi32, _mm_srli_epi64, _mm_srli_si128, _mm_storeu_si128, _mm_test_all_zeros,
-        _mm_xor_si128,
-    },
-    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+#[cfg(target_arch = "x86")]
+use std::arch::x86 as x86_64;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64;
+use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use x86_64::{
+    __m128i, __m256i, _mm256_and_si256, _mm256_blend_epi32, _mm256_blendv_epi8,
+    _mm256_castsi128_si256, _mm256_extracti128_si256, _mm256_inserti128_si256, _mm256_loadu_si256,
+    _mm256_or_si256, _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32, _mm256_set1_epi32,
+    _mm256_set1_epi64x, _mm256_setr_epi64x, _mm256_setzero_si256, _mm256_slli_epi64,
+    _mm256_srai_epi32, _mm256_srli_epi64, _mm256_storeu_si256, _mm256_testz_si256,
+    _mm256_xor_si256, _mm_alignr_epi8, _mm_and_si128, _mm_andnot_si128, _mm_bslli_si128,
+    _mm_clmulepi64_si128, _mm_loadu_si128, _mm_or_si128, _mm_set1_epi8, _mm_set_epi64x,
+    _mm_set_epi8, _mm_setr_epi32, _mm_setr_epi8, _mm_setzero_si128, _mm_shuffle_epi32,
+    _mm_shuffle_epi8, _mm_slli_epi32, _mm_slli_epi64, _mm_slli_si128, _mm_srli_epi32,
+    _mm_srli_epi64, _mm_srli_si128, _mm_storeu_si128, _mm_test_all_zeros, _mm_xor_si128,
 };
 
 use generic_array::{
@@ -40,50 +41,10 @@ unsafe fn m128_clmul_lh(x: __m128i, y: __m128i) -> __m128i {
     _mm_clmulepi64_si128(x, y, 0x10)
 }
 
-// #[inline(always)]
-// unsafe fn m128_clmul_hl(x: __m128i, y: __m128i) -> __m128i {
-//     _mm_clmulepi64_si128(x, y, 0x01)
-// }
-
 #[inline(always)]
 unsafe fn m128_clmul_hh(x: __m128i, y: __m128i) -> __m128i {
     _mm_clmulepi64_si128(x, y, 0x11)
 }
-
-// #[inline]
-// unsafe fn m256_clmulepi64_epi128<const IMM8: i32>(x: __m256i, y: __m256i) -> __m256i {
-//     let low = _mm_clmulepi64_si128(
-//         _mm256_extracti128_si256(x, 0),
-//         _mm256_extracti128_si256(y, 0),
-//         IMM8,
-//     );
-//     let high = _mm_clmulepi64_si128(
-//         _mm256_extracti128_si256(x, 1),
-//         _mm256_extracti128_si256(y, 1),
-//         IMM8,
-//     );
-//     _mm256_inserti128_si256(_mm256_castsi128_si256(low), high, 1)
-// }
-
-// #[inline(always)]
-// unsafe fn m256_clmul_ll(x: __m256i, y: __m256i) -> __m256i {
-//     m256_clmulepi64_epi128::<0x00>(x, y)
-// }
-
-// #[inline(always)]
-// unsafe fn m256_clmul_lh(x: __m256i, y: __m256i) -> __m256i {
-//     m256_clmulepi64_epi128::<0x10>(x, y)
-// }
-
-// #[inline(always)]
-// unsafe fn m256_clmul_hl(x: __m256i, y: __m256i) -> __m256i {
-//     m256_clmulepi64_epi128::<0x01>(x, y)
-// }
-
-// #[inline(always)]
-// unsafe fn m256_clmul_hh(x: __m256i, y: __m256i) -> __m256i {
-//     m256_clmulepi64_epi128::<0x11>(x, y)
-// }
 
 /// Helper to convert values to `__m128i`
 union GF128ConstHelper {
