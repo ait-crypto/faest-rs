@@ -27,12 +27,12 @@ where
 {
     // these parameters are known upfront!
     let n = sd.len() + 1;
-    let d = (64 - (n as u64).leading_zeros() - 1) as usize;
-    let mut r = vec![GenericArray::<u8, LH>::default(); n * 2];
+    let d = 64 - (n.leading_zeros() as usize) - 1;
+    let mut r = vec![0; LH::USIZE * n * 2];
     if let Some(sd0) = sd_0 {
-        PRG::new_prg(sd0, iv).read(&mut r[0]);
+        PRG::new_prg(sd0, iv).read(&mut r[0..LH::USIZE]);
     }
-    for (ri, sdi) in zip(&mut r[1..], sd) {
+    for (ri, sdi) in zip(r[LH::USIZE..].chunks_exact_mut(LH::USIZE), sd) {
         PRG::new_prg(sdi, iv).read(ri);
     }
 
@@ -44,12 +44,13 @@ where
             let j_offset = j_offset + 2 * i;
             let j1_offset = j1_offset + i;
             for k in 0..LH::USIZE {
-                item[k] ^= r[j_offset + 1][k];
-                r[j1_offset][k] = r[j_offset][k] ^ r[j_offset + 1][k];
+                item[k] ^= r[(j_offset + 1) * LH::USIZE + k];
+                r[j1_offset * LH::USIZE + k] =
+                    r[j_offset * LH::USIZE + k] ^ r[(j_offset + 1) * LH::USIZE + k];
             }
         }
     }
-    r.swap_remove((d % 2) * n)
+    GenericArray::from_slice(&r[(d % 2) * n * LH::USIZE..((d % 2) * n + 1) * LH::USIZE]).clone()
 }
 
 /// Reference to storage area in signature for all `c`s.
