@@ -48,9 +48,9 @@ impl<T> From<T> for SmallGF<T> {
     }
 }
 
-impl From<SmallGF<u64>> for u64 {
+impl From<SmallGF<Self>> for u64 {
     #[inline(always)]
-    fn from(value: SmallGF<u64>) -> Self {
+    fn from(value: SmallGF<Self>) -> Self {
         value.0 .0
     }
 }

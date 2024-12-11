@@ -155,7 +155,7 @@ where
         D: Deserializer<'de>,
     {
         GenericArray::<u8, O::SK>::deserialize(deserializer).and_then(|bytes| {
-            SecretKey::<O>::try_from(bytes.as_slice())
+            Self::try_from(bytes.as_slice())
                 .map_err(|_| serde::de::Error::custom("expected a valid secret key"))
         })
     }
@@ -282,7 +282,7 @@ where
         D: Deserializer<'de>,
     {
         GenericArray::<u8, O::PK>::deserialize(deserializer).and_then(|bytes| {
-            PublicKey::<O>::try_from(bytes.as_slice())
+            Self::try_from(bytes.as_slice())
                 .map_err(|_| serde::de::Error::custom("expected a valid public key"))
         })
     }

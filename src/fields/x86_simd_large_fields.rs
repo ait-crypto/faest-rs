@@ -107,7 +107,7 @@ impl Add<&Self> for GF128 {
 }
 
 impl Add<u8> for GF128 {
-    type Output = GF128;
+    type Output = Self;
 
     #[inline(always)]
     fn add(self, rhs: u8) -> Self::Output {
@@ -314,7 +314,7 @@ impl Mul<GF64> for GF128 {
 
     #[inline(always)]
     fn mul(self, rhs: GF64) -> Self::Output {
-        GF128(mul_gf128_u64(self.0, rhs.into()))
+        Self(mul_gf128_u64(self.0, rhs.into()))
     }
 }
 
@@ -555,7 +555,7 @@ impl Add<&Self> for GF256 {
 }
 
 impl Add<u8> for GF256 {
-    type Output = GF256;
+    type Output = Self;
 
     #[inline(always)]
     fn add(self, rhs: u8) -> Self::Output {
@@ -818,7 +818,7 @@ impl Mul<GF64> for GF256 {
 
     #[inline(always)]
     fn mul(self, rhs: GF64) -> Self::Output {
-        GF256(mul_gf256_u64(self.0, rhs.into()))
+        Self(mul_gf256_u64(self.0, rhs.into()))
     }
 }
 
