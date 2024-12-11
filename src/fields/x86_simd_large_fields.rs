@@ -1019,7 +1019,7 @@ impl<'de> serde::Deserialize<'de> for GF256 {
     where
         D: serde::Deserializer<'de>,
     {
-        <[u8; 16]>::deserialize(deserializer).map(|buffer| Self::from(buffer.as_slice()))
+        <[u8; 32]>::deserialize(deserializer).map(|buffer| Self::from(buffer.as_slice()))
     }
 }
 
