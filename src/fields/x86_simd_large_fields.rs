@@ -150,7 +150,7 @@ impl AddAssign<u8> for GF128 {
         self.0 = unsafe {
             _mm_xor_si128(
                 self.0,
-                _mm_setr_epi8(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, rhs as i8),
+                _mm_setr_epi8(rhs as i8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             )
         };
     }
@@ -1021,6 +1021,10 @@ mod test {
                 assert_eq!(check_v3, v3);
                 assert_eq!(v3.as_bytes(), r3.as_bytes());
                 assert_eq!(v3 + F::ZERO, v3);
+
+                let mut v1 = v1;
+                v1 += v2;
+                assert_eq!(v1, v3);
             }
         }
 
@@ -1043,6 +1047,10 @@ mod test {
 
                 assert_eq!(check_v3, v3);
                 assert_eq!(v3.as_bytes(), r3.as_bytes());
+
+                let mut v1 = v1;
+                v1 += r2;
+                assert_eq!(v1, v3);
             }
         }
 
@@ -1068,6 +1076,10 @@ mod test {
                 assert_eq!(v3.as_bytes(), r3.as_bytes());
                 assert_eq!(v3 * F::ZERO, F::ZERO);
                 assert_eq!(v3 * F::ONE, v3);
+
+                let mut v1 = v1;
+                v1 *= v2;
+                assert_eq!(v1, v3);
             }
         }
 
