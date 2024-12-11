@@ -82,11 +82,7 @@ mod universal_hashing;
 mod utils;
 mod vc;
 mod vole;
-#[cfg(target_arch = "x86_64")]
-mod x86_simd_parameters;
 
-#[cfg(target_arch = "x86_64")]
-use crate::faest::{faest_keygen_avx2, faest_sign_avx2, faest_verify_avx2};
 use crate::{
     faest::{faest_keygen, faest_sign, faest_verify},
     internal_keys::{PublicKey, SecretKey},
@@ -152,11 +148,6 @@ macro_rules! define_impl {
                     rho: &[u8],
                     signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
                 ) {
-                    #[cfg(target_arch = "x86_64")]
-                    if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
-                        unsafe { faest_sign_avx2::<x86_simd_parameters::[<$param Parameters>]>(msg, &sk.into(), rho, signature); }
-                        return;
-                    }
                     faest_sign::<[<$param Parameters>]>(msg, sk, rho, signature);
                 }
 
@@ -167,10 +158,6 @@ macro_rules! define_impl {
                     sigma: &GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
                 ) -> Result<(), Error>
                 {
-                    #[cfg(target_arch = "x86_64")]
-                    if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
-                        return unsafe { faest_verify_avx2::<x86_simd_parameters::[<$param Parameters>]>(msg, &pk.into(), sigma) };
-                    }
                     faest_verify::<[<$param Parameters>]>(msg, pk, sigma)
                 }
             }
@@ -285,11 +272,6 @@ macro_rules! define_impl {
                 where
                     R: CryptoRngCore,
                 {
-                    #[cfg(target_arch = "x86_64")]
-                    if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
-                        return Self((&unsafe { faest_keygen_avx2::<<x86_simd_parameters::[<$param Parameters>] as FAESTParameters>::OWF, R>(rng) }).into());
-                    }
-
                     Self(faest_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng))
                 }
             }

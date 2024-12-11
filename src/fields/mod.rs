@@ -1,16 +1,30 @@
 pub(crate) mod large_fields;
 pub(crate) mod small_fields;
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(
+    target_arch = "x86_64",
+    target_feature = "avx2",
+    target_feature = "pclmulqdq"
+))]
 pub(crate) mod x86_simd_large_fields;
 
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use generic_array::{ArrayLength, GenericArray};
 
-pub(crate) use large_fields::{
-    BigGaloisField, ByteCombine, ByteCombineConstants, SumPoly, GF128, GF192, GF256,
-};
+pub(crate) use large_fields::{BigGaloisField, ByteCombine, ByteCombineConstants, SumPoly, GF192};
+#[cfg(not(all(
+    target_arch = "x86_64",
+    target_feature = "avx2",
+    target_feature = "pclmulqdq"
+)))]
+pub(crate) use large_fields::{GF128, GF256};
 pub(crate) use small_fields::GF64;
+#[cfg(all(
+    target_arch = "x86_64",
+    target_feature = "avx2",
+    target_feature = "pclmulqdq"
+))]
+pub(crate) use x86_simd_large_fields::{GF128, GF256};
 
 /// Trait covering the basic functionality of a field
 ///

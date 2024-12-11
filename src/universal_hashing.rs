@@ -6,7 +6,7 @@ use generic_array::{
 };
 use itertools::{chain, izip};
 
-use crate::fields::{x86_simd_large_fields, BigGaloisField, Field, GF128, GF192, GF256, GF64};
+use crate::fields::{BigGaloisField, Field, GF128, GF192, GF256, GF64};
 
 type BBits = U16;
 // Additional bytes returned by VOLE hash
@@ -81,27 +81,6 @@ impl VoleHasherInit<GF192> for VoleHasher<GF192> {
 }
 
 impl VoleHasherInit<GF256> for VoleHasher<GF256> {
-    type SDLength = Sum<Prod<<GF256 as Field>::Length, U5>, <GF64 as Field>::Length>;
-    type OutputLength = Sum<<GF256 as Field>::Length, B>;
-    type Hasher = Self;
-}
-
-#[cfg(target_arch = "x86_64")]
-impl VoleHasherInit<x86_simd_large_fields::GF128> for VoleHasher<x86_simd_large_fields::GF128> {
-    type SDLength = Sum<Prod<<GF128 as Field>::Length, U5>, <GF64 as Field>::Length>;
-    type OutputLength = Sum<<GF128 as Field>::Length, B>;
-    type Hasher = Self;
-}
-
-//  #[cfg(target_arch = "x86_64")]
-//  impl VoleHasherInit<x86_simd_large_fields::GF192> for VoleHasher<x86_simd_large_fields::GF192> {
-//      type SDLength = Sum<Prod<<GF192 as Field>::Length, U5>, <GF64 as Field>::Length>;
-//      type OutputLength = Sum<<GF192 as Field>::Length, B>;
-//      type Hasher = Self;
-//  }
-
-#[cfg(target_arch = "x86_64")]
-impl VoleHasherInit<x86_simd_large_fields::GF256> for VoleHasher<x86_simd_large_fields::GF256> {
     type SDLength = Sum<Prod<<GF256 as Field>::Length, U5>, <GF64 as Field>::Length>;
     type OutputLength = Sum<<GF256 as Field>::Length, B>;
     type Hasher = Self;
@@ -231,21 +210,6 @@ impl ZKHasherInit<GF192> for ZKHasher<GF192> {
 }
 
 impl ZKHasherInit<GF256> for ZKHasher<GF256> {
-    type SDLength = Sum<Prod<<GF256 as Field>::Length, U3>, <GF64 as Field>::Length>;
-}
-
-#[cfg(target_arch = "x86_64")]
-impl ZKHasherInit<x86_simd_large_fields::GF128> for ZKHasher<x86_simd_large_fields::GF128> {
-    type SDLength = Sum<Prod<<GF128 as Field>::Length, U3>, <GF64 as Field>::Length>;
-}
-
-// #[cfg(target_arch = "x86_64")]
-// impl ZKHasherInit<x86_simd_large_fields::GF192> for ZKHasher<x86_simd_large_fields::GF192> {
-//     type SDLength = Sum<Prod<<GF192 as Field>::Length, U3>, <GF64 as Field>::Length>;
-// }
-
-#[cfg(target_arch = "x86_64")]
-impl ZKHasherInit<x86_simd_large_fields::GF256> for ZKHasher<x86_simd_large_fields::GF256> {
     type SDLength = Sum<Prod<<GF256 as Field>::Length, U3>, <GF64 as Field>::Length>;
 }
 
