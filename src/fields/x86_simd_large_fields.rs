@@ -1074,7 +1074,7 @@ mod test {
         }
 
         #[test]
-        fn mul8<Fu, F: BigGaloisField + Debug + Eq>()
+        fn mul<Fu, F: BigGaloisField + Debug + Eq>()
         where
             Standard: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
@@ -1105,6 +1105,10 @@ mod test {
             Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
         {
             let mut rng = SmallRng::from_entropy();
+
+            let v: Fu = rng.gen();
+            let v = F::from(v.as_bytes().as_slice());
+            assert_eq!(v * GF64::ONE, v);
 
             for _ in 0..RUNS {
                 let r1: Fu = rng.gen();
