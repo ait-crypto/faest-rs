@@ -672,6 +672,23 @@ unsafe fn karatsuba_mul_128_uncombined(x: __m128i, y: __m128i) -> [__m128i; 3] {
     out
 }
 
+unsafe fn karatsuba_square_128_uninterpolated(x: __m128i) -> [__m128i; 3] {
+    let x0y0 = m128_clmul_ll(x, x);
+    let x1y1 = m128_clmul_hh(x, x);
+    let x1_cat_y0 = _mm_alignr_epi8(x, x, 8);
+    let xsum = _mm_xor_si128(x, x1_cat_y0); // Result in low.
+    let xsum_ysum = m128_clmul_lh(xsum, xsum);
+
+    [x0y0, xsum_ysum, x1y1]
+}
+
+#[inline(always)]
+unsafe fn karatsuba_square_128_uncombined(x: __m128i) -> [__m128i; 3] {
+    let mut out = karatsuba_square_128_uninterpolated(x);
+    out[1] = _mm_xor_si128(_mm_xor_si128(out[0], out[2]), out[1]);
+    out
+}
+
 #[inline]
 unsafe fn combine_poly128s_7(v: [__m128i; 7]) -> [__m128i; 4] {
     [
@@ -729,6 +746,27 @@ fn mul_gf256(lhs: __m256i, rhs: __m256i) -> __m256i {
         let x0y0 = karatsuba_mul_128_uncombined(x0, y0);
         let x1y1 = karatsuba_mul_128_uncombined(x1, y1);
         let xsum_ysum = karatsuba_mul_128_uncombined(_mm_xor_si128(x0, x1), _mm_xor_si128(y0, y1));
+        let x0y0_2_plus_x1y1_0 = _mm_xor_si128(x0y0[2], x1y1[0]);
+        let combined = [
+            x0y0[0],
+            x0y0[1],
+            _mm_xor_si128(xsum_ysum[0], _mm_xor_si128(x0y0[0], x0y0_2_plus_x1y1_0)),
+            _mm_xor_si128(xsum_ysum[1], _mm_xor_si128(x0y0[1], x1y1[1])),
+            _mm_xor_si128(xsum_ysum[2], _mm_xor_si128(x1y1[2], x0y0_2_plus_x1y1_0)),
+            x1y1[1],
+            x1y1[2],
+        ];
+        poly512_reduce256(combine_poly128s_7(combined))
+    }
+}
+
+fn square_gf256(lhs: __m256i) -> __m256i {
+    unsafe {
+        let x0 = _mm256_extracti128_si256(lhs, 0);
+        let x1 = _mm256_extracti128_si256(lhs, 1);
+        let x0y0 = karatsuba_square_128_uncombined(x0);
+        let x1y1 = karatsuba_square_128_uncombined(x1);
+        let xsum_ysum = karatsuba_square_128_uncombined(_mm_xor_si128(x0, x1));
         let x0y0_2_plus_x1y1_0 = _mm_xor_si128(x0y0[2], x1y1[0]);
         let combined = [
             x0y0[0],
@@ -863,7 +901,7 @@ impl Square for GF256 {
 
     #[inline]
     fn square(self) -> Self::Output {
-        Self(mul_gf256(self.0, self.0))
+        Self(square_gf256(self.0))
     }
 }
 
@@ -1048,6 +1086,8 @@ mod test {
                 let mut v1 = v1;
                 v1 *= v2;
                 assert_eq!(v1, v3);
+
+                assert_eq!(v1 * v1, v1.square());
             }
         }
 
