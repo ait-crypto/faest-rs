@@ -144,18 +144,6 @@ impl AddAssign<&Self> for GF128 {
     }
 }
 
-impl AddAssign<u8> for GF128 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: u8) {
-        self.0 = unsafe {
-            _mm_xor_si128(
-                self.0,
-                _mm_setr_epi8(rhs as i8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-            )
-        };
-    }
-}
-
 // implementations of Sub and SubAssign
 
 impl Sub for GF128 {
@@ -596,22 +584,6 @@ impl AddAssign<&Self> for GF256 {
     }
 }
 
-impl AddAssign<u8> for GF256 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: u8) {
-        self.0 = unsafe {
-            _mm256_xor_si256(
-                self.0,
-                _mm256_inserti128_si256(
-                    _mm256_setzero_si256(),
-                    _mm_setr_epi8(rhs as i8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-                    0,
-                ),
-            )
-        };
-    }
-}
-
 // implementations of Sub and SubAssign
 
 impl Sub for GF256 {
@@ -1047,10 +1019,6 @@ mod test {
 
                 assert_eq!(check_v3, v3);
                 assert_eq!(v3.as_bytes(), r3.as_bytes());
-
-                let mut v1 = v1;
-                v1 += r2;
-                assert_eq!(v1, v3);
             }
         }
 
