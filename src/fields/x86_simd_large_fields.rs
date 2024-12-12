@@ -640,28 +640,16 @@ impl Neg for GF256 {
 
 // implementation of Mul and MulAssign
 
-// Karatsuba multiplication, but end right after the multiplications, and use a different pair of
-// vectors as the inputs for the sum of x and the sum of y.
-unsafe fn karatsuba_mul_128_uninterpolated_other_sum(
-    x: __m128i,
-    y: __m128i,
-    x_for_sum: __m128i,
-    y_for_sum: __m128i,
-) -> [__m128i; 3] {
+// Karatsuba multiplication, but end right after the multiplications
+unsafe fn karatsuba_mul_128_uninterpolated(x: __m128i, y: __m128i) -> [__m128i; 3] {
     let x0y0 = m128_clmul_ll(x, y);
     let x1y1 = m128_clmul_hh(x, y);
-    let x1_cat_y0 = _mm_alignr_epi8(y_for_sum, x_for_sum, 8);
-    let xsum = _mm_xor_si128(x_for_sum, x1_cat_y0); // Result in low.
-    let ysum = _mm_xor_si128(y_for_sum, x1_cat_y0); // Result in high.
+    let x1_cat_y0 = _mm_alignr_epi8(y, x, 8);
+    let xsum = _mm_xor_si128(x, x1_cat_y0); // Result in low.
+    let ysum = _mm_xor_si128(y, x1_cat_y0); // Result in high.
     let xsum_ysum = m128_clmul_lh(xsum, ysum);
 
     [x0y0, xsum_ysum, x1y1]
-}
-
-// Karatsuba multiplication, but end right after the multiplications.
-#[inline(always)]
-unsafe fn karatsuba_mul_128_uninterpolated(x: __m128i, y: __m128i) -> [__m128i; 3] {
-    karatsuba_mul_128_uninterpolated_other_sum(x, y, x, y)
 }
 
 // Karatsuba multiplication, but don't combine the 3 128-bit polynomials into a 256-bit polynomial.
