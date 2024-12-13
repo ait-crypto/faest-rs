@@ -21,7 +21,7 @@ jobs:
           toolchain: ${{matrix.toolchain}}
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-nextest
-        run: cargo install cargo-nextest
+        run: cargo install cargo-nextest --version 0.9.85
       - name: Test without default features
         run: cargo nextest run -r --no-default-features --workspace
       - name: Test with default features
