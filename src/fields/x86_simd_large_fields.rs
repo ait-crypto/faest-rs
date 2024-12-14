@@ -908,7 +908,7 @@ impl Field for GF256 {
 
 impl From<&[u8]> for GF256 {
     fn from(value: &[u8]) -> Self {
-        debug_assert_eq!(value.len(), 16);
+        debug_assert_eq!(value.len(), 32);
         Self(unsafe { _mm256_loadu_si256(value.as_ptr().cast()) })
     }
 }
