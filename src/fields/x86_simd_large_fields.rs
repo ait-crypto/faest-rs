@@ -252,6 +252,7 @@ impl Add<u8> for GF128 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: u8) -> Self::Output {
         Self(unsafe {
             _mm_xor_si128(
@@ -669,6 +670,7 @@ impl Add<u8> for GF192 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: u8) -> Self::Output {
         Self(unsafe {
             _mm256_xor_si256(
@@ -1123,6 +1125,7 @@ impl Add<u8> for GF256 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: u8) -> Self::Output {
         Self(unsafe {
             _mm256_xor_si256(
