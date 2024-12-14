@@ -18,7 +18,7 @@ use x86_64::{
 };
 
 use generic_array::{
-    typenum::{U16, U24, U32},
+    typenum::{Unsigned, U16, U24, U32},
     GenericArray,
 };
 
@@ -552,7 +552,7 @@ impl Field for GF128 {
 
 impl From<&[u8]> for GF128 {
     fn from(value: &[u8]) -> Self {
-        debug_assert_eq!(value.len(), 16);
+        debug_assert_eq!(value.len(), <Self as Field>::Length::USIZE);
         Self(unsafe { _mm_loadu_si128(value.as_ptr().cast()) })
     }
 }
@@ -620,7 +620,8 @@ impl<'de> serde::Deserialize<'de> for GF128 {
     where
         D: serde::Deserializer<'de>,
     {
-        <[u8; 16]>::deserialize(deserializer).map(|buffer| Self::from(buffer.as_slice()))
+        <[u8; <Self as Field>::Length::USIZE]>::deserialize(deserializer)
+            .map(|buffer| Self::from(buffer.as_slice()))
     }
 }
 
@@ -1002,7 +1003,7 @@ impl Field for GF192 {
 
 impl From<&[u8]> for GF192 {
     fn from(value: &[u8]) -> Self {
-        debug_assert_eq!(value.len(), 24);
+        debug_assert_eq!(value.len(), <Self as Field>::Length::USIZE);
         Self(unsafe {
             _mm256_maskload_epi64(
                 value.as_ptr().cast(),
@@ -1075,7 +1076,8 @@ impl<'de> serde::Deserialize<'de> for GF192 {
     where
         D: serde::Deserializer<'de>,
     {
-        <[u8; 24]>::deserialize(deserializer).map(|buffer| Self::from(buffer.as_slice()))
+        <[u8; <Self as Field>::Length::USIZE]>::deserialize(deserializer)
+            .map(|buffer| Self::from(buffer.as_slice()))
     }
 }
 
@@ -1424,7 +1426,7 @@ impl Field for GF256 {
 
 impl From<&[u8]> for GF256 {
     fn from(value: &[u8]) -> Self {
-        debug_assert_eq!(value.len(), 32);
+        debug_assert_eq!(value.len(), <Self as Field>::Length::USIZE);
         Self(unsafe { _mm256_loadu_si256(value.as_ptr().cast()) })
     }
 }
@@ -1492,7 +1494,8 @@ impl<'de> serde::Deserialize<'de> for GF256 {
     where
         D: serde::Deserializer<'de>,
     {
-        <[u8; 32]>::deserialize(deserializer).map(|buffer| Self::from(buffer.as_slice()))
+        <[u8; <Self as Field>::Length::USIZE]>::deserialize(deserializer)
+            .map(|buffer| Self::from(buffer.as_slice()))
     }
 }
 
