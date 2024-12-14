@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 (2024-12-14)
+
+* Fix debug assertions.
+
 ## 0.1.1 (2024-12-14)
 
 * AVX2-based optimizations of 192 bit field arithmetic.
