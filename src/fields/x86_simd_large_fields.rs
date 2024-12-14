@@ -253,11 +253,10 @@ impl Add<u8> for GF128 {
 
     #[inline(always)]
     fn add(self, rhs: u8) -> Self::Output {
-        debug_assert!(rhs < 2);
         Self(unsafe {
             _mm_xor_si128(
                 self.0,
-                _mm_setr_epi8(rhs as i8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                _mm_setr_epi8((rhs & 1) as i8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
             )
         })
     }
@@ -453,7 +452,6 @@ impl Mul<u8> for GF128 {
 
     #[inline(always)]
     fn mul(self, rhs: u8) -> Self::Output {
-        debug_assert!(rhs < 2);
         let mask = -((rhs & 1) as i64);
         Self(unsafe {
             let mask = _mm_set_epi64x(mask, mask);
@@ -672,13 +670,12 @@ impl Add<u8> for GF192 {
 
     #[inline(always)]
     fn add(self, rhs: u8) -> Self::Output {
-        debug_assert!(rhs < 2);
         Self(unsafe {
             _mm256_xor_si256(
                 self.0,
                 _mm256_inserti128_si256(
                     _mm256_setzero_si256(),
-                    _mm_setr_epi8(rhs as i8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    _mm_setr_epi8((rhs & 1) as i8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                     0,
                 ),
             )
@@ -921,7 +918,6 @@ impl Mul<u8> for GF192 {
 
     #[inline(always)]
     fn mul(self, rhs: u8) -> Self::Output {
-        debug_assert!(rhs < 2);
         let mask = -((rhs & 1) as i64);
         Self(unsafe {
             let mask = _mm256_set1_epi64x(mask);
@@ -1128,13 +1124,12 @@ impl Add<u8> for GF256 {
 
     #[inline(always)]
     fn add(self, rhs: u8) -> Self::Output {
-        debug_assert!(rhs < 2);
         Self(unsafe {
             _mm256_xor_si256(
                 self.0,
                 _mm256_inserti128_si256(
                     _mm256_setzero_si256(),
-                    _mm_setr_epi8(rhs as i8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                    _mm_setr_epi8((rhs & 1) as i8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                     0,
                 ),
             )
@@ -1353,7 +1348,6 @@ impl Mul<u8> for GF256 {
 
     #[inline(always)]
     fn mul(self, rhs: u8) -> Self::Output {
-        debug_assert!(rhs < 2);
         let mask = -((rhs & 1) as i64);
         Self(unsafe {
             let mask = _mm256_set1_epi64x(mask);

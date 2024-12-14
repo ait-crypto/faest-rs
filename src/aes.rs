@@ -902,8 +902,8 @@ mod test {
                     &data.as_pk(),
                 );
                 assert_eq!(
-                    GF128::from(data.res_as_u8().as_slice()),
-                    GF128::from(&out[..])
+                    GF128::from(&data.res_as_u8()[..16]),
+                    GF128::from(out.as_slice())
                 );
             } else if data.lambda == 192 {
                 let out = aes_verify::<OWF192, <FAEST192sParameters as FAESTParameters>::Tau>(
@@ -915,8 +915,8 @@ mod test {
                     &data.as_pk(),
                 );
                 assert_eq!(
-                    GF192::from(data.res_as_u8().as_slice()),
-                    GF192::from(&out[..])
+                    GF192::from(&data.res_as_u8()[..24]),
+                    GF192::from(out.as_slice())
                 );
             } else {
                 let out = aes_verify::<OWF256, <FAEST256sParameters as FAESTParameters>::Tau>(
@@ -928,8 +928,8 @@ mod test {
                     &data.as_pk(),
                 );
                 assert_eq!(
-                    GF256::from(data.res_as_u8().as_slice()),
-                    GF256::from(&out[..])
+                    GF256::from(&data.res_as_u8()[..32]),
+                    GF256::from(out.as_slice())
                 );
             }
         }
