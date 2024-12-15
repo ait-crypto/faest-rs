@@ -32,7 +32,6 @@ pub(crate) trait Alphas: Sized {
 pub trait BigGaloisField:
     Field
     + Copy
-    + Add<u8, Output = Self>
     + Double<Output = Self>
     + Mul<u8, Output = Self>
     + Mul<GF64, Output = Self>
@@ -177,20 +176,6 @@ where
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: Self) -> Self::Output {
         BigGF(array::from_fn(|idx| self.0[idx] ^ rhs.0[idx]))
-    }
-}
-
-impl<T, const N: usize, const LENGTH: usize> Add<u8> for BigGF<T, N, LENGTH>
-where
-    T: BitXorAssign + From<u8> + Copy,
-{
-    type Output = Self;
-
-    #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
-    fn add(mut self, rhs: u8) -> Self::Output {
-        self.0[0] ^= rhs.into();
-        self
     }
 }
 

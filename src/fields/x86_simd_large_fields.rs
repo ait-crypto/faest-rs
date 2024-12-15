@@ -248,21 +248,6 @@ impl Add<&Self> for GF128 {
     }
 }
 
-impl Add<u8> for GF128 {
-    type Output = Self;
-
-    #[inline(always)]
-    #[allow(clippy::suspicious_arithmetic_impl)]
-    fn add(self, rhs: u8) -> Self::Output {
-        Self(unsafe {
-            _mm_xor_si128(
-                self.0,
-                _mm_setr_epi8((rhs & 1) as i8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-            )
-        })
-    }
-}
-
 impl Add<GF128> for &GF128 {
     type Output = GF128;
 
@@ -663,25 +648,6 @@ impl Add<&Self> for GF192 {
     #[inline(always)]
     fn add(self, rhs: &Self) -> Self::Output {
         Self(unsafe { _mm256_xor_si256(self.0, rhs.0) })
-    }
-}
-
-impl Add<u8> for GF192 {
-    type Output = Self;
-
-    #[inline(always)]
-    #[allow(clippy::suspicious_arithmetic_impl)]
-    fn add(self, rhs: u8) -> Self::Output {
-        Self(unsafe {
-            _mm256_xor_si256(
-                self.0,
-                _mm256_inserti128_si256(
-                    _mm256_setzero_si256(),
-                    _mm_setr_epi8((rhs & 1) as i8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-                    0,
-                ),
-            )
-        })
     }
 }
 
@@ -1121,25 +1087,6 @@ impl Add<&Self> for GF256 {
     }
 }
 
-impl Add<u8> for GF256 {
-    type Output = Self;
-
-    #[inline(always)]
-    #[allow(clippy::suspicious_arithmetic_impl)]
-    fn add(self, rhs: u8) -> Self::Output {
-        Self(unsafe {
-            _mm256_xor_si256(
-                self.0,
-                _mm256_inserti128_si256(
-                    _mm256_setzero_si256(),
-                    _mm_setr_epi8((rhs & 1) as i8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-                    0,
-                ),
-            )
-        })
-    }
-}
-
 impl Add<GF256> for &GF256 {
     type Output = GF256;
 
@@ -1539,28 +1486,6 @@ mod test {
                 let mut v1 = v1;
                 v1 += v2;
                 assert_eq!(v1, v3);
-            }
-        }
-
-        #[test]
-        fn add_u8<Fu, F: BigGaloisField + Debug + Eq>()
-        where
-            Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
-        {
-            let mut rng = SmallRng::from_entropy();
-
-            for _ in 0..RUNS {
-                let r1: Fu = rng.gen();
-                let r2 = rng.gen::<u8>() & 1;
-                let r3 = r1 + r2;
-
-                let v1 = F::from(r1.as_bytes().as_slice());
-                let check_v3 = F::from(r3.as_bytes().as_slice());
-                let v3 = v1 + r2;
-
-                assert_eq!(check_v3, v3);
-                assert_eq!(v3.as_bytes(), r3.as_bytes());
             }
         }
 
