@@ -1,3 +1,5 @@
+/// Implementation of the binary fields with 128, 192 and 256 bit based on SSE2/AVX2 and the clmul instruction
+
 #[cfg(target_arch = "x86")]
 use std::arch::x86 as x86_64;
 #[cfg(target_arch = "x86_64")]
