@@ -462,7 +462,7 @@ impl MulAssign<&Self> for GF128 {
     }
 }
 
-unsafe fn mm128_apply_mask_msb(v: __m128i, m: __m128i) -> __m128i {
+unsafe fn m128_apply_mask_msb(v: __m128i, m: __m128i) -> __m128i {
     // extract MSB
     let mask = _mm_setr_epi8(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, i8::MIN);
     let m = _mm_and_si128(m, mask);
@@ -507,7 +507,7 @@ impl Double for GF128 {
                 _mm_slli_epi64(self.0, 1),
                 _mm_srli_epi64(_mm_bslli_si128(self.0, 8), 63),
             );
-            _mm_xor_si128(shifted, mm128_apply_mask_msb(GF128_MODULUS, self.0))
+            _mm_xor_si128(shifted, m128_apply_mask_msb(GF128_MODULUS, self.0))
         })
     }
 }
@@ -912,7 +912,7 @@ impl MulAssign<&Self> for GF192 {
 
 // implementation of Double
 
-unsafe fn mm192_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
+unsafe fn m192_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
     let mask = _mm256_setr_epi64x(0, 0, i64::MIN, 0);
     let m = _mm256_and_si256(m, mask);
     let m = _mm256_srai_epi32(m, 32);
@@ -930,7 +930,7 @@ impl Double for GF192 {
         Self(unsafe {
             let shifted = m256_shift_left_1(self.0);
             _mm256_and_si256(
-                _mm256_xor_si256(shifted, mm192_apply_mask_msb(GF192_MODULUS, self.0)),
+                _mm256_xor_si256(shifted, m192_apply_mask_msb(GF192_MODULUS, self.0)),
                 _mm256_setr_epi64x(-1, -1, -1, 0),
             )
         })
@@ -1324,7 +1324,7 @@ impl MulAssign<&Self> for GF256 {
 
 // implementation of Double
 
-unsafe fn mm256_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
+unsafe fn m256_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
     let mask = _mm256_setr_epi64x(0, 0, 0, i64::MIN);
     let m = _mm256_and_si256(m, mask);
     let m = _mm256_srai_epi32(m, 32);
@@ -1341,7 +1341,7 @@ impl Double for GF256 {
     fn double(self) -> Self::Output {
         Self(unsafe {
             let shifted = m256_shift_left_1(self.0);
-            _mm256_xor_si256(shifted, mm256_apply_mask_msb(GF256_MODULUS, self.0))
+            _mm256_xor_si256(shifted, m256_apply_mask_msb(GF256_MODULUS, self.0))
         })
     }
 }
