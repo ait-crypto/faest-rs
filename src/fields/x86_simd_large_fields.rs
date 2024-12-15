@@ -369,6 +369,40 @@ fn mul_gf128(lhs: __m128i, rhs: __m128i) -> __m128i {
     }
 }
 
+fn square_gf128(lhs: __m128i) -> __m128i {
+    unsafe {
+        let mask = _mm_setr_epi32(-1, 0x0, 0x0, 0x0);
+        let tmp3 = m128_clmul_ll(lhs, lhs);
+        let tmp6 = m128_clmul_hh(lhs, lhs);
+        let tmp4 = _mm_shuffle_epi32(lhs, 78);
+        let tmp4 = _mm_xor_si128(tmp4, lhs);
+        let tmp4 = m128_clmul_ll(tmp4, tmp4);
+        let tmp4 = _mm_xor_si128(tmp4, tmp3);
+        let tmp4 = _mm_xor_si128(tmp4, tmp6);
+        let tmp5 = _mm_slli_si128(tmp4, 8);
+        let tmp4 = _mm_srli_si128(tmp4, 8);
+        let tmp3 = _mm_xor_si128(tmp3, tmp5);
+        let tmp6 = _mm_xor_si128(tmp6, tmp4);
+        let tmp7 = _mm_srli_epi32(tmp6, 31);
+        let tmp8 = _mm_srli_epi32(tmp6, 30);
+        let tmp9 = _mm_srli_epi32(tmp6, 25);
+        let tmp7 = _mm_xor_si128(tmp7, tmp8);
+        let tmp7 = _mm_xor_si128(tmp7, tmp9);
+        let tmp8 = _mm_shuffle_epi32(tmp7, 147);
+        let tmp7 = _mm_and_si128(mask, tmp8);
+        let tmp8 = _mm_andnot_si128(mask, tmp8);
+        let tmp3 = _mm_xor_si128(tmp3, tmp8);
+        let tmp6 = _mm_xor_si128(tmp6, tmp7);
+        let tmp10 = _mm_slli_epi32(tmp6, 1);
+        let tmp3 = _mm_xor_si128(tmp3, tmp10);
+        let tmp11 = _mm_slli_epi32(tmp6, 2);
+        let tmp3 = _mm_xor_si128(tmp3, tmp11);
+        let tmp12 = _mm_slli_epi32(tmp6, 7);
+        let tmp3 = _mm_xor_si128(tmp3, tmp12);
+        _mm_xor_si128(tmp3, tmp6)
+    }
+}
+
 fn mul_gf128_u64(lhs: __m128i, rhs: u64) -> __m128i {
     unsafe {
         let mask = _mm_setr_epi32(-1, 0x0, 0x0, 0x0);
@@ -524,7 +558,7 @@ impl Square for GF128 {
 
     #[inline]
     fn square(self) -> Self::Output {
-        Self(mul_gf128(self.0, self.0))
+        Self(square_gf128(self.0))
     }
 }
 
