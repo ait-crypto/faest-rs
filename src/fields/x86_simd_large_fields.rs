@@ -6,14 +6,14 @@ use std::arch::x86 as x86_64;
 use std::arch::x86_64;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use x86_64::{
-    __m128i, __m256i, _mm256_and_si256, _mm256_blend_epi32, _mm256_blendv_epi8,
-    _mm256_castsi128_si256, _mm256_extracti128_si256, _mm256_inserti128_si256, _mm256_loadu_si256,
-    _mm256_maskload_epi64, _mm256_maskstore_epi64, _mm256_or_si256, _mm256_permute4x64_epi64,
-    _mm256_permutevar8x32_epi32, _mm256_set1_epi32, _mm256_set1_epi64x, _mm256_setr_epi64x,
-    _mm256_setzero_si256, _mm256_slli_epi64, _mm256_srai_epi32, _mm256_srli_epi64,
+    __m128i, __m256i, _mm256_and_si256, _mm256_blend_epi32, _mm256_blendv_epi8, _mm256_cmpeq_epi32,
+    _mm256_extracti128_si256, _mm256_loadu_si256, _mm256_maskload_epi64, _mm256_maskstore_epi64,
+    _mm256_or_si256, _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32, _mm256_set1_epi64x,
+    _mm256_setr_epi64x, _mm256_setr_m128i, _mm256_setzero_si256, _mm256_slli_epi32,
+    _mm256_slli_epi64, _mm256_srai_epi32, _mm256_srli_epi32, _mm256_srli_epi64,
     _mm256_storeu_si256, _mm256_testz_si256, _mm256_xor_si256, _mm_alignr_epi8, _mm_and_si128,
-    _mm_andnot_si128, _mm_bslli_si128, _mm_clmulepi64_si128, _mm_loadu_si128, _mm_or_si128,
-    _mm_set1_epi8, _mm_set_epi64x, _mm_set_epi8, _mm_setr_epi32, _mm_setr_epi8, _mm_setzero_si128,
+    _mm_andnot_si128, _mm_bslli_si128, _mm_clmulepi64_si128, _mm_cmpeq_epi32, _mm_loadu_si128,
+    _mm_or_si128, _mm_set_epi64x, _mm_set_epi8, _mm_setr_epi32, _mm_setzero_si128,
     _mm_shuffle_epi32, _mm_shuffle_epi8, _mm_slli_epi32, _mm_slli_epi64, _mm_slli_si128,
     _mm_srli_epi32, _mm_srli_epi64, _mm_srli_si128, _mm_storeu_si128, _mm_test_all_zeros,
     _mm_xor_si128,
@@ -61,6 +61,59 @@ unsafe fn m256_shift_left_1(x: __m256i) -> __m256i {
             _mm256_permute4x64_epi64(_mm256_srli_epi64(x, 63), _MM_SHUFFLE(2, 1, 0, 0)),
             _MM_SHUFFLE(3, 3, 3, 0),
         ),
+    )
+}
+
+#[inline(always)]
+unsafe fn m128_setones() -> __m128i {
+    let zero = _mm_setzero_si128();
+    _mm_cmpeq_epi32(zero, zero)
+}
+
+#[inline(always)]
+unsafe fn m128_set_epi32_15() -> __m128i {
+    _mm_srli_epi32(m128_setones(), 28)
+}
+
+#[inline(always)]
+unsafe fn m128_set_msb() -> __m128i {
+    let all_ones = m128_setones();
+    let one = _mm_slli_epi64(all_ones, 63);
+    _mm_slli_si128(one, 64 / 8)
+}
+
+#[inline(always)]
+unsafe fn m256_setones() -> __m256i {
+    let zero = _mm256_setzero_si256();
+    _mm256_cmpeq_epi32(zero, zero)
+}
+
+#[inline(always)]
+unsafe fn m256_set_epi32_7() -> __m256i {
+    _mm256_srli_epi32(m256_setones(), 29)
+}
+
+#[inline(always)]
+unsafe fn m256_set_epi32_5() -> __m256i {
+    let one = _mm256_srli_epi32(m256_setones(), 31);
+    _mm256_xor_si256(one, _mm256_slli_epi32(one, 2))
+}
+
+#[inline(always)]
+unsafe fn m256_set_msb_192() -> __m256i {
+    _mm256_blend_epi32(
+        _mm256_setzero_si256(),
+        _mm256_slli_epi64(m256_setones(), 63),
+        _MM_SHUFFLE(0, 3, 0, 0),
+    )
+}
+
+#[inline(always)]
+unsafe fn m256_set_msb() -> __m256i {
+    _mm256_blend_epi32(
+        _mm256_setzero_si256(),
+        _mm256_slli_epi64(m256_setones(), 63),
+        _MM_SHUFFLE(3, 0, 0, 0),
     )
 }
 
@@ -503,10 +556,9 @@ impl MulAssign<&Self> for GF128 {
 #[inline]
 unsafe fn m128_apply_mask_msb(v: __m128i, m: __m128i) -> __m128i {
     // extract MSB
-    let mask = _mm_setr_epi8(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, i8::MIN);
-    let m = _mm_and_si128(m, mask);
+    let m = _mm_and_si128(m, m128_set_msb());
     // move MSB to each 1-byte lane
-    let m = _mm_shuffle_epi8(m, _mm_set1_epi8(15));
+    let m = _mm_shuffle_epi8(m, m128_set_epi32_15());
     // if MSB is set, produce index, otherwise keep MSB set to zero result
     let m = _mm_andnot_si128(
         m,
@@ -785,20 +837,15 @@ unsafe fn poly384_reduce192(x: [__m128i; 3]) -> __m256i {
     combined[0] = _mm_xor_si128(combined[0], m128_clmul_lh(GF192_MOD_M128, combined[1]));
     combined[1] = _mm_xor_si128(combined[1], _mm_srli_si128(reduced_256, 8));
 
-    _mm256_inserti128_si256(
-        _mm256_castsi128_si256(combined[0]),
+    _mm256_setr_m128i(
+        combined[0],
         _mm_and_si128(combined[1], _mm_set_epi64x(0, -1)),
-        1,
     )
 }
 
 unsafe fn poly256_reduce192(x: [__m128i; 2]) -> __m256i {
     let low = _mm_xor_si128(x[0], m128_clmul_lh(GF192_MOD_M128, x[1]));
-    _mm256_inserti128_si256(
-        _mm256_castsi128_si256(low),
-        _mm_and_si128(x[1], _mm_set_epi64x(0, -1)),
-        1,
-    )
+    _mm256_setr_m128i(low, _mm_and_si128(x[1], _mm_set_epi64x(0, -1)))
 }
 
 unsafe fn m128_broadcast_low(v: __m128i) -> __m128i {
@@ -954,10 +1001,9 @@ impl MulAssign<&Self> for GF192 {
 
 #[inline]
 unsafe fn m192_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
-    let mask = _mm256_setr_epi64x(0, 0, i64::MIN, 0);
-    let m = _mm256_and_si256(m, mask);
+    let m = _mm256_and_si256(m, m256_set_msb_192());
     let m = _mm256_srai_epi32(m, 32);
-    let m = _mm256_permutevar8x32_epi32(m, _mm256_set1_epi32(5));
+    let m = _mm256_permutevar8x32_epi32(m, m256_set_epi32_5());
     _mm256_blendv_epi8(_mm256_setzero_si256(), v, m)
 }
 
@@ -1229,17 +1275,13 @@ unsafe fn poly512_reduce256(x: [__m128i; 4]) -> __m256i {
         m128_clmul_ll(GF256_MOD_M128, xmod_combined[2]),
     );
 
-    _mm256_inserti128_si256(
-        _mm256_castsi128_si256(xmod_combined[0]),
-        xmod_combined[1],
-        1,
-    )
+    _mm256_setr_m128i(xmod_combined[0], xmod_combined[1])
 }
 
 #[inline]
 unsafe fn poly320_reduce256(x: [__m128i; 3]) -> __m256i {
     let tmp = _mm_xor_si128(x[0], m128_clmul_ll(GF256_MOD_M128, x[2]));
-    _mm256_inserti128_si256(_mm256_castsi128_si256(tmp), x[1], 1)
+    _mm256_setr_m128i(tmp, x[1])
 }
 
 fn mul_gf256(lhs: __m256i, rhs: __m256i) -> __m256i {
@@ -1368,10 +1410,10 @@ impl MulAssign<&Self> for GF256 {
 
 #[inline]
 unsafe fn m256_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
-    let mask = _mm256_setr_epi64x(0, 0, 0, i64::MIN);
+    let mask = m256_set_msb();
     let m = _mm256_and_si256(m, mask);
     let m = _mm256_srai_epi32(m, 32);
-    let m = _mm256_permutevar8x32_epi32(m, _mm256_set1_epi32(7));
+    let m = _mm256_permutevar8x32_epi32(m, m256_set_epi32_7());
     _mm256_blendv_epi8(_mm256_setzero_si256(), v, m)
 }
 
