@@ -65,6 +65,7 @@ unsafe fn m256_shift_left_1(x: __m256i) -> __m256i {
 }
 
 // Karatsuba multiplication, but end right after the multiplications
+#[inline]
 unsafe fn karatsuba_mul_128_uninterpolated_other_sum(
     x: __m128i,
     y: __m128i,
@@ -81,6 +82,7 @@ unsafe fn karatsuba_mul_128_uninterpolated_other_sum(
     [x0y0, xsum_ysum, x1y1]
 }
 
+#[inline]
 unsafe fn karatsuba_mul_128_uninterpolated(x: __m128i, y: __m128i) -> [__m128i; 3] {
     let x0y0 = m128_clmul_ll(x, y);
     let x1y1 = m128_clmul_hh(x, y);
@@ -93,13 +95,14 @@ unsafe fn karatsuba_mul_128_uninterpolated(x: __m128i, y: __m128i) -> [__m128i; 
 }
 
 // Karatsuba multiplication, but don't combine the 3 128-bit polynomials into a 256-bit polynomial.
-#[inline(always)]
+#[inline]
 unsafe fn karatsuba_mul_128_uncombined(x: __m128i, y: __m128i) -> [__m128i; 3] {
     let mut out = karatsuba_mul_128_uninterpolated(x, y);
     out[1] = _mm_xor_si128(_mm_xor_si128(out[0], out[2]), out[1]);
     out
 }
 
+#[inline]
 unsafe fn karatsuba_square_128_uninterpolated_other_sum(
     x: __m128i,
     x_for_sum: __m128i,
@@ -123,7 +126,7 @@ unsafe fn karatsuba_square_128_uninterpolated(x: __m128i) -> [__m128i; 3] {
     [x0y0, xsum_ysum, x1y1]
 }
 
-#[inline(always)]
+#[inline]
 unsafe fn karatsuba_square_128_uncombined(x: __m128i) -> [__m128i; 3] {
     let mut out = karatsuba_square_128_uninterpolated(x);
     out[1] = _mm_xor_si128(_mm_xor_si128(out[0], out[2]), out[1]);
@@ -214,6 +217,7 @@ const fn gfu256_as_m256(v: UnoptimizedGF256) -> __m256i {
 pub(crate) struct GF128(__m128i);
 
 impl Default for GF128 {
+    #[inline(always)]
     fn default() -> Self {
         Self(unsafe { _mm_setzero_si128() })
     }
@@ -462,6 +466,7 @@ impl MulAssign<&Self> for GF128 {
     }
 }
 
+#[inline]
 unsafe fn m128_apply_mask_msb(v: __m128i, m: __m128i) -> __m128i {
     // extract MSB
     let mask = _mm_setr_epi8(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, i8::MIN);
@@ -617,6 +622,7 @@ impl<'de> serde::Deserialize<'de> for GF128 {
 pub(crate) struct GF192(__m256i);
 
 impl Default for GF192 {
+    #[inline]
     fn default() -> Self {
         Self(unsafe { _mm256_setzero_si256() })
     }
@@ -912,6 +918,7 @@ impl MulAssign<&Self> for GF192 {
 
 // implementation of Double
 
+#[inline]
 unsafe fn m192_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
     let mask = _mm256_setr_epi64x(0, 0, i64::MIN, 0);
     let m = _mm256_and_si256(m, mask);
@@ -1053,6 +1060,7 @@ impl<'de> serde::Deserialize<'de> for GF192 {
 pub(crate) struct GF256(__m256i);
 
 impl Default for GF256 {
+    #[inline]
     fn default() -> Self {
         Self(unsafe { _mm256_setzero_si256() })
     }
@@ -1324,6 +1332,7 @@ impl MulAssign<&Self> for GF256 {
 
 // implementation of Double
 
+#[inline]
 unsafe fn m256_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
     let mask = _mm256_setr_epi64x(0, 0, 0, i64::MIN);
     let m = _mm256_and_si256(m, mask);
