@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3 (2025-01-09)
+
+* Update itertools to 0.14.
+* Fix clippy warnings.
+
 ## 0.1.2 (2024-12-14)
 
 * Fix debug assertions.
