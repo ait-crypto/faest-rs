@@ -35,7 +35,7 @@ itertools = { version = "0.14", default-features = false }
 criterion = "0.5"
 generic-tests = "0.1"
 hex = "0.4"
-nist-pqc-seeded-rng = { version = "0.2", default-features = false }
+nist-pqc-seeded-rng = { version = "0.3", default-features = false }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
 serde = { version = "1", features = ["derive"] }
