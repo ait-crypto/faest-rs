@@ -56,7 +56,6 @@
 #![warn(missing_docs)]
 // TODO: fix those
 #![allow(clippy::type_complexity)]
-
 #![allow(unused_imports, dead_code)]
 use generic_array::{typenum::Unsigned, GenericArray};
 use paste::paste;

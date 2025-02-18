@@ -300,34 +300,31 @@ where
     }
 }
 
-
 pub(crate) trait LeafHasher<F>
 where
     F: BigGaloisField,
 {
     type ExtensionField: Field + for<'a> From<&'a [u8]> + Mul<F, Output = Self::ExtensionField>;
     type LambdaBytesFour: ArrayLength;
-    fn leaf_hash(
+    fn finalize(
         uhash: &GenericArray<u8, <Self::ExtensionField as Field>::Length>,
         x: &GenericArray<u8, Self::LambdaBytesFour>,
-    ) -> GenericArray<u8, <Self::ExtensionField as Field>::Length>{
-            let u = <Self as LeafHasher<F>>::ExtensionField::from(uhash.as_slice());
-            let x0 = F::from(&x[..F::Length::USIZE]);
-            let x1 = <Self as LeafHasher<F>>::ExtensionField::from(&x[F::Length::USIZE..]);
+    ) -> GenericArray<u8, <Self::ExtensionField as Field>::Length> {
+        let u = <Self as LeafHasher<F>>::ExtensionField::from(uhash.as_slice());
+        let x0 = F::from(&x[..F::Length::USIZE]);
+        let x1 = <Self as LeafHasher<F>>::ExtensionField::from(&x[F::Length::USIZE..]);
 
-            let h = (u * x0) + x1;
+        let h = (u * x0) + x1;
 
-            h.as_bytes()
+        h.as_bytes()
     }
 }
-
 
 pub(crate) struct LeafHasher128;
 impl LeafHasher<GF128> for LeafHasher128 {
     type LambdaBytesFour = U64;
     type ExtensionField = GF384;
 }
-
 
 pub(crate) struct LeafHasher192;
 impl LeafHasher<GF192> for LeafHasher192 {
@@ -340,7 +337,6 @@ impl LeafHasher<GF256> for LeafHasher256 {
     type LambdaBytesFour = U128;
     type ExtensionField = GF768;
 }
-
 
 #[cfg(test)]
 mod test {
@@ -469,28 +465,26 @@ mod test {
     fn test_leaf_hash_128() {
         let database: Vec<LeafHashDatabaseEntry> = read_test_data("leafhash_128.json");
 
-        for data in database{
+        for data in database {
             let x = GenericArray::from_slice(&data.x);
             let uhash = GenericArray::from_slice(&data.uhash);
             let expected_h = GenericArray::from_slice(&data.expected_h);
 
-            let h = LeafHasher128::leaf_hash(&uhash, &x);
+            let h = LeafHasher128::finalize(&uhash, &x);
             assert_eq!(h, *expected_h)
         }
-
     }
-
 
     #[test]
     fn test_leaf_hash_192() {
         let database: Vec<LeafHashDatabaseEntry> = read_test_data("leafhash_192.json");
 
-        for data in database{
+        for data in database {
             let x = GenericArray::from_slice(&data.x);
             let uhash = GenericArray::from_slice(&data.uhash);
             let expected_h = GenericArray::from_slice(&data.expected_h);
 
-            let h = LeafHasher192::leaf_hash(&uhash, &x);
+            let h = LeafHasher192::finalize(&uhash, &x);
             assert_eq!(h, *expected_h)
         }
     }
@@ -499,12 +493,12 @@ mod test {
     fn test_leaf_hash_256() {
         let database: Vec<LeafHashDatabaseEntry> = read_test_data("leafhash_256.json");
 
-        for data in database{
+        for data in database {
             let x = GenericArray::from_slice(&data.x);
             let uhash = GenericArray::from_slice(&data.uhash);
             let expected_h = GenericArray::from_slice(&data.expected_h);
 
-            let h = LeafHasher256::leaf_hash(&uhash, &x);
+            let h = LeafHasher256::finalize(&uhash, &x);
             assert_eq!(h, *expected_h)
         }
     }
