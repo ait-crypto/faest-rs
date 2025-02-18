@@ -36,7 +36,7 @@ criterion = "0.5"
 generic-tests = "0.1"
 hex = "0.4"
 nist-pqc-seeded-rng = { version = "0.2", default-features = false }
-rand = { version = "0.8", features = ["small_rng"] }
+rand = { version = "0.9", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -52,19 +52,19 @@ serde = ["dep:serde", "generic-array/serde"]
 # enable SIMD optimization implementations
 opt-simd = []
 
-[[bench]]
-name = "bench"
-required-features = ["randomized-signer"]
-harness = false
-test = false
+#[[bench]]
+#name = "bench"
+#required-features = ["randomized-signer"]
+#harness = false
+#test = false
 
-[[example]]
-name = "simple"
-required-features = ["randomized-signer"]
+#[[example]]
+#name = "simple"
+#required-features = ["randomized-signer"]
 
-[[test]]
-name = "nist"
-required-features = ["randomized-signer"]
+#[[test]]
+#name = "nist"
+#required-features = ["randomized-signer"]
 
 [profile.dev.package."*"]
 opt-level = 3

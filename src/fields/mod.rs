@@ -18,7 +18,7 @@ pub(crate) use large_fields::{BigGaloisField, ByteCombine, ByteCombineConstants,
     target_feature = "avx2",
     target_feature = "pclmulqdq"
 )))]
-pub(crate) use large_fields::{GF128, GF192, GF256};
+pub(crate) use large_fields::{GF128, GF192, GF256, GF384, GF576, GF768};
 pub(crate) use small_fields::GF64;
 #[cfg(all(
     feature = "opt-simd",
@@ -71,7 +71,6 @@ pub(crate) trait Double {
 pub(crate) trait Square {
     /// Output type
     type Output;
-
     /// Square an element
     fn square(self) -> Self::Output;
 }
