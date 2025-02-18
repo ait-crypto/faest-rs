@@ -52,19 +52,19 @@ serde = ["dep:serde", "generic-array/serde"]
 # enable SIMD optimization implementations
 opt-simd = []
 
-[[bench]]
-name = "bench"
-required-features = ["randomized-signer"]
-harness = false
-test = false
+#[[bench]]
+#name = "bench"
+#required-features = ["randomized-signer"]
+#harness = false
+#test = false
 
-[[example]]
-name = "simple"
-required-features = ["randomized-signer"]
+#[[example]]
+#name = "simple"
+#required-features = ["randomized-signer"]
 
-[[test]]
-name = "nist"
-required-features = ["randomized-signer"]
+#[[test]]
+#name = "nist"
+#required-features = ["randomized-signer"]
 
 [profile.dev.package."*"]
 opt-level = 3

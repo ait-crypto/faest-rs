@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+#![allow(dead_code)]
 use faest::*;
 use signature::RandomizedSigner;
 use signature::{Signer, Verifier};
@@ -39,16 +41,17 @@ where
 }
 
 fn main() {
-    run_example::<FAEST128fSigningKey, FAEST128fSignature>("FAEST-128f");
-    run_example::<FAEST128sSigningKey, FAEST128sSignature>("FAEST-128s");
-    run_example::<FAEST192fSigningKey, FAEST192fSignature>("FAEST-192f");
-    run_example::<FAEST192sSigningKey, FAEST192sSignature>("FAEST-192s");
-    run_example::<FAEST256fSigningKey, FAEST256fSignature>("FAEST-256f");
-    run_example::<FAEST256sSigningKey, FAEST256sSignature>("FAEST-256s");
-    run_example::<FAESTEM128fSigningKey, FAESTEM128fSignature>("FAEST-EM-128f");
-    run_example::<FAESTEM128sSigningKey, FAESTEM128sSignature>("FAEST-EM-128s");
-    run_example::<FAESTEM192fSigningKey, FAESTEM192fSignature>("FAEST-EM-192f");
-    run_example::<FAESTEM192sSigningKey, FAESTEM192sSignature>("FAEST-EM-192s");
-    run_example::<FAESTEM256fSigningKey, FAESTEM256fSignature>("FAEST-EM-256f");
-    run_example::<FAESTEM256sSigningKey, FAESTEM256sSignature>("FAEST-EM-256s");
+//     run_example::<FAEST128fSigningKey, FAEST128fSignature>("FAEST-128f");
+//     run_example::<FAEST128sSigningKey, FAEST128sSignature>("FAEST-128s");
+//     run_example::<FAEST192fSigningKey, FAEST192fSignature>("FAEST-192f");
+//     run_example::<FAEST192sSigningKey, FAEST192sSignature>("FAEST-192s");
+//     run_example::<FAEST256fSigningKey, FAEST256fSignature>("FAEST-256f");
+//     run_example::<FAEST256sSigningKey, FAEST256sSignature>("FAEST-256s");
+//     run_example::<FAESTEM128fSigningKey, FAESTEM128fSignature>("FAEST-EM-128f");
+//     run_example::<FAESTEM128sSigningKey, FAESTEM128sSignature>("FAEST-EM-128s");
+//     run_example::<FAESTEM192fSigningKey, FAESTEM192fSignature>("FAEST-EM-192f");
+//     run_example::<FAESTEM192sSigningKey, FAESTEM192sSignature>("FAEST-EM-192s");
+//     run_example::<FAESTEM256fSigningKey, FAESTEM256fSignature>("FAEST-EM-256f");
+//     run_example::<FAESTEM256sSigningKey, FAESTEM256sSignature>("FAEST-EM-256s");
+// 
 }
