@@ -1,7 +1,14 @@
-use std::{array, iter::zip, ops::Mul};
+use std::{
+    array,
+    iter::zip,
+    marker::PhantomData,
+    ops::{Add, Mul},
+};
 
 use generic_array::{
-    typenum::{Prod, Quot, Sum, Unsigned, U128, U16, U3, U5, U64, U8, U96},
+    typenum::{
+        IsEqual, Le, Length, Prod, Quot, Sum, Unsigned, U128, U16, U2, U3, U4, U5, U64, U8, U96,
+    },
     ArrayLength, GenericArray,
 };
 use itertools::{chain, izip};
@@ -300,42 +307,71 @@ where
     }
 }
 
-pub(crate) trait LeafHasher<F>
+// Could take the GaloisField as generic arguement. Should we comply to init-update-finalize paradigm?
+pub(crate) trait LeafHasher
 where
-    F: BigGaloisField,
+    <Self::F as Field>::Length: Add<<Self::F as Field>::Length> + Mul<U3> + Mul<U4>,
+    <<Self::F as Field>::Length as Mul<U3>>::Output: ArrayLength,
+    <<Self::F as Field>::Length as Mul<U4>>::Output: ArrayLength,
+    <Self::ExtensionField as Field>::Length: Mul<U3>,
 {
-    type ExtensionField: Field + for<'a> From<&'a [u8]> + Mul<F, Output = Self::ExtensionField>;
+    type F: Field + for<'a> From<&'a [u8]>;
+    type ExtensionField: Field
+        + for<'a> From<&'a [u8]>
+        + Mul<Self::F, Output = Self::ExtensionField>;
+    type LambdaBytes: ArrayLength;
+    type LambdaBytesTwo: ArrayLength;
+    type LambdaBytesThree: ArrayLength;
     type LambdaBytesFour: ArrayLength;
+
     fn finalize(
-        uhash: &GenericArray<u8, <Self::ExtensionField as Field>::Length>,
+        uhash: &GenericArray<u8, Self::LambdaBytesThree>,
         x: &GenericArray<u8, Self::LambdaBytesFour>,
-    ) -> GenericArray<u8, <Self::ExtensionField as Field>::Length> {
-        let u = <Self as LeafHasher<F>>::ExtensionField::from(uhash.as_slice());
-        let x0 = F::from(&x[..F::Length::USIZE]);
-        let x1 = <Self as LeafHasher<F>>::ExtensionField::from(&x[F::Length::USIZE..]);
+    ) -> GenericArray<u8, Self::LambdaBytesThree> {
+        let u = <Self as LeafHasher>::ExtensionField::from(uhash.as_slice());
+        let x0 =
+            <Self as LeafHasher>::F::from(&x[..<<Self as LeafHasher>::F as Field>::Length::USIZE]);
+        let x1 = <Self as LeafHasher>::ExtensionField::from(
+            &x[<<Self as LeafHasher>::F as Field>::Length::USIZE..],
+        );
 
         let h = (u * x0) + x1;
 
-        h.as_bytes()
+        // TODO: Find a better way for converting sizes
+        let mut b = GenericArray::default();
+        b.copy_from_slice(&h.as_bytes());
+        b
     }
 }
 
 pub(crate) struct LeafHasher128;
-impl LeafHasher<GF128> for LeafHasher128 {
-    type LambdaBytesFour = U64;
+impl LeafHasher for LeafHasher128 {
+    type F = GF128;
     type ExtensionField = GF384;
+    type LambdaBytes = <GF128 as Field>::Length;
+    type LambdaBytesTwo = Prod<Self::LambdaBytes, U2>;
+    type LambdaBytesThree = Prod<Self::LambdaBytes, U3>;
+    type LambdaBytesFour = Prod<Self::LambdaBytes, U4>;
 }
 
 pub(crate) struct LeafHasher192;
-impl LeafHasher<GF192> for LeafHasher192 {
-    type LambdaBytesFour = U96;
+impl LeafHasher for LeafHasher192 {
+    type F = GF192;
     type ExtensionField = GF576;
+    type LambdaBytes = <GF192 as Field>::Length;
+    type LambdaBytesTwo = Prod<Self::LambdaBytes, U2>;
+    type LambdaBytesThree = Prod<Self::LambdaBytes, U3>;
+    type LambdaBytesFour = Prod<Self::LambdaBytes, U4>;
 }
 
 pub(crate) struct LeafHasher256;
-impl LeafHasher<GF256> for LeafHasher256 {
-    type LambdaBytesFour = U128;
+impl LeafHasher for LeafHasher256 {
+    type F = GF256;
     type ExtensionField = GF768;
+    type LambdaBytes = <GF256 as Field>::Length;
+    type LambdaBytesTwo = Prod<Self::LambdaBytes, U2>;
+    type LambdaBytesThree = Prod<Self::LambdaBytes, U3>;
+    type LambdaBytesFour = Prod<Self::LambdaBytes, U4>;
 }
 
 #[cfg(test)]
