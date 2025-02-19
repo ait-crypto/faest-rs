@@ -78,9 +78,9 @@ mod fields;
 mod prg;
 mod random_oracles;
 // mod rijndael_32;
+mod bavc;
 mod universal_hashing;
 mod utils;
-// mod vc;
 // mod vole;
 
 // use crate::{
