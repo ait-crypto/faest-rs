@@ -313,10 +313,9 @@ where
     <Self::F as Field>::Length: Add<<Self::F as Field>::Length> + Mul<U3> + Mul<U4>,
     <<Self::F as Field>::Length as Mul<U3>>::Output: ArrayLength,
     <<Self::F as Field>::Length as Mul<U4>>::Output: ArrayLength,
-    <Self::ExtensionField as Field>::Length: Mul<U3>,
 {
     type F: Field + for<'a> From<&'a [u8]>;
-    type ExtensionField: Field
+    type ExtensionField: Field<Length = Self::LambdaBytesThree>
         + for<'a> From<&'a [u8]>
         + Mul<Self::F, Output = Self::ExtensionField>;
     type LambdaBytes: ArrayLength;
@@ -337,10 +336,7 @@ where
 
         let h = (u * x0) + x1;
 
-        // TODO: Find a better way for converting sizes
-        let mut b = GenericArray::default();
-        b.copy_from_slice(&h.as_bytes());
-        b
+        h.as_bytes()
     }
 }
 
