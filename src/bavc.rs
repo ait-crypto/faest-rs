@@ -1,15 +1,17 @@
 use std::{
+    f32::consts::TAU,
     marker::PhantomData,
     ops::{Add, Mul},
 };
 
 use generic_array::{
-    typenum::{Const, IsEqual, Prod, Sum, Unsigned, U128, U16, U3, U4, U48, U64, U8},
+    typenum::{Const, IsEqual, Negate, Prod, Sum, Unsigned, N1, U128, U16, U3, U4, U48, U64, U8},
     ArrayLength, GenericArray, IntoArrayLength,
 };
 
 use crate::{
     fields::{BigGaloisField, Field, GF128},
+    parameter::TauParameters,
     prg::{PseudoRandomGenerator, IV, PRG128, PRG192, PRG256, TWK},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{LeafHasher, LeafHasher128, LeafHasher192, LeafHasher256},
@@ -17,14 +19,13 @@ use crate::{
 };
 
 pub trait LeafCommit {
-    type KeySize: ArrayLength;
     type LambdaBytes: ArrayLength;
     type LambdaBytesTimesTwo: ArrayLength;
     type LambdaByesTimesThree: ArrayLength;
     type LambdaByesTimesFour: ArrayLength;
 
     fn commit(
-        r: &GenericArray<u8, Self::KeySize>,
+        r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
         tweak: TWK,
         uhash: &GenericArray<u8, Self::LambdaByesTimesThree>,
@@ -34,7 +35,7 @@ pub trait LeafCommit {
     );
 
     fn commit_em(
-        r: &GenericArray<u8, Self::KeySize>,
+        r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
         tewak: TWK,
     ) -> (
@@ -50,17 +51,16 @@ where
 
 impl<PRG, LH> LeafCommit for LeafCommitment<PRG, LH>
 where
-    PRG: PseudoRandomGenerator,
+    PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
     LH: LeafHasher,
 {
-    type KeySize = PRG::KeySize;
     type LambdaBytes = LH::LambdaBytes;
     type LambdaBytesTimesTwo = LH::LambdaBytesTwo;
     type LambdaByesTimesThree = LH::LambdaBytesThree;
     type LambdaByesTimesFour = LH::LambdaBytesFour;
 
     fn commit(
-        r: &GenericArray<u8, Self::KeySize>,
+        r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
         tweak: TWK,
         uhash: &GenericArray<u8, Self::LambdaByesTimesThree>,
@@ -81,7 +81,7 @@ where
     }
 
     fn commit_em(
-        r: &GenericArray<u8, Self::KeySize>,
+        r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
         tweak: TWK,
     ) -> (
@@ -97,7 +97,112 @@ where
     }
 }
 
-pub trait BatchVectorCommitment {}
+pub(crate) trait BatchVectorCommitment {
+    type LambdaBytes: ArrayLength;
+    type LambdaBytesTimes2: ArrayLength;
+    type LambdaBytesTimes3: ArrayLength;
+    type LC: LeafCommit;
+
+    fn commit(
+        r: &GenericArray<u8, Self::LambdaBytes>,
+        iv: &IV,
+    ) -> (
+        //com
+        GenericArray<u8, Self::LambdaBytesTimes2>,
+        //decom
+        (
+            Vec<GenericArray<u8, Self::LambdaBytes>>,
+            Vec<GenericArray<u8, Self::LambdaBytesTimes3>>,
+        ),
+        //seeds
+        Vec<GenericArray<u8, Self::LambdaBytes>>,
+    );
+}
+
+pub(crate) struct BAVAC<RO, PRG, LH, TAU>(
+    PhantomData<RO>,
+    PhantomData<PRG>,
+    PhantomData<LH>,
+    PhantomData<TAU>,
+)
+where
+    RO: RandomOracle,
+    PRG: PseudoRandomGenerator,
+    TAU: TauParameters,
+    LH: LeafHasher;
+
+impl<RO, PRG, LH, TAU> BatchVectorCommitment for BAVAC<RO, PRG, LH, TAU>
+where
+    RO: RandomOracle,
+    PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
+    TAU: TauParameters,
+    LH: LeafHasher,
+{
+    type LambdaBytes = LH::LambdaBytes;
+    type LambdaBytesTimes2 = LH::LambdaBytesTwo;
+    type LambdaBytesTimes3 = LH::LambdaBytesThree;
+    type LC = LeafCommitment<PRG, LH>;
+
+    fn commit(
+        r: &GenericArray<u8, Self::LambdaBytes>,
+        iv: &IV,
+    ) -> (
+        //com
+        GenericArray<u8, Self::LambdaBytesTimes2>,
+        //decom
+        (
+            Vec<GenericArray<u8, Self::LambdaBytes>>,
+            Vec<GenericArray<u8, Self::LambdaBytesTimes3>>,
+        ),
+        //seeds
+        Vec<GenericArray<u8, Self::LambdaBytes>>,
+    ) {
+        // step 1..2: init H_0 with IV
+        let mut h0_hasher = RO::h0_init();
+        h0_hasher.update(&iv);
+        let mut h0_hasher = h0_hasher.finish();
+
+        //step 5..7: generate GCM tree nodes
+        let l = TAU::L::USIZE;
+        let mut k = vec![GenericArray::default(); 2 * l - 1];
+        k[0].copy_from_slice(r);
+
+        for alpha in 0..l - 1 {
+            let mut prg = PRG::new_prg(&k[alpha], &iv, alpha as TWK);
+            prg.read(&mut k[2 * alpha + 1]);
+            prg.read(&mut k[2 * alpha + 2]);
+        }
+
+        //setp 8..13: generate seeds and commitment
+        let mut com_hasher = RO::h1_init();
+        let mut sd = vec![GenericArray::default(); TAU::L::USIZE];
+        let mut com = vec![GenericArray::default(); TAU::L::USIZE];
+
+        for i in 0..TAU::Tau::USIZE {
+            let mut hi_hasher = RO::h1_init();
+            let mut uhash_i = GenericArray::default();
+            h0_hasher.read(&mut uhash_i);
+
+            let n_i: usize = TAU::bavac_max_node_index(i);
+            for j in 0..n_i {
+                let alpha = TAU::pos_in_tree(i, j);
+
+                let idx = TAU::convert_index(i) + j;
+                let tweak = (i + l - 1) as TWK;
+
+                (sd[idx], com[idx]) = Self::LC::commit(&k[alpha], &iv, tweak, &uhash_i);
+                hi_hasher.update(&com[idx]);
+            }
+
+            let hi: GenericArray<u8, Self::LambdaBytesTimes2> = hi_hasher.finish().read_into();
+            com_hasher.update(&hi);
+        }
+
+        let decom = (k, com);
+        let com = com_hasher.finish().read_into();
+        (com, decom, sd)
+    }
+}
 
 type Decom<L, L2> = (Vec<GenericArray<u8, L>>, Vec<GenericArray<u8, L2>>);
 
@@ -266,10 +371,9 @@ pub(crate) trait VectorCommitment {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use core::panic;
     use std::iter::zip;
-
-    use super::*;
 
     use generic_array::{
         typenum::{U16, U31, U32, U4, U5, U63},
@@ -278,6 +382,7 @@ mod test {
     use serde::{de::Expected, Deserialize};
 
     use crate::{
+        parameter::{Tau128Fast, Tau128Small, Tau192Fast, Tau192Small, Tau256Fast, Tau256Small},
         prg::{IVSize, PRG128, PRG192, PRG256},
         random_oracles::{RandomOracleShake128, RandomOracleShake256},
         utils::test::read_test_data,
@@ -309,13 +414,12 @@ mod test {
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct DataCommit {
-        keyroot: Vec<u8>,
-        iv: [u8; IVSize::USIZE],
-        depth: u8,
+        lambda: u32,
+        mode: String,
         h: Vec<u8>,
-        k: Vec<Vec<u8>>,
-        com: Vec<Vec<u8>>,
-        sd: Vec<Vec<u8>>,
+        hashed_k: Vec<u8>,
+        hashed_com: Vec<u8>,
+        hashed_sd: Vec<u8>,
     }
 
     #[derive(Debug, Deserialize)]
@@ -339,29 +443,48 @@ mod test {
         sd: Vec<Vec<u8>>,
     }
 
-    type Result<Lambda, Lambda2> = (
+    type Result<Lambda, Lambda2, Lambda3> = (
         GenericArray<u8, Lambda2>,
         (
             Vec<GenericArray<u8, Lambda>>,
-            Vec<GenericArray<u8, Lambda2>>,
+            Vec<GenericArray<u8, Lambda3>>,
         ),
         Vec<GenericArray<u8, Lambda>>,
     );
 
-    fn compare_expected_with_result<Lambda: ArrayLength, Lambda2: ArrayLength>(
+    fn compare_expected_with_result<
+        Lambda: ArrayLength,
+        Lambda2: ArrayLength,
+        Lambda3: ArrayLength,
+    >(
         expected: &DataCommit,
-        res: Result<Lambda, Lambda2>,
+        res: Result<Lambda, Lambda2, Lambda3>,
     ) {
-        assert_eq!(res.0.as_slice(), expected.h.as_slice());
-        for (k, k_expected) in zip(&res.1 .0, &expected.k) {
-            assert_eq!(k.as_slice(), k_expected.as_slice());
-        }
-        for (com, com_expected) in zip(&res.1 .1, &expected.com) {
-            assert_eq!(com.as_slice(), com_expected.as_slice());
-        }
-        for (sd, sd_expected) in zip(&res.2, &expected.sd) {
-            assert_eq!(sd.as_slice(), sd_expected.as_slice());
-        }
+        let (h, decom, sd) = res;
+
+        let hashed_sd = hash_array(&sd.iter().flat_map(|x| x.clone()).collect::<Vec<u8>>());
+        let hashed_k = hash_array(&decom.0.iter().flat_map(|x| x.clone()).collect::<Vec<u8>>());
+        let hashed_coms = hash_array(&decom.1.iter().flat_map(|x| x.clone()).collect::<Vec<u8>>());
+
+        assert_eq!(expected.h.as_slice(), h.as_slice());
+        assert_eq!(expected.hashed_sd.as_slice(), hashed_sd.as_slice());
+        assert_eq!(expected.hashed_k.as_slice(), hashed_k.as_slice());
+        assert_eq!(expected.hashed_com.as_slice(), hashed_coms.as_slice());
+    }
+
+    fn hash_array(data: &[u8]) -> Vec<u8> {
+        use sha3::{
+            digest::{ExtendableOutput, Update, XofReader},
+            Shake256,
+        };
+
+        let mut hasher = sha3::Shake256::default();
+        hasher.update(data);
+        let mut reader = hasher.finalize_xof();
+        let mut ret = [0u8; 64];
+
+        reader.read(&mut ret);
+        ret.to_vec()
     }
 
     #[test]
@@ -457,41 +580,78 @@ mod test {
         }
     }
 
-    // println!(", {{ \"lambda\": 256, \"key\": {:?}, \"iv\": {:?}, \"tweak\": {:?}, \"uhash\": {:?}, \"expectedCom\": {:?}, \"expectedSd\": {:?}}}, ", leaf_commmit_key.as_slice(), leaf_commit_iv, tweak, leaf_commit_uhash.as_slice(), expected_com.as_slice(), expected_sd.as_slice());
+    #[test]
+    fn commit_test() {
+        let r: GenericArray<u8, _> = GenericArray::from_array([
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+            0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b,
+            0x1c, 0x1d, 0x1e, 0x1f,
+        ]);
 
-    // #[test]
-    // fn commit_test() {
-    //     let database: Vec<DataCommit> = read_test_data("vc_com.json");
-    //     for data in database {
-    //         let lamdabytes = data.keyroot.len();
-    //         let iv = IV::from_slice(&data.iv);
-    //         if lamdabytes == 16 {
-    //             let res = VC::<PRG128, RandomOracleShake128>::commit(
-    //                 GenericArray::from_slice(&data.keyroot),
-    //                 iv,
-    //                 1 << data.depth,
-    //             );
-    //             compare_expected_with_result(&data, res);
-    //         } else if lamdabytes == 24 {
-    //             let res = VC::<PRG192, RandomOracleShake256>::commit(
-    //                 GenericArray::from_slice(&data.keyroot),
-    //                 iv,
-    //                 1 << data.depth,
-    //             );
-    //             compare_expected_with_result(&data, res);
-    //         } else {
-    //             let res = VC::<PRG256, RandomOracleShake256>::commit(
-    //                 GenericArray::from_slice(&data.keyroot),
-    //                 iv,
-    //                 1 << data.depth,
-    //             );
-    //             compare_expected_with_result(&data, res);
-    //         }
-    //     }
-    // }
+        let iv: IV = GenericArray::from_array([
+            0x64, 0x2b, 0xb1, 0xf9, 0x7c, 0x5f, 0x97, 0x9a, 0x72, 0xb1, 0xee, 0x39, 0xbe, 0x4e,
+            0x78, 0x22,
+        ]);
+
+        let database: Vec<DataCommit> = read_test_data("bavac_com.json");
+        for data in database {
+            match data.lambda {
+                128 => {
+                    let r = GenericArray::from_slice(&r[..16]);
+                    let res;
+                    if data.mode == "s" {
+                        println!("FAEST-128s - testing BAVAC_commitment..");
+                        res = BAVAC::<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small>::commit(
+                        r, &iv,
+                    );
+                    } else {
+                        println!("FAEST-128f - testing BAVAC_commitment..");
+                        res = BAVAC::<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>::commit(
+                        r, &iv,
+                    );
+                    }
+                    compare_expected_with_result(&data, res);
+                }
+                192 => {
+                    let r = GenericArray::from_slice(&r[..24]);
+                    let res;
+
+                    if data.mode == "s" {
+                        println!("FAEST-192s - testing BAVAC_commitment..");
+                        res = BAVAC::<RandomOracleShake256, PRG192, LeafHasher192, Tau192Small>::commit(
+                        r, &iv,
+                    );
+                    } else {
+                        println!("FAEST-192f - testing BAVAC_commitment..");
+                        res = BAVAC::<RandomOracleShake256, PRG192, LeafHasher192, Tau192Fast>::commit(
+                        r, &iv,
+                    );
+                    }
+                    compare_expected_with_result(&data, res);
+                }
+                _ => {
+                    let res;
+
+                    if data.mode == "s" {
+                        println!("FAEST-256s - testing BAVAC_commitment..");
+                        res = BAVAC::<RandomOracleShake256, PRG256, LeafHasher256, Tau256Small>::commit(
+                        &r, &iv,
+                    );
+                    } else {
+                        println!("FAEST-256f - testing BAVAC_commitment..");
+                        res = BAVAC::<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>::commit(
+                        &r, &iv,
+                    );
+                    }
+                    compare_expected_with_result(&data, res);
+                }
+            }
+        }
+    }
 
     // #[test]
     // fn open_test() {
+    // println!(", {{ \"lambda\": 256, \"mode\": \"f\", \"h\": {:?}, \"hashedK\": {:?}, \"hashedCom\": {:?}, \"hashedSd\": {:?}}}, ", expected_com.as_slice(), hashed_k_expected.as_slice(), hashed_coms_expected.as_slice(), hashed_sd_expected.as_slice());
     //     let database: Vec<DataOpen> = read_test_data("vc_open.json");
     //     for data in database {
     //         if data.k[0].len() == 16 {

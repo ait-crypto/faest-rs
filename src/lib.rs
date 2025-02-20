@@ -74,7 +74,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 // mod faest;
 mod fields;
 // mod internal_keys;
-// mod parameter;
+mod parameter;
 mod prg;
 mod random_oracles;
 // mod rijndael_32;
