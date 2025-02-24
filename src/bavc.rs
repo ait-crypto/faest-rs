@@ -1,7 +1,6 @@
 use core::panic;
 use std::{
     convert, default,
-    f32::consts::TAU,
     marker::PhantomData,
     ops::{Add, Mul},
     process::id,
@@ -127,25 +126,22 @@ pub(crate) trait BatchVectorCommitment {
         Vec<GenericArray<u8, Self::LambdaBytes>>,
     );
 
-    fn open(
-        decom: &(
+    fn open<'a>(
+        decom: &'a (
             Vec<GenericArray<u8, Self::LambdaBytes>>,
             Vec<GenericArray<u8, Self::LambdaBytesTimes3>>,
         ),
         i_delta: &GenericArray<u16, Self::Tau>,
     ) -> Result<
         (
-            Vec<GenericArray<u8, Self::LambdaBytesTimes3>>, // com
-            Vec<GenericArray<u8, Self::LambdaBytes>>,       // nodes
+            Vec<&'a [u8]>, // com
+            Vec<&'a [u8]>, // nodes
         ),
         Box<dyn std::error::Error>,
     >;
 
     fn reconstruct(
-        decom_i: &(
-            Vec<GenericArray<u8, Self::LambdaBytesTimes3>>,
-            Vec<GenericArray<u8, Self::LambdaBytes>>,
-        ),
+        decom_i: &(Vec<&[u8]>, Vec<&[u8]>),
         i_delta: &GenericArray<u16, Self::Tau>,
         iv: &IV,
     ) -> Result<
@@ -243,22 +239,22 @@ where
     }
 
     // TODO: use references instead of cloning values for decommitment info
-    fn open(
-        decom: &(
+    fn open<'a>(
+        decom: &'a (
             Vec<GenericArray<u8, Self::LambdaBytes>>,
             Vec<GenericArray<u8, Self::LambdaBytesTimes3>>,
         ),
         i_delta: &GenericArray<u16, TAU::Tau>,
     ) -> Result<
         (
-            Vec<GenericArray<u8, Self::LambdaBytesTimes3>>, // com
-            Vec<GenericArray<u8, Self::LambdaBytes>>,       // nodes
+            Vec<&'a [u8]>, // com
+            Vec<&'a [u8]>, // nodes
         ),
         Box<dyn std::error::Error>,
     > {
         // Line 3
-        let com_i: Vec<GenericArray<u8, Self::LambdaBytesTimes3>> = (0..TAU::Tau::USIZE)
-            .map(|i| decom.1[TAU::convert_index(i) + i_delta[i] as usize].clone())
+        let com_i: Vec<&[u8]> = (0..TAU::Tau::USIZE)
+            .map(|i| decom.1[TAU::convert_index(i) + i_delta[i] as usize].as_ref())
             .collect();
 
         // Line 5
@@ -282,26 +278,22 @@ where
         }
 
         // Lines 19..23
-        let mut nodes_i: Vec<_> = Vec::with_capacity(TAU::Topen::USIZE);
+        let mut nodes_i: Vec<&[u8]> = Vec::with_capacity(TAU::Topen::USIZE);
         for i in (0..TAU::L::USIZE - 1).rev() {
             if s.contains(2 * i + 1) ^ s.contains(2 * i + 2) {
                 let alpha = 2 * i + 1 + (s.contains(2 * i + 1) as usize);
-                nodes_i.push(decom.0[alpha].clone());
+                nodes_i.push(decom.0[alpha].as_ref());
             }
         }
 
-        // Line 24
-        nodes_i.resize(TAU::Topen::USIZE, GenericArray::default());
+        // Skip step 24: instead of padding with 0s we keep a shorter (nodes) array
 
         Ok((com_i, nodes_i))
     }
 
     // TODO: handle failure case
     fn reconstruct(
-        decom_i: &(
-            Vec<GenericArray<u8, Self::LambdaBytesTimes3>>,
-            Vec<GenericArray<u8, Self::LambdaBytes>>,
-        ),
+        decom_i: &(Vec<&[u8]>, Vec<&[u8]>),
         i_delta: &GenericArray<u16, TAU::Tau>,
         iv: &IV,
     ) -> Result<
@@ -342,14 +334,12 @@ where
             }
         }
 
-        // Steps 22,23
-        while let Some(k) = decom_iter.next() {
-            if *k != GenericArray::default() {
-                return Err("BAVAC reconstruct: cannot expand tree (nodes array too long)".into());
-            }
+        // Step 22: in BAVAC::open we don't actually pad decom with 0s => we must have reached the end of the iterator  
+        if decom_iter.next().is_some() {
+            return Err("BAVAC reconstruct: cannot expand tree (nodes array too long)".into());
         }
 
-        // // Steps 25..27
+        // Steps 25..27
         for i in 0..TAU::L::USIZE - 1 {
             if !s.contains(i) {
                 let mut rng = PRG::new_prg(&keys[i], iv, i as TWK);
@@ -415,6 +405,7 @@ mod test {
         GenericArray,
     };
     use serde::{de::Expected, Deserialize};
+    use serde_json::de;
 
     use crate::{
         parameter::{Tau128Fast, Tau128Small, Tau192Fast, Tau192Small, Tau256Fast, Tau256Small},
@@ -460,7 +451,7 @@ mod test {
         hashed_rec_sd: Vec<u8>,
     }
 
-    type Result<Lambda, Lambda2, Lambda3> = (
+    type Result<'a, Lambda, Lambda2, Lambda3> = (
         // Commit
         (
             GenericArray<u8, Lambda2>,
@@ -472,8 +463,8 @@ mod test {
         ),
         // Open
         (
-            Vec<GenericArray<u8, Lambda3>>, // com
-            Vec<GenericArray<u8, Lambda>>,  // nodes
+            Vec<&'a [u8]>, // com
+            Vec<&'a [u8]>, // nodes
         ),
         // Reconstruct
         (
@@ -486,6 +477,7 @@ mod test {
         Lambda: ArrayLength,
         Lambda2: ArrayLength,
         Lambda3: ArrayLength,
+        TAU: TauParameters,
     >(
         expected: &DataBAVAC,
         res: Result<Lambda, Lambda2, Lambda3>,
@@ -503,12 +495,15 @@ mod test {
         assert_eq!(expected.hashed_com.as_slice(), hashed_coms.as_slice());
 
         // Check decommitment
-        let data_decom = decom_i
+        let mut data_decom: Vec<u8> = decom_i
             .0
-            .iter()
-            .flat_map(|v| v.clone())
-            .chain(decom_i.1.iter().flat_map(|v| v.clone()))
+            .into_iter()
+            .flat_map(|v| v.to_vec())
+            .chain(decom_i.1.into_iter().flat_map(|v| v.to_vec()))
             .collect::<Vec<u8>>();
+        // As we skipped step 22 in BAVAC::commit we need to pad accordingly before checking result  
+        let decom_size = 3 * Lambda::USIZE * TAU::Tau::USIZE + TAU::Topen::USIZE * Lambda::USIZE;
+        data_decom.resize_with(decom_size, Default::default);
         assert_eq!(expected.hashed_decom_i, hash_array(data_decom.as_slice()));
 
         // Check reconstruct
@@ -643,23 +638,20 @@ mod test {
             match data.lambda {
                 128 => {
                     let r = GenericArray::from_slice(&r[..16]);
-                    let res_commit;
-                    let res_open;
-                    let res_reconstruct;
 
                     if data.mode == "s" {
                         println!("FAEST-128s - testing BAVAC..");
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        res_commit = BAVAC::<
+                        let res_commit = BAVAC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
                             Tau128Small,
                         >::commit(r, &iv);
 
-                        res_open = BAVAC::<
+                        let res_open = BAVAC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
@@ -667,7 +659,7 @@ mod test {
                         >::open(&res_commit.1, &i_delta)
                         .unwrap();
 
-                        res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVAC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
@@ -676,26 +668,31 @@ mod test {
                             &res_open, &i_delta, &iv
                         )
                         .unwrap();
+
+                        compare_expected_with_result::<_, _, _, Tau128Small>(
+                            &data,
+                            (res_commit.clone(), res_open, res_reconstruct),
+                        );
                     } else {
                         println!("FAEST-128f - testing BAVAC..");
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        res_commit = BAVAC::<
+                        let res_commit = BAVAC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
                             Tau128Fast,
                         >::commit(r, &iv);
 
-                        res_open =
+                        let res_open =
                             BAVAC::<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>::open(
                                 &res_commit.1,
                                 &i_delta,
                             )
                             .unwrap();
 
-                        res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVAC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
@@ -704,34 +701,37 @@ mod test {
                             &res_open, &i_delta, &iv
                         )
                         .unwrap();
-                    }
 
-                    compare_expected_with_result(&data, (res_commit, res_open, res_reconstruct));
+                        compare_expected_with_result::<_, _, _, Tau128Fast>(
+                            &data,
+                            (res_commit.clone(), res_open, res_reconstruct),
+                        );
+                    }
                 }
                 192 => {
                     let r = GenericArray::from_slice(&r[..24]);
-                    let res_commit;
-                    let res_open;
-                    let res_reconstruct;
 
                     if data.mode == "s" {
                         println!("FAEST-192s - testing BAVAC..");
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        res_commit = BAVAC::<
+                        let res_commit = BAVAC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
                             Tau192Small,
                         >::commit(r, &iv);
 
-                        res_open = BAVAC::<
-                        RandomOracleShake256, PRG192, LeafHasher192, Tau192Small
+                        let res_open = BAVAC::<
+                            RandomOracleShake256,
+                            PRG192,
+                            LeafHasher192,
+                            Tau192Small,
                         >::open(&res_commit.1, &i_delta)
                         .unwrap();
 
-                        res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVAC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
@@ -740,26 +740,31 @@ mod test {
                             &res_open, &i_delta, &iv
                         )
                         .unwrap();
+
+                        compare_expected_with_result::<_, _, _, Tau192Small>(
+                            &data,
+                            (res_commit.clone(), res_open, res_reconstruct),
+                        );
                     } else {
                         println!("FAEST-192f - testing BAVAC..");
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        res_commit = BAVAC::<
+                        let res_commit = BAVAC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
                             Tau192Fast,
                         >::commit(r, &iv);
 
-                        res_open =
+                        let res_open =
                             BAVAC::<RandomOracleShake256, PRG192, LeafHasher192, Tau192Fast>::open(
                                 &res_commit.1,
                                 &i_delta,
                             )
                             .unwrap();
 
-                        res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVAC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
@@ -768,36 +773,34 @@ mod test {
                             &res_open, &i_delta, &iv
                         )
                         .unwrap();
+                        compare_expected_with_result::<_, _, _, Tau192Fast>(
+                            &data,
+                            (res_commit.clone(), res_open, res_reconstruct),
+                        );
                     }
-
-                    compare_expected_with_result(&data, (res_commit, res_open, res_reconstruct));
                 }
                 _ => {
-                    let res_commit;
-                    let res_open;
-                    let res_reconstruct;
-
                     if data.mode == "s" {
                         println!("FAEST-256s - testing BAVAC..");
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        res_commit = BAVAC::<
+                        let res_commit = BAVAC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
                             Tau256Small,
                         >::commit(&r, &iv);
 
-                        res_open = BAVAC::<
-                        RandomOracleShake256,
+                        let res_open = BAVAC::<
+                            RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
                             Tau256Small,
                         >::open(&res_commit.1, &i_delta)
                         .unwrap();
 
-                        res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVAC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
@@ -806,26 +809,30 @@ mod test {
                             &res_open, &i_delta, &iv
                         )
                         .unwrap();
+                        compare_expected_with_result::<_, _, _, Tau256Small>(
+                            &data,
+                            (res_commit.clone(), res_open, res_reconstruct),
+                        );
                     } else {
                         println!("FAEST-256f - testing BAVAC..");
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        res_commit = BAVAC::<
+                        let res_commit = BAVAC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
                             Tau256Fast,
                         >::commit(&r, &iv);
 
-                        res_open = BAVAC::<RandomOracleShake256,
-                        PRG256,
-                        LeafHasher256,
-                        Tau256Fast,
-                        >::open(&res_commit.1, &i_delta)
-                        .unwrap();
+                        let res_open =
+                            BAVAC::<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>::open(
+                                &res_commit.1,
+                                &i_delta,
+                            )
+                            .unwrap();
 
-                        res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVAC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
@@ -834,8 +841,11 @@ mod test {
                             &res_open, &i_delta, &iv
                         )
                         .unwrap();
+                        compare_expected_with_result::<_, _, _, Tau256Fast>(
+                            &data,
+                            (res_commit.clone(), res_open, res_reconstruct),
+                        );
                     }
-                    compare_expected_with_result(&data, (res_commit, res_open, res_reconstruct));
                 }
             }
         }
