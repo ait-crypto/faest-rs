@@ -63,9 +63,9 @@ where
     LH: LeafHasher,
 {
     type LambdaBytes = LH::LambdaBytes;
-    type LambdaBytesTimesTwo = LH::LambdaBytesTwo;
-    type LambdaByesTimesThree = LH::LambdaBytesThree;
-    type LambdaByesTimesFour = LH::LambdaBytesFour;
+    type LambdaBytesTimesTwo = LH::LambdaBytesTimesTwo;
+    type LambdaByesTimesThree = LH::LambdaBytesTimesThree;
+    type LambdaByesTimesFour = LH::LambdaBytesTimesFour;
 
     fn commit(
         r: &GenericArray<u8, Self::LambdaBytes>,
@@ -174,8 +174,8 @@ where
     LH: LeafHasher,
 {
     type LambdaBytes = LH::LambdaBytes;
-    type LambdaBytesTimes2 = LH::LambdaBytesTwo;
-    type LambdaBytesTimes3 = LH::LambdaBytesThree;
+    type LambdaBytesTimes2 = LH::LambdaBytesTimesTwo;
+    type LambdaBytesTimes3 = LH::LambdaBytesTimesThree;
     type LC = LeafCommitment<PRG, LH>;
     type Tau = TAU::Tau;
 

@@ -315,18 +315,18 @@ where
     <<Self::F as Field>::Length as Mul<U4>>::Output: ArrayLength,
 {
     type F: Field + for<'a> From<&'a [u8]>;
-    type ExtensionField: Field<Length = Self::LambdaBytesThree>
+    type ExtensionField: Field<Length = Self::LambdaBytesTimesThree>
         + for<'a> From<&'a [u8]>
         + Mul<Self::F, Output = Self::ExtensionField>;
     type LambdaBytes: ArrayLength;
-    type LambdaBytesTwo: ArrayLength;
-    type LambdaBytesThree: ArrayLength;
-    type LambdaBytesFour: ArrayLength;
+    type LambdaBytesTimesTwo: ArrayLength;
+    type LambdaBytesTimesThree: ArrayLength;
+    type LambdaBytesTimesFour: ArrayLength;
 
     fn finalize(
-        uhash: &GenericArray<u8, Self::LambdaBytesThree>,
-        x: &GenericArray<u8, Self::LambdaBytesFour>,
-    ) -> GenericArray<u8, Self::LambdaBytesThree> {
+        uhash: &GenericArray<u8, Self::LambdaBytesTimesThree>,
+        x: &GenericArray<u8, Self::LambdaBytesTimesFour>,
+    ) -> GenericArray<u8, Self::LambdaBytesTimesThree> {
         let u = <Self as LeafHasher>::ExtensionField::from(uhash.as_slice());
         let x0 =
             <Self as LeafHasher>::F::from(&x[..<<Self as LeafHasher>::F as Field>::Length::USIZE]);
@@ -345,9 +345,9 @@ impl LeafHasher for LeafHasher128 {
     type F = GF128;
     type ExtensionField = GF384;
     type LambdaBytes = <GF128 as Field>::Length;
-    type LambdaBytesTwo = Prod<Self::LambdaBytes, U2>;
-    type LambdaBytesThree = Prod<Self::LambdaBytes, U3>;
-    type LambdaBytesFour = Prod<Self::LambdaBytes, U4>;
+    type LambdaBytesTimesTwo = Prod<Self::LambdaBytes, U2>;
+    type LambdaBytesTimesThree = Prod<Self::LambdaBytes, U3>;
+    type LambdaBytesTimesFour = Prod<Self::LambdaBytes, U4>;
 }
 
 pub(crate) struct LeafHasher192;
@@ -355,9 +355,9 @@ impl LeafHasher for LeafHasher192 {
     type F = GF192;
     type ExtensionField = GF576;
     type LambdaBytes = <GF192 as Field>::Length;
-    type LambdaBytesTwo = Prod<Self::LambdaBytes, U2>;
-    type LambdaBytesThree = Prod<Self::LambdaBytes, U3>;
-    type LambdaBytesFour = Prod<Self::LambdaBytes, U4>;
+    type LambdaBytesTimesTwo = Prod<Self::LambdaBytes, U2>;
+    type LambdaBytesTimesThree = Prod<Self::LambdaBytes, U3>;
+    type LambdaBytesTimesFour = Prod<Self::LambdaBytes, U4>;
 }
 
 pub(crate) struct LeafHasher256;
@@ -365,9 +365,9 @@ impl LeafHasher for LeafHasher256 {
     type F = GF256;
     type ExtensionField = GF768;
     type LambdaBytes = <GF256 as Field>::Length;
-    type LambdaBytesTwo = Prod<Self::LambdaBytes, U2>;
-    type LambdaBytesThree = Prod<Self::LambdaBytes, U3>;
-    type LambdaBytesFour = Prod<Self::LambdaBytes, U4>;
+    type LambdaBytesTimesTwo = Prod<Self::LambdaBytes, U2>;
+    type LambdaBytesTimesThree = Prod<Self::LambdaBytes, U3>;
+    type LambdaBytesTimesFour = Prod<Self::LambdaBytes, U4>;
 }
 
 #[cfg(test)]
