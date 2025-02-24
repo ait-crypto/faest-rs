@@ -7,6 +7,7 @@ use std::{
     vec,
 };
 
+use aes::cipher::KeyInit;
 use bit_set::BitSet;
 
 use generic_array::{
@@ -75,16 +76,15 @@ where
         GenericArray<u8, Self::LambdaBytes>,
         GenericArray<u8, Self::LambdaByesTimesThree>,
     ) {
-        let mut prg = PRG::new_prg(&r, iv, tweak);
-        let mut hash: GenericArray<u8, Self::LambdaByesTimesFour> = GenericArray::default();
-        prg.read(&mut hash);
+        // Step 2
+        let hash: GenericArray<u8, Self::LambdaByesTimesFour> =
+            PRG::new_prg(&r, iv, tweak).read_into();
 
-        let com = LH::finalize(&uhash, &GenericArray::from_slice(&hash));
-
-        // TODO: Find a better way for converting sizes
         let mut sd = GenericArray::default();
         sd.copy_from_slice(&hash[..Self::LambdaBytes::USIZE]);
-        return (sd, com);
+
+        // Step 3
+        return (sd, LH::finalize(&uhash, &hash));
     }
 
     fn commit_em(
@@ -95,11 +95,12 @@ where
         GenericArray<u8, Self::LambdaBytes>,
         GenericArray<u8, Self::LambdaBytesTimesTwo>,
     ) {
-        let mut prg = PRG::new_prg(r, iv, tweak);
-        let mut com = GenericArray::default();
-        prg.read(&mut com);
-        let mut sd = GenericArray::default();
-        sd.copy_from_slice(r);
+        // Step 1
+        let com = PRG::new_prg(r, iv, tweak).read_into();
+
+        // Step 2
+        let sd = r.to_owned();
+
         (sd, com)
     }
 }
@@ -192,12 +193,12 @@ where
         //seeds
         Vec<GenericArray<u8, Self::LambdaBytes>>,
     ) {
-        // step 1..2: init H_0 with IV
+        // Step 3
         let mut h0_hasher = RO::h0_init();
         h0_hasher.update(&iv);
         let mut h0_hasher = h0_hasher.finish();
 
-        //step 5..7: generate GCM tree nodes
+        // Step 5..7
         let l = TAU::L::USIZE;
         let mut k = vec![GenericArray::default(); 2 * l - 1];
         k[0].copy_from_slice(r);
@@ -208,20 +209,19 @@ where
             prg.read(&mut k[2 * alpha + 2]);
         }
 
-        //setp 8..13: generate seeds and commitment
+        // Setps 8..13
         let mut com_hasher = RO::h1_init();
         let mut sd = vec![GenericArray::default(); TAU::L::USIZE];
         let mut com = vec![GenericArray::default(); TAU::L::USIZE];
-
         for i in 0..TAU::Tau::USIZE {
+            // Step 2
             let mut hi_hasher = RO::h1_init();
             let mut uhash_i = GenericArray::default();
             h0_hasher.read(&mut uhash_i);
 
-            let n_i: usize = TAU::bavac_max_node_index(i);
+            let n_i = TAU::bavac_max_node_index(i);
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i, j);
-
                 let idx = TAU::convert_index(i) + j;
                 let tweak = (i + l - 1) as TWK;
 
@@ -229,12 +229,14 @@ where
                 hi_hasher.update(&com[idx]);
             }
 
-            let hi: GenericArray<u8, Self::LambdaBytesTimes2> = hi_hasher.finish().read_into();
-            com_hasher.update(&hi);
+            // Step 14
+            com_hasher.update(&hi_hasher.finish().read_into::<Self::LambdaBytesTimes2>());
         }
 
+        // Steps 15, 16
         let decom = (k, com);
         let com = com_hasher.finish().read_into();
+
         (com, decom, sd)
     }
 
@@ -252,15 +254,10 @@ where
         ),
         Box<dyn std::error::Error>,
     > {
-        // Line 3
-        let com_i: Vec<&[u8]> = (0..TAU::Tau::USIZE)
-            .map(|i| decom.1[TAU::convert_index(i) + i_delta[i] as usize].as_ref())
-            .collect();
-
-        // Line 5
+        // Step 5
         let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
 
-        // Line 6 ..15
+        // Steps 6 ..15
         let mut n_h = 0;
         for i in 0..TAU::Tau::USIZE {
             let mut alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
@@ -272,21 +269,29 @@ where
             }
         }
 
-        // Line 16
+        // Step 16
         if n_h - 2 * TAU::Tau::USIZE + 1 > TAU::Topen::USIZE {
             return Err("BAVAC open: Chosen path larger than treshold".into());
         }
 
-        // Lines 19..23
-        let mut nodes_i: Vec<&[u8]> = Vec::with_capacity(TAU::Topen::USIZE);
-        for i in (0..TAU::L::USIZE - 1).rev() {
-            if s.contains(2 * i + 1) ^ s.contains(2 * i + 2) {
-                let alpha = 2 * i + 1 + (s.contains(2 * i + 1) as usize);
-                nodes_i.push(decom.0[alpha].as_ref());
-            }
-        }
+        // Steps 19..23
+        let nodes_i = (0..TAU::L::USIZE - 1)
+            .rev()
+            .filter_map(|i| {
+                if s.contains(2 * i + 1) ^ s.contains(2 * i + 2) {
+                    let alpha = 2 * i + 1 + (s.contains(2 * i + 1) as usize);
+                    return Some(decom.0[alpha].as_ref());
+                }
+                None
+            })
+            .collect();
 
-        // Skip step 24: instead of padding with 0s we keep a shorter (nodes) array
+        // Skip step 24: as we know expected nodes len we can keep the 0s-pad implicit
+
+        // Step 3
+        let com_i = (0..TAU::Tau::USIZE)
+            .map(|i| decom.1[TAU::convert_index(i) + i_delta[i] as usize].as_ref())
+            .collect();
 
         Ok((com_i, nodes_i))
     }
@@ -334,7 +339,7 @@ where
             }
         }
 
-        // Step 22: in BAVAC::open we don't actually pad decom with 0s => we must have reached the end of the iterator  
+        // Step 22: in BAVAC::open we don't actually pad decom with 0s => we must have reached the end of the iterator
         if decom_iter.next().is_some() {
             return Err("BAVAC reconstruct: cannot expand tree (nodes array too long)".into());
         }
@@ -355,15 +360,15 @@ where
 
         // Steps 28..34
         let mut h1_com_hasher = RO::h1_init();
-        let mut seeds = Vec::new();
+        let mut seeds = Vec::with_capacity(TAU::L::USIZE - TAU::Tau::USIZE);
         let mut com_it = decom_i.0.iter();
 
         for i in 0..TAU::Tau::USIZE {
+            // Step 3
             let mut uhash_i = GenericArray::default();
             h0_hasher.read(&mut uhash_i);
 
             let mut h1_hasher = RO::h1_init();
-
             for j in 0..TAU::bavac_max_node_index(i) {
                 let alpha = TAU::pos_in_tree(i, j);
                 // Step 33
@@ -387,6 +392,8 @@ where
                     }
                 }
             }
+
+            // Step 37
             h1_com_hasher.update(&h1_hasher.finish().read_into::<Self::LambdaBytesTimes2>());
         }
 
@@ -501,7 +508,7 @@ mod test {
             .flat_map(|v| v.to_vec())
             .chain(decom_i.1.into_iter().flat_map(|v| v.to_vec()))
             .collect::<Vec<u8>>();
-        // As we skipped step 22 in BAVAC::commit we need to pad accordingly before checking result  
+        // As we skipped step 22 in BAVAC::commit we need to pad accordingly before checking result
         let decom_size = 3 * Lambda::USIZE * TAU::Tau::USIZE + TAU::Topen::USIZE * Lambda::USIZE;
         data_decom.resize_with(decom_size, Default::default);
         assert_eq!(expected.hashed_decom_i, hash_array(data_decom.as_slice()));
