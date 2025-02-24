@@ -4,10 +4,11 @@ use aes::{
 };
 use generic_array::{
     typenum::{
-        Diff, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1024, U11, U112, U12, U128, U14, U142, U152,
-        U16, U160, U16384, U192, U2, U200, U2048, U22, U24, U256, U288, U3, U32, U32768, U384, U4,
-        U40, U408, U4096, U448, U470, U476, U48, U5, U500, U511, U512, U52, U56, U576, U584, U596,
-        U6, U600, U64, U640, U65536, U672, U7, U752, U8, U8192, U832, U96,
+        Diff, Prod, Quot, Sum, Unsigned, U0, U1, U10, U102, U1024, U11, U110, U112, U12, U128, U14,
+        U142, U152, U16, U160, U162, U163, U16384, U192, U2, U200, U2048, U22, U24, U245, U246,
+        U256, U288, U3, U32, U32768, U384, U4, U40, U408, U4096, U448, U470, U476, U48, U5, U500,
+        U511, U512, U52, U56, U576, U584, U596, U6, U600, U64, U640, U65536, U672, U7, U752, U8,
+        U8192, U832, U96,
     },
     ArrayLength, GenericArray,
 };
@@ -671,7 +672,7 @@ pub(crate) trait TauParameters {
     type Tau0: ArrayLength;
     type Tau1: ArrayLength;
     type L: ArrayLength;
-    type NLeafCom: ArrayLength;
+    type Topen: ArrayLength;
     // fn decode_challenge(chal: &[u8], i: usize) -> Vec<u8> {
     //     Self::decode_challenge_as_iter(chal, i).collect()
     // }
@@ -719,6 +720,7 @@ pub(crate) trait TauParameters {
 
     fn pos_in_tree(i: usize, j: usize) -> usize {
         let tmp = 1usize << (Self::K::USIZE - 1);
+
         if j < tmp {
             return Self::L::USIZE - 1 + Self::Tau::USIZE * j + i;
         }
@@ -749,7 +751,7 @@ impl TauParameters for Tau128Small {
     type L = Prod<U11, U2048>;
     type Tau0 = U11;
     type Tau1 = U0;
-    type NLeafCom = U3;
+    type Topen = U102;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -761,7 +763,7 @@ impl TauParameters for Tau128Fast {
     type L = Sum<Prod<U8, U256>, Prod<U8, U128>>;
     type Tau0 = U8;
     type Tau1 = U8;
-    type NLeafCom = U3;
+    type Topen = U110;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -773,7 +775,7 @@ impl TauParameters for Tau192Small {
     type L = Sum<Prod<U12, U2048>, Prod<U4, U4096>>;
     type Tau0 = U12;
     type Tau1 = U4;
-    type NLeafCom = U3;
+    type Topen = U162;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -785,7 +787,7 @@ impl TauParameters for Tau192Fast {
     type L = Sum<Prod<U8, U128>, Prod<U16, U256>>;
     type Tau0 = U8;
     type Tau1 = U16;
-    type NLeafCom = U3;
+    type Topen = U163;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -797,7 +799,7 @@ impl TauParameters for Tau256Small {
     type L = Sum<Prod<U14, U2048>, Prod<U8, U4096>>;
     type Tau0 = U14;
     type Tau1 = U8;
-    type NLeafCom = U3;
+    type Topen = U245;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -809,7 +811,7 @@ impl TauParameters for Tau256Fast {
     type L = Sum<Prod<U8, U128>, Prod<U24, U256>>;
     type Tau0 = U8;
     type Tau1 = U24;
-    type NLeafCom = U3;
+    type Topen = U246;
 }
 
 // pub(crate) trait FAESTParameters {
