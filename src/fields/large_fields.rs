@@ -939,6 +939,8 @@ impl Distribution<GF256> for Standard {
     }
 }
 
+
+// I haven't implemented BigGaloisField as we only need a restricted set of operations
 /// Type representing binary Galois field of size `2^384`
 pub type GF384 = BigGF<u128, 3, 384>;
 
@@ -994,6 +996,20 @@ impl Mul<GF128> for GF384 {
     }
 }
 
+impl Mul<&GF128> for GF384 {
+    type Output = Self;
+    fn mul(mut self, rhs: &GF128) -> Self::Output {
+        let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
+        for idx in 1..128 {
+            let mask = self.to_mask();
+            self = self.shift_left_1();
+            self.0[0] ^= mask & Self::MODULUS;
+            result += self.copy_apply_mask(rhs.to_mask_bit(idx));
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 impl Distribution<GF384> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF384 {
@@ -1001,8 +1017,9 @@ impl Distribution<GF384> for Standard {
     }
 }
 
+
 /// Type representing binary Galois field of size `2^576`
-pub type GF576 = BigGF<u128, 5, 576>;
+pub type GF576 = BigGF<u128, 5, 576>; 
 
 impl Modulus<u128> for GF576 {
     const MODULUS: u128 = 0b10000000011001u128;
@@ -1036,6 +1053,20 @@ impl Field for GF576 {
 impl Mul<GF192> for GF576 {
     type Output = Self;
     fn mul(mut self, rhs: GF192) -> Self::Output {
+        let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
+        for idx in 1..192 {
+            let mask = self.to_mask();
+            self = self.shift_left_1();
+            self.0[0] ^= mask & Self::MODULUS;
+            result += self.copy_apply_mask(rhs.to_mask_bit(idx));
+        }
+        result
+    }
+}
+
+impl Mul<&GF192> for GF576 {
+    type Output = Self;
+    fn mul(mut self, rhs: &GF192) -> Self::Output {
         let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
         for idx in 1..192 {
             let mask = self.to_mask();
@@ -1118,6 +1149,20 @@ impl From<&[u8]> for GF768 {
 impl Mul<GF256> for GF768 {
     type Output = Self;
     fn mul(mut self, rhs: GF256) -> Self::Output {
+        let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
+        for idx in 1..256 {
+            let mask = self.to_mask();
+            self = self.shift_left_1();
+            self.0[0] ^= mask & Self::MODULUS;
+            result += self.copy_apply_mask(rhs.to_mask_bit(idx));
+        }
+        result
+    }
+}
+
+impl Mul<&GF256> for GF768 {
+    type Output = Self;
+    fn mul(mut self, rhs: &GF256) -> Self::Output {
         let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
         for idx in 1..256 {
             let mask = self.to_mask();
