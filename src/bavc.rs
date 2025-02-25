@@ -206,6 +206,99 @@ where
     TAU: TauParameters,
     LH: LeafHasher;
 
+impl<RO, PRG, LH, TAU> BAVAC<RO, PRG, LH, TAU>
+where
+    RO: RandomOracle,
+    PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
+    TAU: TauParameters,
+    LH: LeafHasher,
+{
+
+    #[inline(always)]
+    fn construct_keys(r: &GenericArray<u8, LH::LambdaBytes>, iv: &IV) -> Vec<GenericArray<u8, <LH as LeafHasher>::LambdaBytes>>{
+        let mut keys = vec![GenericArray::default(); 2 * TAU::L::USIZE - 1];
+        keys[0].copy_from_slice(r);
+
+        for alpha in 0..TAU::L::USIZE - 1 {
+            let mut prg = PRG::new_prg(&keys[alpha], &iv, alpha as TWK);
+            prg.read(&mut keys[2 * alpha + 1]);
+            prg.read(&mut keys[2 * alpha + 2]);
+        }
+
+        keys
+    }
+
+    #[inline(always)]
+    fn reconstruct_keys(s: &mut BitSet, decom_keys: &[&[u8]], i_delta: &GenericArray<u16, TAU::Tau>, iv: &IV) -> Option<Vec<GenericArray<u8, LH::LambdaBytes>>>{
+        // Steps 8..11
+        for i in 0..TAU::Tau::USIZE {
+            let alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
+            s.insert(alpha);
+        }
+
+        // Steps 13..21
+        let mut keys = vec![GenericArray::default(); 2 * TAU::L::USIZE - 1];
+        let mut decom_iter = decom_keys.iter();
+        for i in (0..TAU::L::USIZE - 1).rev() {
+            let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
+
+            if left_child | right_child {
+                s.insert(i);
+            }
+
+            if left_child ^ right_child {
+                if let Some(key) = decom_iter.next() {
+                    let alpha = 2 * i + 1 + (left_child as usize);
+                    keys[alpha].copy_from_slice(key);
+                } else {
+                    return None;
+                }
+            }
+        }
+
+        // Step 22: in BAVAC::open we don't actually pad decom with 0s => we must have reached the end of the iterator
+        if decom_iter.next().is_some() {
+            return None;
+        }
+
+        // Steps 25..27
+        for i in 0..TAU::L::USIZE - 1 {
+            if !s.contains(i) {
+                let mut rng = PRG::new_prg(&keys[i], iv, i as TWK);
+                rng.read(&mut keys[2 * i + 1]);
+                rng.read(&mut keys[2 * i + 2]);
+            }
+        }
+
+        Some(keys)
+    }
+
+
+    #[inline(always)]
+    fn mark_nodes(s: &mut BitSet, i_delta: &GenericArray<u16, TAU::Tau>) -> Option<u32> {
+        
+        // Steps 6 ..15
+        let mut n_h = 0;
+        for i in 0..TAU::Tau::USIZE {
+            let mut alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
+            s.insert(alpha);
+            n_h += 1;
+            while alpha > 0 && s.insert((alpha - 1) / 2) {
+                alpha = (alpha - 1) / 2;
+                n_h += 1;
+            }
+        }
+        
+        // Step 16
+        if n_h - 2 * TAU::Tau::U32 + 1 > TAU::Topen::U32 {
+            return None;
+        }
+
+        Some(n_h)
+    }
+
+}
+
 impl<RO, PRG, LH, TAU> BatchVectorCommitment for BAVAC<RO, PRG, LH, TAU>
 where
     RO: RandomOracle,
@@ -238,34 +331,26 @@ where
         h0_hasher.update(&iv);
         let mut h0_hasher = h0_hasher.finish();
 
-        // Step 5..7
-        let l = TAU::L::USIZE;
-        let mut k = vec![GenericArray::default(); 2 * l - 1];
-        k[0].copy_from_slice(r);
-
-        for alpha in 0..l - 1 {
-            let mut prg = PRG::new_prg(&k[alpha], &iv, alpha as TWK);
-            prg.read(&mut k[2 * alpha + 1]);
-            prg.read(&mut k[2 * alpha + 2]);
-        }
+        // Steps 5..7
+        let keys = Self::construct_keys(r, iv);
 
         // Setps 8..13
         let mut com_hasher = RO::h1_init();
         let mut sd = vec![GenericArray::default(); TAU::L::USIZE];
         let mut com = vec![GenericArray::default(); TAU::L::USIZE];
-        for i in 0..TAU::Tau::USIZE {
+        for i in 0..TAU::Tau::U32 {
             // Step 2
             let mut hi_hasher = RO::h1_init();
             let mut uhash_i = GenericArray::default();
             h0_hasher.read(&mut uhash_i);
 
-            let n_i = TAU::bavac_max_node_index(i);
+            let n_i = TAU::bavac_max_node_index(i as usize);
             for j in 0..n_i {
-                let alpha = TAU::pos_in_tree(i, j);
-                let idx = TAU::convert_index(i) + j;
-                let tweak = (i + l - 1) as TWK;
+                let alpha = TAU::pos_in_tree(i as usize, j);
+                let idx = TAU::convert_index(i as usize) + j;
+                let tweak = i + TAU::L::U32 - 1;
 
-                (sd[idx], com[idx]) = Self::LC::commit(&k[alpha], &iv, tweak, &uhash_i);
+                (sd[idx], com[idx]) = Self::LC::commit(&keys[alpha], &iv, tweak, &uhash_i);
                 hi_hasher.update(&com[idx]);
             }
 
@@ -274,7 +359,7 @@ where
         }
 
         // Steps 15, 16
-        let decom = (k, com);
+        let decom = (keys, com);
         let com = com_hasher.finish().read_into();
 
         (com, decom, sd)
@@ -293,20 +378,8 @@ where
         // Step 5
         let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
 
-        // Steps 6 ..15
-        let mut n_h = 0;
-        for i in 0..TAU::Tau::USIZE {
-            let mut alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
-            s.insert(alpha);
-            n_h += 1;
-            while alpha > 0 && s.insert((alpha - 1) / 2) {
-                alpha = (alpha - 1) / 2;
-                n_h += 1;
-            }
-        }
-
-        // Step 16
-        if n_h - 2 * TAU::Tau::USIZE + 1 > TAU::Topen::USIZE {
+        // Steps 6..17
+        if Self::mark_nodes(&mut s, i_delta).is_none(){
             return None;
         }
 
@@ -343,44 +416,10 @@ where
         // Step 7
         let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
 
-        // Steps 8..11
-        for i in 0..TAU::Tau::USIZE {
-            let alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
-            s.insert(alpha);
-        }
-
-        // Steps 13..21
-        let mut keys = vec![GenericArray::default(); 2 * TAU::L::USIZE - 1];
-        let mut decom_iter = decom_i.1.iter();
-        for i in (0..TAU::L::USIZE - 1).rev() {
-            let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
-
-            if left_child | right_child {
-                s.insert(i);
-            }
-
-            if left_child ^ right_child {
-                if let Some(key) = decom_iter.next() {
-                    let alpha = 2 * i + 1 + (left_child as usize);
-                    keys[alpha].copy_from_slice(key);
-                } else {
-                    return None;
-                }
-            }
-        }
-
-        // Step 22: in BAVAC::open we don't actually pad decom with 0s => we must have reached the end of the iterator
-        if decom_iter.next().is_some() {
+        // Steps 8..27
+        let keys = Self::reconstruct_keys(&mut s, &decom_i.1, i_delta, iv).unwrap_or_default();
+        if keys.is_empty() {
             return None;
-        }
-
-        // Steps 25..27
-        for i in 0..TAU::L::USIZE - 1 {
-            if !s.contains(i) {
-                let mut rng = PRG::new_prg(&keys[i], iv, i as TWK);
-                rng.read(&mut keys[2 * i + 1]);
-                rng.read(&mut keys[2 * i + 2]);
-            }
         }
 
         // Step 4
@@ -393,22 +432,20 @@ where
         let mut seeds = Vec::with_capacity(TAU::L::USIZE - TAU::Tau::USIZE);
         let mut com_it = decom_i.0.iter();
 
-        for i in 0..TAU::Tau::USIZE {
+        for i in 0u32..TAU::Tau::U32 {
             // Step 3
             let mut uhash_i = GenericArray::default();
             h0_hasher.read(&mut uhash_i);
 
             let mut h1_hasher = RO::h1_init();
-            for j in 0..TAU::bavac_max_node_index(i) {
-                let alpha = TAU::pos_in_tree(i, j);
+
+
+            let n_i = TAU::bavac_max_node_index(i as usize);
+            for j in 0..n_i {
+                let alpha = TAU::pos_in_tree(i as usize, j);
                 // Step 33
                 if !s.contains(alpha) {
-                    let (sd, h) = Self::LC::commit(
-                        &keys[alpha],
-                        iv,
-                        (i + TAU::L::USIZE - 1) as TWK,
-                        &uhash_i,
-                    );
+                    let (sd, h) = Self::LC::commit(&keys[alpha], iv, i + TAU::L::U32 - 1, &uhash_i);
 
                     seeds.push(sd);
                     h1_hasher.update(&h);
@@ -458,31 +495,23 @@ where
         //seeds
         Vec<GenericArray<u8, Self::LambdaBytes>>,
     ) {
-        // Step 5..7
-        let l = TAU::L::USIZE;
-        let mut k = vec![GenericArray::default(); 2 * l - 1];
-        k[0].copy_from_slice(r);
-
-        for alpha in 0..l - 1 {
-            let mut prg = PRG::new_prg(&k[alpha], &iv, alpha as TWK);
-            prg.read(&mut k[2 * alpha + 1]);
-            prg.read(&mut k[2 * alpha + 2]);
-        }
+        // Steps 5..7
+        let keys = Self::construct_keys(r, iv);
 
         // Setps 8..13
         let mut com_hasher = RO::h1_init();
         let mut sd = vec![GenericArray::default(); TAU::L::USIZE];
         let mut com = vec![GenericArray::default(); TAU::L::USIZE];
-        for i in 0..TAU::Tau::USIZE {
+        for i in 0..TAU::Tau::U32 {
             let mut hi_hasher = RO::h1_init();
 
-            let n_i = TAU::bavac_max_node_index(i);
+            let n_i = TAU::bavac_max_node_index(i as usize);
             for j in 0..n_i {
-                let alpha = TAU::pos_in_tree(i, j);
-                let idx = TAU::convert_index(i) + j;
-                let tweak = (i + l - 1) as TWK;
+                let alpha = TAU::pos_in_tree(i as usize, j);
+                let idx = TAU::convert_index(i as usize) + j;
+                let tweak = i + TAU::L::U32 - 1;
 
-                (sd[idx], com[idx]) = Self::LC::commit_em(&k[alpha], &iv, tweak);
+                (sd[idx], com[idx]) = Self::LC::commit_em(&keys[alpha], &iv, tweak);
 
                 // Step 13
                 hi_hasher.update(&com[idx]);
@@ -493,9 +522,8 @@ where
         }
 
         // Steps 15, 16
-        let decom = (k, com);
+        let decom = (keys, com);
         let com = com_hasher.finish().read_into();
-
         (com, decom, sd)
     }
 
@@ -512,20 +540,8 @@ where
         // Step 5
         let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
 
-        // Steps 6 ..15
-        let mut n_h = 0;
-        for i in 0..TAU::Tau::USIZE {
-            let mut alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
-            s.insert(alpha);
-            n_h += 1;
-            while alpha > 0 && s.insert((alpha - 1) / 2) {
-                alpha = (alpha - 1) / 2;
-                n_h += 1;
-            }
-        }
-
-        // Step 16
-        if n_h - 2 * TAU::Tau::USIZE + 1 > TAU::Topen::USIZE {
+        // Steps 6..17
+        if Self::mark_nodes(&mut s, i_delta).is_none(){
             return None;
         }
 
@@ -569,37 +585,9 @@ where
         }
 
         // Steps 13..21
-        let mut keys = vec![GenericArray::default(); 2 * TAU::L::USIZE - 1];
-        let mut decom_iter = decom_i.1.iter();
-        for i in (0..TAU::L::USIZE - 1).rev() {
-            let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
-
-            if left_child | right_child {
-                s.insert(i);
-            }
-
-            if left_child ^ right_child {
-                if let Some(key) = decom_iter.next() {
-                    let alpha = 2 * i + 1 + (left_child as usize);
-                    keys[alpha].copy_from_slice(key);
-                } else {
-                    return None;
-                }
-            }
-        }
-
-        // Step 22: in BAVAC::open we don't actually pad decom with 0s => we must have reached the end of the iterator
-        if decom_iter.next().is_some() {
+        let keys = Self::reconstruct_keys(&mut s, &decom_i.1, i_delta, iv).unwrap_or_default();
+        if keys.is_empty() {
             return None;
-        }
-
-        // Steps 25..27
-        for i in 0..TAU::L::USIZE - 1 {
-            if !s.contains(i) {
-                let mut rng = PRG::new_prg(&keys[i], iv, i as TWK);
-                rng.read(&mut keys[2 * i + 1]);
-                rng.read(&mut keys[2 * i + 2]);
-            }
         }
 
         // Steps 28..34
@@ -607,26 +595,26 @@ where
         let mut seeds = Vec::with_capacity(TAU::L::USIZE - TAU::Tau::USIZE);
         let mut com_it = decom_i.0.iter();
 
-        for i in 0..TAU::Tau::USIZE {
+        for i in 0u32..TAU::Tau::U32 {
             let mut h1_hasher = RO::h1_init();
 
-            for j in 0..TAU::bavac_max_node_index(i) {
-                let alpha = TAU::pos_in_tree(i, j);
+            let n_i = TAU::bavac_max_node_index(i as usize);
+            for j in 0..n_i {
+                let alpha = TAU::pos_in_tree(i as usize, j);
+                
                 // Step 33
                 if !s.contains(alpha) {
-                    let (sd, h) =
-                        Self::LC::commit_em(&keys[alpha], iv, (i + TAU::L::USIZE - 1) as TWK);
+                    let (sd, h) = Self::LC::commit_em(&keys[alpha], iv, i + TAU::L::U32 - 1);
 
                     seeds.push(sd);
                     h1_hasher.update(&h);
                 }
+
                 // Step 31
-                else {
-                    if let Some(com_ij) = com_it.next() {
+                else if let Some(com_ij) = com_it.next() {
                         h1_hasher.update(com_ij);
-                    } else {
-                        return None;
-                    }
+                } else {
+                    return None;
                 }
             }
 
@@ -937,7 +925,7 @@ mod test {
 
                         let res_open =
                             BAVAC::<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>::open(
-                                (&res_commit.1.0, &res_commit.1.1),
+                                (&res_commit.1 .0, &res_commit.1 .1),
                                 &i_delta,
                             )
                             .unwrap();
@@ -980,7 +968,9 @@ mod test {
                             PRG192,
                             LeafHasher192,
                             Tau192Small,
-                        >::open((&res_commit.1.0, &res_commit.1.1), &i_delta)
+                        >::open(
+                            (&res_commit.1 .0, &res_commit.1 .1), &i_delta
+                        )
                         .unwrap();
 
                         let res_reconstruct = BAVAC::<
@@ -1013,7 +1003,7 @@ mod test {
 
                         let res_open =
                             BAVAC::<RandomOracleShake256, PRG192, LeafHasher192, Tau192Fast>::open(
-                                (&res_commit.1.0, &res_commit.1.1),
+                                (&res_commit.1 .0, &res_commit.1 .1),
                                 &i_delta,
                             )
                             .unwrap();
@@ -1053,7 +1043,9 @@ mod test {
                             PRG256,
                             LeafHasher256,
                             Tau256Small,
-                        >::open((&res_commit.1.0, &res_commit.1.1), &i_delta)
+                        >::open(
+                            (&res_commit.1 .0, &res_commit.1 .1), &i_delta
+                        )
                         .unwrap();
 
                         let res_reconstruct = BAVAC::<
@@ -1085,7 +1077,7 @@ mod test {
 
                         let res_open =
                             BAVAC::<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>::open(
-                                (&res_commit.1.0, &res_commit.1.1),
+                                (&res_commit.1 .0, &res_commit.1 .1),
                                 &i_delta,
                             )
                             .unwrap();
@@ -1199,7 +1191,9 @@ mod test {
                             PRG128,
                             LeafHasher128,
                             Tau128Small,
-                        >::open_em((&res_commit.1.0, &res_commit.1.1), &i_delta)
+                        >::open_em(
+                            (&res_commit.1 .0, &res_commit.1 .1), &i_delta
+                        )
                         .unwrap();
 
                         let res_reconstruct = BAVAC::<
@@ -1230,7 +1224,7 @@ mod test {
 
                         let res_open =
                             BAVAC::<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>::open(
-                                (&res_commit.1.0, &res_commit.1.1),
+                                (&res_commit.1 .0, &res_commit.1 .1),
                                 &i_delta,
                             )
                             .unwrap();
