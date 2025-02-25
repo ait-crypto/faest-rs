@@ -307,7 +307,6 @@ where
     }
 }
 
-// Could take the GaloisField as generic arguement. Should we comply to init-update-finalize paradigm?
 pub(crate) trait LeafHasher
 where
     <Self::F as Field>::Length: Add<<Self::F as Field>::Length> + Mul<U3> + Mul<U4>,
@@ -317,13 +316,14 @@ where
     type F: Field + for<'a> From<&'a [u8]>;
     type ExtensionField: Field<Length = Self::LambdaBytesTimesThree>
         + for<'a> From<&'a [u8]>
+        + for<'a> Mul<&'a Self::F, Output = Self::ExtensionField>
         + Mul<Self::F, Output = Self::ExtensionField>;
     type LambdaBytes: ArrayLength;
     type LambdaBytesTimesTwo: ArrayLength;
     type LambdaBytesTimesThree: ArrayLength;
     type LambdaBytesTimesFour: ArrayLength;
 
-    fn finalize(
+    fn hash(
         uhash: &GenericArray<u8, Self::LambdaBytesTimesThree>,
         x: &GenericArray<u8, Self::LambdaBytesTimesFour>,
     ) -> GenericArray<u8, Self::LambdaBytesTimesThree> {
@@ -502,7 +502,7 @@ mod test {
             let uhash = GenericArray::from_slice(&data.uhash);
             let expected_h = GenericArray::from_slice(&data.expected_h);
 
-            let h = LeafHasher128::finalize(&uhash, &x);
+            let h = LeafHasher128::hash(&uhash, &x);
             assert_eq!(h, *expected_h)
         }
     }
@@ -516,7 +516,7 @@ mod test {
             let uhash = GenericArray::from_slice(&data.uhash);
             let expected_h = GenericArray::from_slice(&data.expected_h);
 
-            let h = LeafHasher192::finalize(&uhash, &x);
+            let h = LeafHasher192::hash(&uhash, &x);
             assert_eq!(h, *expected_h)
         }
     }
@@ -530,7 +530,7 @@ mod test {
             let uhash = GenericArray::from_slice(&data.uhash);
             let expected_h = GenericArray::from_slice(&data.expected_h);
 
-            let h = LeafHasher256::finalize(&uhash, &x);
+            let h = LeafHasher256::hash(&uhash, &x);
             assert_eq!(h, *expected_h)
         }
     }
