@@ -4,7 +4,11 @@ use aes::{
 };
 use generic_array::{
     typenum::{
-        Diff, Prod, Quot, Sum, Unsigned, U0, U1, U10, U102, U1024, U103, U11, U110, U112, U12, U128, U14, U142, U152, U16, U160, U162, U163, U16384, U176, U192, U2, U200, U2048, U218, U22, U234, U24, U245, U246, U256, U288, U3, U32, U32768, U384, U4, U40, U408, U4096, U448, U470, U476, U48, U5, U500, U511, U512, U52, U56, U576, U584, U596, U6, U600, U64, U640, U65536, U672, U7, U752, U8, U8192, U832, U96
+        Diff, Prod, Quot, Sum, Unsigned, U0, U1, U10, U102, U1024, U103, U11, U110, U112, U12,
+        U128, U14, U142, U152, U16, U160, U162, U163, U16384, U176, U192, U2, U200, U2048, U218,
+        U22, U234, U24, U245, U246, U256, U288, U3, U32, U32768, U384, U4, U40, U408, U4096, U448,
+        U470, U476, U48, U5, U500, U511, U512, U52, U56, U576, U584, U596, U6, U600, U64, U640,
+        U65536, U672, U7, U752, U8, U8192, U832, U96,
     },
     ArrayLength, GenericArray,
 };
@@ -669,6 +673,7 @@ pub(crate) trait TauParameters {
     type Tau1: ArrayLength;
     type L: ArrayLength;
     type Topen: ArrayLength;
+
     // fn decode_challenge(chal: &[u8], i: usize) -> Vec<u8> {
     //     Self::decode_challenge_as_iter(chal, i).collect()
     // }
@@ -711,8 +716,7 @@ pub(crate) trait TauParameters {
             return Self::K::USIZE * i;
         }
 
-        Self::Tau1::USIZE * (Self::K::USIZE)
-            + (Self::K::USIZE - 1) * (i - Self::Tau1::USIZE)
+        Self::Tau1::USIZE * (Self::K::USIZE) + (Self::K::USIZE - 1) * (i - Self::Tau1::USIZE)
     }
 
     fn bavac_max_node_depth(i: usize) -> usize {
@@ -751,6 +755,7 @@ pub(crate) trait TauParameters {
     // }
 }
 
+// FAEST
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Tau128Small;
 
@@ -764,18 +769,6 @@ impl TauParameters for Tau128Small {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Tau128SmallEM;
-
-impl TauParameters for Tau128SmallEM {
-    type Tau = U11;
-    type K = U12;
-    type L = Prod<U11, U2048>;
-    type Tau0 = U11;
-    type Tau1 = U0;
-    type Topen = U103;
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Tau128Fast;
 
 impl TauParameters for Tau128Fast {
@@ -785,18 +778,6 @@ impl TauParameters for Tau128Fast {
     type Tau0 = U8;
     type Tau1 = U8;
     type Topen = U110;
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Tau128FastEM;
-
-impl TauParameters for Tau128FastEM {
-    type Tau = U16;
-    type K = U8;
-    type L = Sum<Prod<U8, U256>, Prod<U8, U128>>;
-    type Tau0 = U8;
-    type Tau1 = U8;
-    type Topen = U112;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -824,31 +805,6 @@ impl TauParameters for Tau192Fast {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Tau192SmallEM;
-
-impl TauParameters for Tau192SmallEM {
-    type Tau = U16;
-    type K = U12;
-    type L = Sum<Prod<U8, U2048>, Prod<U8, U4096>>;
-    type Tau0 = U8;
-    type Tau1 = U8;
-    type Topen = U162;
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Tau192FastEM;
-
-impl TauParameters for Tau192FastEM {
-    type Tau = U24;
-    type K = U8;
-    type L = Sum<Prod<U8, U128>, Prod<U16, U256>>;
-    type Tau0 = U8;
-    type Tau1 = U16;
-    type Topen = U176;
-}
-
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Tau256Small;
 
 impl TauParameters for Tau256Small {
@@ -872,6 +828,53 @@ impl TauParameters for Tau256Fast {
     type Topen = U246;
 }
 
+// FAEST-EM
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau128SmallEM;
+
+impl TauParameters for Tau128SmallEM {
+    type Tau = U11;
+    type K = U12;
+    type L = Prod<U11, U2048>;
+    type Tau0 = U11;
+    type Tau1 = U0;
+    type Topen = U103;
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau128FastEM;
+
+impl TauParameters for Tau128FastEM {
+    type Tau = U16;
+    type K = U8;
+    type L = Sum<Prod<U8, U256>, Prod<U8, U128>>;
+    type Tau0 = U8;
+    type Tau1 = U8;
+    type Topen = U112;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau192SmallEM;
+
+impl TauParameters for Tau192SmallEM {
+    type Tau = U16;
+    type K = U12;
+    type L = Sum<Prod<U8, U2048>, Prod<U8, U4096>>;
+    type Tau0 = U8;
+    type Tau1 = U8;
+    type Topen = U162;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau192FastEM;
+
+impl TauParameters for Tau192FastEM {
+    type Tau = U24;
+    type K = U8;
+    type L = Sum<Prod<U8, U128>, Prod<U16, U256>>;
+    type Tau0 = U8;
+    type Tau1 = U16;
+    type Topen = U176;
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Tau256SmallEM;
@@ -896,7 +899,6 @@ impl TauParameters for Tau256FastEM {
     type Tau1 = U24;
     type Topen = U234;
 }
-
 
 // pub(crate) trait FAESTParameters {
 //     type OWF: OWFParameters;
