@@ -81,7 +81,7 @@ mod random_oracles;
 mod bavc;
 mod universal_hashing;
 mod utils;
-// mod vole;
+mod vole;
 
 // use crate::{
 //     faest::{faest_keygen, faest_sign, faest_verify},

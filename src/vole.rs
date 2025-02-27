@@ -1,84 +1,110 @@
 use std::{
+    f32::consts::TAU,
     iter::zip,
     marker::PhantomData,
+    mem::swap,
     ops::{Index, IndexMut},
 };
 
-use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
+use generic_array::{
+    typenum::{Prod, Unsigned, U128, U8},
+    ArrayLength, GenericArray,
+};
+use itertools::izip;
 
 use crate::{
+    bavc::{BatchVectorCommitment, BAVC},
     parameter::TauParameters,
-    prg::{PseudoRandomGenerator, IV},
+    prg::{PseudoRandomGenerator, IV, TWK},
     random_oracles::{Hasher, RandomOracle},
+    universal_hashing::LeafHasher,
     utils::Reader,
-    vc::VectorCommitment,
 };
 
+const TWEAK_OFFSET: u32 = 1 << 31;
+
 #[allow(clippy::type_complexity)]
-fn convert_to_vole<'a, PRG, LH>(
-    v: &mut [GenericArray<u8, LH>],
-    sd_0: Option<&GenericArray<u8, PRG::KeySize>>,
+fn convert_to_vole<'a, PRG, TAU, LH, LHatBytes>(
+    v: &mut GenericArray<GenericArray<u8, LH::Lambda>, LHatBytes>,
     sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, PRG::KeySize>>,
     iv: &IV,
-) -> GenericArray<u8, LH>
+    round: u32,
+) -> GenericArray<u8, LHatBytes>
 where
-    PRG: PseudoRandomGenerator,
-    LH: ArrayLength,
+    PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
+    LH: LeafHasher,
+    TAU: TauParameters,
+    LHatBytes: ArrayLength,
 {
-    // these parameters are known upfront!
-    let n = sd.len() + 1;
-    let d = 64 - (n.leading_zeros() as usize) - 1;
-    let mut r = vec![0; LH::USIZE * n * 2];
-    if let Some(sd0) = sd_0 {
-        PRG::new_prg(sd0, iv).read(&mut r[0..LH::USIZE]);
-    }
-    for (ri, sdi) in zip(r[LH::USIZE..].chunks_exact_mut(LH::USIZE), sd) {
-        PRG::new_prg(sdi, iv).read(ri);
+    // Step 1
+    let twk = round + TWEAK_OFFSET; 
+    let d = TAU::bavac_max_node_depth(round as usize);
+    let ni = TAU::bavac_max_node_index(round as usize);
+
+    // For step 6 we only need two rows at a time
+    let mut rj: Vec<GenericArray<u8, LHatBytes>> = vec![GenericArray::default(); ni];
+    let mut rj1: Vec<GenericArray<u8, LHatBytes>> = vec![GenericArray::default(); ni];
+
+
+    // Step 2
+    let offset = (sd.len() != ni) as usize;
+    debug_assert!(sd.len() == ni || sd.len()+1 == ni);
+
+    // Step 3,4
+    for (i, sdi) in sd.enumerate() {
+        PRG::new_prg(sdi, iv, twk).read(&mut rj[i + offset]);
     }
 
-    // FIXME
-    for (j, item) in v.iter_mut().enumerate() {
-        let j_offset = (j % 2) * n;
-        let j1_offset = ((j + 1) % 2) * n;
-        for i in 0..n / (1 << (j + 1)) {
-            let j_offset = j_offset + 2 * i;
-            let j1_offset = j1_offset + i;
-            for k in 0..LH::USIZE {
-                item[k] ^= r[(j_offset + 1) * LH::USIZE + k];
-                r[j1_offset * LH::USIZE + k] =
-                    r[j_offset * LH::USIZE + k] ^ r[(j_offset + 1) * LH::USIZE + k];
+    // Step 6..9
+    let vcol_offset = TAU::convert_depth(round as usize);
+    for j in 0..d {
+        for i in 0..(ni >> (j + 1)) {
+
+            // Do steps 8 and 9 together
+            for (vrow, (r_dst, r_src, r_src1)) in
+                izip!(&mut rj1[i], &rj[2 * i], &rj[2 * i + 1]).enumerate()
+            {
+                // Step 8
+                v[vrow][vcol_offset + j] ^= r_src1;
+
+                // Step 9
+                *r_dst = r_src ^ r_src1;
             }
+
         }
+
+        swap(&mut rj, &mut rj1); // At next iteration we want to have last row in rj
     }
-    GenericArray::from_slice(&r[(d % 2) * n * LH::USIZE..((d % 2) * n + 1) * LH::USIZE]).clone()
+
+    // Step 10 
+    rj.into_iter().next().unwrap() // Move rj[0] (after last swap, rj[0] contains r_d,0)
 }
 
 /// Reference to storage area in signature for all `c`s.
-pub(crate) struct VoleCommitmentCRef<'a, LH>(&'a mut [u8], PhantomData<LH>);
-
-impl<LH> Index<usize> for VoleCommitmentCRef<'_, LH>
+pub(crate) struct VoleCommitmentCRef<'a, LHatBytes>(&'a mut [u8], PhantomData<LHatBytes>);
+impl<LHatBytes> Index<usize> for VoleCommitmentCRef<'_, LHatBytes>
 where
-    LH: ArrayLength,
+    LHatBytes: ArrayLength,
 {
     type Output = [u8];
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index * LH::USIZE..(index + 1) * LH::USIZE]
+        &self.0[index * LHatBytes::USIZE..(index + 1) * LHatBytes::USIZE]
     }
 }
 
-impl<LH> IndexMut<usize> for VoleCommitmentCRef<'_, LH>
+impl<LHatBytes> IndexMut<usize> for VoleCommitmentCRef<'_, LHatBytes>
 where
-    LH: ArrayLength,
+    LHatBytes: ArrayLength,
 {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.0[index * LH::USIZE..(index + 1) * LH::USIZE]
+        &mut self.0[index * LHatBytes::USIZE..(index + 1) * LHatBytes::USIZE]
     }
 }
 
-impl<'a, LH> VoleCommitmentCRef<'a, LH>
+impl<'a, LHatBytes> VoleCommitmentCRef<'a, LHatBytes>
 where
-    LH: ArrayLength,
+    LHatBytes: ArrayLength,
 {
     pub(crate) fn new(buffer: &'a mut [u8]) -> Self {
         Self(buffer, PhantomData)
@@ -86,415 +112,487 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-pub fn volecommit<VC, Tau, LH>(
-    mut c: VoleCommitmentCRef<LH>,
-    r: &GenericArray<u8, VC::LambdaBytes>,
+pub fn volecommit<RO, PRG, LH, TAU, LHatBytes>(
+    mut c: VoleCommitmentCRef<LHatBytes>,
+    r: &GenericArray<u8, LH::LambdaBytes>,
     iv: &IV,
 ) -> (
-    GenericArray<u8, VC::LambdaBytesTimes2>,
-    //Here decom can have two diferent length, depending on if it's a i < t0 or > 0 so we use vectors
-    Box<
-        GenericArray<
-            (
-                Vec<GenericArray<u8, VC::LambdaBytes>>,
-                Vec<GenericArray<u8, VC::LambdaBytesTimes2>>,
-            ),
-            Tau::Tau,
-        >,
-    >,
-    Box<GenericArray<u8, LH>>,
-    Box<GenericArray<GenericArray<u8, LH>, VC::Lambda>>,
+    GenericArray<u8, LH::LambdaBytesTimes2>, // com
+    //decom
+    (
+        Vec<GenericArray<u8, LH::LambdaBytes>>,
+        Vec<GenericArray<u8, LH::LambdaBytesTimesThree>>,
+    ),
+    GenericArray<u8, LHatBytes>,                          // u
+    Box<GenericArray<GenericArray<u8, LH::Lambda>, LHatBytes>>, // V
 )
 where
-    Tau: TauParameters,
-    VC: VectorCommitment,
-    LH: ArrayLength,
+    RO: RandomOracle,
+    PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
+    TAU: TauParameters,
+    LH: LeafHasher,
+    LHatBytes: ArrayLength,
 {
-    let mut prg = VC::PRG::new_prg(r, iv);
-    let mut decom = GenericArray::default_boxed();
-    let mut u0 = GenericArray::<u8, LH>::default_boxed();
-    let mut v = GenericArray::default_boxed();
+    let (com, decom, sd) = BAVC::<RO, PRG, LH, TAU>::commit(r, iv);
 
-    let mut hasher = VC::RO::h1_init();
-    for i in 0..Tau::Tau::USIZE {
-        let b = usize::from(i < Tau::Tau0::USIZE);
-        let k = b * Tau::K0::USIZE + (1 - b) * Tau::K1::USIZE;
-        let mut r_i = GenericArray::default();
-        prg.read(&mut r_i);
-        let (com_i, decom_i, sd_i) = VC::commit(&r_i, iv, 1 << k);
-        decom[i] = decom_i;
-        hasher.update(&com_i);
-        let ui = convert_to_vole::<VC::PRG, _>(
-            {
-                let (index, size) = Tau::convert_index_and_size(i);
-                &mut v[index..index + size]
-            },
-            Some(&sd_i[0]),
-            sd_i.iter().skip(1),
+    let mut v: GenericArray<GenericArray<u8, LH::Lambda>, LHatBytes> = GenericArray::default();
+
+    let u = convert_to_vole::<PRG, TAU, LH, LHatBytes>(
+        &mut v,
+        sd[..TAU::bavac_max_node_index(0)].iter(),
+        iv,
+        0,
+    );
+
+    for i in 1..TAU::Tau::U32 {
+        let sdi_start = TAU::convert_index(i as usize);
+        let sdi_end = sdi_start + TAU::bavac_max_node_index(i as usize);
+
+        // Step 4
+        let u_i = convert_to_vole::<PRG, TAU, LH, LHatBytes>(
+            &mut v,
+            sd[sdi_start..sdi_end].iter(),
             iv,
+            i,
         );
 
-        if i == 0 {
-            *u0 = ui;
-        } else {
-            for (c, (u0, ui)) in zip(c[i - 1].iter_mut(), zip(u0.iter(), ui.into_iter())) {
-                *c = u0 ^ ui;
-            }
+        // Step 8
+        for (u_i, u, c) in izip!(&u_i, &u, &mut c[i as usize - 1]) {
+            *c = u_i ^ u;
         }
     }
 
-    (hasher.finish().read_into(), decom, u0, v)
+    (com, decom, u, Box::new(v))
 }
 
-#[allow(clippy::type_complexity)]
-pub fn volereconstruct<VC, Tau, LH>(
-    chal: &[u8],
-    pdecom: &[u8],
-    iv: &IV,
-) -> (
-    GenericArray<u8, VC::LambdaBytesTimes2>,
-    Box<GenericArray<GenericArray<u8, LH>, VC::Lambda>>,
-)
-where
-    Tau: TauParameters,
-    VC: VectorCommitment,
-    LH: ArrayLength,
-{
-    let mut hasher = VC::RO::h1_init();
-    let q = Box::from_iter((0..Tau::Tau::USIZE).flat_map(|i| {
-        let delta_p = Tau::decode_challenge(chal, i);
-        let pdecom = if i < Tau::Tau0::USIZE {
-            let start =
-                Tau::K0::USIZE * i * VC::LambdaBytes::USIZE + i * 2 * VC::LambdaBytes::USIZE;
-            &pdecom[start
-                ..start + Tau::K0::USIZE * VC::LambdaBytes::USIZE + 2 * VC::LambdaBytes::USIZE]
-        } else {
-            let start = (Tau::K0::USIZE * Tau::Tau0::USIZE
-                + (i - Tau::Tau0::USIZE) * Tau::K1::USIZE)
-                * VC::LambdaBytes::USIZE
-                + i * 2 * VC::LambdaBytes::USIZE;
-            &pdecom[start
-                ..start + Tau::K1::USIZE * VC::LambdaBytes::USIZE + 2 * VC::LambdaBytes::USIZE]
-        };
-        let (com_i, s_i) = VC::reconstruct(pdecom, &delta_p, iv);
-        hasher.update(&com_i);
+// #[allow(clippy::type_complexity)]
+// pub fn volereconstruct<VC, Tau, LH>(
+//     chal: &[u8],
+//     pdecom: &[u8],
+//     iv: &IV,
+// ) -> (
+//     GenericArray<u8, VC::LambdaBytesTimes2>,
+//     Box<GenericArray<GenericArray<u8, LH>, VC::Lambda>>,
+// )
+// where
+//     Tau: TauParameters,
+//     VC: VectorCommitment,
+//     LH: ArrayLength,
+// {
+//     let mut hasher = VC::RO::h1_init();
+//     let q = Box::from_iter((0..Tau::Tau::USIZE).flat_map(|i| {
+//         let delta_p = Tau::decode_challenge(chal, i);
+//         let pdecom = if i < Tau::Tau0::USIZE {
+//             let start =
+//                 Tau::K0::USIZE * i * VC::LambdaBytes::USIZE + i * 2 * VC::LambdaBytes::USIZE;
+//             &pdecom[start
+//                 ..start + Tau::K0::USIZE * VC::LambdaBytes::USIZE + 2 * VC::LambdaBytes::USIZE]
+//         } else {
+//             let start = (Tau::K0::USIZE * Tau::Tau0::USIZE
+//                 + (i - Tau::Tau0::USIZE) * Tau::K1::USIZE)
+//                 * VC::LambdaBytes::USIZE
+//                 + i * 2 * VC::LambdaBytes::USIZE;
+//             &pdecom[start
+//                 ..start + Tau::K1::USIZE * VC::LambdaBytes::USIZE + 2 * VC::LambdaBytes::USIZE]
+//         };
+//         let (com_i, s_i) = VC::reconstruct(pdecom, &delta_p, iv);
+//         hasher.update(&com_i);
 
-        let delta: usize = delta_p
-            .into_iter()
-            .enumerate()
-            .fold(0, |a, (j, d)| a ^ (usize::from(d) << j));
+//         let delta: usize = delta_p
+//             .into_iter()
+//             .enumerate()
+//             .fold(0, |a, (j, d)| a ^ (usize::from(d) << j));
 
-        let k = if i < Tau::Tau0::USIZE {
-            Tau::K0::USIZE
-        } else {
-            Tau::K1::USIZE
-        };
+//         let k = if i < Tau::Tau0::USIZE {
+//             Tau::K0::USIZE
+//         } else {
+//             Tau::K1::USIZE
+//         };
 
-        let mut buf = vec![GenericArray::default(); k];
-        convert_to_vole::<VC::PRG, _>(
-            buf.as_mut_slice(),
-            None,
-            (1..(1 << k)).map(|j| &s_i[j ^ delta]),
-            iv,
-        );
-        buf.into_iter()
-    }));
-    (hasher.finish().read_into(), q)
-}
+//         let mut buf = vec![GenericArray::default(); k];
+//         convert_to_vole::<VC::PRG, _>(
+//             buf.as_mut_slice(),
+//             None,
+//             (1..(1 << k)).map(|j| &s_i[j ^ delta]),
+//             iv,
+//         );
+//         buf.into_iter()
+//     }));
+//     (hasher.finish().read_into(), q)
+// }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    use generic_array::{sequence::GenericSequence, GenericArray};
+    use generic_array::{sequence::GenericSequence, typenum::U210, GenericArray};
     use serde::Deserialize;
 
     use crate::{
-        parameter::{
-            BaseParameters, FAEST128fParameters, FAEST128sParameters, FAEST192fParameters,
-            FAEST192sParameters, FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters,
-            FAESTEM128sParameters, FAESTEM192fParameters, FAESTEM192sParameters,
-            FAESTEM256fParameters, FAESTEM256sParameters, FAESTParameters, OWFParameters,
-        },
+        bavc::{self, BatchVectorCommitment},
+        parameter::Tau128Small,
+        prg::PRG128,
+        random_oracles::RandomOracleShake128,
+        universal_hashing::LeafHasher128,
         utils::test::read_test_data,
     };
 
-    type VC<P> = <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC;
-    type Tau<P> = <P as FAESTParameters>::Tau;
-    type LH<P> = <<P as FAESTParameters>::OWF as OWFParameters>::LHATBYTES;
+    fn hash_array(data: &[u8]) -> Vec<u8> {
+        use sha3::{
+            digest::{ExtendableOutput, Update, XofReader},
+            Shake256,
+        };
 
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct DataVoleCommit {
-        lambdabytes: [u16; 1],
-        k0: [u8; 1],
-        hcom: Vec<u8>,
-        u: Vec<u8>,
-    }
+        let mut hasher = sha3::Shake256::default();
+        hasher.update(data);
+        let mut reader = hasher.finalize_xof();
+        let mut ret = [0u8; 64];
 
-    fn volecommit<VC, Tau, LH>(
-        r: &GenericArray<u8, VC::LambdaBytes>,
-        iv: &IV,
-    ) -> (
-        GenericArray<u8, VC::LambdaBytesTimes2>,
-        Box<GenericArray<u8, LH>>,
-    )
-    where
-        Tau: TauParameters,
-        VC: VectorCommitment,
-        LH: ArrayLength,
-    {
-        let mut c = vec![0; LH::USIZE * (Tau::Tau::USIZE - 1)];
-        let ret =
-            super::volecommit::<VC, Tau, LH>(VoleCommitmentCRef::new(c.as_mut_slice()), r, iv);
-        (ret.0, ret.2)
+        reader.read(&mut ret);
+        ret.to_vec()
     }
 
     #[test]
-    fn volecommit_test() {
-        let database: Vec<DataVoleCommit> = read_test_data("DataVoleCommit.json");
-        for data in database {
-            if data.lambdabytes[0] == 16 {
-                if data.u.len() == 234 {
-                    if data.k0[0] == 12 {
-                        let res = volecommit::<
-                            VC<FAEST128sParameters>,
-                            Tau<FAEST128sParameters>,
-                            LH<FAEST128sParameters>,
-                        >(
-                            &GenericArray::generate(|idx| idx as u8), &IV::default()
-                        );
-                        assert_eq!(res.0.as_slice(), &data.hcom);
-                        assert_eq!(res.1.as_slice(), &data.u);
-                    } else {
-                        let res = volecommit::<
-                            VC<FAEST128fParameters>,
-                            Tau<FAEST128fParameters>,
-                            LH<FAEST128fParameters>,
-                        >(
-                            &GenericArray::generate(|idx| idx as u8), &IV::default()
-                        );
-                        assert_eq!(res.0.as_slice(), &data.hcom);
-                        assert_eq!(res.1.as_slice(), &data.u);
-                    }
-                } else if data.k0[0] == 12 {
-                    let res = volecommit::<
-                        VC<FAESTEM128sParameters>,
-                        Tau<FAESTEM128sParameters>,
-                        LH<FAESTEM128sParameters>,
-                    >(
-                        &GenericArray::generate(|idx| idx as u8), &IV::default()
-                    );
-                    assert_eq!(res.0.as_slice(), &data.hcom);
-                    assert_eq!(res.1.as_slice(), &data.u);
-                } else {
-                    let res = volecommit::<
-                        VC<FAESTEM128fParameters>,
-                        Tau<FAESTEM128fParameters>,
-                        LH<FAESTEM128fParameters>,
-                    >(
-                        &GenericArray::generate(|idx| idx as u8), &IV::default()
-                    );
-                    assert_eq!(res.0.as_slice(), &data.hcom);
-                    assert_eq!(res.1.as_slice(), &data.u);
-                }
-            } else if data.lambdabytes[0] == 24 {
-                if data.u.len() == 458 {
-                    if data.k0[0] == 12 {
-                        let res = volecommit::<
-                            VC<FAEST192sParameters>,
-                            Tau<FAEST192sParameters>,
-                            LH<FAEST192sParameters>,
-                        >(
-                            &GenericArray::generate(|idx| idx as u8), &IV::default()
-                        );
-                        assert_eq!(res.0.as_slice(), &data.hcom);
-                        assert_eq!(res.1.as_slice(), &data.u);
-                    } else {
-                        let res = volecommit::<
-                            VC<FAEST192fParameters>,
-                            Tau<FAEST192fParameters>,
-                            LH<FAEST192fParameters>,
-                        >(
-                            &GenericArray::generate(|idx| idx as u8), &IV::default()
-                        );
-                        assert_eq!(res.0.as_slice(), &data.hcom);
-                        assert_eq!(res.1.as_slice(), &data.u);
-                    }
-                } else if data.k0[0] == 12 {
-                    let res = volecommit::<
-                        VC<FAESTEM192sParameters>,
-                        Tau<FAESTEM192sParameters>,
-                        LH<FAESTEM192sParameters>,
-                    >(
-                        &GenericArray::generate(|idx| idx as u8), &IV::default()
-                    );
-                    assert_eq!(res.0.as_slice(), &data.hcom);
-                    assert_eq!(res.1.as_slice(), &data.u);
-                } else {
-                    let res = volecommit::<
-                        VC<FAESTEM192fParameters>,
-                        Tau<FAESTEM192fParameters>,
-                        LH<FAESTEM192fParameters>,
-                    >(
-                        &GenericArray::generate(|idx| idx as u8), &IV::default()
-                    );
-                    assert_eq!(res.0.as_slice(), &data.hcom);
-                    assert_eq!(res.1.as_slice(), &data.u);
-                }
-            } else if data.u.len() == 566 {
-                if data.k0[0] == 12 {
-                    let res = volecommit::<
-                        VC<FAEST256sParameters>,
-                        Tau<FAEST256sParameters>,
-                        LH<FAEST256sParameters>,
-                    >(
-                        &GenericArray::generate(|idx| idx as u8), &IV::default()
-                    );
-                    assert_eq!(res.0.as_slice(), &data.hcom);
-                    assert_eq!(res.1.as_slice(), &data.u);
-                } else {
-                    let res = volecommit::<
-                        VC<FAEST256fParameters>,
-                        Tau<FAEST256fParameters>,
-                        LH<FAEST256fParameters>,
-                    >(
-                        &GenericArray::generate(|idx| idx as u8), &IV::default()
-                    );
-                    assert_eq!(res.0.as_slice(), &data.hcom);
-                    assert_eq!(res.1.as_slice(), &data.u);
-                }
-            } else if data.k0[0] == 12 {
-                let res =
-                    volecommit::<
-                        VC<FAESTEM256sParameters>,
-                        Tau<FAESTEM256sParameters>,
-                        LH<FAESTEM256sParameters>,
-                    >(&GenericArray::generate(|idx| idx as u8), &IV::default());
-                assert_eq!(res.0.as_slice(), &data.hcom);
-                assert_eq!(res.1.as_slice(), &data.u);
-            } else {
-                let res =
-                    volecommit::<
-                        VC<FAESTEM256fParameters>,
-                        Tau<FAESTEM256fParameters>,
-                        LH<FAESTEM256fParameters>,
-                    >(&GenericArray::generate(|idx| idx as u8), &IV::default());
-                assert_eq!(res.0.as_slice(), &data.hcom);
-                assert_eq!(res.1.as_slice(), &data.u);
+    fn convert_to_vole_test() {
+        let iv = GenericArray::default();
+        let r = GenericArray::from_array([
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+            0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b,
+            0x1c, 0x1d, 0x1e, 0x1f,
+        ]);
+
+        let h = GenericArray::from_array([
+            0x7b, 0xe2, 0x76, 0xd1, 0x6b, 0x90, 0x16, 0x87, 0x50, 0x81, 0x97, 0xdb, 0x27, 0xb5,
+            0x46, 0x10, 0x39, 0xbe, 0xab, 0x9d, 0x42, 0x6c, 0x6a, 0xbf, 0xee, 0x4a, 0x7c, 0x03,
+            0x38, 0x99, 0x2d, 0x05,
+        ]);
+
+        let hashed_c = GenericArray::from_array([
+            0x50, 0x5b, 0xe2, 0x84, 0xf9, 0x8b, 0x7d, 0x69, 0xa3, 0x92, 0x36, 0x4f, 0xa5, 0x5c,
+            0x4a, 0x32, 0x73, 0xba, 0xd2, 0xae, 0x23, 0xa9, 0x01, 0x4f, 0xbb, 0x19, 0x2c, 0x82,
+            0x5a, 0x0b, 0x51, 0x57, 0xa9, 0xf6, 0xdd, 0xe9, 0x24, 0x71, 0xfd, 0x64, 0x59, 0xd8,
+            0xbe, 0x2d, 0x73, 0xe5, 0xfe, 0x45, 0x9b, 0xf9, 0xfc, 0xe8, 0xef, 0x74, 0x15, 0xd4,
+            0x2b, 0x83, 0x4f, 0xff, 0xef, 0x2f, 0xfb, 0xfc,
+        ]);
+
+        let hashed_u = GenericArray::from_array([
+            0xf0, 0xf3, 0x08, 0x6c, 0x71, 0x8c, 0xfb, 0x03, 0x40, 0xfd, 0x0f, 0xf0, 0x70, 0xd5,
+            0x7e, 0x5a, 0x87, 0xc6, 0x42, 0xc5, 0x9f, 0x86, 0xab, 0x83, 0xf2, 0x14, 0x29, 0x54,
+            0x9b, 0xe5, 0x62, 0xb3, 0xf2, 0x51, 0x88, 0x82, 0x55, 0xab, 0x8e, 0x74, 0x3d, 0x39,
+            0xf6, 0x0d, 0x6b, 0xb2, 0x59, 0xef, 0x3a, 0x42, 0x78, 0x3e, 0xb4, 0xd8, 0x93, 0x81,
+            0x25, 0xe8, 0xbd, 0x1e, 0x51, 0x31, 0x41, 0x9a,
+        ]);
+
+        let hashed_v_trans = GenericArray::from_array([
+            0x9a, 0x59, 0x3e, 0xf5, 0x92, 0xae, 0x2a, 0xd8, 0x4c, 0x00, 0xc7, 0xd5, 0xa5, 0x03,
+            0x86, 0xa2, 0x24, 0x18, 0x52, 0x30, 0x2c, 0x7c, 0xb0, 0x0d, 0xc7, 0xb4, 0x2e, 0x50,
+            0x8a, 0x78, 0x78, 0x7b, 0xe5, 0xba, 0x00, 0x97, 0x1b, 0x6e, 0x84, 0x2c, 0x0a, 0x6d,
+            0x64, 0xc1, 0xd2, 0xa6, 0xd4, 0xe4, 0x01, 0x05, 0xd3, 0x4f, 0xe9, 0x89, 0x04, 0x2e,
+            0xa7, 0xb4, 0x49, 0xac, 0x39, 0x44, 0x67, 0x96,
+        ]);
+
+        let r = GenericArray::from_slice(&r[..16]);
+
+        let mut c = vec![0; U210::USIZE * (<Tau128Small as TauParameters>::Tau::USIZE - 1)];
+        let (com, decom, u, v) = super::volecommit::<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small, U210>(
+            VoleCommitmentCRef::new(c.as_mut_slice()),
+            r,
+            &iv,
+        );
+
+
+        let mut v_trans = vec![vec![]; v[0].len()];
+        for i in 0..v[0].len(){
+            for j in 0..v.len(){
+                v_trans[i].push(v[j][i]);
             }
         }
+        let v_trans: Vec<u8> = v_trans.into_iter().flatten().collect();
+        
+        assert_eq!(com.as_slice(), h.as_slice());
+        assert_eq!(hash_array(&u), hashed_u.as_slice());
+        assert_eq!(hash_array(&c), hashed_c.as_slice());
+        assert_eq!(hash_array(&v_trans), hashed_v_trans.as_slice());
+  
+
     }
 
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct DataVoleReconstruct {
-        chal: Vec<u8>,
-        pdec: Vec<Vec<Vec<u8>>>,
-        com: Vec<Vec<u8>>,
-        hcom: Vec<u8>,
-        q: Vec<Vec<Vec<u8>>>,
-    }
+    //     type VC<P> = <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC;
+    //     type Tau<P> = <P as FAESTParameters>::Tau;
+    //     type LH<P> = <<P as FAESTParameters>::OWF as OWFParameters>::LHATBYTES;
 
-    #[test]
-    fn volereconstruct_test() {
-        let database: Vec<DataVoleReconstruct> = read_test_data("DataVoleReconstruct.json");
-        for data in database {
-            if data.chal.len() == 16 {
-                if data.q[0].len() == 8 {
-                    let pdecom = &data
-                        .pdec
-                        .into_iter()
-                        .zip(&data.com)
-                        .flat_map(|(x, y)| {
-                            [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
-                        })
-                        .collect::<Vec<u8>>();
-                    let res = volereconstruct::<
-                        VC<FAEST128fParameters>,
-                        Tau<FAEST128fParameters>,
-                        LH<FAEST128fParameters>,
-                    >(&data.chal, pdecom, &IV::default());
-                    assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                } else {
-                    let pdecom = &data
-                        .pdec
-                        .into_iter()
-                        .zip(&data.com)
-                        .flat_map(|(x, y)| {
-                            [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
-                        })
-                        .collect::<Vec<u8>>();
-                    let res = volereconstruct::<
-                        VC<FAEST128sParameters>,
-                        Tau<FAEST128sParameters>,
-                        LH<FAEST128sParameters>,
-                    >(&data.chal, pdecom, &IV::default());
-                    assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                }
-            } else if data.chal.len() == 24 {
-                if data.q[0].len() == 8 {
-                    let pdecom = &data
-                        .pdec
-                        .into_iter()
-                        .zip(&data.com)
-                        .flat_map(|(x, y)| {
-                            [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
-                        })
-                        .collect::<Vec<u8>>();
-                    let res = volereconstruct::<
-                        VC<FAEST192fParameters>,
-                        Tau<FAEST192fParameters>,
-                        LH<FAEST192fParameters>,
-                    >(&data.chal, pdecom, &IV::default());
-                    assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                } else {
-                    let pdecom = &data
-                        .pdec
-                        .into_iter()
-                        .zip(&data.com)
-                        .flat_map(|(x, y)| {
-                            [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
-                        })
-                        .collect::<Vec<u8>>();
-                    let res = volereconstruct::<
-                        VC<FAEST192sParameters>,
-                        Tau<FAEST192sParameters>,
-                        LH<FAEST192sParameters>,
-                    >(&data.chal, pdecom, &IV::default());
-                    assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-                }
-            } else if data.q[0].len() == 8 {
-                let pdecom = &data
-                    .pdec
-                    .into_iter()
-                    .zip(&data.com)
-                    .flat_map(|(x, y)| {
-                        [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
-                    })
-                    .collect::<Vec<u8>>();
-                let res = volereconstruct::<
-                    VC<FAEST256fParameters>,
-                    Tau<FAEST256fParameters>,
-                    LH<FAEST256fParameters>,
-                >(&data.chal, pdecom, &IV::default());
-                assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-            } else {
-                let pdecom = &data
-                    .pdec
-                    .into_iter()
-                    .zip(&data.com)
-                    .flat_map(|(x, y)| {
-                        [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
-                    })
-                    .collect::<Vec<u8>>();
-                let res = volereconstruct::<
-                    VC<FAEST256sParameters>,
-                    Tau<FAEST256sParameters>,
-                    LH<FAEST256sParameters>,
-                >(&data.chal, pdecom, &IV::default());
-                assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
-            }
-        }
-    }
+    //     #[derive(Debug, Deserialize)]
+    //     #[serde(rename_all = "camelCase")]
+    //     struct DataVoleCommit {
+    //         lambdabytes: [u16; 1],
+    //         k0: [u8; 1],
+    //         hcom: Vec<u8>,
+    //         u: Vec<u8>,
+    //     }
+
+    //     fn volecommit<VC, Tau, LH>(
+    //         r: &GenericArray<u8, VC::LambdaBytes>,
+    //         iv: &IV,
+    //     ) -> (
+    //         GenericArray<u8, VC::LambdaBytesTimes2>,
+    //         Box<GenericArray<u8, LH>>,
+    //     )
+    //     where
+    //         Tau: TauParameters,
+    //         VC: VectorCommitment,
+    //         LH: ArrayLength,
+    //     {
+    //         let mut c = vec![0; LH::USIZE * (Tau::Tau::USIZE - 1)];
+    //         let ret =
+    //             super::volecommit::<VC, Tau, LH>(VoleCommitmentCRef::new(c.as_mut_slice()), r, iv);
+    //         (ret.0, ret.2)
+    //     }
+
+    //     #[test]
+    //     fn volecommit_test() {
+    //         let database: Vec<DataVoleCommit> = read_test_data("DataVoleCommit.json");
+    //         for data in database {
+    //             if data.lambdabytes[0] == 16 {
+    //                 if data.u.len() == 234 {
+    //                     if data.k0[0] == 12 {
+    //                         let res = volecommit::<
+    //                             VC<FAEST128sParameters>,
+    //                             Tau<FAEST128sParameters>,
+    //                             LH<FAEST128sParameters>,
+    //                         >(
+    //                             &GenericArray::generate(|idx| idx as u8), &IV::default()
+    //                         );
+    //                         assert_eq!(res.0.as_slice(), &data.hcom);
+    //                         assert_eq!(res.1.as_slice(), &data.u);
+    //                     } else {
+    //                         let res = volecommit::<
+    //                             VC<FAEST128fParameters>,
+    //                             Tau<FAEST128fParameters>,
+    //                             LH<FAEST128fParameters>,
+    //                         >(
+    //                             &GenericArray::generate(|idx| idx as u8), &IV::default()
+    //                         );
+    //                         assert_eq!(res.0.as_slice(), &data.hcom);
+    //                         assert_eq!(res.1.as_slice(), &data.u);
+    //                     }
+    //                 } else if data.k0[0] == 12 {
+    //                     let res = volecommit::<
+    //                         VC<FAESTEM128sParameters>,
+    //                         Tau<FAESTEM128sParameters>,
+    //                         LH<FAESTEM128sParameters>,
+    //                     >(
+    //                         &GenericArray::generate(|idx| idx as u8), &IV::default()
+    //                     );
+    //                     assert_eq!(res.0.as_slice(), &data.hcom);
+    //                     assert_eq!(res.1.as_slice(), &data.u);
+    //                 } else {
+    //                     let res = volecommit::<
+    //                         VC<FAESTEM128fParameters>,
+    //                         Tau<FAESTEM128fParameters>,
+    //                         LH<FAESTEM128fParameters>,
+    //                     >(
+    //                         &GenericArray::generate(|idx| idx as u8), &IV::default()
+    //                     );
+    //                     assert_eq!(res.0.as_slice(), &data.hcom);
+    //                     assert_eq!(res.1.as_slice(), &data.u);
+    //                 }
+    //             } else if data.lambdabytes[0] == 24 {
+    //                 if data.u.len() == 458 {
+    //                     if data.k0[0] == 12 {
+    //                         let res = volecommit::<
+    //                             VC<FAEST192sParameters>,
+    //                             Tau<FAEST192sParameters>,
+    //                             LH<FAEST192sParameters>,
+    //                         >(
+    //                             &GenericArray::generate(|idx| idx as u8), &IV::default()
+    //                         );
+    //                         assert_eq!(res.0.as_slice(), &data.hcom);
+    //                         assert_eq!(res.1.as_slice(), &data.u);
+    //                     } else {
+    //                         let res = volecommit::<
+    //                             VC<FAEST192fParameters>,
+    //                             Tau<FAEST192fParameters>,
+    //                             LH<FAEST192fParameters>,
+    //                         >(
+    //                             &GenericArray::generate(|idx| idx as u8), &IV::default()
+    //                         );
+    //                         assert_eq!(res.0.as_slice(), &data.hcom);
+    //                         assert_eq!(res.1.as_slice(), &data.u);
+    //                     }
+    //                 } else if data.k0[0] == 12 {
+    //                     let res = volecommit::<
+    //                         VC<FAESTEM192sParameters>,
+    //                         Tau<FAESTEM192sParameters>,
+    //                         LH<FAESTEM192sParameters>,
+    //                     >(
+    //                         &GenericArray::generate(|idx| idx as u8), &IV::default()
+    //                     );
+    //                     assert_eq!(res.0.as_slice(), &data.hcom);
+    //                     assert_eq!(res.1.as_slice(), &data.u);
+    //                 } else {
+    //                     let res = volecommit::<
+    //                         VC<FAESTEM192fParameters>,
+    //                         Tau<FAESTEM192fParameters>,
+    //                         LH<FAESTEM192fParameters>,
+    //                     >(
+    //                         &GenericArray::generate(|idx| idx as u8), &IV::default()
+    //                     );
+    //                     assert_eq!(res.0.as_slice(), &data.hcom);
+    //                     assert_eq!(res.1.as_slice(), &data.u);
+    //                 }
+    //             } else if data.u.len() == 566 {
+    //                 if data.k0[0] == 12 {
+    //                     let res = volecommit::<
+    //                         VC<FAEST256sParameters>,
+    //                         Tau<FAEST256sParameters>,
+    //                         LH<FAEST256sParameters>,
+    //                     >(
+    //                         &GenericArray::generate(|idx| idx as u8), &IV::default()
+    //                     );
+    //                     assert_eq!(res.0.as_slice(), &data.hcom);
+    //                     assert_eq!(res.1.as_slice(), &data.u);
+    //                 } else {
+    //                     let res = volecommit::<
+    //                         VC<FAEST256fParameters>,
+    //                         Tau<FAEST256fParameters>,
+    //                         LH<FAEST256fParameters>,
+    //                     >(
+    //                         &GenericArray::generate(|idx| idx as u8), &IV::default()
+    //                     );
+    //                     assert_eq!(res.0.as_slice(), &data.hcom);
+    //                     assert_eq!(res.1.as_slice(), &data.u);
+    //                 }
+    //             } else if data.k0[0] == 12 {
+    //                 let res =
+    //                     volecommit::<
+    //                         VC<FAESTEM256sParameters>,
+    //                         Tau<FAESTEM256sParameters>,
+    //                         LH<FAESTEM256sParameters>,
+    //                     >(&GenericArray::generate(|idx| idx as u8), &IV::default());
+    //                 assert_eq!(res.0.as_slice(), &data.hcom);
+    //                 assert_eq!(res.1.as_slice(), &data.u);
+    //             } else {
+    //                 let res =
+    //                     volecommit::<
+    //                         VC<FAESTEM256fParameters>,
+    //                         Tau<FAESTEM256fParameters>,
+    //                         LH<FAESTEM256fParameters>,
+    //                     >(&GenericArray::generate(|idx| idx as u8), &IV::default());
+    //                 assert_eq!(res.0.as_slice(), &data.hcom);
+    //                 assert_eq!(res.1.as_slice(), &data.u);
+    //             }
+    //         }
+    //     }
+
+    //     #[derive(Debug, Deserialize)]
+    //     #[serde(rename_all = "camelCase")]
+    //     struct DataVoleReconstruct {
+    //         chal: Vec<u8>,
+    //         pdec: Vec<Vec<Vec<u8>>>,
+    //         com: Vec<Vec<u8>>,
+    //         hcom: Vec<u8>,
+    //         q: Vec<Vec<Vec<u8>>>,
+    //     }
+
+    //     #[test]
+    //     fn volereconstruct_test() {
+    //         let database: Vec<DataVoleReconstruct> = read_test_data("DataVoleReconstruct.json");
+    //         for data in database {
+    //             if data.chal.len() == 16 {
+    //                 if data.q[0].len() == 8 {
+    //                     let pdecom = &data
+    //                         .pdec
+    //                         .into_iter()
+    //                         .zip(&data.com)
+    //                         .flat_map(|(x, y)| {
+    //                             [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
+    //                         })
+    //                         .collect::<Vec<u8>>();
+    //                     let res = volereconstruct::<
+    //                         VC<FAEST128fParameters>,
+    //                         Tau<FAEST128fParameters>,
+    //                         LH<FAEST128fParameters>,
+    //                     >(&data.chal, pdecom, &IV::default());
+    //                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
+    //                 } else {
+    //                     let pdecom = &data
+    //                         .pdec
+    //                         .into_iter()
+    //                         .zip(&data.com)
+    //                         .flat_map(|(x, y)| {
+    //                             [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
+    //                         })
+    //                         .collect::<Vec<u8>>();
+    //                     let res = volereconstruct::<
+    //                         VC<FAEST128sParameters>,
+    //                         Tau<FAEST128sParameters>,
+    //                         LH<FAEST128sParameters>,
+    //                     >(&data.chal, pdecom, &IV::default());
+    //                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
+    //                 }
+    //             } else if data.chal.len() == 24 {
+    //                 if data.q[0].len() == 8 {
+    //                     let pdecom = &data
+    //                         .pdec
+    //                         .into_iter()
+    //                         .zip(&data.com)
+    //                         .flat_map(|(x, y)| {
+    //                             [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
+    //                         })
+    //                         .collect::<Vec<u8>>();
+    //                     let res = volereconstruct::<
+    //                         VC<FAEST192fParameters>,
+    //                         Tau<FAEST192fParameters>,
+    //                         LH<FAEST192fParameters>,
+    //                     >(&data.chal, pdecom, &IV::default());
+    //                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
+    //                 } else {
+    //                     let pdecom = &data
+    //                         .pdec
+    //                         .into_iter()
+    //                         .zip(&data.com)
+    //                         .flat_map(|(x, y)| {
+    //                             [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
+    //                         })
+    //                         .collect::<Vec<u8>>();
+    //                     let res = volereconstruct::<
+    //                         VC<FAEST192sParameters>,
+    //                         Tau<FAEST192sParameters>,
+    //                         LH<FAEST192sParameters>,
+    //                     >(&data.chal, pdecom, &IV::default());
+    //                     assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
+    //                 }
+    //             } else if data.q[0].len() == 8 {
+    //                 let pdecom = &data
+    //                     .pdec
+    //                     .into_iter()
+    //                     .zip(&data.com)
+    //                     .flat_map(|(x, y)| {
+    //                         [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
+    //                     })
+    //                     .collect::<Vec<u8>>();
+    //                 let res = volereconstruct::<
+    //                     VC<FAEST256fParameters>,
+    //                     Tau<FAEST256fParameters>,
+    //                     LH<FAEST256fParameters>,
+    //                 >(&data.chal, pdecom, &IV::default());
+    //                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
+    //             } else {
+    //                 let pdecom = &data
+    //                     .pdec
+    //                     .into_iter()
+    //                     .zip(&data.com)
+    //                     .flat_map(|(x, y)| {
+    //                         [x.into_iter().flatten().collect::<Vec<u8>>(), y.to_vec()].concat()
+    //                     })
+    //                     .collect::<Vec<u8>>();
+    //                 let res = volereconstruct::<
+    //                     VC<FAEST256sParameters>,
+    //                     Tau<FAEST256sParameters>,
+    //                     LH<FAEST256sParameters>,
+    //                 >(&data.chal, pdecom, &IV::default());
+    //                 assert_eq!(res.0, *GenericArray::from_slice(&data.hcom));
+    //             }
+    //         }
+    //     }
 }
