@@ -31,6 +31,7 @@ pub trait LeafCommit {
     type LambdaBytesTimesTwo: ArrayLength;
     type LambdaByesTimesThree: ArrayLength;
     type LambdaByesTimesFour: ArrayLength;
+    type PRG: PseudoRandomGenerator;
 
     fn commit(
         r: &GenericArray<u8, Self::LambdaBytes>,
@@ -63,9 +64,10 @@ where
     LH: LeafHasher,
 {
     type LambdaBytes = LH::LambdaBytes;
-    type LambdaBytesTimesTwo = LH::LambdaBytesTimesTwo;
+    type LambdaBytesTimesTwo = LH::LambdaBytesTimes2;
     type LambdaByesTimesThree = LH::LambdaBytesTimesThree;
     type LambdaByesTimesFour = LH::LambdaBytesTimesFour;
+    type PRG = PRG;
 
     fn commit(
         r: &GenericArray<u8, Self::LambdaBytes>,
@@ -194,7 +196,7 @@ pub(crate) trait BatchVectorCommitmentEM {
     )>;
 }
 
-pub(crate) struct BAVAC<RO, PRG, LH, TAU>(
+pub(crate) struct BAVC<RO, PRG, LH, TAU>(
     PhantomData<RO>,
     PhantomData<PRG>,
     PhantomData<LH>,
@@ -206,7 +208,7 @@ where
     TAU: TauParameters,
     LH: LeafHasher;
 
-impl<RO, PRG, LH, TAU> BAVAC<RO, PRG, LH, TAU>
+impl<RO, PRG, LH, TAU> BAVC<RO, PRG, LH, TAU>
 where
     RO: RandomOracle,
     PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
@@ -304,7 +306,7 @@ where
     }
 }
 
-impl<RO, PRG, LH, TAU> BatchVectorCommitment for BAVAC<RO, PRG, LH, TAU>
+impl<RO, PRG, LH, TAU> BatchVectorCommitment for BAVC<RO, PRG, LH, TAU>
 where
     RO: RandomOracle,
     PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
@@ -312,10 +314,11 @@ where
     LH: LeafHasher,
 {
     type LambdaBytes = LH::LambdaBytes;
-    type LambdaBytesTimes2 = LH::LambdaBytesTimesTwo;
+    type LambdaBytesTimes2 = LH::LambdaBytesTimes2;
     type LambdaBytesTimes3 = LH::LambdaBytesTimesThree;
     type LC = LeafCommitment<PRG, LH>;
     type Tau = TAU::Tau;
+
 
     fn commit(
         r: &GenericArray<u8, Self::LambdaBytes>,
@@ -472,7 +475,7 @@ where
     }
 }
 
-impl<RO, PRG, LH, TAU> BatchVectorCommitmentEM for BAVAC<RO, PRG, LH, TAU>
+impl<RO, PRG, LH, TAU> BatchVectorCommitmentEM for BAVC<RO, PRG, LH, TAU>
 where
     RO: RandomOracle,
     PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
@@ -480,7 +483,7 @@ where
     LH: LeafHasher,
 {
     type LambdaBytes = LH::LambdaBytes;
-    type LambdaBytesTimes2 = LH::LambdaBytesTimesTwo;
+    type LambdaBytesTimes2 = LH::LambdaBytesTimes2;
     type LambdaBytesTimes3 = LH::LambdaBytesTimesThree;
     type LC = LeafCommitment<PRG, LH>;
     type Tau = TAU::Tau;
@@ -885,14 +888,14 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVAC::<
+                        let res_commit = BAVC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
                             Tau128Small,
                         >::commit(r, &iv);
 
-                        let res_open = BAVAC::<
+                        let res_open = BAVC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
@@ -903,7 +906,7 @@ mod test {
                         )
                         .unwrap();
 
-                        let res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
@@ -925,7 +928,7 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVAC::<
+                        let res_commit = BAVC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
@@ -933,13 +936,13 @@ mod test {
                         >::commit(r, &iv);
 
                         let res_open =
-                            BAVAC::<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>::open(
+                            BAVC::<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>::open(
                                 (&res_commit.1 .0, &res_commit.1 .1),
                                 &i_delta,
                             )
                             .unwrap();
 
-                        let res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
@@ -966,14 +969,14 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVAC::<
+                        let res_commit = BAVC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
                             Tau192Small,
                         >::commit(r, &iv);
 
-                        let res_open = BAVAC::<
+                        let res_open = BAVC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
@@ -983,7 +986,7 @@ mod test {
                         )
                         .unwrap();
 
-                        let res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
@@ -1005,7 +1008,7 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVAC::<
+                        let res_commit = BAVC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
@@ -1013,13 +1016,13 @@ mod test {
                         >::commit(r, &iv);
 
                         let res_open =
-                            BAVAC::<RandomOracleShake256, PRG192, LeafHasher192, Tau192Fast>::open(
+                            BAVC::<RandomOracleShake256, PRG192, LeafHasher192, Tau192Fast>::open(
                                 (&res_commit.1 .0, &res_commit.1 .1),
                                 &i_delta,
                             )
                             .unwrap();
 
-                        let res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
@@ -1043,14 +1046,14 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVAC::<
+                        let res_commit = BAVC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
                             Tau256Small,
                         >::commit(&r, &iv);
 
-                        let res_open = BAVAC::<
+                        let res_open = BAVC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
@@ -1060,7 +1063,7 @@ mod test {
                         )
                         .unwrap();
 
-                        let res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
@@ -1081,7 +1084,7 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVAC::<
+                        let res_commit = BAVC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
@@ -1089,13 +1092,13 @@ mod test {
                         >::commit(&r, &iv);
 
                         let res_open =
-                            BAVAC::<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>::open(
+                            BAVC::<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>::open(
                                 (&res_commit.1 .0, &res_commit.1 .1),
                                 &i_delta,
                             )
                             .unwrap();
 
-                        let res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
@@ -1141,14 +1144,14 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVAC::<
+                        let res_commit = BAVC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
                             Tau128SmallEM,
                         >::commit_em(r, &iv);
 
-                        let res_open = BAVAC::<
+                        let res_open = BAVC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
@@ -1158,7 +1161,7 @@ mod test {
                         )
                         .unwrap();
 
-                        let res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
@@ -1178,14 +1181,14 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVAC::<
+                        let res_commit = BAVC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
                             Tau128FastEM,
                         >::commit_em(r, &iv);
 
-                        let res_open = BAVAC::<
+                        let res_open = BAVC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
@@ -1195,7 +1198,7 @@ mod test {
                         )
                         .unwrap();
 
-                        let res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVC::<
                             RandomOracleShake128,
                             PRG128,
                             LeafHasher128,
@@ -1222,7 +1225,7 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVAC::<
+                        let res_commit = BAVC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
@@ -1230,7 +1233,7 @@ mod test {
                         >::commit_em(r, &iv);
 
 
-                        let res_open = BAVAC::<
+                        let res_open = BAVC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
@@ -1240,7 +1243,7 @@ mod test {
                         )
                         .unwrap();
 
-                        let res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
@@ -1262,14 +1265,14 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVAC::<
+                        let res_commit = BAVC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
                             Tau192FastEM,
                         >::commit_em(r, &iv);
 
-                        let res_open = BAVAC::<
+                        let res_open = BAVC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
@@ -1279,7 +1282,7 @@ mod test {
                         )
                         .unwrap();
 
-                        let res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVC::<
                             RandomOracleShake256,
                             PRG192,
                             LeafHasher192,
@@ -1304,14 +1307,14 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVAC::<
+                        let res_commit = BAVC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
                             Tau256SmallEM,
                         >::commit_em(&r, &iv);
 
-                        let res_open = BAVAC::<
+                        let res_open = BAVC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
@@ -1321,7 +1324,7 @@ mod test {
                         )
                         .unwrap();
 
-                        let res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
@@ -1343,14 +1346,14 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVAC::<
+                        let res_commit = BAVC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
                             Tau256FastEM,
                         >::commit_em(&r, &iv);
 
-                        let res_open = BAVAC::<
+                        let res_open = BAVC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,
@@ -1360,7 +1363,7 @@ mod test {
                         )
                         .unwrap();
 
-                        let res_reconstruct = BAVAC::<
+                        let res_reconstruct = BAVC::<
                             RandomOracleShake256,
                             PRG256,
                             LeafHasher256,

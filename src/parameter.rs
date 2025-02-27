@@ -11,7 +11,7 @@ use generic_array::{
 use rand_core::RngCore;
 
 use crate::{
-    bavc::{BatchVectorCommitment, BAVAC},
+    bavc::{BatchVectorCommitment, BAVC},
     // aes::{aes_extendedwitness, aes_prove, aes_verify},
     // em::{em_extendedwitness, em_prove, em_verify},
     fields::{BigGaloisField, GF128, GF192, GF256},
@@ -700,6 +700,19 @@ pub(crate) trait TauParameters {
 
         Self::Tau1::USIZE * (1 << Self::K::USIZE)
             + (1 << (Self::K::USIZE - 1)) * (i - Self::Tau1::USIZE)
+    }
+
+    fn convert_depth(i: usize) -> usize {
+        if i == 0 {
+            return 0;
+        }
+
+        if i < Self::Tau1::USIZE {
+            return Self::K::USIZE * i;
+        }
+
+        Self::Tau1::USIZE * (Self::K::USIZE)
+            + (Self::K::USIZE - 1) * (i - Self::Tau1::USIZE)
     }
 
     fn bavac_max_node_depth(i: usize) -> usize {
