@@ -7,13 +7,13 @@ use std::{
 };
 
 use generic_array::{
-    typenum::{Prod, Unsigned, U128, U8},
+    typenum::{Prod, Unsigned, U128, U3, U8},
     ArrayLength, GenericArray,
 };
 use itertools::izip;
 
 use crate::{
-    bavc::{BatchVectorCommitment, BAVC},
+    bavc::{BatchVectorCommitment, Commitment, Decommitment, BAVC},
     parameter::TauParameters,
     prg::{PseudoRandomGenerator, IV, TWK},
     random_oracles::{Hasher, RandomOracle},
@@ -37,7 +37,7 @@ where
     LHatBytes: ArrayLength,
 {
     // Step 1
-    let twk = round + TWEAK_OFFSET; 
+    let twk = round + TWEAK_OFFSET;
     let d = TAU::bavac_max_node_depth(round as usize);
     let ni = TAU::bavac_max_node_index(round as usize);
 
@@ -45,10 +45,9 @@ where
     let mut rj: Vec<GenericArray<u8, LHatBytes>> = vec![GenericArray::default(); ni];
     let mut rj1: Vec<GenericArray<u8, LHatBytes>> = vec![GenericArray::default(); ni];
 
-
     // Step 2
     let offset = (sd.len() != ni) as usize;
-    debug_assert!(sd.len() == ni || sd.len()+1 == ni);
+    debug_assert!(sd.len() == ni || sd.len() + 1 == ni);
 
     // Step 3,4
     for (i, sdi) in sd.enumerate() {
@@ -59,8 +58,8 @@ where
     let vcol_offset = TAU::convert_depth(round as usize);
     for j in 0..d {
         for i in 0..(ni >> (j + 1)) {
-
-            // Do steps 8 and 9 together
+            
+            // Join steps 8 and 9
             for (vrow, (r_dst, r_src, r_src1)) in
                 izip!(&mut rj1[i], &rj[2 * i], &rj[2 * i + 1]).enumerate()
             {
@@ -70,13 +69,12 @@ where
                 // Step 9
                 *r_dst = r_src ^ r_src1;
             }
-
         }
 
         swap(&mut rj, &mut rj1); // At next iteration we want to have last row in rj
     }
 
-    // Step 10 
+    // Step 10
     rj.into_iter().next().unwrap() // Move rj[0] (after last swap, rj[0] contains r_d,0)
 }
 
@@ -119,11 +117,8 @@ pub fn volecommit<RO, PRG, LH, TAU, LHatBytes>(
 ) -> (
     GenericArray<u8, LH::LambdaBytesTimes2>, // com
     //decom
-    (
-        Vec<GenericArray<u8, LH::LambdaBytes>>,
-        Vec<GenericArray<u8, LH::LambdaBytesTimesThree>>,
-    ),
-    GenericArray<u8, LHatBytes>,                          // u
+    Decommitment<LH::LambdaBytes, U3>,
+    GenericArray<u8, LHatBytes>,                                // u
     Box<GenericArray<GenericArray<u8, LH::Lambda>, LHatBytes>>, // V
 )
 where
@@ -133,13 +128,13 @@ where
     LH: LeafHasher,
     LHatBytes: ArrayLength,
 {
-    let (com, decom, sd) = BAVC::<RO, PRG, LH, TAU>::commit(r, iv);
+    let Commitment { com, decom, seeds } = BAVC::<RO, PRG, LH, TAU>::commit(r, iv);
 
     let mut v: GenericArray<GenericArray<u8, LH::Lambda>, LHatBytes> = GenericArray::default();
 
     let u = convert_to_vole::<PRG, TAU, LH, LHatBytes>(
         &mut v,
-        sd[..TAU::bavac_max_node_index(0)].iter(),
+        seeds[..TAU::bavac_max_node_index(0)].iter(),
         iv,
         0,
     );
@@ -151,7 +146,7 @@ where
         // Step 4
         let u_i = convert_to_vole::<PRG, TAU, LH, LHatBytes>(
             &mut v,
-            sd[sdi_start..sdi_end].iter(),
+            seeds[sdi_start..sdi_end].iter(),
             iv,
             i,
         );
@@ -253,7 +248,7 @@ mod test {
     }
 
     #[test]
-    fn convert_to_vole_test() {
+    fn volecommit_test() {
         let iv = GenericArray::default();
         let r = GenericArray::from_array([
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
@@ -294,27 +289,25 @@ mod test {
         let r = GenericArray::from_slice(&r[..16]);
 
         let mut c = vec![0; U210::USIZE * (<Tau128Small as TauParameters>::Tau::USIZE - 1)];
-        let (com, decom, u, v) = super::volecommit::<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small, U210>(
-            VoleCommitmentCRef::new(c.as_mut_slice()),
-            r,
-            &iv,
-        );
-
+        let (com, _, u, v) =
+            super::volecommit::<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small, U210>(
+                VoleCommitmentCRef::new(c.as_mut_slice()),
+                r,
+                &iv,
+            );
 
         let mut v_trans = vec![vec![]; v[0].len()];
-        for i in 0..v[0].len(){
-            for j in 0..v.len(){
+        for i in 0..v[0].len() {
+            for j in 0..v.len() {
                 v_trans[i].push(v[j][i]);
             }
         }
         let v_trans: Vec<u8> = v_trans.into_iter().flatten().collect();
-        
+
         assert_eq!(com.as_slice(), h.as_slice());
         assert_eq!(hash_array(&u), hashed_u.as_slice());
         assert_eq!(hash_array(&c), hashed_c.as_slice());
         assert_eq!(hash_array(&v_trans), hashed_v_trans.as_slice());
-  
-
     }
 
     //     type VC<P> = <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC;
