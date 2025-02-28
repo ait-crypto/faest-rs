@@ -719,7 +719,7 @@ pub(crate) trait TauParameters {
         Self::Tau1::USIZE * (Self::K::USIZE) + (Self::K::USIZE - 1) * (i - Self::Tau1::USIZE)
     }
 
-    fn bavac_max_node_depth(i: usize) -> usize {
+    fn bavc_max_node_depth(i: usize) -> usize {
         if i < Self::Tau1::USIZE {
             return Self::K::USIZE;
         } else {
@@ -727,8 +727,8 @@ pub(crate) trait TauParameters {
         }
     }
 
-    fn bavac_max_node_index(i: usize) -> usize {
-        1usize << Self::bavac_max_node_depth(i)
+    fn bavc_max_node_index(i: usize) -> usize {
+        1usize << Self::bavc_max_node_depth(i)
     }
 
     fn pos_in_tree(i: usize, j: usize) -> usize {

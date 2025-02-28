@@ -324,7 +324,7 @@ where
             let mut uhash_i = GenericArray::default();
             h0_hasher.read(&mut uhash_i);
 
-            let n_i = TAU::bavac_max_node_index(i as usize);
+            let n_i = TAU::bavc_max_node_index(i as usize);
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
                 let idx = TAU::convert_index(i as usize) + j;
@@ -415,7 +415,7 @@ where
 
             let mut h1_hasher = RO::h1_init();
 
-            let n_i = TAU::bavac_max_node_index(i as usize);
+            let n_i = TAU::bavc_max_node_index(i as usize);
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
                 // Step 33
@@ -497,7 +497,7 @@ where
         for i in 0..TAU::Tau::U32 {
             let mut hi_hasher = RO::h1_init();
 
-            let n_i = TAU::bavac_max_node_index(i as usize);
+            let n_i = TAU::bavc_max_node_index(i as usize);
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
                 let idx = TAU::convert_index(i as usize) + j;
@@ -585,7 +585,7 @@ where
         for i in 0u32..TAU::Tau::U32 {
             let mut h1_hasher = RO::h1_init();
 
-            let n_i = TAU::bavac_max_node_index(i as usize);
+            let n_i = TAU::bavc_max_node_index(i as usize);
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
 

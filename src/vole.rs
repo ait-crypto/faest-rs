@@ -38,8 +38,8 @@ where
 {
     // Step 1
     let twk = round + TWEAK_OFFSET;
-    let d = TAU::bavac_max_node_depth(round as usize);
-    let ni = TAU::bavac_max_node_index(round as usize);
+    let d = TAU::bavc_max_node_depth(round as usize);
+    let ni = TAU::bavc_max_node_index(round as usize);
 
     // For step 6 we only need two rows at a time
     let mut rj: Vec<GenericArray<u8, LHatBytes>> = vec![GenericArray::default(); ni];
@@ -134,14 +134,14 @@ where
 
     let u = convert_to_vole::<PRG, TAU, LH, LHatBytes>(
         &mut v,
-        seeds[..TAU::bavac_max_node_index(0)].iter(),
+        seeds[..TAU::bavc_max_node_index(0)].iter(),
         iv,
         0,
     );
 
     for i in 1..TAU::Tau::U32 {
         let sdi_start = TAU::convert_index(i as usize);
-        let sdi_end = sdi_start + TAU::bavac_max_node_index(i as usize);
+        let sdi_end = sdi_start + TAU::bavc_max_node_index(i as usize);
 
         // Step 4
         let u_i = convert_to_vole::<PRG, TAU, LH, LHatBytes>(
