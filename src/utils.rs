@@ -1,10 +1,14 @@
-use std::{array, iter::zip};
+use std::{array, f32::consts::TAU, io::Read, iter::zip};
 
+use bitvec::prelude::*;
+use bitvec::{order::Lsb0, slice::BitSlice, view::BitView};
+use generic_array::typenum::bit;
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use itertools::iproduct;
 
 use crate::{
     fields::ByteCombine,
+    parameter::TauParameters,
     // parameter::{BaseParameters, OWFParameters, TauParameters},
 };
 
@@ -24,6 +28,46 @@ pub(crate) trait Reader {
     }
 }
 
+fn chall_to_u16(chall: &[u8], start_bit: usize, mut k: usize) -> u16 {
+    let mut result = 0u16;
+
+    let byte_idx = start_bit / 8;
+    let bit_off = start_bit % 8;
+
+    // Take bits from lo to end of first byte
+    let taken = std::cmp::min(k, 8 - bit_off);
+    let mask = (1 << taken) - 1;
+    result |= (chall[byte_idx] as u16 >> bit_off) & mask;
+    k -= taken;
+
+    // Take bits from next byte
+    if k != 0 {
+        let taken = std::cmp::min(k, 8);
+        let mask = (1 << taken) - 1;
+        result |= (chall[byte_idx + 1] as u16 & mask) << 8 - bit_off;
+        k -= taken;
+    }
+
+    if k != 0 {
+        let mask = (1 << k) - 1;
+        result |= (chall[byte_idx + 2] as u16 & mask) << 16 - bit_off;
+    }
+
+    result
+}
+
+pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> GenericArray<u16, TAU::Tau> {
+    let k = TAU::K::USIZE;
+
+    (0..TAU::Tau1::USIZE)
+        .map(|i| chall_to_u16(chall, TAU::tau1_offset_unchecked(i), k))
+        .chain(
+            (TAU::Tau1::USIZE..TAU::Tau::USIZE)
+                .map(|i| chall_to_u16(chall, TAU::tau0_offset_unchecked(i), k - 1)),
+        )
+        .collect()
+}
+
 // pub(crate) type Field<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
 
 // pub(crate) fn transpose_and_into_field<O>(
@@ -40,7 +84,7 @@ pub(crate) trait Reader {
 //             ))
 //         }),
 //     )
-// }
+// }0x48, 0xb0, 0xcd, 0x3a, 0x03, 0x76, 0x84, 0x7b,
 
 // #[allow(clippy::boxed_local)]
 // pub(crate) fn convert_gq<O, Tau>(
@@ -93,7 +137,10 @@ pub(crate) trait Reader {
 pub(crate) mod test {
     use std::{fs::File, path::Path};
 
+    use generic_array::GenericArray;
     use serde::de::DeserializeOwned;
+
+    use crate::parameter::{Tau128Fast, Tau128Small};
 
     pub(crate) fn read_test_data<T: DeserializeOwned>(path: &str) -> Vec<T> {
         File::open(
@@ -109,5 +156,16 @@ pub(crate) mod test {
             serde_json::from_reader,
         )
         .unwrap_or_else(|_| panic!("Failed to read JSON test data from {}", path))
+    }
+
+    #[test]
+    pub fn test_chall() {
+        let chal = GenericArray::from_array([
+            0x71, 0x55, 0xb8, 0xf0, 0xde, 0x65, 0xbe, 0xd1, 0x93, 0xb8, 0x61, 0x5b, 0xcd, 0xe6,
+            0x89, 0x00,
+        ]);
+
+        let i_delta = super::decode_all_chall_3::<Tau128Fast>(chal.as_slice());
+        println!("{:?}", i_delta);
     }
 }
