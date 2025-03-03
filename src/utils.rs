@@ -1,7 +1,5 @@
 use std::{array, f32::consts::TAU, io::Read, iter::zip};
 
-use bitvec::prelude::*;
-use bitvec::{order::Lsb0, slice::BitSlice, view::BitView};
 use generic_array::typenum::bit;
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use itertools::iproduct;
