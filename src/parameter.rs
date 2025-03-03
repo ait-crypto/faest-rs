@@ -695,9 +695,6 @@ pub(crate) trait TauParameters {
     // }
 
     fn convert_index(i: usize) -> usize {
-        if i == 0 {
-            return 0;
-        }
 
         if i < Self::Tau1::USIZE {
             return (1 << Self::K::USIZE) * i;
@@ -707,16 +704,40 @@ pub(crate) trait TauParameters {
             + (1 << (Self::K::USIZE - 1)) * (i - Self::Tau1::USIZE)
     }
 
-    fn convert_depth(i: usize) -> usize {
-        if i == 0 {
-            return 0;
-        }
 
+    #[inline]
+    fn tau1_offset_unchecked(i: usize) -> usize{
+        Self::K::USIZE * i
+    }
+
+    #[inline]
+    fn tau0_offset_unchecked(i: usize) -> usize{
+        Self::Tau1::USIZE * (Self::K::USIZE) + (Self::K::USIZE - 1) * (i - Self::Tau1::USIZE)
+    }
+
+    fn get_round_offset(i: usize) -> usize {
+        
         if i < Self::Tau1::USIZE {
             return Self::K::USIZE * i;
         }
 
         Self::Tau1::USIZE * (Self::K::USIZE) + (Self::K::USIZE - 1) * (i - Self::Tau1::USIZE)
+    }
+
+    fn get_round_bounds(i: usize) -> Option<(usize, usize)> {
+
+        if i > Self::Tau::USIZE {
+            return None;
+        }
+        
+        if i < Self::Tau1::USIZE {
+            let lo = Self::tau1_offset_unchecked(i); 
+            Some((lo, lo + Self::K::USIZE))
+        }else{
+            let lo = Self::tau0_offset_unchecked(i);
+            Some((lo, lo + Self::K::USIZE - 1))
+        }
+
     }
 
     fn bavc_max_node_depth(i: usize) -> usize {
@@ -899,6 +920,9 @@ impl TauParameters for Tau256FastEM {
     type Tau1 = U24;
     type Topen = U234;
 }
+
+
+
 
 // pub(crate) trait FAESTParameters {
 //     type OWF: OWFParameters;

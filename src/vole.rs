@@ -13,12 +13,12 @@ use generic_array::{
 use itertools::izip;
 
 use crate::{
-    bavc::{BatchVectorCommitment, Commitment, Decommitment, BAVC},
+    bavc::{BatchVectorCommitment, Commitment, Decommitment, Opening, BAVC},
     parameter::TauParameters,
     prg::{PseudoRandomGenerator, IV, TWK},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::LeafHasher,
-    utils::Reader,
+    utils::{decode_all_chall_3, Reader},
 };
 
 const TWEAK_OFFSET: u32 = 1 << 31;
@@ -55,10 +55,9 @@ where
     }
 
     // Step 6..9
-    let vcol_offset = TAU::convert_depth(round as usize);
+    let vcol_offset = TAU::get_round_offset(round as usize);
     for j in 0..d {
         for i in 0..(ni >> (j + 1)) {
-            
             // Join steps 8 and 9
             for (vrow, (r_dst, r_src, r_src1)) in
                 izip!(&mut rj1[i], &rj[2 * i], &rj[2 * i + 1]).enumerate()
@@ -160,61 +159,77 @@ where
     (com, decom, u, Box::new(v))
 }
 
-// #[allow(clippy::type_complexity)]
-// pub fn volereconstruct<VC, Tau, LH>(
-//     chal: &[u8],
-//     pdecom: &[u8],
-//     iv: &IV,
-// ) -> (
-//     GenericArray<u8, VC::LambdaBytesTimes2>,
-//     Box<GenericArray<GenericArray<u8, LH>, VC::Lambda>>,
-// )
-// where
-//     Tau: TauParameters,
-//     VC: VectorCommitment,
-//     LH: ArrayLength,
-// {
-//     let mut hasher = VC::RO::h1_init();
-//     let q = Box::from_iter((0..Tau::Tau::USIZE).flat_map(|i| {
-//         let delta_p = Tau::decode_challenge(chal, i);
-//         let pdecom = if i < Tau::Tau0::USIZE {
-//             let start =
-//                 Tau::K0::USIZE * i * VC::LambdaBytes::USIZE + i * 2 * VC::LambdaBytes::USIZE;
-//             &pdecom[start
-//                 ..start + Tau::K0::USIZE * VC::LambdaBytes::USIZE + 2 * VC::LambdaBytes::USIZE]
-//         } else {
-//             let start = (Tau::K0::USIZE * Tau::Tau0::USIZE
-//                 + (i - Tau::Tau0::USIZE) * Tau::K1::USIZE)
-//                 * VC::LambdaBytes::USIZE
-//                 + i * 2 * VC::LambdaBytes::USIZE;
-//             &pdecom[start
-//                 ..start + Tau::K1::USIZE * VC::LambdaBytes::USIZE + 2 * VC::LambdaBytes::USIZE]
-//         };
-//         let (com_i, s_i) = VC::reconstruct(pdecom, &delta_p, iv);
-//         hasher.update(&com_i);
+#[allow(clippy::type_complexity)]
+pub fn volereconstruct<RO, PRG, LH, TAU, LHatBytes>(
+    chall: &GenericArray<u8, LH::LambdaBytes>,
+    decom_i: &Opening,
+    c: VoleCommitmentCRef<LHatBytes>,
+    iv: &IV,
+) -> Option<(
+    GenericArray<u8, LH::LambdaBytesTimes2>,
+    Box<GenericArray<GenericArray<u8, LH::Lambda>, LHatBytes>>,
+)>
+where
+    LHatBytes: ArrayLength,
+    PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
+    RO: RandomOracle,
+    TAU: TauParameters,
+    LH: LeafHasher,
+{
+    // Step 1
+    let i_delta = decode_all_chall_3::<TAU>(chall);
 
-//         let delta: usize = delta_p
-//             .into_iter()
-//             .enumerate()
-//             .fold(0, |a, (j, d)| a ^ (usize::from(d) << j));
+    // Step 4
+    let rec = BAVC::<RO, PRG, LH, TAU>::reconstruct(decom_i, &i_delta, iv);
 
-//         let k = if i < Tau::Tau0::USIZE {
-//             Tau::K0::USIZE
-//         } else {
-//             Tau::K1::USIZE
-//         };
+    if rec.is_none() {
+        return None;
+    }
 
-//         let mut buf = vec![GenericArray::default(); k];
-//         convert_to_vole::<VC::PRG, _>(
-//             buf.as_mut_slice(),
-//             None,
-//             (1..(1 << k)).map(|j| &s_i[j ^ delta]),
-//             iv,
-//         );
-//         buf.into_iter()
-//     }));
-//     (hasher.finish().read_into(), q)
-// }
+    let rec = rec.unwrap();
+
+    let mut q = GenericArray::default_boxed();
+
+    let mut off = 0;
+
+    // Step 7
+    for i in 0..TAU::Tau::U32 {
+        let ni = TAU::bavc_max_node_index(i as usize);
+        let delta_i = i_delta[i as usize];
+
+        let seeds_i: Vec<_> = (0..ni).filter_map(|j_delta| {
+
+            let j = j_delta ^ delta_i as usize;
+
+            if j < delta_i as usize {
+                return Some(&rec.seeds[off + j]);
+            } else if j > delta_i as usize {
+                return Some(&rec.seeds[off + j - 1]);
+            }
+            
+            None
+        }).collect();
+
+        let _ = convert_to_vole::<PRG, TAU, LH, LHatBytes>(&mut q, seeds_i.into_iter(), iv, i);
+
+        if i != 0 {
+            let q_col_offset = TAU::get_round_offset(i as usize);
+            let ki = TAU::bavc_max_node_depth(i as usize);
+            // Step 14
+            for j in (0..ki).filter(|j| delta_i & (1 << j) != 0) {
+                // Step 15
+                for (row, c_ij) in c[i as usize - 1].iter().enumerate() {
+                    q[row][q_col_offset + j] ^= c_ij; // Column range q_col_offset,...,q_col_offset + k_i
+                }
+            }
+        }
+
+        off += ni - 1;
+    }
+
+    Some((rec.com, q))
+}
+
 
 #[cfg(test)]
 mod test {
@@ -248,7 +263,7 @@ mod test {
     }
 
     #[test]
-    fn volecommit_test() {
+    fn vole_test() {
         let iv = GenericArray::default();
         let r = GenericArray::from_array([
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
@@ -286,10 +301,24 @@ mod test {
             0xa7, 0xb4, 0x49, 0xac, 0x39, 0x44, 0x67, 0x96,
         ]);
 
+        let hashed_q_trans = GenericArray::from_array([
+            0x20, 0x4c, 0x57, 0x11, 0xa2, 0x0b, 0xb4, 0xb9, 0x41, 0xa4, 0x02, 0x03, 0x5e, 0xe2,
+            0x99, 0x59, 0x10, 0x5a, 0xb7, 0x27, 0x71, 0xeb, 0x3d, 0x47, 0xc1, 0xae, 0xfe, 0x45,
+            0xc2, 0xa8, 0x14, 0xb6, 0xe5, 0x1c, 0xce, 0x9d, 0xc7, 0x98, 0x6f, 0xee, 0xfe, 0x30,
+            0x36, 0x85, 0x4c, 0x15, 0x2a, 0x0f, 0xe1, 0x63, 0x9a, 0x6c, 0x95, 0xed, 0x9f, 0x6c,
+            0x4e, 0x6d, 0xa6, 0xfb, 0xe8, 0x19, 0x7c, 0xe2,
+        ]);
+
+        let chall = GenericArray::from_array([
+            0x48, 0xb0, 0xcd, 0x3a, 0x03, 0x76, 0x84, 0x7b, 0xe0, 0xcd, 0x11, 0xb2, 0x7d, 0x44,
+            0x0d, 0x01,
+        ]);
+
         let r = GenericArray::from_slice(&r[..16]);
 
         let mut c = vec![0; U210::USIZE * (<Tau128Small as TauParameters>::Tau::USIZE - 1)];
-        let (com, _, u, v) =
+
+        let (com, decom, u, v) =
             super::volecommit::<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small, U210>(
                 VoleCommitmentCRef::new(c.as_mut_slice()),
                 r,
@@ -308,6 +337,31 @@ mod test {
         assert_eq!(hash_array(&u), hashed_u.as_slice());
         assert_eq!(hash_array(&c), hashed_c.as_slice());
         assert_eq!(hash_array(&v_trans), hashed_v_trans.as_slice());
+
+        let i_delta = decode_all_chall_3::<Tau128Small>(&chall);
+        let decom_i = BAVC::<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small>::open(
+            &decom, &i_delta,
+        )
+        .unwrap();
+
+        let (com, q) =
+            volereconstruct::<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small, U210>(
+                &chall,
+                &decom_i,
+                VoleCommitmentCRef::new(c.as_mut_slice()),
+                &iv,
+            ).unwrap();
+
+        let mut q_trans = vec![vec![]; q[0].len()];
+        for i in 0..q[0].len() {
+            for j in 0..q.len() {
+                q_trans[i].push(q[j][i]);
+            }
+        }
+        let q_trans: Vec<u8> = q_trans.into_iter().flatten().collect();
+
+        assert_eq!(h.as_slice(), com.as_slice());
+        assert_eq!(hashed_q_trans.as_slice(), hash_array(&q_trans).as_slice());
     }
 
     //     type VC<P> = <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::VC;
