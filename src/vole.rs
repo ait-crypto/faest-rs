@@ -13,7 +13,7 @@ use generic_array::{
 use itertools::izip;
 
 use crate::{
-    bavc::{BatchVectorCommitment, Commitment, Decommitment, Opening},
+    bavc::{BatchVectorCommitment, Commitment, Decommitment, Opening, Reconstruct},
     parameter::TauParameters,
     prg::{PseudoRandomGenerator, IV, TWK},
     random_oracles::{Hasher, RandomOracle},
@@ -23,13 +23,14 @@ use crate::{
 
 const TWEAK_OFFSET: u32 = 1 << 31;
 
+
 #[allow(clippy::type_complexity)]
 fn convert_to_vole<'a, BAVC, LHatBytes>(
-    v: &mut GenericArray<GenericArray<u8, BAVC::Lambda>, LHatBytes>,
+    v: &mut GenericArray<GenericArray<u8, BAVC::Lambda>, LHatBytes>, // We directly work with the lambda*l_hat matrix instead of transposing it later
     sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, BAVC::LambdaBytes>>,
     iv: &IV,
     round: u32,
-) -> GenericArray<u8, LHatBytes>
+) -> GenericArray<u8, LHatBytes> // Should it be boxed?
 where
     BAVC: BatchVectorCommitment,
     LHatBytes: ArrayLength,
@@ -175,12 +176,11 @@ where
     // Skip step 2 as decode_all_chall_3 can't fail (parameter constraints ensure that we only provide valid challenges/indexes)
 
     // Step 4
-    // TODO: implement default for Reconstruct and use unwrap_or_deafault instead
-    let rec = BAVC::reconstruct(decom_i, &i_delta, iv);
-    if rec.is_none() {
+    let rec = BAVC::reconstruct(decom_i, &i_delta, iv).unwrap_or_default();
+    if rec == Reconstruct::default() {
         return None;
     }
-    let rec = rec.unwrap();
+    
 
     let mut q = GenericArray::default_boxed();
 
