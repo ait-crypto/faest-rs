@@ -20,12 +20,26 @@ use generic_array::{
 
 use crate::{
     fields::{BigGaloisField, Field, GF128},
-    parameter::TauParameters,
+    parameter::{TauParameters, Tau128Fast, Tau128FastEM, Tau128Small, Tau128SmallEM, Tau192Fast, Tau192FastEM, Tau192Small, Tau192SmallEM, Tau256Fast, Tau256FastEM, Tau256Small, Tau256SmallEM},
     prg::{PseudoRandomGenerator, IV, PRG128, PRG192, PRG256, TWK},
-    random_oracles::{Hasher, RandomOracle},
+    random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256},
     universal_hashing::{LeafHasher, LeafHasher128, LeafHasher192, LeafHasher256},
     utils::Reader,
 };
+
+pub(crate) type BAVC128S = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small>;
+pub(crate) type BAVC128F = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>;
+pub(crate) type BAVC192S = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Small>;
+pub(crate) type BAVC192F = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Fast>;
+pub(crate) type BAVC256S = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Small>;
+pub(crate) type BAVC256F = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>;
+
+pub(crate) type BAVCEM128S = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128SmallEM>;
+pub(crate) type BAVCEM128F = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128FastEM>;
+pub(crate) type BAVCEM192S = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192SmallEM>;
+pub(crate) type BAVCEM192F = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192FastEM>;
+pub(crate) type BAVCEM256S = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256SmallEM>;
+pub(crate) type BAVCEM256F = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256FastEM>;
 
 pub trait LeafCommit {
     type LambdaBytes: ArrayLength;
@@ -153,7 +167,13 @@ where
     Self::LambdaBytes: Mul<U2, Output = Self::LambdaBytesTimes2>
         + Mul<U3, Output = Self::LambdaBytesTimes3>
         + Mul<Self::NLeafCommit, Output: ArrayLength>,
-{
+    {
+    type PRG: PseudoRandomGenerator<KeySize = Self::LambdaBytes>;
+    type TAU: TauParameters<Tau = Self::Tau>;
+    type LH: LeafHasher;
+    type RO: RandomOracle;
+
+    type Lambda: ArrayLength;
     type LambdaBytes: ArrayLength;
     type LambdaBytesTimes2: ArrayLength;
     type LambdaBytesTimes3: ArrayLength;
@@ -162,8 +182,7 @@ where
     type LC: LeafCommit;
     type NLeafCommit: ArrayLength;
     type Topen: ArrayLength;
-    type PRG: PseudoRandomGenerator<KeySize = Self::LambdaBytes>;
-    type TAU: TauParameters;
+    
 
     fn commit(
         r: &GenericArray<u8, Self::LambdaBytes>,
@@ -296,6 +315,9 @@ where
     TAU: TauParameters,
     LH: LeafHasher,
 {
+    type LH = LH;
+    type RO = RO;
+    type Lambda = LH::Lambda;
     type LambdaBytes = LH::LambdaBytes;
     type LambdaBytesTimes2 = LH::LambdaBytesTimes2;
     type LambdaBytesTimes3 = LH::LambdaBytesTimes3;
@@ -474,14 +496,18 @@ where
     TAU: TauParameters,
     LH: LeafHasher,
 {
+    type RO = RO;
+    type PRG = PRG;
+    type LH = LH;
+    type TAU = TAU;
+    type LC = LeafCommitment<PRG, LH>;
+
+    type Lambda = LH::Lambda;
     type LambdaBytes = LH::LambdaBytes;
     type LambdaBytesTimes2 = LH::LambdaBytesTimes2;
     type LambdaBytesTimes3 = LH::LambdaBytesTimes3;
-    type LC = LeafCommitment<PRG, LH>;
-    type TAU = TAU;
     type Tau = TAU::Tau;
     type L = TAU::L;
-    type PRG = PRG;
     type Topen = TAU::Topen;
     type NLeafCommit = U2;
 
@@ -830,20 +856,6 @@ mod test {
         }
     }
 
-    type BAVC128S = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small>;
-    type BAVC128F = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>;
-    type BAVC192S = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Small>;
-    type BAVC192F = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Fast>;
-    type BAVC256S = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Small>;
-    type BAVC256F = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>;
-
-    type BAVCEM128S = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128SmallEM>;
-    type BAVCEM128F = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128FastEM>;
-    type BAVCEM192S = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192SmallEM>;
-    type BAVCEM192F = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192FastEM>;
-    type BAVCEM256S = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256SmallEM>;
-    type BAVCEM256F = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256FastEM>;
-
     #[test]
     fn bavc_test() {
         let r: GenericArray<u8, _> = GenericArray::from_array([
@@ -858,7 +870,7 @@ mod test {
             0x78, 0x22,
         ]);
 
-        let database: Vec<DataBAVAC> = read_test_data("bavac.json");
+        let database: Vec<DataBAVAC> = read_test_data("bavc.json");
         for data in database {
             match data.lambda {
                 128 => {
