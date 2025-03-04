@@ -2,7 +2,7 @@ use core::panic;
 use std::{
     convert, default,
     marker::PhantomData,
-    ops::{Add, Mul},
+    ops::{Add, Mul, Sub},
     process::{id, Output},
     vec,
 };
@@ -12,7 +12,7 @@ use bit_set::BitSet;
 
 use generic_array::{
     typenum::{
-        Const, IsEqual, Negate, Prod, Sum, Unsigned, N1, U10, U128, U16, U2, U216, U3, U4, U48,
+        Const, IsEqual, Negate, Prod, Sum, Diff, Unsigned, U1, U10, U128, U16, U2, U216, U3, U4, U48,
         U64, U8,
     },
     ArrayLength, GenericArray, IntoArrayLength,
@@ -30,20 +30,6 @@ use crate::{
     universal_hashing::{LeafHasher, LeafHasher128, LeafHasher192, LeafHasher256},
     utils::Reader,
 };
-
-pub(crate) type BAVC128S = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small>;
-pub(crate) type BAVC128F = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>;
-pub(crate) type BAVC192S = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Small>;
-pub(crate) type BAVC192F = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Fast>;
-pub(crate) type BAVC256S = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Small>;
-pub(crate) type BAVC256F = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>;
-
-pub(crate) type BAVCEM128S = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128SmallEM>;
-pub(crate) type BAVCEM128F = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128FastEM>;
-pub(crate) type BAVCEM192S = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192SmallEM>;
-pub(crate) type BAVCEM192F = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192FastEM>;
-pub(crate) type BAVCEM256S = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256SmallEM>;
-pub(crate) type BAVCEM256F = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256FastEM>;
 
 pub trait LeafCommit {
     type LambdaBytes: ArrayLength;
@@ -126,16 +112,151 @@ where
     }
 }
 
+mod bavc_common {
+    use std::ops::Sub;
 
-// Should we define a trait for LambdaBytes to avoid repeating constraints?
+    use generic_array::typenum::Diff;
+
+    use super::*;
+    // Need to find an alternative way to define helper functions (maybe in a private struct)
+    pub(super) fn construct_keys<PRG, L>(
+        r: &GenericArray<u8, PRG::KeySize>,
+        iv: &IV,
+    ) -> Vec<GenericArray<u8, PRG::KeySize>>
+    where
+        PRG: PseudoRandomGenerator,
+        L: ArrayLength,
+    {
+        let mut keys = vec![GenericArray::default(); 2 * L::USIZE - 1];
+        keys[0].copy_from_slice(r);
+
+        for alpha in 0..L::USIZE - 1 {
+            let mut prg = PRG::new_prg(&keys[alpha], &iv, alpha as TWK);
+            prg.read(&mut keys[2 * alpha + 1]);
+            prg.read(&mut keys[2 * alpha + 2]);
+        }
+
+        keys
+    }
+
+    pub(super) fn reconstruct_keys<PRG, TAU>(
+        s: &mut BitSet,
+        decom_keys: &[&[u8]],
+        i_delta: &GenericArray<u16, TAU::Tau>,
+        iv: &IV,
+    ) -> Option<Vec<GenericArray<u8, PRG::KeySize>>>
+    where
+        PRG: PseudoRandomGenerator,
+        TAU: TauParameters,
+    {
+        // Steps 8..11
+        for i in 0..TAU::Tau::USIZE {
+            let alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
+            s.insert(alpha);
+        }
+
+        // Steps 13..21
+        let mut keys = vec![GenericArray::default(); 2 * TAU::L::USIZE - 1];
+        let mut decom_iter = decom_keys.iter();
+        for i in (0..TAU::L::USIZE - 1).rev() {
+            let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
+
+            if left_child | right_child {
+                s.insert(i);
+            }
+
+            if left_child ^ right_child {
+                if let Some(key) = decom_iter.next() {
+                    let alpha = 2 * i + 1 + (left_child as usize);
+                    keys[alpha].copy_from_slice(key);
+                } else {
+                    return None;
+                }
+            }
+        }
+
+        // Step 22: in BAVC::open we don't actually pad decom with 0s => we must have reached the end of the iterator
+        if decom_iter.next().is_some() {
+            return None;
+        }
+
+        // Steps 25..27
+        for i in 0..TAU::L::USIZE - 1 {
+            if !s.contains(i) {
+                let mut rng = PRG::new_prg(&keys[i], iv, i as TWK);
+                rng.read(&mut keys[2 * i + 1]);
+                rng.read(&mut keys[2 * i + 2]);
+            }
+        }
+
+        Some(keys)
+    }
+
+    pub(super) fn mark_nodes<TAU>(
+        s: &mut BitSet,
+        i_delta: &GenericArray<u16, TAU::Tau>,
+    ) -> Option<u32>
+    where
+        TAU: TauParameters,
+    {
+        // Steps 6 ..15
+        let mut n_h = 0;
+        for i in 0..TAU::Tau::USIZE {
+            let mut alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
+            s.insert(alpha);
+            n_h += 1;
+            while alpha > 0 && s.insert((alpha - 1) / 2) {
+                alpha = (alpha - 1) / 2;
+                n_h += 1;
+            }
+        }
+
+        // Step 16
+        if n_h - 2 * TAU::Tau::U32 + 1 > TAU::Topen::U32 {
+            return None;
+        }
+
+        Some(n_h)
+    }
+
+    pub(super) fn construct_nodes<'a, LambdaBytes, L>(
+        keys: &'a [GenericArray<u8,LambdaBytes>],
+        s: &BitSet,
+    ) -> Vec<&'a [u8]>
+    where
+        L: ArrayLength,
+        LambdaBytes: ArrayLength
+    {
+
+        // Steps 19..22
+        (0..L::USIZE - 1)
+            .rev()
+            .filter_map(|i| {
+
+                let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
+
+                if left_child ^ right_child {
+                    let alpha = 2 * i + 1 + (left_child as usize);
+                    return Some(keys[alpha].as_ref());
+                }
+                
+                None
+            })
+            .collect()
+    }
+}
+
+use bavc_common::{construct_keys, construct_nodes, mark_nodes, reconstruct_keys};
+
 pub(crate) trait BatchVectorCommitment
 where
     Self::LambdaBytes: Mul<U2, Output = Self::LambdaBytesTimes2>
         + Mul<U3, Output = Self::LambdaBytesTimes3>
-        + Mul<Self::NLeafCommit, Output: ArrayLength> + PartialEq,
+        + Mul<Self::NLeafCommit, Output: ArrayLength>
+        + PartialEq,
 {
     type PRG: PseudoRandomGenerator<KeySize = Self::LambdaBytes>;
-    type TAU: TauParameters<Tau = Self::Tau>;
+    type TAU: TauParameters<Tau = Self::Tau, L = Self::L>;
     type LH: LeafHasher;
     type RO: RandomOracle;
 
@@ -164,94 +285,6 @@ where
         i_delta: &GenericArray<u16, Self::Tau>,
         iv: &IV,
     ) -> Option<BavcReconstructResult<Self::LambdaBytes>>;
-
-
-    // Need to find an alternative way to define helper functions (maybe in a private struct)
-    fn construct_keys(
-        r: &GenericArray<u8, Self::LambdaBytes>,
-        iv: &IV,
-    ) -> Vec<GenericArray<u8, Self::LambdaBytes>> {
-        let mut keys = vec![GenericArray::default(); 2 * Self::L::USIZE - 1];
-        keys[0].copy_from_slice(r);
-
-        for alpha in 0..Self::L::USIZE - 1 {
-            let mut prg = Self::PRG::new_prg(&keys[alpha], &iv, alpha as TWK);
-            prg.read(&mut keys[2 * alpha + 1]);
-            prg.read(&mut keys[2 * alpha + 2]);
-        }
-
-        keys
-    }
-
-    fn reconstruct_keys(
-        s: &mut BitSet,
-        decom_keys: &[&[u8]],
-        i_delta: &GenericArray<u16, Self::Tau>,
-        iv: &IV,
-    ) -> Option<Vec<GenericArray<u8, Self::LambdaBytes>>> {
-        // Steps 8..11
-        for i in 0..Self::Tau::USIZE {
-            let alpha = Self::TAU::pos_in_tree(i, i_delta[i] as usize);
-            s.insert(alpha);
-        }
-
-        // Steps 13..21
-        let mut keys = vec![GenericArray::default(); 2 * Self::L::USIZE - 1];
-        let mut decom_iter = decom_keys.iter();
-        for i in (0..Self::L::USIZE - 1).rev() {
-            let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
-
-            if left_child | right_child {
-                s.insert(i);
-            }
-
-            if left_child ^ right_child {
-                if let Some(key) = decom_iter.next() {
-                    let alpha = 2 * i + 1 + (left_child as usize);
-                    keys[alpha].copy_from_slice(key);
-                } else {
-                    return None;
-                }
-            }
-        }
-
-        // Step 22: in BAVC::open we don't actually pad decom with 0s => we must have reached the end of the iterator
-        if decom_iter.next().is_some() {
-            return None;
-        }
-
-        // Steps 25..27
-        for i in 0..Self::L::USIZE - 1 {
-            if !s.contains(i) {
-                let mut rng = Self::PRG::new_prg(&keys[i], iv, i as TWK);
-                rng.read(&mut keys[2 * i + 1]);
-                rng.read(&mut keys[2 * i + 2]);
-            }
-        }
-
-        Some(keys)
-    }
-
-    fn mark_nodes(s: &mut BitSet, i_delta: &GenericArray<u16, Self::Tau>) -> Option<u32> {
-        // Steps 6 ..15
-        let mut n_h = 0;
-        for i in 0..Self::Tau::USIZE {
-            let mut alpha = Self::TAU::pos_in_tree(i, i_delta[i] as usize);
-            s.insert(alpha);
-            n_h += 1;
-            while alpha > 0 && s.insert((alpha - 1) / 2) {
-                alpha = (alpha - 1) / 2;
-                n_h += 1;
-            }
-        }
-
-        // Step 16
-        if n_h - 2 * Self::Tau::U32 + 1 > Self::Topen::U32 {
-            return None;
-        }
-
-        Some(n_h)
-    }
 }
 
 // It would be nice to avoid all this code duplication between BAVC and BAVCEM
@@ -298,7 +331,7 @@ where
         let mut h0_hasher = h0_hasher.finish();
 
         // Steps 5..7
-        let keys = <Self as BatchVectorCommitment>::construct_keys(r, iv);
+        let keys = construct_keys::<PRG, Self::L>(r, iv);
 
         // Setps 8..13
         let mut com_hasher = RO::h1_init();
@@ -339,23 +372,12 @@ where
         let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
 
         // Steps 6..17
-        if <Self as BatchVectorCommitment>::mark_nodes(&mut s, i_delta).is_none() {
+        if mark_nodes::<TAU>(&mut s, i_delta).is_none() {
             return None;
         }
 
         // Steps 19..23
-        let nodes = (0..TAU::L::USIZE - 1)
-            .rev()
-            .filter_map(|i| {
-                let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
-
-                if left_child ^ right_child {
-                    let alpha = 2 * i + 1 + (left_child as usize);
-                    return Some(decom.keys[alpha].as_ref());
-                }
-                None
-            })
-            .collect();
+        let nodes = construct_nodes::<Self::LambdaBytes, Self::L>(&decom.keys, &s);
 
         // Skip step 24: as we know expected nodes len we can keep the 0s-pad implicit
 
@@ -377,8 +399,7 @@ where
 
         // Steps 8..27
         let keys =
-            <Self as BatchVectorCommitment>::reconstruct_keys(&mut s, &decom_i.nodes, i_delta, iv)
-                .unwrap_or_default();
+            reconstruct_keys::<PRG, TAU>(&mut s, &decom_i.nodes, i_delta, iv).unwrap_or_default();
         if keys.is_empty() {
             return None;
         }
@@ -444,7 +465,6 @@ where
     TAU: TauParameters,
     LH: LeafHasher;
 
-
 impl<RO, PRG, LH, TAU> BatchVectorCommitment for BAVC_EM<RO, PRG, LH, TAU>
 where
     RO: RandomOracle,
@@ -472,7 +492,7 @@ where
         iv: &IV,
     ) -> BavcCommitResult<Self::LambdaBytes, Self::NLeafCommit> {
         // Steps 5..7
-        let keys = Self::construct_keys(r, iv);
+        let keys = construct_keys::<PRG, Self::L>(r, iv);
 
         // Setps 8..13
         let mut com_hasher = RO::h1_init();
@@ -507,26 +527,17 @@ where
     fn open<'a>(
         decom: &'a BavcDecommitment<Self::LambdaBytes, Self::NLeafCommit>,
         i_delta: &GenericArray<u16, Self::Tau>,
-    ) -> Option<BavcOpenResult<'a>> {
+    ) -> Option<BavcOpenResult<'a>>{
         // Step 5
         let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
 
         // Steps 6..17
-        if Self::mark_nodes(&mut s, i_delta).is_none() {
+        if mark_nodes::<TAU>(&mut s, i_delta).is_none() {
             return None;
         }
 
         // Steps 19..23
-        let nodes = (0..TAU::L::USIZE - 1)
-            .rev()
-            .filter_map(|i| {
-                if s.contains(2 * i + 1) ^ s.contains(2 * i + 2) {
-                    let alpha = 2 * i + 1 + (s.contains(2 * i + 1) as usize);
-                    return Some(decom.keys[alpha].as_ref());
-                }
-                None
-            })
-            .collect();
+        let nodes = construct_nodes::<Self::LambdaBytes, Self::L>(&decom.keys, &s);
 
         // Skip step 24: as we know expected nodes len we can keep the 0s-pad implicit
 
@@ -553,7 +564,8 @@ where
         }
 
         // Steps 13..21
-        let keys = Self::reconstruct_keys(&mut s, &decom_i.nodes, i_delta, iv).unwrap_or_default();
+        let keys =
+            reconstruct_keys::<PRG, TAU>(&mut s, &decom_i.nodes, i_delta, iv).unwrap_or_default();
         if keys.is_empty() {
             return None;
         }
@@ -596,11 +608,13 @@ where
     }
 }
 
-
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub(crate) struct BavcCommitResult<LambdaBytes, NLeafCommit>
 where
-    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<NLeafCommit, Output: ArrayLength> + PartialEq,
+    LambdaBytes: ArrayLength
+        + Mul<U2, Output: ArrayLength>
+        + Mul<NLeafCommit, Output: ArrayLength>
+        + PartialEq,
     NLeafCommit: ArrayLength,
 {
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
@@ -610,7 +624,7 @@ where
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub(crate) struct BavcOpenResult<'a> {
-    pub coms: Vec<&'a [u8]>, // GenericArray<&'a [u8], L>?
+    pub coms: Vec<&'a [u8]>,  // GenericArray<&'a [u8], L>?
     pub nodes: Vec<&'a [u8]>, // GenericArray<&'a [u8], 2*L-1>?
 }
 
@@ -620,7 +634,7 @@ where
     LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + PartialEq,
 {
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
-    pub seeds: Vec<GenericArray<u8, LambdaBytes>>,  //GenericArray<<GenericArray<u8, LambdaBytes>, L-Tau> ?
+    pub seeds: Vec<GenericArray<u8, LambdaBytes>>, //GenericArray<<GenericArray<u8, LambdaBytes>, L-Tau> ?
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
@@ -632,6 +646,20 @@ where
     keys: Vec<GenericArray<u8, LambdaBytes>>, // GenericArray<GenericArray<u8, LambdaBytes>, 2*L-1>?
     coms: Vec<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>>>, // GenericArray<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>, L>?
 }
+
+pub(crate) type BAVC128S = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small>;
+pub(crate) type BAVC128F = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>;
+pub(crate) type BAVC192S = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Small>;
+pub(crate) type BAVC192F = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Fast>;
+pub(crate) type BAVC256S = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Small>;
+pub(crate) type BAVC256F = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>;
+
+pub(crate) type BAVCEM128S = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128SmallEM>;
+pub(crate) type BAVCEM128F = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128FastEM>;
+pub(crate) type BAVCEM192S = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192SmallEM>;
+pub(crate) type BAVCEM192F = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192FastEM>;
+pub(crate) type BAVCEM256S = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256SmallEM>;
+pub(crate) type BAVCEM256F = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256FastEM>;
 
 #[cfg(test)]
 mod test {
@@ -704,7 +732,10 @@ mod test {
 
     fn compare_expected_with_result<
         'a,
-        Lambda: ArrayLength + Mul<NLeafCommit, Output: ArrayLength> + Mul<U2, Output: ArrayLength> + PartialEq,
+        Lambda: ArrayLength
+            + Mul<NLeafCommit, Output: ArrayLength>
+            + Mul<U2, Output: ArrayLength>
+            + PartialEq,
         NLeafCommit: ArrayLength,
         TAU: TauParameters,
     >(
