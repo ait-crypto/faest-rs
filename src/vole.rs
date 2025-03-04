@@ -13,7 +13,7 @@ use generic_array::{
 use itertools::izip;
 
 use crate::{
-    bavc::{BatchVectorCommitment, Commitment, Decommitment, Opening, Reconstruct},
+    bavc::{BatchVectorCommitment, BavcCommitResult, BavcDecommitment, BavcOpenResult, BavcReconstructResult},
     parameter::TauParameters,
     prg::{PseudoRandomGenerator, IV, TWK},
     random_oracles::{Hasher, RandomOracle},
@@ -117,7 +117,7 @@ pub fn volecommit<BAVC, LHatBytes>(
 ) -> (
     GenericArray<u8, BAVC::LambdaBytesTimes2>, // com
     //decom
-    Decommitment<BAVC::LambdaBytes, BAVC::NLeafCommit>,
+    BavcDecommitment<BAVC::LambdaBytes, BAVC::NLeafCommit>,
     GenericArray<u8, LHatBytes>, // u => Should this be boxed?
     Box<GenericArray<GenericArray<u8, BAVC::Lambda>, LHatBytes>>, // V
 )
@@ -125,7 +125,7 @@ where
     BAVC: BatchVectorCommitment,
     LHatBytes: ArrayLength,
 {
-    let Commitment { com, decom, seeds } = BAVC::commit(r, iv);
+    let BavcCommitResult { com, decom, seeds } = BAVC::commit(r, iv);
 
     let mut v: Box<GenericArray<GenericArray<u8, BAVC::Lambda>, LHatBytes>> =
         GenericArray::default_boxed();
@@ -159,7 +159,7 @@ where
 #[allow(clippy::type_complexity)]
 pub fn volereconstruct<BAVC, LHatBytes>(
     chall: &GenericArray<u8, BAVC::LambdaBytes>,
-    decom_i: &Opening,
+    decom_i: &BavcOpenResult,
     c: VoleCommitmentCRef<LHatBytes>,
     iv: &IV,
 ) -> Option<(
@@ -177,7 +177,7 @@ where
 
     // Step 4
     let rec = BAVC::reconstruct(decom_i, &i_delta, iv).unwrap_or_default();
-    if rec == Reconstruct::default() {
+    if rec == BavcReconstructResult::default() {
         return None;
     }
     

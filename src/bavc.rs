@@ -126,47 +126,8 @@ where
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
-pub(crate) struct Commitment<LambdaBytes, NLeafCommit>
-where
-    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<NLeafCommit, Output: ArrayLength>,
-    NLeafCommit: ArrayLength,
-{
-    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
-    pub decom: Decommitment<LambdaBytes, NLeafCommit>,
-    pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
-}
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
-pub(crate) struct Opening<'a> {
-    pub coms: Vec<&'a [u8]>,
-    pub nodes: Vec<&'a [u8]>,
-}
-impl<'a> Opening<'a> {
-    fn decom_i(&'a self) -> (&'a [&'a [u8]], &'a [&'a [u8]]) {
-        (self.coms.as_slice(), self.nodes.as_slice())
-    }
-}
-
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
-pub(crate) struct Reconstruct<LambdaBytes>
-where
-    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + PartialEq,
-{
-    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
-    pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
-pub(crate) struct Decommitment<LambdaBytes, NLeafCommit>
-where
-    LambdaBytes: ArrayLength + Mul<NLeafCommit, Output: ArrayLength>,
-    NLeafCommit: ArrayLength,
-{
-    keys: Vec<GenericArray<u8, LambdaBytes>>,
-    coms: Vec<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>>>,
-}
-
+// Should we define a trait for LambdaBytes to avoid repeating constraints?
 pub(crate) trait BatchVectorCommitment
 where
     Self::LambdaBytes: Mul<U2, Output = Self::LambdaBytesTimes2>
@@ -191,18 +152,18 @@ where
     fn commit(
         r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
-    ) -> Commitment<Self::LambdaBytes, Self::NLeafCommit>;
+    ) -> BavcCommitResult<Self::LambdaBytes, Self::NLeafCommit>;
 
     fn open<'a>(
-        decom: &'a Decommitment<Self::LambdaBytes, Self::NLeafCommit>,
+        decom: &'a BavcDecommitment<Self::LambdaBytes, Self::NLeafCommit>,
         i_delta: &GenericArray<u16, Self::Tau>,
-    ) -> Option<Opening<'a>>;
+    ) -> Option<BavcOpenResult<'a>>;
 
     fn reconstruct(
-        decom_i: &Opening,
+        decom_i: &BavcOpenResult,
         i_delta: &GenericArray<u16, Self::Tau>,
         iv: &IV,
-    ) -> Option<Reconstruct<Self::LambdaBytes>>;
+    ) -> Option<BavcReconstructResult<Self::LambdaBytes>>;
 
 
     // Need to find an alternative way to define helper functions (maybe in a private struct)
@@ -330,7 +291,7 @@ where
     fn commit(
         r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
-    ) -> Commitment<Self::LambdaBytes, Self::NLeafCommit> {
+    ) -> BavcCommitResult<Self::LambdaBytes, Self::NLeafCommit> {
         // Step 3
         let mut h0_hasher = RO::h0_init();
         h0_hasher.update(&iv);
@@ -364,16 +325,16 @@ where
         }
 
         // Steps 15, 16
-        let decom = Decommitment { keys, coms };
+        let decom = BavcDecommitment { keys, coms };
         let com = com_hasher.finish().read_into();
 
-        Commitment { com, decom, seeds }
+        BavcCommitResult { com, decom, seeds }
     }
 
     fn open<'a>(
-        decom: &'a Decommitment<Self::LambdaBytes, Self::NLeafCommit>,
+        decom: &'a BavcDecommitment<Self::LambdaBytes, Self::NLeafCommit>,
         i_delta: &GenericArray<u16, TAU::Tau>,
-    ) -> Option<Opening<'a>> {
+    ) -> Option<BavcOpenResult<'a>> {
         // Step 5
         let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
 
@@ -403,14 +364,14 @@ where
             .map(|i| decom.coms[TAU::bavc_index_offset(i) + i_delta[i] as usize].as_ref())
             .collect();
 
-        Some(Opening { coms, nodes })
+        Some(BavcOpenResult { coms, nodes })
     }
 
     fn reconstruct(
-        decom_i: &Opening,
+        decom_i: &BavcOpenResult,
         i_delta: &GenericArray<u16, TAU::Tau>,
         iv: &IV,
-    ) -> Option<Reconstruct<Self::LambdaBytes>> {
+    ) -> Option<BavcReconstructResult<Self::LambdaBytes>> {
         // Step 7
         let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
 
@@ -463,7 +424,7 @@ where
             h1_com_hasher.update(&h1_hasher.finish().read_into::<Self::LambdaBytesTimes2>());
         }
 
-        Some(Reconstruct {
+        Some(BavcReconstructResult {
             com: h1_com_hasher.finish().read_into(),
             seeds,
         })
@@ -483,14 +444,6 @@ where
     TAU: TauParameters,
     LH: LeafHasher;
 
-impl<RO, PRG, LH, TAU> BAVC<RO, PRG, LH, TAU>
-where
-    RO: RandomOracle,
-    PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
-    TAU: TauParameters,
-    LH: LeafHasher,
-{
-}
 
 impl<RO, PRG, LH, TAU> BatchVectorCommitment for BAVC_EM<RO, PRG, LH, TAU>
 where
@@ -517,7 +470,7 @@ where
     fn commit(
         r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
-    ) -> Commitment<Self::LambdaBytes, Self::NLeafCommit> {
+    ) -> BavcCommitResult<Self::LambdaBytes, Self::NLeafCommit> {
         // Steps 5..7
         let keys = Self::construct_keys(r, iv);
 
@@ -545,16 +498,16 @@ where
         }
 
         // Steps 15, 16
-        let decom = Decommitment { keys, coms };
+        let decom = BavcDecommitment { keys, coms };
         let com = com_hasher.finish().read_into();
 
-        Commitment { com, decom, seeds }
+        BavcCommitResult { com, decom, seeds }
     }
 
     fn open<'a>(
-        decom: &'a Decommitment<Self::LambdaBytes, Self::NLeafCommit>,
+        decom: &'a BavcDecommitment<Self::LambdaBytes, Self::NLeafCommit>,
         i_delta: &GenericArray<u16, Self::Tau>,
-    ) -> Option<Opening<'a>> {
+    ) -> Option<BavcOpenResult<'a>> {
         // Step 5
         let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
 
@@ -582,14 +535,14 @@ where
             .map(|i| decom.coms[TAU::bavc_index_offset(i) + i_delta[i] as usize].as_ref())
             .collect();
 
-        Some(Opening { coms, nodes })
+        Some(BavcOpenResult { coms, nodes })
     }
 
     fn reconstruct(
-        decom_i: &Opening,
+        decom_i: &BavcOpenResult,
         i_delta: &GenericArray<u16, Self::Tau>,
         iv: &IV,
-    ) -> Option<Reconstruct<Self::LambdaBytes>> {
+    ) -> Option<BavcReconstructResult<Self::LambdaBytes>> {
         // Step 7
         let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
 
@@ -636,11 +589,48 @@ where
             h1_com_hasher.update(&h1_hasher.finish().read_into::<Self::LambdaBytesTimes2>());
         }
 
-        Some(Reconstruct {
+        Some(BavcReconstructResult {
             com: h1_com_hasher.finish().read_into(),
             seeds,
         })
     }
+}
+
+
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub(crate) struct BavcCommitResult<LambdaBytes, NLeafCommit>
+where
+    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<NLeafCommit, Output: ArrayLength> + PartialEq,
+    NLeafCommit: ArrayLength,
+{
+    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
+    pub decom: BavcDecommitment<LambdaBytes, NLeafCommit>,
+    pub seeds: Vec<GenericArray<u8, LambdaBytes>>, // GenericArray<GenericArray<u8, LambdaBytes>, L>?
+}
+
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub(crate) struct BavcOpenResult<'a> {
+    pub coms: Vec<&'a [u8]>, // GenericArray<&'a [u8], L>?
+    pub nodes: Vec<&'a [u8]>, // GenericArray<&'a [u8], 2*L-1>?
+}
+
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub(crate) struct BavcReconstructResult<LambdaBytes>
+where
+    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + PartialEq,
+{
+    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
+    pub seeds: Vec<GenericArray<u8, LambdaBytes>>,  //GenericArray<<GenericArray<u8, LambdaBytes>, L-Tau> ?
+}
+
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub(crate) struct BavcDecommitment<LambdaBytes, NLeafCommit>
+where
+    LambdaBytes: ArrayLength + Mul<NLeafCommit, Output: ArrayLength>,
+    NLeafCommit: ArrayLength,
+{
+    keys: Vec<GenericArray<u8, LambdaBytes>>, // GenericArray<GenericArray<u8, LambdaBytes>, 2*L-1>?
+    coms: Vec<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>>>, // GenericArray<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>, L>?
 }
 
 #[cfg(test)]
@@ -705,11 +695,11 @@ mod test {
 
     type Result<'a, LambdaBytes, NLeafCommit> = (
         // Commit
-        Commitment<LambdaBytes, NLeafCommit>,
+        BavcCommitResult<LambdaBytes, NLeafCommit>,
         // Open
-        Opening<'a>,
+        BavcOpenResult<'a>,
         // Reconstruct
-        Reconstruct<LambdaBytes>,
+        BavcReconstructResult<LambdaBytes>,
     );
 
     fn compare_expected_with_result<
@@ -722,15 +712,15 @@ mod test {
         res: Result<'a, Lambda, NLeafCommit>,
     ) {
         let (
-            Commitment { com, decom, seeds },
+            BavcCommitResult { com, decom, seeds },
             decom_i,
-            Reconstruct {
+            BavcReconstructResult {
                 com: rec_h,
                 seeds: rec_sd,
             },
         ) = res;
 
-        let Decommitment { keys, coms } = decom;
+        let BavcDecommitment { keys, coms } = decom;
 
         let hashed_sd = hash_array(&seeds.iter().flat_map(|x| x.clone()).collect::<Vec<u8>>());
         let hashed_k = hash_array(&keys.iter().flat_map(|x| x.clone()).collect::<Vec<u8>>());
