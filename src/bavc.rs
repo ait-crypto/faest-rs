@@ -20,7 +20,11 @@ use generic_array::{
 
 use crate::{
     fields::{BigGaloisField, Field, GF128},
-    parameter::{TauParameters, Tau128Fast, Tau128FastEM, Tau128Small, Tau128SmallEM, Tau192Fast, Tau192FastEM, Tau192Small, Tau192SmallEM, Tau256Fast, Tau256FastEM, Tau256Small, Tau256SmallEM},
+    parameter::{
+        Tau128Fast, Tau128FastEM, Tau128Small, Tau128SmallEM, Tau192Fast, Tau192FastEM,
+        Tau192Small, Tau192SmallEM, Tau256Fast, Tau256FastEM, Tau256Small, Tau256SmallEM,
+        TauParameters,
+    },
     prg::{PseudoRandomGenerator, IV, PRG128, PRG192, PRG256, TWK},
     random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256},
     universal_hashing::{LeafHasher, LeafHasher128, LeafHasher192, LeafHasher256},
@@ -144,10 +148,11 @@ impl<'a> Opening<'a> {
     }
 }
 
-
 #[derive(Clone, Debug)]
-pub(crate) struct Reconstruct<LambdaBytes> 
-where  LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength>{
+pub(crate) struct Reconstruct<LambdaBytes>
+where
+    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength>,
+{
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
     pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
 }
@@ -167,7 +172,7 @@ where
     Self::LambdaBytes: Mul<U2, Output = Self::LambdaBytesTimes2>
         + Mul<U3, Output = Self::LambdaBytesTimes3>
         + Mul<Self::NLeafCommit, Output: ArrayLength>,
-    {
+{
     type PRG: PseudoRandomGenerator<KeySize = Self::LambdaBytes>;
     type TAU: TauParameters<Tau = Self::Tau>;
     type LH: LeafHasher;
@@ -182,7 +187,6 @@ where
     type LC: LeafCommit;
     type NLeafCommit: ArrayLength;
     type Topen: ArrayLength;
-    
 
     fn commit(
         r: &GenericArray<u8, Self::LambdaBytes>,
@@ -299,15 +303,6 @@ where
     TAU: TauParameters,
     LH: LeafHasher;
 
-impl<RO, PRG, LH, TAU> BAVC<RO, PRG, LH, TAU>
-where
-    RO: RandomOracle,
-    PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
-    TAU: TauParameters,
-    LH: LeafHasher,
-{
-}
-
 impl<RO, PRG, LH, TAU> BatchVectorCommitment for BAVC<RO, PRG, LH, TAU>
 where
     RO: RandomOracle,
@@ -354,7 +349,7 @@ where
             let n_i = TAU::bavc_max_node_index(i as usize);
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
-                let idx = TAU::convert_index(i as usize) + j;
+                let idx = TAU::bavc_index_offset(i as usize) + j;
                 let tweak = i + TAU::L::U32 - 1;
 
                 (seeds[idx], coms[idx]) = Self::LC::commit(&keys[alpha], &iv, tweak, &uhash_i);
@@ -388,8 +383,10 @@ where
         let nodes = (0..TAU::L::USIZE - 1)
             .rev()
             .filter_map(|i| {
-                if s.contains(2 * i + 1) ^ s.contains(2 * i + 2) {
-                    let alpha = 2 * i + 1 + (s.contains(2 * i + 1) as usize);
+                let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
+
+                if left_child ^ right_child {
+                    let alpha = 2 * i + 1 + (left_child as usize);
                     return Some(decom.keys[alpha].as_ref());
                 }
                 None
@@ -400,7 +397,7 @@ where
 
         // Step 3
         let coms = (0..TAU::Tau::USIZE)
-            .map(|i| decom.coms[TAU::convert_index(i) + i_delta[i] as usize].as_ref())
+            .map(|i| decom.coms[TAU::bavc_index_offset(i) + i_delta[i] as usize].as_ref())
             .collect();
 
         Some(Opening { coms, nodes })
@@ -463,7 +460,10 @@ where
             h1_com_hasher.update(&h1_hasher.finish().read_into::<Self::LambdaBytesTimes2>());
         }
 
-        Some(Reconstruct{com: h1_com_hasher.finish().read_into(), seeds})
+        Some(Reconstruct {
+            com: h1_com_hasher.finish().read_into(),
+            seeds,
+        })
     }
 }
 
@@ -528,7 +528,7 @@ where
             let n_i = TAU::bavc_max_node_index(i as usize);
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
-                let idx = TAU::convert_index(i as usize) + j;
+                let idx = TAU::bavc_index_offset(i as usize) + j;
                 let tweak = i + TAU::L::U32 - 1;
 
                 (seeds[idx], coms[idx]) = Self::LC::commit_em(&keys[alpha], &iv, tweak);
@@ -576,7 +576,7 @@ where
 
         // Step 3
         let coms = (0..TAU::Tau::USIZE)
-            .map(|i| decom.coms[TAU::convert_index(i) + i_delta[i] as usize].as_ref())
+            .map(|i| decom.coms[TAU::bavc_index_offset(i) + i_delta[i] as usize].as_ref())
             .collect();
 
         Some(Opening { coms, nodes })
@@ -633,7 +633,10 @@ where
             h1_com_hasher.update(&h1_hasher.finish().read_into::<Self::LambdaBytesTimes2>());
         }
 
-        Some(Reconstruct{com: h1_com_hasher.finish().read_into(), seeds})
+        Some(Reconstruct {
+            com: h1_com_hasher.finish().read_into(),
+            seeds,
+        })
     }
 }
 
@@ -715,7 +718,14 @@ mod test {
         expected: &DataBAVAC,
         res: Result<'a, Lambda, NLeafCommit>,
     ) {
-        let (Commitment { com, decom, seeds }, decom_i, Reconstruct{com: rec_h, seeds: rec_sd}) = res;
+        let (
+            Commitment { com, decom, seeds },
+            decom_i,
+            Reconstruct {
+                com: rec_h,
+                seeds: rec_sd,
+            },
+        ) = res;
 
         let Decommitment { keys, coms } = decom;
 

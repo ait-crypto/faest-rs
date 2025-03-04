@@ -939,7 +939,6 @@ impl Distribution<GF256> for Standard {
     }
 }
 
-
 // I haven't implemented BigGaloisField as we only need a restricted set of operations
 /// Type representing binary Galois field of size `2^384`
 pub type GF384 = BigGF<u128, 3, 384>;
@@ -1017,9 +1016,8 @@ impl Distribution<GF384> for Standard {
     }
 }
 
-
 /// Type representing binary Galois field of size `2^576`
-pub type GF576 = BigGF<u128, 5, 576>; 
+pub type GF576 = BigGF<u128, 5, 576>;
 
 impl Modulus<u128> for GF576 {
     const MODULUS: u128 = 0b10000000011001u128;
