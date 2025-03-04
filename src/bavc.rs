@@ -126,7 +126,7 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub(crate) struct Commitment<LambdaBytes, NLeafCommit>
 where
     LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<NLeafCommit, Output: ArrayLength>,
@@ -137,7 +137,7 @@ where
     pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub(crate) struct Opening<'a> {
     pub coms: Vec<&'a [u8]>,
     pub nodes: Vec<&'a [u8]>,
@@ -148,16 +148,16 @@ impl<'a> Opening<'a> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub(crate) struct Reconstruct<LambdaBytes>
 where
-    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength>,
+    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + PartialEq,
 {
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
     pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub(crate) struct Decommitment<LambdaBytes, NLeafCommit>
 where
     LambdaBytes: ArrayLength + Mul<NLeafCommit, Output: ArrayLength>,
@@ -171,7 +171,7 @@ pub(crate) trait BatchVectorCommitment
 where
     Self::LambdaBytes: Mul<U2, Output = Self::LambdaBytesTimes2>
         + Mul<U3, Output = Self::LambdaBytesTimes3>
-        + Mul<Self::NLeafCommit, Output: ArrayLength>,
+        + Mul<Self::NLeafCommit, Output: ArrayLength> + PartialEq,
 {
     type PRG: PseudoRandomGenerator<KeySize = Self::LambdaBytes>;
     type TAU: TauParameters<Tau = Self::Tau>;
@@ -204,6 +204,8 @@ where
         iv: &IV,
     ) -> Option<Reconstruct<Self::LambdaBytes>>;
 
+
+    // Need to find an alternative way to define helper functions (maybe in a private struct)
     fn construct_keys(
         r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
@@ -291,6 +293,7 @@ where
     }
 }
 
+// It would be nice to avoid all this code duplication between BAVC and BAVCEM
 pub(crate) struct BAVC<RO, PRG, LH, TAU>(
     PhantomData<RO>,
     PhantomData<PRG>,
@@ -711,7 +714,7 @@ mod test {
 
     fn compare_expected_with_result<
         'a,
-        Lambda: ArrayLength + Mul<NLeafCommit, Output: ArrayLength> + Mul<U2, Output: ArrayLength>,
+        Lambda: ArrayLength + Mul<NLeafCommit, Output: ArrayLength> + Mul<U2, Output: ArrayLength> + PartialEq,
         NLeafCommit: ArrayLength,
         TAU: TauParameters,
     >(

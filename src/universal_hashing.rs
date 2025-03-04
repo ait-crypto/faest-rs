@@ -313,7 +313,8 @@ where
         + Mul<U2, Output = Self::LambdaBytesTimes2>
         + Mul<U3, Output = Self::LambdaBytesTimes3>
         + Mul<U4, Output: ArrayLength>
-        + Mul<U8, Output: ArrayLength>,
+        + Mul<U8, Output: ArrayLength> 
+        + PartialEq,
 
     Self::ExtensionField: for<'a> From<&'a [u8]>
         + for<'a> Mul<&'a Self::F, Output = Self::ExtensionField>
