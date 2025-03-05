@@ -26,39 +26,51 @@ pub(crate) trait Reader {
     }
 }
 
+
+#[inline]
+fn extract_k_bits_first_byte(chall: &[u8], first_byte: usize, bit_off: usize, k: usize) -> u16 {
+    let mask = (1<<k) - 1;
+    (chall[first_byte] as u16 >> bit_off) & mask
+}
+
+#[inline]
+fn extract_k_bits_next_bytes(chall: &[u8], byte_idx: usize, byte_off: usize, bit_off: usize, k: usize) -> u16{
+    let mask = (1<<k) - 1;
+    (chall[byte_idx + byte_off] as u16 & mask) << 8*byte_off - bit_off
+}
+
 /// Directly convert `chal[start_bit...start_bit+k]` into a 16-bit integer
-fn chall_to_u16(chall: &[u8], start_bit: usize, mut k: usize) -> u16 {
+fn chall_to_u16(chall: &[u8], start_bit: usize, k: usize) -> u16 {
     // As by current specification, we assume k<16
     debug_assert!(k < 16);
     debug_assert!(chall.len() >= k);
 
-    let mut result = 0u16;
 
     // Starting byte and offset within byte
     let byte_idx = start_bit / 8;
     let bit_off = start_bit % 8;
 
-    // Take bits from lo to end of first byte
-    let taken = std::cmp::min(k, 8 - bit_off);
-    let mask = (1 << taken) - 1;
-    result |= (chall[byte_idx] as u16 >> bit_off) & mask;
-    k -= taken;
+    // Only consider first byte
+    if k <= 8-bit_off{
+        // Take k bits from first byte
+        return extract_k_bits_first_byte(chall, byte_idx, bit_off, k);
+    } 
 
-    // If needed bits from next byte_idx + 1
-    if k != 0 {
-        let taken = std::cmp::min(k, 8);
-        let mask = (1 << taken) - 1;
-        result |= (chall[byte_idx + 1] as u16 & mask) << 8 - bit_off;
-        k -= taken;
+    // Only consider first two bytes
+    if k <= 16-bit_off{
+        // Take all bits from first byte
+        let res = extract_k_bits_first_byte(chall, byte_idx, bit_off, 8-bit_off);
+        // Take remaining bits from second byte
+        return res | extract_k_bits_next_bytes(chall, byte_idx, 1, bit_off, k-(8-bit_off));
     }
 
-    // If needed, take bits from byte_idx + 2
-    if k != 0 {
-        let mask = (1 << k) - 1; // Assuming k<16
-        result |= (chall[byte_idx + 2] as u16 & mask) << 16 - bit_off;
-    }
+    // Take all bits from first byte
+    let mut res = extract_k_bits_first_byte(chall, byte_idx, bit_off, 8-bit_off);
+    // Take all bits from second byte
+    res |= extract_k_bits_next_bytes(chall, byte_idx, 1, bit_off, 8);
+    // Take remaining bits from third byte
+    res | extract_k_bits_next_bytes(chall, byte_idx, 2, bit_off, k-(16-bit_off))
 
-    result
 }
 
 pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> GenericArray<u16, TAU::Tau> {
