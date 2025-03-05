@@ -312,8 +312,8 @@ where
     Self::LambdaBytes: Add<Self::LambdaBytes, Output = Self::LambdaBytesTimes2>
         + Mul<U2, Output = Self::LambdaBytesTimes2>
         + Mul<U3, Output = Self::LambdaBytesTimes3>
-        + Mul<U4, Output: ArrayLength>
-        + Mul<U8, Output: ArrayLength> 
+        + Mul<U4, Output = Self::LambdaBytesTimes4>
+        + Mul<U8, Output = Self::Lambda>
         + PartialEq,
 
     Self::ExtensionField: for<'a> From<&'a [u8]>

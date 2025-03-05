@@ -12,8 +12,8 @@ use bit_set::BitSet;
 
 use generic_array::{
     typenum::{
-        Const, IsEqual, Negate, Prod, Sum, Diff, Unsigned, U1, U10, U128, U16, U2, U216, U3, U4, U48,
-        U64, U8,
+        Const, Diff, IsEqual, Negate, Prod, Sum, Unsigned, U1, U10, U128, U16, U2, U216, U3, U4,
+        U48, U64, U8,
     },
     ArrayLength, GenericArray, IntoArrayLength,
 };
@@ -220,26 +220,24 @@ mod bavc_common {
     }
 
     pub(super) fn construct_nodes<'a, LambdaBytes, L>(
-        keys: &'a [GenericArray<u8,LambdaBytes>],
+        keys: &'a [GenericArray<u8, LambdaBytes>],
         s: &BitSet,
     ) -> Vec<&'a [u8]>
     where
         L: ArrayLength,
-        LambdaBytes: ArrayLength
+        LambdaBytes: ArrayLength,
     {
-
         // Steps 19..22
         (0..L::USIZE - 1)
             .rev()
             .filter_map(|i| {
-
                 let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
 
                 if left_child ^ right_child {
                     let alpha = 2 * i + 1 + (left_child as usize);
                     return Some(keys[alpha].as_ref());
                 }
-                
+
                 None
             })
             .collect()
@@ -252,6 +250,7 @@ pub(crate) trait BatchVectorCommitment
 where
     Self::LambdaBytes: Mul<U2, Output = Self::LambdaBytesTimes2>
         + Mul<U3, Output = Self::LambdaBytesTimes3>
+        + Mul<U8, Output = Self::Lambda>
         + Mul<Self::NLeafCommit, Output: ArrayLength>
         + PartialEq,
 {
@@ -527,7 +526,7 @@ where
     fn open<'a>(
         decom: &'a BavcDecommitment<Self::LambdaBytes, Self::NLeafCommit>,
         i_delta: &GenericArray<u16, Self::Tau>,
-    ) -> Option<BavcOpenResult<'a>>{
+    ) -> Option<BavcOpenResult<'a>> {
         // Step 5
         let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
 
@@ -647,19 +646,19 @@ where
     coms: Vec<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>>>, // GenericArray<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>, L>?
 }
 
-pub(crate) type BAVC128S = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small>;
-pub(crate) type BAVC128F = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>;
-pub(crate) type BAVC192S = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Small>;
-pub(crate) type BAVC192F = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Fast>;
-pub(crate) type BAVC256S = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Small>;
-pub(crate) type BAVC256F = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>;
+pub(crate) type BAVC128Small = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small>;
+pub(crate) type BAVC128Fast = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>;
+pub(crate) type BAVC192Small = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Small>;
+pub(crate) type BAVC192Fast = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Fast>;
+pub(crate) type BAVC256Small = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Small>;
+pub(crate) type BAVC256Fast = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>;
 
-pub(crate) type BAVCEM128S = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128SmallEM>;
-pub(crate) type BAVCEM128F = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128FastEM>;
-pub(crate) type BAVCEM192S = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192SmallEM>;
-pub(crate) type BAVCEM192F = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192FastEM>;
-pub(crate) type BAVCEM256S = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256SmallEM>;
-pub(crate) type BAVCEM256F = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256FastEM>;
+pub(crate) type BAVC128SmallEM = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128SmallEM>;
+pub(crate) type BAVC128FastEM = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128FastEM>;
+pub(crate) type BAVC192SmallEM = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192SmallEM>;
+pub(crate) type BAVC192FastEM = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192FastEM>;
+pub(crate) type BAVC256SmallEM = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256SmallEM>;
+pub(crate) type BAVC256FastEM = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256FastEM>;
 
 #[cfg(test)]
 mod test {
@@ -683,6 +682,41 @@ mod test {
         random_oracles::{RandomOracleShake128, RandomOracleShake256},
         utils::test::read_test_data,
     };
+
+    impl<LambdaBytes, NLeafCommit> BavcDecommitment<LambdaBytes, NLeafCommit>
+    where
+        LambdaBytes: ArrayLength + Mul<NLeafCommit, Output: ArrayLength>,
+        NLeafCommit: ArrayLength,
+    {
+        pub fn bytes(&self) -> Vec<u8> {
+            let mut v: Vec<u8> = self.keys.iter().flat_map(|a| a.to_vec()).collect();
+
+            v.extend(
+                self.coms
+                    .iter()
+                    .flat_map(|c| c.to_vec())
+                    .collect::<Vec<u8>>(),
+            );
+
+            v
+        }
+    }
+
+    impl<LambdaBytes, NLeafCommit> BavcCommitResult<LambdaBytes, NLeafCommit>
+    where
+        LambdaBytes: ArrayLength
+            + Mul<U2, Output: ArrayLength>
+            + Mul<NLeafCommit, Output: ArrayLength>
+            + PartialEq,
+        NLeafCommit: ArrayLength,
+    {
+        pub fn bytes(&self) -> Vec<u8> {
+            let mut v = self.com.to_vec();
+            v.extend(self.decom.bytes());
+            v.extend(self.seeds.iter().flat_map(|s| s.to_vec()));
+            v
+        }
+    }
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -915,12 +949,12 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVC128S::commit(r, &iv);
+                        let res_commit = BAVC128Small::commit(r, &iv);
 
-                        let res_open = BAVC128S::open(&res_commit.decom, &i_delta).unwrap();
+                        let res_open = BAVC128Small::open(&res_commit.decom, &i_delta).unwrap();
 
                         let res_reconstruct =
-                            BAVC128S::reconstruct(&res_open, &i_delta, &iv).unwrap();
+                            BAVC128Small::reconstruct(&res_open, &i_delta, &iv).unwrap();
 
                         compare_expected_with_result::<_, _, Tau128Small>(
                             &data,
@@ -931,12 +965,12 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVC128F::commit(r, &iv);
+                        let res_commit = BAVC128Fast::commit(r, &iv);
 
-                        let res_open = BAVC128F::open(&res_commit.decom, &i_delta).unwrap();
+                        let res_open = BAVC128Fast::open(&res_commit.decom, &i_delta).unwrap();
 
                         let res_reconstruct =
-                            BAVC128F::reconstruct(&res_open, &i_delta, &iv).unwrap();
+                            BAVC128Fast::reconstruct(&res_open, &i_delta, &iv).unwrap();
 
                         compare_expected_with_result::<_, _, Tau128Fast>(
                             &data,
@@ -952,12 +986,12 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVC192S::commit(r, &iv);
+                        let res_commit = BAVC192Small::commit(r, &iv);
 
-                        let res_open = BAVC192S::open(&res_commit.decom, &i_delta).unwrap();
+                        let res_open = BAVC192Small::open(&res_commit.decom, &i_delta).unwrap();
 
                         let res_reconstruct =
-                            BAVC192S::reconstruct(&res_open, &i_delta, &iv).unwrap();
+                            BAVC192Small::reconstruct(&res_open, &i_delta, &iv).unwrap();
 
                         compare_expected_with_result::<_, _, Tau192Small>(
                             &data,
@@ -968,12 +1002,12 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVC192F::commit(r, &iv);
+                        let res_commit = BAVC192Fast::commit(r, &iv);
 
-                        let res_open = BAVC192F::open(&res_commit.decom, &i_delta).unwrap();
+                        let res_open = BAVC192Fast::open(&res_commit.decom, &i_delta).unwrap();
 
                         let res_reconstruct =
-                            BAVC192F::reconstruct(&res_open, &i_delta, &iv).unwrap();
+                            BAVC192Fast::reconstruct(&res_open, &i_delta, &iv).unwrap();
                         compare_expected_with_result::<_, _, Tau192Fast>(
                             &data,
                             (res_commit.clone(), res_open, res_reconstruct),
@@ -987,12 +1021,12 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVC256S::commit(&r, &iv);
+                        let res_commit = BAVC256Small::commit(&r, &iv);
 
-                        let res_open = BAVC256S::open(&res_commit.decom, &i_delta).unwrap();
+                        let res_open = BAVC256Small::open(&res_commit.decom, &i_delta).unwrap();
 
                         let res_reconstruct =
-                            BAVC256S::reconstruct(&res_open, &i_delta, &iv).unwrap();
+                            BAVC256Small::reconstruct(&res_open, &i_delta, &iv).unwrap();
                         compare_expected_with_result::<_, _, Tau256Small>(
                             &data,
                             (res_commit.clone(), res_open, res_reconstruct),
@@ -1002,12 +1036,12 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVC256F::commit(&r, &iv);
+                        let res_commit = BAVC256Fast::commit(&r, &iv);
 
-                        let res_open = BAVC256F::open(&res_commit.decom, &i_delta).unwrap();
+                        let res_open = BAVC256Fast::open(&res_commit.decom, &i_delta).unwrap();
 
                         let res_reconstruct =
-                            BAVC256F::reconstruct(&res_open, &i_delta, &iv).unwrap();
+                            BAVC256Fast::reconstruct(&res_open, &i_delta, &iv).unwrap();
                         compare_expected_with_result::<_, _, Tau256Fast>(
                             &data,
                             (res_commit.clone(), res_open, res_reconstruct),
@@ -1042,12 +1076,12 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVCEM128S::commit(r, &iv);
+                        let res_commit = BAVC128SmallEM::commit(r, &iv);
 
-                        let res_open = BAVCEM128S::open(&res_commit.decom, &i_delta).unwrap();
+                        let res_open = BAVC128SmallEM::open(&res_commit.decom, &i_delta).unwrap();
 
                         let res_reconstruct =
-                            BAVCEM128S::reconstruct(&res_open, &i_delta, &iv).unwrap();
+                            BAVC128SmallEM::reconstruct(&res_open, &i_delta, &iv).unwrap();
 
                         compare_expected_with_result::<_, _, Tau128SmallEM>(
                             &data,
@@ -1058,12 +1092,12 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVCEM128F::commit(r, &iv);
+                        let res_commit = BAVC128FastEM::commit(r, &iv);
 
-                        let res_open = BAVCEM128F::open(&res_commit.decom, &i_delta).unwrap();
+                        let res_open = BAVC128FastEM::open(&res_commit.decom, &i_delta).unwrap();
 
                         let res_reconstruct =
-                            BAVCEM128F::reconstruct(&res_open, &i_delta, &iv).unwrap();
+                            BAVC128FastEM::reconstruct(&res_open, &i_delta, &iv).unwrap();
 
                         compare_expected_with_result::<_, _, Tau128FastEM>(
                             &data,
@@ -1079,12 +1113,12 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVCEM192S::commit(r, &iv);
+                        let res_commit = BAVC192SmallEM::commit(r, &iv);
 
-                        let res_open = BAVCEM192S::open(&res_commit.decom, &i_delta).unwrap();
+                        let res_open = BAVC192SmallEM::open(&res_commit.decom, &i_delta).unwrap();
 
                         let res_reconstruct =
-                            BAVCEM192S::reconstruct(&res_open, &i_delta, &iv).unwrap();
+                            BAVC192SmallEM::reconstruct(&res_open, &i_delta, &iv).unwrap();
 
                         compare_expected_with_result::<_, _, Tau192SmallEM>(
                             &data,
@@ -1095,12 +1129,12 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVCEM192F::commit(r, &iv);
+                        let res_commit = BAVC192FastEM::commit(r, &iv);
 
-                        let res_open = BAVCEM192F::open(&res_commit.decom, &i_delta).unwrap();
+                        let res_open = BAVC192FastEM::open(&res_commit.decom, &i_delta).unwrap();
 
                         let res_reconstruct =
-                            BAVCEM192F::reconstruct(&res_open, &i_delta, &iv).unwrap();
+                            BAVC192FastEM::reconstruct(&res_open, &i_delta, &iv).unwrap();
 
                         compare_expected_with_result::<_, _, Tau192FastEM>(
                             &data,
@@ -1114,12 +1148,12 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVCEM256S::commit(&r, &iv);
+                        let res_commit = BAVC256SmallEM::commit(&r, &iv);
 
-                        let res_open = BAVCEM256S::open(&res_commit.decom, &i_delta).unwrap();
+                        let res_open = BAVC256SmallEM::open(&res_commit.decom, &i_delta).unwrap();
 
                         let res_reconstruct =
-                            BAVCEM256S::reconstruct(&res_open, &i_delta, &iv).unwrap();
+                            BAVC256SmallEM::reconstruct(&res_open, &i_delta, &iv).unwrap();
 
                         compare_expected_with_result::<_, _, Tau256SmallEM>(
                             &data,
@@ -1130,12 +1164,12 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let res_commit = BAVCEM256F::commit(&r, &iv);
+                        let res_commit = BAVC256FastEM::commit(&r, &iv);
 
-                        let res_open = BAVCEM256F::open(&res_commit.decom, &i_delta).unwrap();
+                        let res_open = BAVC256FastEM::open(&res_commit.decom, &i_delta).unwrap();
 
                         let res_reconstruct =
-                            BAVCEM256F::reconstruct(&res_open, &i_delta, &iv).unwrap();
+                            BAVC256FastEM::reconstruct(&res_open, &i_delta, &iv).unwrap();
 
                         compare_expected_with_result::<_, _, Tau256FastEM>(
                             &data,
