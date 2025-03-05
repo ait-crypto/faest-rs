@@ -28,17 +28,15 @@ pub(crate) trait Reader {
 
 /// Directly convert `chal[start_bit...start_bit+k]` into a 16-bit integer
 fn chall_to_u16(chall: &[u8], start_bit: usize, mut k: usize) -> u16 {
-
-    // As by current specification, we assume k<16 
-    debug_assert!(k<16);
+    // As by current specification, we assume k<16
+    debug_assert!(k < 16);
     debug_assert!(chall.len() >= k);
-
 
     let mut result = 0u16;
 
     // Starting byte and offset within byte
-    let byte_idx = start_bit / 8; 
-    let bit_off = start_bit % 8;  
+    let byte_idx = start_bit / 8;
+    let bit_off = start_bit % 8;
 
     // Take bits from lo to end of first byte
     let taken = std::cmp::min(k, 8 - bit_off);
@@ -53,7 +51,7 @@ fn chall_to_u16(chall: &[u8], start_bit: usize, mut k: usize) -> u16 {
         result |= (chall[byte_idx + 1] as u16 & mask) << 8 - bit_off;
         k -= taken;
     }
-    
+
     // If needed, take bits from byte_idx + 2
     if k != 0 {
         let mask = (1 << k) - 1; // Assuming k<16
@@ -64,17 +62,16 @@ fn chall_to_u16(chall: &[u8], start_bit: usize, mut k: usize) -> u16 {
 }
 
 pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> GenericArray<u16, TAU::Tau> {
-    
     let k = TAU::K::USIZE;
 
     // Compute Delta_i[0...Tau1)
-    let first_half = (0..TAU::Tau1::USIZE)
-        .map(|i| chall_to_u16(chall, TAU::tau1_offset_unchecked(i), k));
-    
+    let first_half =
+        (0..TAU::Tau1::USIZE).map(|i| chall_to_u16(chall, TAU::tau1_offset_unchecked(i), k));
+
     // Compute Delta_i[Tau1..Tau)
     let second_half = (TAU::Tau1::USIZE..TAU::Tau::USIZE)
         .map(|i| chall_to_u16(chall, TAU::tau0_offset_unchecked(i), k - 1));
-    
+
     first_half.chain(second_half).collect()
 }
 
@@ -165,4 +162,18 @@ pub(crate) mod test {
         .unwrap_or_else(|_| panic!("Failed to read JSON test data from {}", path))
     }
 
+    pub(crate) fn hash_array(data: &[u8]) -> Vec<u8> {
+        use sha3::{
+            digest::{ExtendableOutput, Update, XofReader},
+            Shake256,
+        };
+
+        let mut hasher = sha3::Shake256::default();
+        hasher.update(data);
+        let mut reader = hasher.finalize_xof();
+        let mut ret = [0u8; 64];
+
+        reader.read(&mut ret);
+        ret.to_vec()
+    }
 }
