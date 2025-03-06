@@ -69,7 +69,7 @@ pub use signature::{self, Error, Keypair, Signer, Verifier};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-// mod aes;
+mod aes;
 // mod em;
 // mod faest;
 mod fields;
@@ -77,7 +77,7 @@ mod fields;
 mod parameter;
 mod prg;
 mod random_oracles;
-// mod rijndael_32;
+mod rijndael_32;
 mod bavc;
 mod universal_hashing;
 mod utils;
