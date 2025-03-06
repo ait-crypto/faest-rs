@@ -653,11 +653,14 @@ pub(crate) type BAVC192Fast = BAVC<RandomOracleShake256, PRG192, LeafHasher192, 
 pub(crate) type BAVC256Small = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Small>;
 pub(crate) type BAVC256Fast = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>;
 
-pub(crate) type BAVC128SmallEM = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128SmallEM>;
+pub(crate) type BAVC128SmallEM =
+    BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128SmallEM>;
 pub(crate) type BAVC128FastEM = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128FastEM>;
-pub(crate) type BAVC192SmallEM = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192SmallEM>;
+pub(crate) type BAVC192SmallEM =
+    BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192SmallEM>;
 pub(crate) type BAVC192FastEM = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192FastEM>;
-pub(crate) type BAVC256SmallEM = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256SmallEM>;
+pub(crate) type BAVC256SmallEM =
+    BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256SmallEM>;
 pub(crate) type BAVC256FastEM = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256FastEM>;
 
 #[cfg(test)]

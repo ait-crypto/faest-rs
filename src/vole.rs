@@ -265,8 +265,9 @@ mod test {
 
     use crate::{
         bavc::{
-            self, BatchVectorCommitment, BAVC128Fast, BAVC128Small, BAVC192Fast, BAVC192Small, BAVC256Fast,
-            BAVC256Small, BAVC128FastEM, BAVC128SmallEM, BAVC192FastEM, BAVC192SmallEM, BAVC256FastEM, BAVC256SmallEM,
+            self, BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast,
+            BAVC192FastEM, BAVC192Small, BAVC192SmallEM, BAVC256Fast, BAVC256FastEM, BAVC256Small,
+            BAVC256SmallEM, BatchVectorCommitment,
         },
         parameter::{
             OWFParameters, Tau128Fast, Tau128Small, Tau192Fast, Tau192Small, Tau256Fast,
