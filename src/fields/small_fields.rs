@@ -1,13 +1,17 @@
 use std::{
+    default,
     num::Wrapping,
     ops::{
         Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
     },
 };
 
-use generic_array::{typenum::U8, GenericArray};
+use generic_array::{
+    typenum::{U1, U3, U8},
+    GenericArray,
+};
 
-use super::Field;
+use super::{Field, Square};
 
 trait GaloisFieldHelper<T>
 where
@@ -137,6 +141,12 @@ impl GaloisFieldHelper<u64> for SmallGF<u64> {
     const ONE: Wrapping<u64> = Wrapping(1u64);
 }
 
+impl GaloisFieldHelper<u8> for SmallGF<u8> {
+    const BITS: usize = u8::BITS as usize;
+    const MODULUS: Wrapping<u8> = Wrapping(0b00011011);
+    const ONE: Wrapping<u8> = Wrapping(1u8);
+}
+
 impl<T> Mul for SmallGF<T>
 where
     Self: GaloisFieldHelper<T>,
@@ -171,6 +181,53 @@ where
     fn mul_assign(&mut self, rhs: Self) {
         self.0 = Self::mul_helper(self.0, rhs.0);
     }
+}
+
+/// Binary field `2^64`
+pub type GF8 = SmallGF<u8>;
+impl Square for GF8 {
+    type Output = GF8;
+
+    fn square(mut self) -> Self::Output {
+        let mut result_value = -(self.0 & GF8::ONE) & self.0;
+        let right = self.0;
+
+        for i in 1..GF8::BITS {
+            let mask = -((self.0 >> (GF8::BITS - 1)) & GF8::ONE);
+            self.0 = (self.0 << 1) ^ (mask & GF8::MODULUS);
+            result_value ^= -((right >> i) & GF8::ONE) & self.0;
+        }
+
+        SmallGF(result_value)
+    }
+}
+
+impl GF8 {
+    pub fn invnorm(x: u8) -> u8 {
+        let inv = GF8::exp_238(GF8::from(x));
+
+        let mut res = inv & 1; // Take bit 0 in pos 0
+        
+        res |= (inv & 0b11000000u8) >> 5; // Take bit 6,7 in pos 1,2
+        
+        res | ((inv & 0b100)<<1) // Take bit 2 in pos 3
+    }
+
+    fn exp_238(mut x: GF8) -> u8 {
+        // 238 == 0b11101110
+        let mut y = x.square(); // x^2
+        x = y.square(); // x^4
+        y = x * y;
+        x = x.square(); // x^8
+        y = x * y;
+        x = x.square(); // x^16
+        x = x.square(); // x^32
+        y = x * y;
+        x = x.square(); // x^64
+        y = x * y;
+        x = x.square(); // x^128
+        return (x * y).0.0;
+    } 
 }
 
 /// Binary field `2^64`
@@ -252,5 +309,15 @@ mod test {
             //to test commutativity
             assert_eq!(res, res_rev);
         }
+    }
+
+    #[test]
+    fn gf8_test_invnorm(){
+        assert_eq!(GF8::invnorm(0), 0);
+        assert_eq!(GF8::invnorm(1), 1);
+        assert_eq!(GF8::invnorm(2), 1<<3 | 1<<2 | 1);
+        assert_eq!(GF8::invnorm(0x80), 1<<3 | 1<<2 | 1);
+        assert_eq!(GF8::invnorm(0x88), 1<<2 | 1);
+
     }
 }
