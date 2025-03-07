@@ -32,6 +32,8 @@ use crate::{
     universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
 };
 
+pub type GetBytes<BitLen> = Quot<BitLen, U8>;
+
 pub type L<LBytes> = Prod<LBytes, U8>;
 
 pub type Lambda<LambdaBytes> = Prod<LambdaBytes, U8>;
@@ -308,7 +310,7 @@ pub(crate) struct OWF192;
 
 impl OWFParameters for OWF192 {
     type BaseParams = BaseParams192;
-    type InputSize = U32;
+    type InputSize = U16;
 
     type B = U16;
     type LAMBDA = U192;
@@ -398,7 +400,7 @@ pub(crate) struct OWF256;
 
 impl OWFParameters for OWF256 {
     type BaseParams = BaseParams256;
-    type InputSize = U32;
+    type InputSize = U16;
 
     type B = U16;
     type LAMBDA = U256;
