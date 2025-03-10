@@ -7,7 +7,7 @@ use generic_array::{
 use itertools::iproduct;
 
 use crate::{
-    fields::{small_fields::GF8, ByteCombine, ByteCombineConstants, Field as _, SumPoly},
+    fields::{small_fields::{GF8, GF8_INV_NORM}, ByteCombine, ByteCombineConstants, Field as _, SumPoly},
     // internal_keys::PublicKey,
     parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},
     rijndael_32::{
@@ -94,19 +94,18 @@ fn save_non_lin_bits<O>(witness: &mut [u8], kb: &[u32], index: &mut usize)
 where
     O: OWFParameters,
 {
-
     let start_off = 1 + (O::NK::USIZE / 8);
 
-    for j in start_off 
-        ..start_off
-            + (O::SKE::USIZE * ((2 - (O::NK::USIZE % 4)) * 2 + (O::NK::USIZE % 4) * 3)) / 16
-    {
+    let non_lin_blocks = if O::NK::USIZE % 4 == 0 {O::SKE::USIZE / 4} else {O::SKE::USIZE * 3 / 8};
+        // (O::SKE::USIZE * ((2 - (O::NK::USIZE % 4)) * 2 + (O::NK::USIZE % 4) * 3)) / 16;
+
+    for j in start_off..start_off + non_lin_blocks {
         let inside = GenericArray::<_, U3>::from_iter(
             convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)])).take(3),
         );
-        if O::NK::USIZE != 6 || j % 3 == 0{
-                witness[*index..*index + size_of::<u32>()].copy_from_slice(&inside[0]);
-                *index += size_of::<u32>();
+        if O::NK::USIZE != 6 || j % 3 == 0 {
+            witness[*index..*index + size_of::<u32>()].copy_from_slice(&inside[0]);
+            *index += size_of::<u32>();
         } else if j % 3 == 1 {
             witness[*index..*index + size_of::<u32>()].copy_from_slice(&inside[2]);
             *index += size_of::<u32>();
@@ -138,11 +137,11 @@ where
         // Step 19
         if even_round {
             for i in convert_from_batchblocks(inv_bitslice(&state)).take(4) {
-                witness[*index] = GF8::invnorm(i[0]);
-                witness[*index] |= GF8::invnorm(i[1]) << 4;
+                witness[*index] = GF8_INV_NORM[i[0] as usize];
+                witness[*index] |= GF8_INV_NORM[i[1] as usize] << 4;
                 *index += 1;
-                witness[*index] = GF8::invnorm(i[2]);
-                witness[*index] |= GF8::invnorm(i[3]) << 4;
+                witness[*index] = GF8_INV_NORM[i[2] as usize];
+                witness[*index] |= GF8_INV_NORM[i[3] as usize] << 4;
                 *index += 1;
             }
         }
@@ -784,6 +783,9 @@ mod test {
 
     #[test]
     fn aes_extended_witness_test() {
+        // let database: Vec<AesExtendedWitness> = read_test_data("AesExtendedWitness.json");
+
+
         let owf_key: GenericArray<u8, _> = GenericArray::from_array([
             0xc1, 0xa3, 0xc0, 0x22, 0xe7, 0x18, 0x93, 0x5f, 0x46, 0x63, 0x03, 0x86, 0xaf, 0xa3,
             0xd3, 0xf2, 0xc0, 0x72, 0x0b, 0x10, 0xbf, 0x26, 0x6c, 0x19, 0x24, 0x18, 0x87, 0x72,
@@ -810,6 +812,11 @@ mod test {
             0x9a, 0x45, 0x54, 0xee, 0x84, 0x1a, 0xed, 0x05, 0x02, 0x96, 0x78, 0x82, 0x79, 0x22,
             0x57, 0x1a, 0xea, 0x65, 0x19, 0xce,
         ]);
+
+
+        // println!("key: {:?}, input: {:?}, wit:{:?}\n\n", owf_key.as_slice(), owf_input.as_slice(), exp_wit.as_slice());
+        
+        // return;
 
         let wit = aes_extendedwitness::<OWF128>(
             GenericArray::from_slice(&owf_key[16..]),
@@ -863,8 +870,6 @@ mod test {
 
         assert_eq!(*wit, exp_wit);
 
-        // println!("wit: {:?}, \nexp: {:?}\n\n", &wit[56..], &exp_wit[56..]);
-
         let owf_key: GenericArray<u8, _> = GenericArray::from_array([
             0x56, 0xbe, 0x29, 0xa6, 0x14, 0x66, 0x5b, 0x84, 0xab, 0xb8, 0x80, 0x85, 0x65, 0xca,
             0x30, 0x59, 0x8d, 0x14, 0x3b, 0x6e, 0x79, 0x37, 0x99, 0xfd, 0xe7, 0x61, 0x7b, 0x4a,
@@ -910,45 +915,15 @@ mod test {
             0xa6, 0x5e, 0x6f, 0x6c, 0x94, 0x1a, 0x2c, 0xe3, 0x95, 0xf1,
         ]);
 
-
         let message = GenericArray::from_slice(&owf_input[..16]);
         let owf_key = GenericArray::from_slice(&owf_key[16..]);
 
         let wit = aes_extendedwitness::<OWF256>(&owf_key, message).unwrap();
 
-
         assert_eq!(*wit, exp_wit);
 
-        // let database: Vec<AesExtendedWitness> = read_test_data("AesExtendedWitness.json");
-        // for data in database {
-        //     if data.lambda == 128 {
-        //         let res = aes_extendedwitness::<OWF128>(
-        //             GenericArray::from_slice(&data.key),
-        //             GenericArray::from_slice(
-        //                 &data.input[..<OWF128 as OWFParameters>::InputSize::USIZE],
-        //             ),
-        //         );
-        //         assert_eq!(res.unwrap().as_slice(), &data.w);
-        //     } else if data.lambda == 192 {
-        //         let res = aes_extendedwitness::<OWF192>(
-        //             GenericArray::from_slice(&data.key),
-        //             GenericArray::from_slice(
-        //                 &data.input[..<OWF192 as OWFParameters>::InputSize::USIZE],
-        //             ),
-        //         );
-        //         assert_eq!(res.unwrap().as_slice(), &data.w);
-        //     } else {
-        //         let res = aes_extendedwitness::<OWF256>(
-        //             GenericArray::from_slice(&data.key),
-        //             GenericArray::from_slice(
-        //                 &data.input[..<OWF256 as OWFParameters>::InputSize::USIZE],
-        //             ),
-        //         );
-        //         assert_eq!(res.unwrap().as_slice(), &data.w);
-        //     }
-        // }
+        
     }
-
 }
 //     #[derive(Debug, Deserialize)]
 //     #[serde(rename_all = "camelCase")]
