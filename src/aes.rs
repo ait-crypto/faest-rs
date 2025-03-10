@@ -1,7 +1,7 @@
 use std::{array, mem::size_of};
 
 use generic_array::{
-    typenum::{Unsigned, U3, U4},
+    typenum::{Unsigned, B1, U1, U10, U3, U4},
     GenericArray,
 };
 use itertools::iproduct;
@@ -14,8 +14,7 @@ use crate::{
     // internal_keys::PublicKey,
     parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},
     rijndael_32::{
-        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
-        rijndael_key_schedule, rijndael_shift_rows_1, sub_bytes, sub_bytes_nots, State, RCON_TABLE,
+        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key, rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes, sub_bytes, sub_bytes_nots, State, RCON_TABLE
     },
     universal_hashing::{ZKHasherInit, ZKProofHasher, ZKVerifyHasher},
     utils::contains_zeros,
@@ -40,10 +39,11 @@ const fn inverse_rotate_word(r: usize, rotate: bool) -> usize {
     }
 }
 
+
 pub(crate) fn aes_extendedwitness<O>(
-    owf_key: &GenericArray<u8, O::LAMBDABYTES>,
+    owf_secret: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
-) -> Option<Box<GenericArray<u8, O::LBYTES>>>
+) -> Box<GenericArray<u8, O::LBYTES>>
 where
     O: OWFParameters,
 {
@@ -55,31 +55,29 @@ where
     let mut witness = GenericArray::default_boxed();
 
     // Step 6
-    let ske = if !O::is_em() {
-        O::SKE::USIZE
-    } else {
-        4 * (((O::R::USIZE + 1) * O::NST::USIZE) / O::NK::USIZE)
-    };
-    let (kb, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(owf_key, ske);
+    // Note: for FAEST-LAMBDA-EM, SKE is set to the actual number of S-Boxes in Rijndael-LAMBDA.KeyExpansion. 
+    // This slightly differs from FAEST Spec v2, where SKE is always set to 0 in EM mode. 
+    let (kb, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(owf_secret, O::SKE::USIZE);
 
     let mut index = 0;
 
-    // Step 7,8
+    // Step 7
     if !O::is_em() {
-        save_key_bits::<O>(&mut witness, owf_key, &mut index);
+        save_key_bits::<O>(&mut witness, owf_secret, &mut index);
+        // Step 8
         save_non_lin_bits::<O>(&mut witness, &kb, &mut index);
     } else {
+        // In EM mode, AES key is part of public input while pt is secret
         save_key_bits::<O>(&mut witness, owf_input, &mut index);
     }
 
     // Step 14
-    let _ = round_with_save::<O>(&input, &kb, &mut witness, &mut index);
-    if O::BETA::USIZE > 1 {
+    for _ in 0..O::BETA::USIZE{
+        round_with_save::<O>(&input, &kb, &mut witness, &mut index);
         input[0] ^= 1;
-        let _ = round_with_save::<O>(&input, &kb, &mut witness, &mut index);
     }
 
-    Some(witness)
+    witness
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -105,9 +103,11 @@ where
     };
 
     for j in start_off..start_off + non_lin_blocks {
+        
         let inside = GenericArray::<_, U3>::from_iter(
             convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)])).take(3),
         );
+
         if O::NK::USIZE != 6 || j % 3 == 0 {
             witness[*index..*index + size_of::<u32>()].copy_from_slice(&inside[0]);
             *index += size_of::<u32>();
@@ -118,17 +118,21 @@ where
     }
 }
 
+#[inline]
+fn store_invnorm_state(dst: &mut u8, lo_idx:u8, hi_idx: u8){
+    *dst = GF8_INV_NORM[lo_idx as usize] | GF8_INV_NORM[hi_idx as usize] << 4;
+}
+
 #[allow(clippy::too_many_arguments)]
 fn round_with_save<O>(
     input1: &[u8], // in
     kb: &[u32],    // k_bar
     witness: &mut [u8],
     index: &mut usize,
-) -> bool
+)
 where
     O: OWFParameters,
 {
-    let mut zeros = false;
     let mut state = State::default();
 
     // Input1 is always empty except for FAEST-EM-192 and FAEST-EM-256
@@ -138,8 +142,6 @@ where
     rijndael_add_round_key(&mut state, &kb[..8]);
 
     for j in 0..O::R::USIZE - 1 {
-        // Not needed?
-        // zeros |= contains_zeros(&inv_bitslice(&state)[0]);
 
         let even_round = (j % 2) == 0;
 
@@ -147,16 +149,15 @@ where
         if even_round {
             let to_take = if !O::is_em() { 4 } else { O::NK::USIZE };
             for i in convert_from_batchblocks(inv_bitslice(&state)).take(to_take) {
-                witness[*index] = GF8_INV_NORM[i[0] as usize] | GF8_INV_NORM[i[1] as usize] << 4;
+                store_invnorm_state(&mut witness[*index], i[0], i[1]);
                 *index += 1;
-                witness[*index] = GF8_INV_NORM[i[2] as usize] | GF8_INV_NORM[i[3] as usize] << 4;
+                store_invnorm_state(&mut witness[*index], i[2], i[3]);
                 *index += 1;
             }
         }
 
-        // Step 23: Consider defining a function rijndael_sub_bytes that calls sub_bytes and sub_bytes_nots in sequence
-        sub_bytes(&mut state);
-        sub_bytes_nots(&mut state);
+        // Step 23
+        rijndael_sub_bytes(&mut state);
 
         // Step 24
         rijndael_shift_rows_1::<O::NST>(&mut state);
@@ -176,9 +177,6 @@ where
         // Step 28
         rijndael_add_round_key(&mut state, &kb[8 * (j + 1)..8 * (j + 2)]);
     }
-    // Not needed?
-    // zeros | contains_zeros(&inv_bitslice(&state)[0])
-    zeros
 }
 
 // fn aes_key_exp_fwd_1<O>(
@@ -805,8 +803,7 @@ mod test {
                     let wit = OWF128::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
-                    )
-                    .unwrap();
+                    );
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 192 => {
@@ -814,8 +811,7 @@ mod test {
                     let wit = OWF192::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
-                    )
-                    .unwrap();
+                    );
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 _ => {
@@ -823,8 +819,7 @@ mod test {
                     let wit = OWF256::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
-                    )
-                    .unwrap();
+                    );
                     (*wit).as_slice() == self.w.as_slice()
                 }
             }
@@ -837,8 +832,7 @@ mod test {
                     let wit = OWF128EM::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
-                    )
-                    .unwrap();
+                    );
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 192 => {
@@ -846,8 +840,7 @@ mod test {
                     let wit = OWF192EM::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
-                    )
-                    .unwrap();
+                    );
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 _ => {
@@ -855,8 +848,7 @@ mod test {
                     let wit = OWF256EM::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
-                    )
-                    .unwrap();
+                    );
                     (*wit).as_slice() == self.w.as_slice()
                 }
             }
