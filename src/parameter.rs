@@ -22,7 +22,7 @@ use rand_core::RngCore;
 
 use crate::{
     bavc::{BatchVectorCommitment, BAVC},
-    // aes::{aes_extendedwitness, aes_prove, aes_verify},
+    aes::{aes_extendedwitness},
     // em::{em_extendedwitness, em_prove, em_verify},
     fields::{BigGaloisField, GF128, GF192, GF256},
     // internal_keys::{PublicKey, SecretKey},
@@ -155,6 +155,7 @@ pub(crate) trait OWFParameters: Sized {
     type LENC: ArrayLength;
     type NST: ArrayLength;
 
+    fn is_em() -> bool;
 
     // type QUOTLENC8: ArrayLength;
     // type LAMBDALBYTES: ArrayLength;
@@ -169,10 +170,10 @@ pub(crate) trait OWFParameters: Sized {
 
     // fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]);
 
-    // fn extendwitness(
-    //     owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     owf_input: &GenericArray<u8, Self::InputSize>,
-    // ) -> Option<Box<GenericArray<u8, Self::LBYTES>>>;
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>>;
 
     // fn witness(sk: &SecretKey<Self>) -> Box<GenericArray<u8, Self::LBYTES>> {
     //     // SAFETY: only ever called on valid inputs
@@ -250,6 +251,9 @@ impl OWFParameters for OWF128 {
     type LENC = U832;
     type NST = U4;
     
+    fn is_em() -> bool {
+        false
+    }
     //type PK = U32;
 
     // type LAMBDALBYTES = Sum<Self::LAMBDABYTES, Self::LBYTES>;
@@ -270,13 +274,13 @@ impl OWFParameters for OWF128 {
     //     );
     // }
 
-    // #[inline]
-    // fn extendwitness(
-    //     owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     owf_input: &GenericArray<u8, Self::InputSize>,
-    // ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
-    //     aes_extendedwitness::<Self>(owf_key, owf_input)
-    // }
+    #[inline]
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
+        aes_extendedwitness::<Self>(owf_key, owf_input)
+    }
 
     // #[inline]
     // fn prove(
@@ -328,6 +332,10 @@ impl OWFParameters for OWF192 {
     type LENC = U1024;
     type NST = U4;
 
+    fn is_em() -> bool {
+        false
+    }
+
     // type LAMBDALBYTES = Sum<Self::LAMBDABYTES, Self::LBYTES>;
     // type NK = U6;
     // type R = U12;
@@ -358,13 +366,13 @@ impl OWFParameters for OWF192 {
     //     );
     // }
 
-    // #[inline]
-    // fn extendwitness(
-    //     owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     owf_input: &GenericArray<u8, Self::InputSize>,
-    // ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
-    //     aes_extendedwitness::<Self>(owf_key, owf_input)
-    // }
+    #[inline]
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
+        aes_extendedwitness::<Self>(owf_key, owf_input)
+    }
 
     // #[inline]
     // fn prove(
@@ -418,6 +426,10 @@ impl OWFParameters for OWF256 {
     type LENC = U1216;
     type NST = U4;
 
+    fn is_em() -> bool {
+        false
+    }
+
     // fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
     //     let aes = Aes256Enc::new(GenericArray_AES::from_slice(key));
     //     aes.encrypt_block_b2b(
@@ -430,13 +442,13 @@ impl OWFParameters for OWF256 {
     //     );
     // }
 
-    // #[inline]
-    // fn extendwitness(
-    //     owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     owf_input: &GenericArray<u8, Self::InputSize>,
-    // ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
-    //     aes_extendedwitness::<Self>(owf_key, owf_input)
-    // }
+    #[inline]
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,    
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
+        aes_extendedwitness::<Self>(owf_key, owf_input)
+    }
 
     // #[inline]
     // fn prove(
@@ -488,6 +500,10 @@ impl OWFParameters for OWF128EM {
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U832;
 
+    fn is_em() -> bool {
+        true
+    }
+
     // fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
     //     let aes = Aes128Enc::new(GenericArray_AES::from_slice(input));
     //     aes.encrypt_block_b2b(
@@ -499,14 +515,13 @@ impl OWFParameters for OWF128EM {
     //     }
     // }
 
-    // #[inline]
-    // fn extendwitness(
-    //     owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     owf_input: &GenericArray<u8, Self::InputSize>,    type B = U16;
-
-    // ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
-    //     em_extendedwitness::<Self>(owf_key, owf_input)
-    // }
+    #[inline]
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,    
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
+        aes_extendedwitness::<Self>( owf_input, owf_key)
+    }
 
     // #[inline]
     // fn prove(
@@ -560,6 +575,9 @@ impl OWFParameters for OWF192EM {
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U1536;
 
+    fn is_em() -> bool {
+        true
+    }
     // fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
     //     let aes = Rijndael192::new(GenericArray_AES::from_slice(input));
     //     aes.encrypt_block_b2b(
@@ -571,13 +589,13 @@ impl OWFParameters for OWF192EM {
     //     }
     // }
 
-    // #[inline]
-    // fn extendwitness(
-    //     owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     owf_input: &GenericArray<u8, Self::InputSize>,
-    // ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
-    //     em_extendedwitness::<Self>(owf_key, owf_input)
-    // }
+    #[inline]
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,    
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
+        aes_extendedwitness::<Self>(owf_input, owf_key)
+    }
 
     // #[inline]
     // fn prove(
@@ -631,6 +649,9 @@ impl OWFParameters for OWF256EM {
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U1536;
 
+    fn is_em() -> bool {
+        true
+    }
     // fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
     //     let aes = Rijndael256::new(GenericArray_AES::from_slice(input));
     //     aes.encrypt_block_b2b(
@@ -642,13 +663,13 @@ impl OWFParameters for OWF256EM {
     //     }
     // }
 
-    // #[inline]
-    // fn extendwitness(
-    //     owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     owf_input: &GenericArray<u8, Self::InputSize>,
-    // ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
-    //     em_extendedwitness::<Self>(owf_key, owf_input)
-    // }
+    #[inline]
+    fn extendwitness(
+        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_input: &GenericArray<u8, Self::InputSize>,    
+    ) -> Option<Box<GenericArray<u8, Self::LBYTES>>> {
+        aes_extendedwitness::<Self>(owf_input, owf_key)
+    }
 
     // #[inline]
     // fn prove(
