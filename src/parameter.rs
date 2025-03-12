@@ -1,5 +1,5 @@
 use std::{
-    ops::{Div, Mul},
+    ops::{Div, Mul, Sub},
     process::Output,
 };
 
@@ -38,6 +38,7 @@ pub type LambdaBytesTimes4<LambdaBytes> = Prod<LambdaBytes, U4>;
 
 // l_hat = l + 3*lambda + B
 type LHatBytes<LBytes, LambdaBytes, B> = Sum<LBytes, Sum<Prod<U3, LambdaBytes>, Quot<B, U8>>>;
+
 
 /// Base parameters per security level
 pub(crate) trait BaseParameters {
@@ -144,11 +145,17 @@ pub(crate) trait OWFParameters: Sized {
     type BETA: ArrayLength;
     type NK: ArrayLength;
     type R: ArrayLength;
-    type SKE: ArrayLength;
+    type SKE: ArrayLength + Mul<U8, Output: ArrayLength>;
     type LKE: ArrayLength;
     type LKEBytes: ArrayLength;
     type LENC: ArrayLength;
     type NST: ArrayLength;
+    
+    type PRODRUN128Bytes: ArrayLength;
+    type PRODRUN128: ArrayLength;
+
+    type DIFFLKELAMBDA: ArrayLength;
+    type DIFFLKELAMBDABytes: ArrayLength;
 
     fn is_em() -> bool;
 
@@ -158,8 +165,6 @@ pub(crate) trait OWFParameters: Sized {
     // type PK: ArrayLength;
     // type SK: ArrayLength;
     // type KBLENGTH: ArrayLength;
-    // type PRODRUN128: ArrayLength;
-    // type PRODRUN128Bytes: ArrayLength;
     // type LAMBDALBYTESLAMBDA: ArrayLength;
     // type LAMBDAR1BYTE: ArrayLength;
 
@@ -245,7 +250,13 @@ impl OWFParameters for OWF128 {
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U832;
     type NST = U4;
+
+    type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     
+    type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
+    type DIFFLKELAMBDABytes = Quot<Self::DIFFLKELAMBDA, U8>;
+
     fn is_em() -> bool {
         false
     }
@@ -254,8 +265,6 @@ impl OWFParameters for OWF128 {
     // type LAMBDALBYTES = Sum<Self::LAMBDABYTES, Self::LBYTES>;
     // type SK = U32;
     // type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
-    // type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
-    // type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
     // type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
     // type QUOTLENC8 = Quot<Self::LENC, U8>;
     // type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
@@ -326,6 +335,12 @@ impl OWFParameters for OWF192 {
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U1024;
     type NST = U4;
+
+    type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
+
+    type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
+    type DIFFLKELAMBDABytes = Quot<Self::DIFFLKELAMBDA, U8>;
 
     fn is_em() -> bool {
         false
@@ -421,6 +436,12 @@ impl OWFParameters for OWF256 {
     type LENC = U1216;
     type NST = U4;
 
+    type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
+
+    type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
+    type DIFFLKELAMBDABytes = Quot<Self::DIFFLKELAMBDA, U8>;
+
     fn is_em() -> bool {
         false
     }
@@ -494,6 +515,12 @@ impl OWFParameters for OWF128EM {
     type LKE = U128;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U832;
+
+    type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
+
+    type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
+    type DIFFLKELAMBDABytes = Quot<Self::DIFFLKELAMBDA, U8>;
 
     fn is_em() -> bool {
         true
@@ -570,6 +597,12 @@ impl OWFParameters for OWF192EM {
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U1536;
 
+    type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
+
+    type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
+    type DIFFLKELAMBDABytes = Quot<Self::DIFFLKELAMBDA, U8>;
+
     fn is_em() -> bool {
         true
     }
@@ -643,6 +676,12 @@ impl OWFParameters for OWF256EM {
     type LKE = U448;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U1536;
+
+    type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
+
+    type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
+    type DIFFLKELAMBDABytes = Quot<Self::DIFFLKELAMBDA, U8>;
 
     fn is_em() -> bool {
         true

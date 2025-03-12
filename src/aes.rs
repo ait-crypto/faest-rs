@@ -1,20 +1,27 @@
-use std::{array, mem::size_of};
+use std::{
+    array,
+    mem::size_of,
+    ops::{Add, Mul, Sub},
+};
 
 use generic_array::{
-    typenum::{Unsigned, B1, U1, U10, U3, U4},
-    GenericArray,
+    functional::FunctionalSequence,
+    typenum::{Prod, Unsigned, B1, U1, U10, U3, U4, U8},
+    ArrayLength, GenericArray,
 };
-use itertools::iproduct;
+use itertools::{iproduct, izip};
 
 use crate::{
     fields::{
         small_fields::{GF8, GF8_INV_NORM},
-        ByteCombine, ByteCombineConstants, Field as _, SumPoly,
+        BigGaloisField, ByteCombine, ByteCombineConstants, Field, SumPoly,
     },
     // internal_keys::PublicKey,
     parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},
     rijndael_32::{
-        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key, rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes, sub_bytes, sub_bytes_nots, State, RCON_TABLE
+        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
+        rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes, sub_bytes,
+        sub_bytes_nots, State, RCON_TABLE,
     },
     universal_hashing::{ZKHasherInit, ZKProofHasher, ZKVerifyHasher},
     utils::contains_zeros,
@@ -39,7 +46,6 @@ const fn inverse_rotate_word(r: usize, rotate: bool) -> usize {
     }
 }
 
-
 pub(crate) fn aes_extendedwitness<O>(
     owf_secret: &GenericArray<u8, O::LAMBDABYTES>,
     owf_input: &GenericArray<u8, O::InputSize>,
@@ -55,8 +61,8 @@ where
     let mut witness = GenericArray::default_boxed();
 
     // Step 6
-    // Note: for FAEST-LAMBDA-EM, SKE is set to the actual number of S-Boxes in Rijndael-LAMBDA.KeyExpansion. 
-    // This slightly differs from FAEST Spec v2, where SKE is always set to 0 in EM mode. 
+    // Note: for FAEST-LAMBDA-EM, SKE is set to the actual number of S-Boxes in Rijndael-LAMBDA.KeyExpansion.
+    // This slightly differs from FAEST Spec v2, where SKE is always set to 0 in EM mode.
     let (kb, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(owf_secret, O::SKE::USIZE);
 
     let mut index = 0;
@@ -72,7 +78,7 @@ where
     }
 
     // Step 14
-    for _ in 0..O::BETA::USIZE{
+    for _ in 0..O::BETA::USIZE {
         round_with_save::<O>(&input, &kb, &mut witness, &mut index);
         input[0] ^= 1;
     }
@@ -103,7 +109,6 @@ where
     };
 
     for j in start_off..start_off + non_lin_blocks {
-        
         let inside = GenericArray::<_, U3>::from_iter(
             convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)])).take(3),
         );
@@ -119,7 +124,7 @@ where
 }
 
 #[inline]
-fn store_invnorm_state(dst: &mut u8, lo_idx:u8, hi_idx: u8){
+fn store_invnorm_state(dst: &mut u8, lo_idx: u8, hi_idx: u8) {
     *dst = GF8_INV_NORM[lo_idx as usize] | GF8_INV_NORM[hi_idx as usize] << 4;
 }
 
@@ -129,8 +134,7 @@ fn round_with_save<O>(
     kb: &[u32],    // k_bar
     witness: &mut [u8],
     index: &mut usize,
-)
-where
+) where
     O: OWFParameters,
 {
     let mut state = State::default();
@@ -142,7 +146,6 @@ where
     rijndael_add_round_key(&mut state, &kb[..8]);
 
     for j in 0..O::R::USIZE - 1 {
-
         let even_round = (j % 2) == 0;
 
         // Step 19
@@ -179,181 +182,262 @@ where
     }
 }
 
-// fn aes_key_exp_fwd_1<O>(
-//     x: &GenericArray<u8, O::LKEBytes>,
-// ) -> Box<GenericArray<u8, O::PRODRUN128Bytes>>
-// where
-//     O: OWFParameters,
-// {
-//     let mut out = GenericArray::default_boxed();
-//     out[..O::LAMBDABYTES::USIZE].copy_from_slice(&x[..O::LAMBDABYTES::USIZE]);
-//     let mut index = O::LAMBDABYTES::USIZE;
-//     let mut x_index = O::LAMBDABYTES::USIZE;
-//     for j in O::NK::USIZE..(4 * (O::R::USIZE + 1)) {
-//         if (j % O::NK::USIZE == 0) || ((O::NK::USIZE > 6) && (j % O::NK::USIZE == 4)) {
-//             out[index..index + 32 / 8].copy_from_slice(&x[x_index..x_index + 32 / 8]);
-//             index += 32 / 8;
-//             x_index += 32 / 8;
-//         } else {
-//             for i in 0..4 {
-//                 out[index] = out[(32 * (j - O::NK::USIZE)) / 8 + i] ^ out[(32 * (j - 1)) / 8 + i];
-//                 index += 1;
-//             }
-//         }
-//     }
-//     out
-// }
+type OWFField<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
 
-// fn aes_key_exp_fwd<O>(
-//     x: &GenericArray<Field<O>, O::LKE>,
-// ) -> Box<GenericArray<Field<O>, O::PRODRUN128>>
-// where
-//     O: OWFParameters,
-// {
-//     // Step 1 is ok by construction
-//     let mut out = GenericArray::default_boxed();
-//     out[..O::LAMBDA::USIZE].copy_from_slice(&x[..O::LAMBDA::USIZE]);
-//     let mut index = O::LAMBDA::USIZE;
-//     let mut x_index = O::LAMBDA::USIZE;
-//     for j in O::NK::USIZE..(4 * (O::R::USIZE + 1)) {
-//         if (j % O::NK::USIZE == 0) || ((O::NK::USIZE > 6) && (j % O::NK::USIZE == 4)) {
-//             out[index..index + 32].copy_from_slice(&x[x_index..x_index + 32]);
-//             index += 32;
-//             x_index += 32;
-//         } else {
-//             for i in 0..32 {
-//                 out[index] = out[(32 * (j - O::NK::USIZE)) + i] + out[(32 * (j - 1)) + i];
-//                 index += 1;
-//             }
-//         }
-//     }
-//     out
-// }
+fn aes_key_exp_fwd<O>(
+    w: &GenericArray<u8, O::LKEBytes>,
+    w_0: &GenericArray<OWFField<O>, O::LKE>,
+) -> (
+    Box<GenericArray<u8, O::PRODRUN128Bytes>>,
+    Box<GenericArray<OWFField<O>, O::PRODRUN128>>,
+)
+where
+    O: OWFParameters,
+{
+    // Step 1
+    let mut y = GenericArray::default_boxed();
+    let mut y_0 = GenericArray::default_boxed();
+    y[..O::LAMBDABYTES::USIZE].copy_from_slice(&w[..O::LAMBDABYTES::USIZE]);
+    y_0[..O::LAMBDA::USIZE].copy_from_slice(&w_0[..O::LAMBDA::USIZE]);
 
-// fn aes_key_exp_bwd_mtag0_mkey0<'a, O>(
-//     x: &'a GenericArray<u8, O::LKEBytes>,
-//     xk: &'a GenericArray<u8, O::PRODRUN128Bytes>,
-// ) -> impl Iterator<Item = Field<O>> + 'a
-// where
-//     O: OWFParameters,
-// {
-//     let mut indice = 0;
-//     let mut c = 0;
-//     let mut rmvrcon = true;
-//     let mut ircon = 0;
-//     // Step 6
-//     (0..O::SKE::USIZE).map(move |j| {
-//         // Step 7
-//         let mut x_tilde = xk[indice + c] ^ x[j + O::LAMBDABYTES::USIZE];
-//         // Step 8
-//         if rmvrcon && (c == 0) {
-//             let rcon = RCON_TABLE[ircon];
-//             ircon += 1;
-//             // Step 11
-//             x_tilde ^= rcon;
-//         }
+    // Step 2
+    let mut i_wd = O::LAMBDA::USIZE;
 
-//         c += 1;
-//         // Step 21
-//         if c == 4 {
-//             c = 0;
-//             if O::LAMBDA::USIZE == 192 {
-//                 indice += 192 / 8;
-//             } else {
-//                 indice += 128 / 8;
-//                 if O::LAMBDA::USIZE == 256 {
-//                     rmvrcon = !rmvrcon;
-//                 }
-//             }
-//         }
+    for j in O::NK::USIZE..(4 * (O::R::USIZE + 1)) {
+        // Step 5
+        if (j % O::NK::USIZE == 0) || ((O::NK::USIZE > 6) && (j % O::NK::USIZE == 4)) {
+            // Step 6
+            y[4 * j..4 * j + 4].copy_from_slice(&w[i_wd / 8..i_wd / 8 + 4]);
+            y_0[32 * j..32 * j + 32].copy_from_slice(&w_0[i_wd..i_wd + 32]);
 
-//         Field::<O>::byte_combine_bits(
-//             x_tilde.rotate_right(7) ^ x_tilde.rotate_right(5) ^ x_tilde.rotate_right(2) ^ 0x5,
-//         )
-//     })
-// }
+            // Step 7
+            i_wd += 32;
+        } else {
+            // Step 9-10
+            for i in 0..4 {
+                y[4 * j + i] = y[4 * (j - O::NK::USIZE) + i] ^ y[4 * (j - 1) + i];
 
-// fn aes_key_exp_bwd_mtag1_mkey0<'a, O>(
-//     x: &'a [Field<O>],
-//     xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
-// ) -> impl Iterator<Item = Field<O>> + 'a
-// where
-//     O: OWFParameters,
-// {
-//     let mut indice = 0;
-//     let mut c = 0;
-//     let mut rmvrcon = true;
-//     // Step 6
-//     (0..O::SKE::USIZE).map(move |j| {
-//         // Step 7
-//         let x_tilde: [_; 8] = array::from_fn(|i| x[8 * j + i] + xk[indice + 8 * c + i]);
-//         // Step 15
-//         let y_tilde =
-//             array::from_fn(|i| x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8]);
-//         c += 1;
-//         // Step 21
-//         if c == 4 {
-//             c = 0;
-//             if O::LAMBDA::USIZE == 192 {
-//                 indice += 192;
-//             } else {
-//                 indice += 128;
-//                 if O::LAMBDA::USIZE == 256 {
-//                     rmvrcon = !rmvrcon;
-//                 }
-//             }
-//         }
-//         Field::<O>::byte_combine(&y_tilde)
-//     })
-// }
+                for i_0 in 8 * i..8 * i + 8 {
+                    y_0[32 * j + i_0] =
+                        y_0[32 * (j - O::NK::USIZE) + i_0] + y_0[32 * (j - 1) + i_0];
+                }
+            }
+        }
+    }
 
-// fn aes_key_exp_bwd_mtag0_mkey1<'a, O>(
-//     x: &'a GenericArray<Field<O>, O::LKE>,
-//     xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
-//     delta: &'a Field<O>,
-// ) -> impl Iterator<Item = Field<O>> + 'a
-// where
-//     O: OWFParameters,
-// {
-//     let mut indice = 0;
-//     let mut c = 0;
-//     let mut rmvrcon = true;
-//     let mut ircon = 0;
-//     // Step 6
-//     (0..O::SKE::USIZE).map(move |j| {
-//         // Step 7
-//         let mut x_tilde: [_; 8] =
-//             array::from_fn(|i| x[8 * j + i + O::LAMBDA::USIZE] + xk[indice + 8 * c + i]);
-//         // Step 8
-//         if rmvrcon && (c == 0) {
-//             let rcon = RCON_TABLE[ircon];
-//             ircon += 1;
-//             // Step 11
-//             for (i, x) in x_tilde.iter_mut().enumerate() {
-//                 *x += *delta * ((rcon >> i) & 1);
-//             }
-//         }
-//         // Step 15
-//         let mut y_tilde =
-//             array::from_fn(|i| x_tilde[(i + 7) % 8] + x_tilde[(i + 5) % 8] + x_tilde[(i + 2) % 8]);
-//         y_tilde[0] += delta;
-//         y_tilde[2] += delta;
-//         c += 1;
-//         // Step 21
-//         if c == 4 {
-//             c = 0;
-//             if O::LAMBDA::USIZE == 192 {
-//                 indice += 192;
-//             } else {
-//                 indice += 128;
-//                 if O::LAMBDA::USIZE == 256 {
-//                     rmvrcon = !rmvrcon;
-//                 }
-//             }
-//         }
-//         Field::<O>::byte_combine(&y_tilde)
-//     })
-// }
+    (y, y_0)
+}
+
+fn aes_key_exp_bkwd<O>(
+    x: &GenericArray<u8, O::DIFFLKELAMBDABytes>,
+    x_0: &GenericArray<OWFField<O>, O::DIFFLKELAMBDA>,
+    xk: &GenericArray<u8, O::PRODRUN128Bytes>,
+    xk_0: &GenericArray<OWFField<O>, O::PRODRUN128>,
+) -> (
+    Box<GenericArray<u8, O::SKE>>,
+    Box<GenericArray<OWFField<O>, Prod<O::SKE, U8>>>,
+)
+where
+    O: OWFParameters,
+{
+    let mut y = GenericArray::default_boxed();
+    let mut y_0 = GenericArray::default_boxed();
+
+    let mut i_wd = 0;
+
+    let rcon_evry = 4 * (O::LAMBDA::USIZE / 8);
+
+    for j in 0..O::SKE::USIZE {
+        // Step 7
+        let mut xt = x[j] ^ xk[i_wd / 8 + (j % 4)];
+
+        let xt_0: GenericArray<OWFField<O>, U8> = (0..8)
+            .map(|i| x_0[8 * j + i] + xk_0[i_wd + 8 * (j % 4) + i])
+            .collect();
+
+        // Step 8
+        if j % rcon_evry == 0 {
+            xt ^= RCON_TABLE[j / rcon_evry];
+        }
+
+        inverse_affine_byte::<O>(xt, &xt_0, &mut y[j], &mut y_0[8 * j..8 * j + 8]);
+
+        // Step 12
+        if j % 4 == 3 {
+            if O::LAMBDA::USIZE != 256 {
+                i_wd += O::LAMBDA::USIZE;
+            } else {
+                i_wd += 128;
+            }
+        }
+    }
+
+    (y, y_0)
+}
+
+fn inverse_affine_byte<O>(
+    x: u8,
+    x_0: &GenericArray<OWFField<O>, U8>,
+    y: &mut u8,
+    y_0: &mut [OWFField<O>],
+) where
+    O: OWFParameters,
+{
+    *y = x.rotate_right(7) ^ x.rotate_right(5) ^ x.rotate_right(2) ^ 0x5;
+
+    for i in 0..8 {
+        y_0[i] = x_0[(i + 8 - 1) % 8] + x_0[(i + 8 - 3) % 8] + x_0[(i + 8 - 6) % 8];
+    }
+}
+
+fn aes_key_exp_cstrnts_prover<O>(
+    w: &GenericArray<u8, O::LKEBytes>,
+    w_tag: &GenericArray<OWFField<O>, O::LKE>,
+) -> (
+    Box<GenericArray<u8, O::PRODRUN128Bytes>>,
+    Box<GenericArray<OWFField<O>, O::PRODRUN128>>,
+)
+where
+    O: OWFParameters,
+    OWFField<O>: BigGaloisField + ByteCombine,
+    <<O as OWFParameters>::BaseParams as BaseParameters>::Field: PartialEq,
+{
+    // Step 1-2
+    let (k, k_tag) = aes_key_exp_fwd::<O>(w, w_tag);
+    let (w_flat, w_flat_tag) = aes_key_exp_bkwd::<O>(
+        GenericArray::from_slice(&w[O::LAMBDABYTES::USIZE..]),
+        GenericArray::from_slice(&w_tag[O::LAMBDA::USIZE..]),
+        &k,
+        &k_tag,
+    );
+
+    let mut i_wd = 32 * (O::NK::USIZE - 1);
+
+    let mut do_rot_word = true;
+
+    // Step 7
+    for j in 0..O::SKE::USIZE / 4 {
+        // Step 8
+        let (mut k_hat, mut k_hat_tag) = (
+            GenericArray::<OWFField<O>, U4>::default(),
+            GenericArray::<OWFField<O>, U4>::default(),
+        );
+        let (mut k_hat_sq, mut k_hat_tag_sq) = (
+            GenericArray::<OWFField<O>, U4>::default(),
+            GenericArray::<OWFField<O>, U4>::default(),
+        );
+        let (mut w_hat, mut w_hat_tag) = (
+            GenericArray::<OWFField<O>, U4>::default(),
+            GenericArray::<OWFField<O>, U4>::default(),
+        );
+        let (mut w_hat_sq, mut w_hat_tag_sq) = (
+            GenericArray::<OWFField<O>, U4>::default(),
+            GenericArray::<OWFField<O>, U4>::default(),
+        );
+
+        for r in 0..4 {
+            let r_prime = if do_rot_word { (r + 3) % 4 } else { r };
+
+            // Steps 12-15
+            k_hat[r_prime] = OWFField::<O>::byte_combine_bits(k[i_wd / 8 + r]);
+            k_hat_sq[r_prime] = square_and_combine_bits(k[i_wd / 8 + r]);
+            
+            
+            w_hat[r] = OWFField::<O>::byte_combine_bits(w_flat[4 * j + r]);
+            w_hat_sq[r] = square_and_combine_bits(w_flat[4 * j + r]);
+            
+
+            k_hat_tag[r_prime] = OWFField::<O>::byte_combine_slice(&k_tag[i_wd + 8 * r..i_wd + 8 * r + 8]);
+            k_hat_tag_sq[r_prime] = square_and_combine(&k_tag[i_wd + 8 * r..i_wd + 8 * r + 8]);
+            
+
+            w_hat_tag[r] =
+                OWFField::<O>::byte_combine_slice(&w_flat_tag[32 * j + 8 * r..32 * j + 8 * r + 8]);
+            w_hat_tag_sq[r_prime] = square_and_combine(&w_flat_tag[32 * j + 8 * r..32 * j + 8 * r + 8]);
+        }
+
+        // Step 16
+        if O::LAMBDA::USIZE == 256 {
+            do_rot_word = !do_rot_word;
+        }
+
+        // Step 17
+        for r in 0..4 {
+            
+            let z = k_hat_sq[r] * w_hat[r] - k_hat[r];
+            println!("{:?}", z);  
+            // assert_eq!(z, <OWFField<O> as Field>::ZERO);
+
+            let z = k_hat[r] * w_hat_sq[r] - w_hat[r];
+            println!("{:?}\n\n", z);  
+
+            // assert_eq!(z, <OWFField<O> as Field>::ZERO);
+        }
+
+        if O::LAMBDA::USIZE == 192 {
+            i_wd += 192;
+        } else {
+            i_wd += 128;
+        }
+    }
+
+    (k, k_tag)
+}
+
+fn square_bits(x: u8) -> u8 {
+    let bits = [
+        x & 0b1,
+        (x & 0b10) >> 1,
+        (x & 0b100) >> 2,
+        (x & 0b1000) >> 3,
+        (x & 0b10000) >> 4,
+        (x & 0b100000) >> 5,
+        (x & 0b1000000) >> 6,
+        (x & 0b10000000) >> 7,
+    ];
+
+    let mut sq_bits = bits[0] ^ bits[4] ^ bits[6];
+    sq_bits |= (bits[4] ^ bits[6] ^ bits[7]) << 1;
+    sq_bits |= (bits[1] ^ bits[5]) << 2;
+    sq_bits |= (bits[4] ^ bits[5] ^ bits[6] ^ bits[7]) << 3;
+    sq_bits |= (bits[2] ^ bits[4] ^ bits[7]) << 4;
+    sq_bits |= (bits[5] ^ bits[6]) << 5;
+    sq_bits |= (bits[3] ^ bits[5]) << 6;
+    sq_bits |= (bits[6] ^ bits[7]) << 7;
+    sq_bits
+}
+
+fn square_and_combine_bits<F>(x: u8) -> F
+where
+    F: BigGaloisField,
+{
+    let sq_bits = square_bits(x);
+    F::byte_combine_bits(sq_bits)
+}
+
+fn square<F>(x: &[F]) -> [F; 8]
+where
+    F: BigGaloisField,
+{
+    let mut sq = [F::ZERO; 8];
+    sq[0] = x[0] + x[4] + x[6];
+    sq[1] = x[4] + x[6] + x[7];
+    sq[2] = x[1] + x[5];
+    sq[3] = x[4] + x[5] + x[6] + x[7];
+    sq[4] = x[2] + x[4] + x[7];
+    sq[5] = x[5] + x[6];
+    sq[6] = x[3] + x[5];
+    sq[7] = x[6] + x[7];
+    sq
+}
+
+fn square_and_combine<F>(x: &[F]) -> F
+where
+    F: BigGaloisField,
+{
+    let sq = square(x);
+    F::byte_combine(&sq)
+}
 
 // fn aes_key_exp_cstrnts_mkey0<O>(
 //     zk_hasher: &mut ZKProofHasher<Field<O>>,
@@ -788,11 +872,10 @@ mod test {
         w: Vec<u8>,
     }
     impl AesExtendedWitness {
-
-        fn test(&self) -> bool{
-            match self.em{
+        fn test(&self) -> bool {
+            match self.em {
                 false => self.extend_witness_test(),
-                true => self.extend_witness_test_em()
+                true => self.extend_witness_test_em(),
             }
         }
 
@@ -862,7 +945,88 @@ mod test {
         for data in database {
             assert!(data.test())
         }
+    }
 
+    #[test]
+    fn aes_enc_fwd_prover_128_test() {
+        let w: GenericArray<u8, _> = GenericArray::from_array([
+            17, 114, 181, 111, 55, 1, 111, 109, 39, 0, 190, 122, 209, 86, 174, 250, 161, 150, 152,
+            81, 219, 2, 253, 129, 241, 75, 93, 95, 57, 172, 5, 217, 225, 238, 21, 13, 45, 134, 80,
+            97, 15, 126, 161, 50, 27, 253, 118, 137, 35, 0, 176, 94, 230, 199, 184, 147,
+        ]);
+
+        let exp_k: GenericArray<u8, _> = GenericArray::from_array([
+            17, 114, 181, 111, 55, 1, 111, 109, 39, 0, 190, 122, 209, 86, 174, 250, 161, 150, 152,
+            81, 150, 151, 247, 60, 177, 151, 73, 70, 96, 193, 231, 188, 219, 2, 253, 129, 77, 149,
+            10, 189, 252, 2, 67, 251, 156, 195, 164, 71, 241, 75, 93, 95, 188, 222, 87, 226, 64,
+            220, 20, 25, 220, 31, 176, 94, 57, 172, 5, 217, 133, 114, 82, 59, 197, 174, 70, 34, 25,
+            177, 246, 124, 225, 238, 21, 13, 100, 156, 71, 54, 161, 50, 1, 20, 184, 131, 247, 104,
+            45, 134, 80, 97, 73, 26, 23, 87, 232, 40, 22, 67, 80, 171, 225, 43, 15, 126, 161, 50,
+            70, 100, 182, 101, 174, 76, 160, 38, 254, 231, 65, 13, 27, 253, 118, 137, 93, 153, 192,
+            236, 243, 213, 96, 202, 13, 50, 33, 199, 35, 0, 176, 94, 126, 153, 112, 178, 141, 76,
+            16, 120, 128, 126, 49, 191, 230, 199, 184, 147, 152, 94, 200, 33, 21, 18, 216, 89, 149,
+            108, 233, 230,
+        ]);
+
+        let tags = GenericArray::default();
+
+        let res = aes_key_exp_fwd::<OWF128>(&w, &tags);
+
+        assert!(*res.0 == exp_k);
+    }
+
+    #[test]
+    fn aes_enc_bkwd_prover_128_test() {
+        let w: GenericArray<u8, _> = GenericArray::from_array([
+            168, 233, 176, 51, 172, 6, 233, 110, 215, 248, 209, 67, 11, 234, 191, 117, 60, 3, 82,
+            31, 53, 103, 128, 235, 3, 122, 147, 230, 113, 159, 193, 47, 11, 201, 121, 202, 159,
+            209, 193, 112,
+        ]);
+
+        let k: GenericArray<u8, _> = GenericArray::from_array([
+            188, 126, 253, 108, 122, 171, 208, 78, 219, 200, 132, 13, 132, 47, 133, 101, 168, 233,
+            176, 51, 210, 66, 96, 125, 9, 138, 228, 112, 141, 165, 97, 21, 172, 6, 233, 110, 126,
+            68, 137, 19, 119, 206, 109, 99, 250, 107, 12, 118, 215, 248, 209, 67, 169, 188, 88, 80,
+            222, 114, 53, 51, 36, 25, 57, 69, 11, 234, 191, 117, 162, 86, 231, 37, 124, 36, 210,
+            22, 88, 61, 235, 83, 60, 3, 82, 31, 158, 85, 181, 58, 226, 113, 103, 44, 186, 76, 140,
+            127, 53, 103, 128, 235, 171, 50, 53, 209, 73, 67, 82, 253, 243, 15, 222, 130, 3, 122,
+            147, 230, 168, 72, 166, 55, 225, 11, 244, 202, 18, 4, 42, 72, 113, 159, 193, 47, 217,
+            215, 103, 24, 56, 220, 147, 210, 42, 216, 185, 154, 11, 201, 121, 202, 210, 30, 30,
+            210, 234, 194, 141, 0, 192, 26, 52, 154, 159, 209, 193, 112, 77, 207, 223, 162, 167,
+            13, 82, 162, 103, 23, 102, 56,
+        ]);
+
+        let w_tags = GenericArray::default();
+        let k_tags = GenericArray::default();
+
+        let res = aes_key_exp_bkwd::<OWF128>(&w, &w_tags, &k, &k_tags);
+
+        println!("{:?}", res.0);
+    }
+
+    #[test]
+    fn test_keycnstr() {
+        let w = GenericArray::from_array([
+            0xc0, 0x72, 0x0b, 0x10, 0xbf, 0x26, 0x6c, 0x19, 0x24, 0x18, 0x87, 0x72, 0xc5, 0x1f,
+            0xbe, 0x52, 0x01, 0xdc, 0x0b, 0xb6, 0x57, 0x84, 0x78, 0x79, 0xbc, 0xb6, 0x27, 0x08,
+            0x22, 0x85, 0xf6, 0x6f, 0x43, 0x2d, 0x60, 0x56, 0x9f, 0xc5, 0x2e, 0xe4, 0x78, 0x1a,
+            0x2b, 0x68, 0x7f, 0xe1, 0xea, 0x3d, 0x6a, 0x05, 0x3a, 0x77, 0x94, 0xa8, 0x8a, 0x86,
+            0x81, 0x4d, 0xe7, 0x6b, 0x58, 0x35, 0xcd, 0xba, 0x3d, 0xd5, 0x16, 0x1c, 0x47, 0x99,
+            0x22, 0xf2, 0x75, 0x6f, 0x09, 0xd6, 0xe7, 0x1d, 0xc7, 0x42, 0x22, 0xd7, 0x54, 0x35,
+            0xc2, 0xa6, 0x73, 0x11, 0xaa, 0x32, 0x99, 0xc3, 0x3f, 0x42, 0x84, 0x1c, 0xfd, 0x5b,
+            0xdf, 0xba, 0x0c, 0x93, 0x83, 0xe8, 0x4c, 0xce, 0xde, 0xa5, 0x84, 0x3f, 0x25, 0xc9,
+            0x15, 0x5a, 0x7e, 0x0c, 0x7a, 0x29, 0xd6, 0xa0, 0x2a, 0x93, 0xb7, 0xf2, 0xeb, 0x6d,
+            0xad, 0x50, 0x54, 0x32, 0x5a, 0x4d, 0xe9, 0xc9, 0xcb, 0xac, 0x5d, 0x90, 0x10, 0x0f,
+            0x9a, 0x45, 0x54, 0xee, 0x84, 0x1a, 0xed, 0x05, 0x02, 0x96, 0x78, 0x82, 0x79, 0x22,
+            0x57, 0x1a, 0xea, 0x65, 0x19, 0xce,
+        ]);
+
+        println!("{}", w.len());
+        let lke = <OWF128 as OWFParameters>::LKEBytes::USIZE;
+        aes_key_exp_cstrnts_prover::<OWF128>(
+            GenericArray::from_slice(&w[..lke]),
+            &GenericArray::default(),
+        );
     }
 }
 //     #[derive(Debug, Deserialize)]
@@ -1035,4 +1199,52 @@ mod test {
 //             }
 //         }
 //     }
+// }
+
+// fn mul_deg_1_commits<F, L>(
+//     lhs: &GenericArray<F, L>,
+//     lhs_tag: &GenericArray<F, L>,
+//     rhs: &GenericArray<F, L>,
+//     rhs_tag: &GenericArray<F, L>,
+// ) -> (GenericArray<F, L>, GenericArray<F, L>, GenericArray<F, L>)
+// where
+//     F: crate::fields::Field,
+//     for<'a> &'a F: Mul<&'a F, Output = F>,
+//     L: ArrayLength,
+// {
+//     let mut res_tag0 = GenericArray::default();
+//     let mut res_tag1 = GenericArray::default();
+//     let mut res = GenericArray::default();
+
+//     for (i, (l, ltag, r, rtag)) in izip!(lhs, lhs_tag, rhs, rhs_tag).enumerate() {
+//         res_tag0[i] = ltag * rtag;
+//         res_tag1[i] = ltag * r + rtag * l;
+//         res[i] = l * r;
+//     }
+
+//     (res_tag0, res_tag1, res)
+// }
+
+// fn diff_deg_2_deg_1_commits<F, L>(
+//     lhs: &GenericArray<F, L>,
+//     lhs_tag1: &GenericArray<F, L>,
+//     lhs_tag0: &GenericArray<F, L>,
+//     rhs: &GenericArray<F, L>,
+//     rhs_tag: &GenericArray<F, L>,
+// ) -> (GenericArray<F, L>, GenericArray<F, L>, GenericArray<F, L>)
+// where
+//     F: Clone + crate::fields::Field,
+//     for<'a> &'a F: Sub<&'a F, Output = F>,
+//     L: ArrayLength,
+// {
+//     let res_tag0= (*lhs_tag0).clone();
+//     let mut res_tag1 = GenericArray::default();
+//     let mut res = GenericArray::default();
+
+//     for (i, (l, ltag, r, rtag)) in izip!(lhs, lhs_tag1, rhs, rhs_tag).enumerate() {
+//         res_tag1[i] = ltag - rtag;
+//         res[i] = l-r;
+//     }
+
+//     (res_tag0, res_tag1, res)
 // }

@@ -1,9 +1,11 @@
+use std::ops::Add;
 use std::{array, f32::consts::TAU, io::Read, iter::zip};
 
 use generic_array::typenum::bit;
 use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use itertools::iproduct;
 
+use crate::fields::Field;
 use crate::{
     fields::ByteCombine,
     parameter::TauParameters,
@@ -154,6 +156,26 @@ pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> GenericArr
 pub(crate) fn contains_zeros(buf: &[u8]) -> bool {
     buf.contains(&0)
 }
+
+// struct BitCommitment<F>
+// where 
+//     F: Field,
+//     for <'a> &'a F: Add<&'a F>, 
+// {
+//     tags: Vec<F>,
+//     comm: bool
+// }
+
+// impl<F> Add for BitCommitment<F> where F:Field{
+//     type Output = BitCommitment<F>;
+//     fn add(&self, rhs: Self) -> Self::Output {
+//         let tag_len: Vec<_> = std::cmp::max(self.tags.len(), rhs.tags.len());
+//         let new_tags = rhs.tags.iter().rev().zip(self.tags.iter().rev()).map(
+//             |(tag_l, tag_r)| tag_l + tag_r
+//         ).collect();
+//     }   
+// }
+
 
 #[cfg(test)]
 pub(crate) mod test {
