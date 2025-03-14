@@ -387,7 +387,7 @@ pub(crate) fn sub_bytes_nots(state: &mut [u32]) {
     state[6] ^= 0xffffffff;
 }
 
-pub(crate) fn rijndael_sub_bytes(state: &mut [u32]){
+pub(crate) fn rijndael_sub_bytes(state: &mut [u32]) {
     sub_bytes(state);
     sub_bytes_nots(state);
 }

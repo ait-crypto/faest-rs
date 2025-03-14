@@ -158,9 +158,9 @@ pub(crate) fn contains_zeros(buf: &[u8]) -> bool {
 }
 
 // struct BitCommitment<F>
-// where 
+// where
 //     F: Field,
-//     for <'a> &'a F: Add<&'a F>, 
+//     for <'a> &'a F: Add<&'a F>,
 // {
 //     tags: Vec<F>,
 //     comm: bool
@@ -173,9 +173,8 @@ pub(crate) fn contains_zeros(buf: &[u8]) -> bool {
 //         let new_tags = rhs.tags.iter().rev().zip(self.tags.iter().rev()).map(
 //             |(tag_l, tag_r)| tag_l + tag_r
 //         ).collect();
-//     }   
+//     }
 // }
-
 
 #[cfg(test)]
 pub(crate) mod test {

@@ -13,7 +13,10 @@ use generic_array::{
 };
 use itertools::{chain, izip};
 
-use crate::fields::{BigGaloisField, Field, GF128, GF192, GF256, GF384, GF576, GF64, GF768};
+use crate::{
+    aes::FieldCommitDegTwo,
+    fields::{BigGaloisField, Field, GF128, GF192, GF256, GF384, GF576, GF64, GF768},
+};
 
 type BBits = U16;
 // Additional bytes returned by VOLE hash
@@ -152,7 +155,7 @@ where
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Init part
 pub(crate) trait ZKHasherInit<F>
 where
-    F: BigGaloisField,
+    F: BigGaloisField + PartialEq + std::fmt::Debug,
 {
     type SDLength: ArrayLength;
 
@@ -176,7 +179,7 @@ where
 
     fn new_zk_proof_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKProofHasher<F> {
         let hasher = Self::new_zk_hasher(sd);
-        ZKProofHasher::new(hasher.clone(), hasher)
+        ZKProofHasher::new(hasher.clone(), hasher.clone(), hasher)
     }
 
     fn new_zk_verify_hasher(sd: &GenericArray<u8, Self::SDLength>, delta: F) -> ZKVerifyHasher<F> {
@@ -200,8 +203,8 @@ pub(crate) struct ZKHasher<F>
 where
     F: BigGaloisField,
 {
-    h0: F,
-    h1: F,
+    pub(crate) h0: F,
+    pub(crate) h1: F,
     s: F,
     t: GF64,
     r0: F,
@@ -234,41 +237,67 @@ where
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct ZKProofHasher<F>
 where
     F: BigGaloisField,
 {
-    a_hasher: ZKHasher<F>,
-    b_hasher: ZKHasher<F>,
+    pub(crate) a0_hasher: ZKHasher<F>,
+    a1_hasher: ZKHasher<F>,
+    a2_hasher: ZKHasher<F>,
 }
 
 impl<F> ZKProofHasher<F>
 where
-    F: BigGaloisField,
+    F: BigGaloisField + PartialEq + std::fmt::Debug,
 {
-    const fn new(a_hasher: ZKHasher<F>, b_hasher: ZKHasher<F>) -> Self {
-        Self { a_hasher, b_hasher }
-    }
-
-    pub(crate) fn process<I1, I2, I3, I4>(&mut self, s: I1, vs: I2, s_b: I3, v_s_b: I4)
-    where
-        I1: Iterator<Item = F>,
-        I2: Iterator<Item = F>,
-        I3: Iterator<Item = F>,
-        I4: Iterator<Item = F>,
-    {
-        for (s_j, vs_j, s_b_j, v_s_b_j) in izip!(s, vs, s_b, v_s_b) {
-            let a0 = v_s_b_j * vs_j;
-            let a1 = (s_j + vs_j) * (s_b_j + v_s_b_j) + F::ONE + a0;
-            self.a_hasher.update(&a1);
-            self.b_hasher.update(&a0);
+    pub(crate) const fn new(
+        a0_hasher: ZKHasher<F>,
+        a1_hasher: ZKHasher<F>,
+        a2_hasher: ZKHasher<F>,
+    ) -> Self {
+        Self {
+            a0_hasher,
+            a1_hasher,
+            a2_hasher,
         }
     }
 
-    pub(crate) fn finalize(self, u: &F, v: &F) -> (F, F) {
-        let a = self.a_hasher.finalize(u);
-        let b = self.b_hasher.finalize(v);
-        (a, b)
+    pub(crate) fn lift_and_process<I1, I2, I3, I4>(&mut self, a: I1, a_sq: I2, b: I3, b_sq: I4)
+    where
+        for<'a> I1: Iterator<Item = FieldCommitDegTwo<F>>,
+        for<'a> I2: Iterator<Item = FieldCommitDegTwo<F>>,
+        for<'a> I3: Iterator<Item = FieldCommitDegTwo<F>>,
+        for<'a> I4: Iterator<Item = FieldCommitDegTwo<F>>,
+    {
+        // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
+        for (a, a_sq, b, b_sq) in izip!(a, a_sq, b, b_sq) {
+            // Degree 0
+            self.a0_hasher.update(&F::ZERO);
+            self.a0_hasher.update(&F::ZERO);
+
+            // Degree 1
+            self.a1_hasher.update(&(a_sq.tag * b.tag - a.tag));
+            self.a1_hasher.update(&(b_sq.tag * a.tag - b.tag));
+
+            // Degree 2
+            self.a2_hasher
+                .update(&(a_sq.key * b.tag + a_sq.tag * b.key - a.key));
+            self.a2_hasher
+                .update(&(b_sq.key * a.tag + b_sq.tag * a.key - b.key));
+
+            // Degree 3 (i.e., commitments) should be zero
+            debug_assert_eq!(a_sq.key * b.key - a.key, F::ZERO);
+            debug_assert_eq!(b_sq.key * a.key - b.key, F::ZERO);
+        }
+    }
+
+    pub(crate) fn finalize(self, u: &F, u_plus_v: &F, v: &F) -> (F, F, F) {
+        let a0 = self.a0_hasher.finalize(u);
+        let a1 = self.a1_hasher.finalize(u_plus_v);
+        let a2 = self.a2_hasher.finalize(v);
+
+        (a0, a1, a2)
     }
 }
 

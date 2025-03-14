@@ -1,9 +1,10 @@
 use std::{
-    array,
+    array, default,
     mem::size_of,
     ops::{Add, Mul, Sub},
 };
 
+use aes::cipher::KeyInit;
 use generic_array::{
     functional::FunctionalSequence,
     typenum::{Prod, Unsigned, B1, U1, U10, U3, U4, U8},
@@ -16,26 +17,26 @@ use crate::{
         small_fields::{GF8, GF8_INV_NORM},
         BigGaloisField, ByteCombine, ByteCombineConstants, Field, SumPoly,
     },
-    // internal_keys::PublicKey,
+    internal_keys::PublicKey,
     parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes, sub_bytes,
         sub_bytes_nots, State, RCON_TABLE,
     },
-    universal_hashing::{ZKHasherInit, ZKProofHasher, ZKVerifyHasher},
+    universal_hashing::{ZKHasher, ZKHasherInit, ZKHasherProcess, ZKProofHasher, ZKVerifyHasher},
     utils::contains_zeros,
 };
 
-// type KeyCstrnts<O> = (
-//     Box<GenericArray<u8, <O as OWFParameters>::PRODRUN128Bytes>>,
-//     Box<GenericArray<Field<O>, <O as OWFParameters>::PRODRUN128>>,
-// );
+pub(crate) type KeyCstrnts<O> = (
+    Box<GenericArray<u8, <O as OWFParameters>::PRODRUN128Bytes>>,
+    Box<GenericArray<OWFField<O>, <O as OWFParameters>::PRODRUN128>>,
+);
 
-// type CstrntsVal<'a, O> = &'a GenericArray<
-//     GenericArray<u8, <O as OWFParameters>::LAMBDALBYTES>,
-//     <O as OWFParameters>::LAMBDA,
-// >;
+pub(crate) type CstrntsVal<'a, O> = &'a GenericArray<
+    GenericArray<u8, <O as OWFParameters>::LAMBDA>,
+    <O as OWFParameters>::LAMBDALBYTES,
+>;
 
 const fn inverse_rotate_word(r: usize, rotate: bool) -> usize {
     if rotate {
@@ -183,6 +184,7 @@ fn round_with_save<O>(
 }
 
 type OWFField<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
+type OWFHasher<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher;
 
 fn aes_key_exp_fwd<O>(
     w: &GenericArray<u8, O::LKEBytes>,
@@ -230,9 +232,9 @@ where
 
 fn aes_key_exp_bkwd<O>(
     x: &GenericArray<u8, O::DIFFLKELAMBDABytes>,
-    x_0: &GenericArray<OWFField<O>, O::DIFFLKELAMBDA>,
+    x_tag: &GenericArray<OWFField<O>, O::DIFFLKELAMBDA>,
     xk: &GenericArray<u8, O::PRODRUN128Bytes>,
-    xk_0: &GenericArray<OWFField<O>, O::PRODRUN128>,
+    xk_tag: &GenericArray<OWFField<O>, O::PRODRUN128>,
 ) -> (
     Box<GenericArray<u8, O::SKE>>,
     Box<GenericArray<OWFField<O>, Prod<O::SKE, U8>>>,
@@ -241,38 +243,38 @@ where
     O: OWFParameters,
 {
     let mut y = GenericArray::default_boxed();
-    let mut y_0 = GenericArray::default_boxed();
+    let mut y_tag = GenericArray::default_boxed();
 
-    let mut i_wd = 0;
+    let mut iwd = 0;
 
-    let rcon_evry = 4 * (O::LAMBDA::USIZE / 8);
+    let rcon_evry = 4 * (O::LAMBDA::USIZE / 128);
 
     for j in 0..O::SKE::USIZE {
         // Step 7
-        let mut xt = x[j] ^ xk[i_wd / 8 + (j % 4)];
+        let mut x_tilde = x[j] ^ xk[iwd / 8 + (j % 4)];
 
         let xt_0: GenericArray<OWFField<O>, U8> = (0..8)
-            .map(|i| x_0[8 * j + i] + xk_0[i_wd + 8 * (j % 4) + i])
+            .map(|i| x_tag[8 * j + i] + xk_tag[iwd + 8 * (j % 4) + i])
             .collect();
 
         // Step 8
         if j % rcon_evry == 0 {
-            xt ^= RCON_TABLE[j / rcon_evry];
+            x_tilde ^= RCON_TABLE[j / rcon_evry];
         }
 
-        inverse_affine_byte::<O>(xt, &xt_0, &mut y[j], &mut y_0[8 * j..8 * j + 8]);
+        inverse_affine_byte::<O>(x_tilde, &xt_0, &mut y[j], &mut y_tag[8 * j..8 * j + 8]);
 
         // Step 12
         if j % 4 == 3 {
             if O::LAMBDA::USIZE != 256 {
-                i_wd += O::LAMBDA::USIZE;
+                iwd += O::LAMBDA::USIZE;
             } else {
-                i_wd += 128;
+                iwd += 128;
             }
         }
     }
 
-    (y, y_0)
+    (y, y_tag)
 }
 
 fn inverse_affine_byte<O>(
@@ -290,7 +292,19 @@ fn inverse_affine_byte<O>(
     }
 }
 
+use itertools::multiunzip;
+
+#[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
+pub(crate) struct FieldCommitDegTwo<F>
+where
+    F: BigGaloisField,
+{
+    pub(crate) key: F,
+    pub(crate) tag: F,
+}
+
 fn aes_key_exp_cstrnts_prover<O>(
+    zk_hasher: &mut ZKProofHasher<OWFField<O>>,
     w: &GenericArray<u8, O::LKEBytes>,
     w_tag: &GenericArray<OWFField<O>, O::LKE>,
 ) -> (
@@ -311,75 +325,70 @@ where
         &k_tag,
     );
 
-    let mut i_wd = 32 * (O::NK::USIZE - 1);
+    let mut iwd = 32 * (O::NK::USIZE - 1);
 
     let mut do_rot_word = true;
 
     // Step 7
-    for j in 0..O::SKE::USIZE / 4 {
-        // Step 8
-        let (mut k_hat, mut k_hat_tag) = (
-            GenericArray::<OWFField<O>, U4>::default(),
-            GenericArray::<OWFField<O>, U4>::default(),
-        );
-        let (mut k_hat_sq, mut k_hat_tag_sq) = (
-            GenericArray::<OWFField<O>, U4>::default(),
-            GenericArray::<OWFField<O>, U4>::default(),
-        );
-        let (mut w_hat, mut w_hat_tag) = (
-            GenericArray::<OWFField<O>, U4>::default(),
-            GenericArray::<OWFField<O>, U4>::default(),
-        );
-        let (mut w_hat_sq, mut w_hat_tag_sq) = (
-            GenericArray::<OWFField<O>, U4>::default(),
-            GenericArray::<OWFField<O>, U4>::default(),
-        );
+    // TODO: is it really more efficient than initializing 4 GenericArrays and copying values?
+    let (k_hat, k_hat_sq, w_hat, w_hat_sq): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) =
+        multiunzip(iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
+            // Step 11
+            let r_prime_inv = if do_rot_word { (4 + r - 3) % 4 } else { r };
 
-        for r in 0..4 {
-            let r_prime = if do_rot_word { (r + 3) % 4 } else { r };
+            // Step 12
+            // k_hat[(r+3) mod 3] = k[r] <=> k_hat[r] = k[(r-3) mod 3]
+            let k_hat = FieldCommitDegTwo {
+                key: OWFField::<O>::byte_combine_bits(k[iwd / 8 + r_prime_inv]),
+                tag: OWFField::<O>::byte_combine_slice(
+                    &k_tag[iwd + 8 * r_prime_inv..iwd + 8 * r_prime_inv + 8],
+                ),
+            };
 
-            // Steps 12-15
-            k_hat[r_prime] = OWFField::<O>::byte_combine_bits(k[i_wd / 8 + r]);
-            k_hat_sq[r_prime] = square_and_combine_bits(k[i_wd / 8 + r]);
-            
-            
-            w_hat[r] = OWFField::<O>::byte_combine_bits(w_flat[4 * j + r]);
-            w_hat_sq[r] = square_and_combine_bits(w_flat[4 * j + r]);
-            
+            // Step 13
+            let k_hat_sq = FieldCommitDegTwo {
+                key: square_and_combine_bits(k[iwd / 8 + r_prime_inv]),
+                tag: square_and_combine(&k_tag[iwd + 8 * r_prime_inv..iwd + 8 * r_prime_inv + 8]),
+            };
 
-            k_hat_tag[r_prime] = OWFField::<O>::byte_combine_slice(&k_tag[i_wd + 8 * r..i_wd + 8 * r + 8]);
-            k_hat_tag_sq[r_prime] = square_and_combine(&k_tag[i_wd + 8 * r..i_wd + 8 * r + 8]);
-            
+            // Step 14
+            let w_hat = FieldCommitDegTwo {
+                key: OWFField::<O>::byte_combine_bits(w_flat[4 * j + r]),
+                tag: OWFField::<O>::byte_combine_slice(
+                    &w_flat_tag[32 * j + 8 * r..32 * j + 8 * r + 8],
+                ),
+            };
 
-            w_hat_tag[r] =
-                OWFField::<O>::byte_combine_slice(&w_flat_tag[32 * j + 8 * r..32 * j + 8 * r + 8]);
-            w_hat_tag_sq[r_prime] = square_and_combine(&w_flat_tag[32 * j + 8 * r..32 * j + 8 * r + 8]);
-        }
+            // Step 15
+            let w_hat_sq = FieldCommitDegTwo {
+                key: square_and_combine_bits(w_flat[4 * j + r]),
+                tag: square_and_combine(&w_flat_tag[32 * j + 8 * r..32 * j + 8 * r + 8]),
+            };
 
-        // Step 16
-        if O::LAMBDA::USIZE == 256 {
-            do_rot_word = !do_rot_word;
-        }
+            if r == 3 {
+                // Step 16
+                if O::LAMBDA::USIZE == 256 {
+                    do_rot_word = !do_rot_word;
+                }
 
-        // Step 17
-        for r in 0..4 {
-            
-            let z = k_hat_sq[r] * w_hat[r] - k_hat[r];
-            println!("{:?}", z);  
-            // assert_eq!(z, <OWFField<O> as Field>::ZERO);
+                // Step 21
+                if O::LAMBDA::USIZE == 192 {
+                    iwd += 192;
+                } else {
+                    iwd += 128;
+                }
+            }
 
-            let z = k_hat[r] * w_hat_sq[r] - w_hat[r];
-            println!("{:?}\n\n", z);  
+            (k_hat, k_hat_sq, w_hat, w_hat_sq)
+        }));
 
-            // assert_eq!(z, <OWFField<O> as Field>::ZERO);
-        }
-
-        if O::LAMBDA::USIZE == 192 {
-            i_wd += 192;
-        } else {
-            i_wd += 128;
-        }
-    }
+    // Steps 19-20 (directly update zk_hahser with constraints)
+    zk_hasher.lift_and_process(
+        k_hat.into_iter(),
+        k_hat_sq.into_iter(),
+        w_hat.into_iter(),
+        w_hat_sq.into_iter(),
+    );
 
     (k, k_tag)
 }
@@ -439,363 +448,90 @@ where
     F::byte_combine(&sq)
 }
 
-// fn aes_key_exp_cstrnts_mkey0<O>(
-//     zk_hasher: &mut ZKProofHasher<Field<O>>,
-//     w: &GenericArray<u8, O::LKEBytes>,
-//     v: &GenericArray<Field<O>, O::LKE>,
-// ) -> KeyCstrnts<O>
-// where
-//     O: OWFParameters,
-// {
-//     let k = aes_key_exp_fwd_1::<O>(w);
-//     let vk = aes_key_exp_fwd::<O>(v);
-//     let w_b = aes_key_exp_bwd_mtag0_mkey0::<O>(w, &k);
-//     let v_w_b = aes_key_exp_bwd_mtag1_mkey0::<O>(&v[O::LAMBDA::USIZE..], &vk);
+#[allow(unused)]
+fn owf_constraints<O>(
+    zk_hasher: &mut ZKProofHasher<OWFField<O>>,
+    w: &GenericArray<u8, O::LBYTES>,
+    w_tag: &GenericArray<OWFField<O>, O::L>,
+    pk: &PublicKey<O>,
+) where
+    O: OWFParameters,
+    <<O as OWFParameters>::BaseParams as BaseParameters>::Field: PartialEq,
+{
+    let PublicKey {
+        owf_input,
+        owf_output,
+    } = pk;
 
-//     zk_hasher.process(
-//         iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
-//             let iwd = 32 * (O::NK::USIZE - 1) + j * if O::LAMBDA::USIZE == 192 { 192 } else { 128 };
-//             let dorotword = !(O::LAMBDA::USIZE == 256 && j % 2 == 1);
-//             Field::<O>::byte_combine_bits(k[iwd / 8 + inverse_rotate_word(r, dorotword)])
-//         }),
-//         iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
-//             let iwd = 32 * (O::NK::USIZE - 1) + j * if O::LAMBDA::USIZE == 192 { 192 } else { 128 };
-//             let dorotword = !(O::LAMBDA::USIZE == 256 && j % 2 == 1);
-//             let r = inverse_rotate_word(r, dorotword);
-//             Field::<O>::byte_combine_slice(&vk[iwd + (8 * r)..iwd + (8 * r) + 8])
-//         }),
-//         w_b,
-//         v_w_b,
-//     );
+    let in_keys = owf_input.clone();
 
-//     (k, vk)
-// }
+    println!("before: {:?}", zk_hasher);
 
-// fn aes_key_exp_cstrnts_mkey1<O>(
-//     zk_hasher: &mut ZKVerifyHasher<Field<O>>,
-//     q: &GenericArray<Field<O>, O::LKE>,
-//     delta: &Field<O>,
-// ) -> Box<GenericArray<Field<O>, <O as OWFParameters>::PRODRUN128>>
-// where
-//     O: OWFParameters,
-// {
-//     let q_k = aes_key_exp_fwd::<O>(q);
-//     let q_w_b = aes_key_exp_bwd_mtag0_mkey1::<O>(q, &q_k, delta);
+    let (k, k_tag) = aes_key_exp_cstrnts_prover::<O>(
+        zk_hasher,
+        GenericArray::from_slice(&w[..O::LKEBytes::USIZE]),
+        GenericArray::from_slice(&w_tag[..O::LKE::USIZE]),
+    );
 
-//     zk_hasher.process(
-//         q_w_b,
-//         iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
-//             let iwd = 32 * (O::NK::USIZE - 1) + j * if O::LAMBDA::USIZE == 192 { 192 } else { 128 };
-//             let dorotword = !(O::LAMBDA::USIZE == 256 && j % 2 == 1);
-//             let rotated_r = inverse_rotate_word(r, dorotword);
-//             Field::<O>::byte_combine_slice(&q_k[iwd + (8 * rotated_r)..iwd + (8 * rotated_r) + 8])
-//         }),
-//     );
+    println!("after: {:?}", zk_hasher);
 
-//     q_k
-// }
+    // TODO: consider EM mode
 
-// fn aes_enc_fwd_mkey0_mtag0<'a, O>(
-//     x: &'a GenericArray<u8, O::QUOTLENC8>,
-//     xk: &'a GenericArray<u8, O::PRODRUN128Bytes>,
-//     input: &'a [u8; 16],
-// ) -> impl Iterator<Item = Field<O>> + 'a
-// where
-//     O: OWFParameters,
-// {
-//     (0..16)
-//         .map(|i| {
-//             // Step 2-5
-//             Field::<O>::byte_combine_bits(input[i]) + Field::<O>::byte_combine_bits(xk[i])
-//         })
-//         .chain(
-//             iproduct!(1..O::R::USIZE, 0..4)
-//                 .map(move |(j, c)| {
-//                     // Step 6
-//                     let ix: usize = 128 * (j - 1) + 32 * c;
-//                     let ik: usize = 128 * j + 32 * c;
-//                     let x_hat: [_; 4] =
-//                         array::from_fn(|r| Field::<O>::byte_combine_bits(x[ix / 8 + r]));
-//                     let mut res: [_; 4] =
-//                         array::from_fn(|r| Field::<O>::byte_combine_bits(xk[ik / 8 + r]));
+    todo!("Implement encrypt constraints")
+}
 
-//                     // Step 16
-//                     res[0] += x_hat[0] * Field::<O>::BYTE_COMBINE_2
-//                         + x_hat[1] * Field::<O>::BYTE_COMBINE_3
-//                         + x_hat[2]
-//                         + x_hat[3];
-//                     res[1] += x_hat[0]
-//                         + x_hat[1] * Field::<O>::BYTE_COMBINE_2
-//                         + x_hat[2] * Field::<O>::BYTE_COMBINE_3
-//                         + x_hat[3];
-//                     res[2] += x_hat[0]
-//                         + x_hat[1]
-//                         + x_hat[2] * Field::<O>::BYTE_COMBINE_2
-//                         + x_hat[3] * Field::<O>::BYTE_COMBINE_3;
-//                     res[3] += x_hat[0] * Field::<O>::BYTE_COMBINE_3
-//                         + x_hat[1]
-//                         + x_hat[2]
-//                         + x_hat[3] * Field::<O>::BYTE_COMBINE_2;
-//                     res
-//                 })
-//                 .flatten(),
-//         )
-// }
+#[allow(unused)]
+pub(crate) fn aes_prove<O>(
+    w: &GenericArray<u8, O::LBYTES>,
+    u: &GenericArray<u8, O::LAMBDABYTESTWO>,
+    v: CstrntsVal<O>,
+    pk: &PublicKey<O>,
+    chall_2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
+) -> QSProof<O>
+where
+    O: OWFParameters,
+{
+    let mut zk_hasher =
+        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_proof_hasher(
+            chall_2,
+        );
 
-// fn aes_enc_fwd_mkey1_mtag0<'a, O>(
-//     x: &'a GenericArray<Field<O>, O::LENC>,
-//     xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
-//     input: &'a [u8; 16],
-//     delta: &'a Field<O>,
-// ) -> impl Iterator<Item = Field<O>> + 'a
-// where
-//     O: OWFParameters,
-// {
-//     (0..16)
-//         .map(|i| {
-//             // Step 2-5
-//             bit_combine_with_delta::<O>(input[i], delta)
-//                 + Field::<O>::byte_combine_slice(&xk[8 * i..(8 * i) + 8])
-//         })
-//         .chain(
-//             iproduct!(1..O::R::USIZE, 0..4)
-//                 .map(move |(j, c)| {
-//                     // Step 6
-//                     let ix: usize = 128 * (j - 1) + 32 * c;
-//                     let ik: usize = 128 * j + 32 * c;
-//                     let x_hat: [_; 4] = array::from_fn(|r| {
-//                         Field::<O>::byte_combine_slice(&x[ix + 8 * r..ix + 8 * r + 8])
-//                     });
-//                     let mut res: [_; 4] = array::from_fn(|r| {
-//                         Field::<O>::byte_combine_slice(&xk[ik + 8 * r..ik + 8 * r + 8])
-//                     });
+    // Step 1:
+    // let w_tag: GenericArray<OWFField<O>, O::L> = v
+    //     .iter()
+    //     .take(O::LBYTES::USIZE)
+    //     .map(|v_i| [OWFField::<O>::from(v_i.as_slice())])
+    //     .collect();
 
-//                     // Step 16
-//                     res[0] += x_hat[0] * Field::<O>::BYTE_COMBINE_2
-//                         + x_hat[1] * Field::<O>::BYTE_COMBINE_3
-//                         + x_hat[2]
-//                         + x_hat[3];
-//                     res[1] += x_hat[0]
-//                         + x_hat[1] * Field::<O>::BYTE_COMBINE_2
-//                         + x_hat[2] * Field::<O>::BYTE_COMBINE_3
-//                         + x_hat[3];
-//                     res[2] += x_hat[0]
-//                         + x_hat[1]
-//                         + x_hat[2] * Field::<O>::BYTE_COMBINE_2
-//                         + x_hat[3] * Field::<O>::BYTE_COMBINE_3;
-//                     res[3] += x_hat[0] * Field::<O>::BYTE_COMBINE_3
-//                         + x_hat[1]
-//                         + x_hat[2]
-//                         + x_hat[3] * Field::<O>::BYTE_COMBINE_2;
-//                     res
-//                 })
-//                 .flatten(),
-//         )
-// }
+    // TODO: modify vole to return V as a LHAT * LAMBDABYTES instead of LHATBYTES * LAMBDA
+    let w_tag: GenericArray<OWFField<O>, O::L> = (0..O::LBYTES::USIZE)
+        .flat_map(|row| {
+            let mut ret = vec![GenericArray::<u8, O::LAMBDABYTES>::default(); 8];
 
-// fn aes_enc_fwd_mkey0_mtag1<'a, O>(
-//     x: &'a GenericArray<Field<O>, O::LENC>,
-//     xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
-// ) -> impl Iterator<Item = Field<O>> + 'a
-// where
-//     O: OWFParameters,
-// {
-//     (0..16)
-//         .map(|i| {
-//             // Step 2-5
-//             Field::<O>::byte_combine_slice(&xk[8 * i..(8 * i) + 8])
-//         })
-//         .chain(
-//             iproduct!(1..O::R::USIZE, 0..4)
-//                 .map(move |(j, c)| {
-//                     // Step 6
-//                     let ix: usize = 128 * (j - 1) + 32 * c;
-//                     let ik: usize = 128 * j + 32 * c;
-//                     let x_hat: [_; 4] = array::from_fn(|r| {
-//                         Field::<O>::byte_combine_slice(&x[ix + 8 * r..ix + 8 * r + 8])
-//                     });
-//                     let mut res: [_; 4] = array::from_fn(|r| {
-//                         Field::<O>::byte_combine_slice(&xk[ik + 8 * r..ik + 8 * r + 8])
-//                     });
+            (0..O::LAMBDA::USIZE).for_each(|bit_pos| {
+                for i in 0..8 {
+                    ret[i][bit_pos / 8] |= (v[row][bit_pos] & 1 << i) >> bit_pos % 8;
+                }
+            });
 
-//                     // Step 16
-//                     res[0] += x_hat[0] * Field::<O>::BYTE_COMBINE_2
-//                         + x_hat[1] * Field::<O>::BYTE_COMBINE_3
-//                         + x_hat[2]
-//                         + x_hat[3];
-//                     res[1] += x_hat[0]
-//                         + x_hat[1] * Field::<O>::BYTE_COMBINE_2
-//                         + x_hat[2] * Field::<O>::BYTE_COMBINE_3
-//                         + x_hat[3];
-//                     res[2] += x_hat[0]
-//                         + x_hat[1]
-//                         + x_hat[2] * Field::<O>::BYTE_COMBINE_2
-//                         + x_hat[3] * Field::<O>::BYTE_COMBINE_3;
-//                     res[3] += x_hat[0] * Field::<O>::BYTE_COMBINE_3
-//                         + x_hat[1]
-//                         + x_hat[2]
-//                         + x_hat[3] * Field::<O>::BYTE_COMBINE_2;
-//                     res
-//                 })
-//                 .flatten(),
-//         )
-// }
+            ret.into_iter()
+                .map(|r_i| OWFField::<O>::from(r_i.as_slice()))
+        })
+        .collect();
 
-// fn aes_enc_bkwd_mkey0_mtag0<'a, O>(
-//     x: &'a GenericArray<u8, O::QUOTLENC8>,
-//     xk: &'a GenericArray<u8, O::PRODRUN128Bytes>,
-//     out: &'a [u8; 16],
-// ) -> impl Iterator<Item = Field<O>> + 'a
-// where
-//     O: OWFParameters,
-// {
-//     // Step 2
-//     iproduct!(0..O::R::USIZE, 0..4, 0..4).map(move |(j, c, k)| {
-//         // Step 4
-//         let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
-//         let x_t = if j < O::R::USIZE - 1 {
-//             x[ird / 8]
-//         } else {
-//             let x_out = out[(ird - 128 * j) / 8];
-//             x_out ^ xk[(128 + ird) / 8]
-//         };
-//         let y_t = x_t.rotate_right(7) ^ x_t.rotate_right(5) ^ x_t.rotate_right(2) ^ 0x5;
-//         Field::<O>::byte_combine_bits(y_t)
-//     })
-// }
+    // Step 6
+    let u0_star = OWFField::<O>::from(&u[..O::LAMBDABYTES::USIZE]);
+    let u1_star = OWFField::<O>::from(&u[O::LAMBDABYTES::USIZE..]);
 
-// fn aes_enc_bkwd_mkey1_mtag0<'a, O>(
-//     x: &'a GenericArray<Field<O>, O::LENC>,
-//     xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
-//     out: &'a [u8; 16],
-//     delta: &'a Field<O>,
-// ) -> impl Iterator<Item = Field<O>> + 'a
-// where
-//     O: OWFParameters,
-// {
-//     // Step 2
-//     iproduct!(0..O::R::USIZE, 0..4, 0..4).map(move |(j, c, k)| {
-//         // Step 4
-//         let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
-//         let x_t: [_; 8] = if j < O::R::USIZE - 1 {
-//             array::from_fn(|i| x[ird + i])
-//         } else {
-//             array::from_fn(|i| {
-//                 *delta * ((out[(ird - 128 * j + i) / 8] >> ((ird - 128 * j + i) % 8)) & 1)
-//                     + xk[128 + ird + i]
-//             })
-//         };
-//         let mut y_t = array::from_fn(|i| x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8]);
-//         y_t[0] += delta;
-//         y_t[2] += delta;
-//         Field::<O>::byte_combine(&y_t)
-//     })
-// }
+    // TODO: compute v0_star, v1_star
+    owf_constraints::<O>(&mut zk_hasher, w, &w_tag, pk);
 
-// fn aes_enc_bkwd_mkey0_mtag1<'a, O>(
-//     x: &'a GenericArray<Field<O>, O::LENC>,
-//     xk: &'a GenericArray<Field<O>, O::PRODRUN128>,
-// ) -> impl Iterator<Item = Field<O>> + 'a
-// where
-//     O: OWFParameters,
-// {
-//     // Step 2
-//     iproduct!(0..O::R::USIZE, 0..4, 0..4).map(move |(j, c, k)| {
-//         // Step 4
-//         let ird = 128 * j + 32 * ((c + 4 - k) % 4) + 8 * k;
-//         let x_t = if j < O::R::USIZE - 1 {
-//             &x[ird..ird + 8]
-//         } else {
-//             &xk[128 + ird..136 + ird]
-//         };
-//         let y_t = array::from_fn(|i| x_t[(i + 7) % 8] + x_t[(i + 5) % 8] + x_t[(i + 2) % 8]);
-//         Field::<O>::byte_combine(&y_t)
-//     })
-// }
+    // let u_s = Field::<O>::from(&u[O::LBYTES::USIZE..]);
+    // let v_s = Field::<O>::sum_poly(&new_v[O::L::USIZE..O::L::USIZE + O::LAMBDA::USIZE]);
+    // let (a_t, b_t) = zk_hasher.finalize(&u_s, &v_s);
 
-// fn aes_enc_cstrnts_mkey0<O>(
-//     zk_hasher: &mut ZKProofHasher<Field<O>>,
-//     input: &[u8; 16],
-//     output: &[u8; 16],
-//     w: &GenericArray<u8, O::QUOTLENC8>,
-//     v: &GenericArray<Field<O>, O::LENC>,
-//     k: &GenericArray<u8, O::PRODRUN128Bytes>,
-//     vk: &GenericArray<Field<O>, O::PRODRUN128>,
-// ) where
-//     O: OWFParameters,
-// {
-//     let s = aes_enc_fwd_mkey0_mtag0::<O>(w, k, input);
-//     let vs = aes_enc_fwd_mkey0_mtag1::<O>(v, vk);
-//     let s_b = aes_enc_bkwd_mkey0_mtag0::<O>(w, k, output);
-//     let v_s_b = aes_enc_bkwd_mkey0_mtag1::<O>(v, vk);
-//     zk_hasher.process(s, vs, s_b, v_s_b);
-// }
-
-// fn aes_enc_cstrnts_mkey1<O>(
-//     zk_hasher: &mut ZKVerifyHasher<Field<O>>,
-//     input: &[u8; 16],
-//     output: &[u8; 16],
-//     q: &GenericArray<Field<O>, O::LENC>,
-//     qk: &GenericArray<Field<O>, O::PRODRUN128>,
-//     delta: &Field<O>,
-// ) where
-//     O: OWFParameters,
-// {
-//     let qs = aes_enc_fwd_mkey1_mtag0::<O>(q, qk, input, delta);
-//     let q_s_b = aes_enc_bkwd_mkey1_mtag0::<O>(q, qk, output, delta);
-//     zk_hasher.process(qs, q_s_b);
-// }
-
-// // Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
-// pub(crate) fn aes_prove<O>(
-//     w: &GenericArray<u8, O::LBYTES>,
-//     u: &GenericArray<u8, O::LAMBDALBYTES>,
-//     gv: CstrntsVal<O>,
-//     pk: &PublicKey<O>,
-//     chall: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
-// ) -> QSProof<O>
-// where
-//     O: OWFParameters,
-// {
-//     let new_v = transpose_and_into_field::<O>(gv);
-
-//     let mut zk_hasher =
-//         <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_proof_hasher(chall);
-
-//     let (k, vk) = aes_key_exp_cstrnts_mkey0::<O>(
-//         &mut zk_hasher,
-//         GenericArray::from_slice(&w[..O::LKE::USIZE / 8]),
-//         GenericArray::from_slice(&new_v[..O::LKE::USIZE]),
-//     );
-
-//     aes_enc_cstrnts_mkey0::<O>(
-//         &mut zk_hasher,
-//         pk.owf_input[..16].try_into().unwrap(),
-//         pk.owf_output[..16].try_into().unwrap(),
-//         GenericArray::from_slice(&w[O::LKE::USIZE / 8..(O::LKE::USIZE + O::LENC::USIZE) / 8]),
-//         GenericArray::from_slice(&new_v[O::LKE::USIZE..O::LKE::USIZE + O::LENC::USIZE]),
-//         &k,
-//         &vk,
-//     );
-
-//     if O::LAMBDA::USIZE > 128 {
-//         aes_enc_cstrnts_mkey0::<O>(
-//             &mut zk_hasher,
-//             pk.owf_input[16..].try_into().unwrap(),
-//             pk.owf_output[16..].try_into().unwrap(),
-//             GenericArray::from_slice(&w[(O::LKE::USIZE + O::LENC::USIZE) / 8..O::LBYTES::USIZE]),
-//             GenericArray::from_slice(&new_v[(O::LKE::USIZE + O::LENC::USIZE)..O::L::USIZE]),
-//             &k,
-//             &vk,
-//         );
-//     }
-
-//     let u_s = Field::<O>::from(&u[O::LBYTES::USIZE..]);
-//     let v_s = Field::<O>::sum_poly(&new_v[O::L::USIZE..O::L::USIZE + O::LAMBDA::USIZE]);
-//     let (a_t, b_t) = zk_hasher.finalize(&u_s, &v_s);
-
-//     (a_t.as_bytes(), b_t.as_bytes())
-// }
+    todo!("Implement OWF constraints")
+}
 
 // // Bits are represented as bytes : each times we manipulate bit data, we divide length by 8
 // #[allow(clippy::too_many_arguments)]
@@ -996,12 +732,17 @@ mod test {
             13, 82, 162, 103, 23, 102, 56,
         ]);
 
+        let exp = GenericArray::from_array([
+            194, 115, 166, 150, 184, 94, 43, 2, 223, 176, 186, 125, 63, 53, 49, 85, 187, 227, 202,
+            24, 84, 247, 130, 118, 199, 144, 127, 52, 203, 152, 167, 170, 148, 142, 159, 152, 253,
+            243, 159, 11,
+        ]);
         let w_tags = GenericArray::default();
         let k_tags = GenericArray::default();
 
         let res = aes_key_exp_bkwd::<OWF128>(&w, &w_tags, &k, &k_tags);
 
-        println!("{:?}", res.0);
+        assert_eq!(exp, *res.0);
     }
 
     #[test]
@@ -1021,9 +762,11 @@ mod test {
             0x57, 0x1a, 0xea, 0x65, 0x19, 0xce,
         ]);
 
-        println!("{}", w.len());
         let lke = <OWF128 as OWFParameters>::LKEBytes::USIZE;
+        let mut hasher = ZKHasher::<GF128>::new_zk_hasher(&GenericArray::default());
+        let mut hasher = ZKProofHasher::<GF128>::new(hasher.clone(), hasher.clone(), hasher);
         aes_key_exp_cstrnts_prover::<OWF128>(
+            &mut hasher,
             GenericArray::from_slice(&w[..lke]),
             &GenericArray::default(),
         );

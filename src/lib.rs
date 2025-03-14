@@ -71,14 +71,14 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 mod aes;
 // mod em;
-// mod faest;
+mod bavc;
+mod faest;
 mod fields;
-// mod internal_keys;
+mod internal_keys;
 mod parameter;
 mod prg;
 mod random_oracles;
 mod rijndael_32;
-mod bavc;
 mod universal_hashing;
 mod utils;
 mod vole;

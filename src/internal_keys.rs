@@ -46,19 +46,15 @@ where
             let owf_input = GenericArray::from_slice(&bytes[..O::InputSize::USIZE]);
             let owf_key = GenericArray::from_slice(&bytes[O::InputSize::USIZE..]);
 
-            O::extendwitness(owf_key, owf_input)
-                .map(|_| {
-                    let mut owf_output = GenericArray::default();
-                    O::evaluate_owf(owf_key, owf_input, &mut owf_output);
-                    Self {
-                        owf_key: owf_key.clone(),
-                        pk: PublicKey {
-                            owf_input: owf_input.clone(),
-                            owf_output,
-                        },
-                    }
-                })
-                .ok_or_else(Error::new)
+            let mut owf_output = GenericArray::default();
+            O::evaluate_owf(owf_key, owf_input, &mut owf_output);
+            Ok(Self {
+                owf_key: owf_key.clone(),
+                pk: PublicKey {
+                    owf_input: owf_input.clone(),
+                    owf_output,
+                },
+            })
         } else {
             Err(Error::new())
         }
