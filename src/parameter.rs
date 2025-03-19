@@ -21,7 +21,8 @@ use generic_array::{
 use rand_core::RngCore;
 
 use crate::{
-    aes::{aes_extendedwitness, aes_prove, CstrntsVal},
+    zk_constraints::{CstrntsVal, aes_prove},
+    witness::aes_extendedwitness,
     bavc::{
         BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast, BAVC192FastEM,
         BAVC192Small, BAVC192SmallEM, BAVC256Fast, BAVC256FastEM, BAVC256Small, BAVC256SmallEM,
@@ -152,11 +153,12 @@ pub(crate) type QSProof<O> = (
     <<O as OWFParameters>::BaseParams as BaseParameters>::Field,
 );
 
+
 pub(crate) trait OWFParameters: Sized {
     // Base parameters of the OWF
     type BaseParams: BaseParameters<Lambda = Self::LAMBDA, LambdaBytes = Self::LAMBDABYTES>;
     /// The input (= output) size of the OWF (in bytes)
-    type InputSize: ArrayLength;
+    type InputSize: ArrayLength + Mul<U8, Output: ArrayLength>;
 
     type B: ArrayLength;
     type LAMBDA: ArrayLength;
@@ -167,25 +169,28 @@ pub(crate) trait OWFParameters: Sized {
     type LAMBDABYTESTWO: ArrayLength + Add<Self::LBYTES, Output = Self::LAMBDALBYTES>;
 
     type L: ArrayLength;
-    type LBYTES: ArrayLength;
-    type LHATBYTES: ArrayLength;
+    type LBYTES: ArrayLength + Mul<U8, Output: ArrayLength>;
+    type LHATBYTES: ArrayLength + Mul<U8, Output: ArrayLength>;
 
     type BETA: ArrayLength;
     type NK: ArrayLength;
     type R: ArrayLength;
     type SKE: ArrayLength + Mul<U8, Output: ArrayLength>;
     type LKE: ArrayLength;
-    type LKEBytes: ArrayLength;
+    type LKEBytes: ArrayLength + Mul<U8, Output: ArrayLength>;
     type LENC: ArrayLength;
-    type NST: ArrayLength;
+    type LENCBytes: ArrayLength + Mul<U8, Output: ArrayLength>;
+    type NST: ArrayLength + Mul<U4, Output = Self::NSTBytes>;
+    type NSTBytes: ArrayLength + Mul<U8, Output = Self::NSTBits>;
+    type NSTBits: ArrayLength + Mul<U4, Output: ArrayLength>;
     type NLeafCommit: ArrayLength;
-    type LAMBDALBYTES: ArrayLength;
+    type LAMBDALBYTES: ArrayLength + Mul<U8, Output: ArrayLength>;
 
-    type PRODRUN128Bytes: ArrayLength;
+    type PRODRUN128Bytes: ArrayLength + Mul<U8, Output = Self::PRODRUN128>;
     type PRODRUN128: ArrayLength;
 
     type DIFFLKELAMBDA: ArrayLength;
-    type DIFFLKELAMBDABytes: ArrayLength;
+    type DIFFLKELAMBDABytes: ArrayLength + Mul<U8, Output: ArrayLength>;
 
     type SK: ArrayLength;
     type PK: ArrayLength;
@@ -277,7 +282,10 @@ impl OWFParameters for OWF128 {
     type LKE = U448;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U832;
+    type LENCBytes = Quot<Self::LENC, U8>;
     type NST = U4;
+    type NSTBytes = Prod<Self::NST, U4>;
+    type NSTBits = Prod<Self::NSTBytes, U8>;
     type NLeafCommit = U3;
     type LAMBDALBYTES = Sum<Self::LAMBDABYTESTWO, Self::LBYTES>;
 
@@ -368,7 +376,10 @@ impl OWFParameters for OWF192 {
     type LKE = U448;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U1024;
+    type LENCBytes = Quot<Self::LENC, U8>;
     type NST = U4;
+    type NSTBytes = Prod<Self::NST, U4>;
+    type NSTBits = Prod<Self::NSTBytes, U8>;
     type NLeafCommit = U3;
 
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
@@ -478,7 +489,10 @@ impl OWFParameters for OWF256 {
     type LKE = U672;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U1216;
+    type LENCBytes = Quot<Self::LENC, U8>;
     type NST = U4;
+    type NSTBytes = Prod<Self::NST, U4>;
+    type NSTBits = Prod<Self::NSTBytes, U8>;
     type NLeafCommit = U3;
 
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
@@ -563,12 +577,15 @@ impl OWFParameters for OWF128EM {
 
     type NK = U4;
     type NST = U4;
+    type NSTBytes = Prod<Self::NST, U4>;
+    type NSTBits = Prod<Self::NSTBytes, U8>;
     type R = U10;
     type SKE = U44;
     type BETA = U1;
     type LKE = U128;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U832;
+    type LENCBytes = Quot<Self::LENC, U8>;
     type NLeafCommit = U2;
 
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
@@ -650,12 +667,15 @@ impl OWFParameters for OWF192EM {
 
     type NK = U6;
     type NST = U6;
+    type NSTBytes = Prod<Self::NST, U4>;
+    type NSTBits = Prod<Self::NSTBytes, U8>;
     type BETA = U1;
     type R = U12;
     type SKE = U52;
     type LKE = U192;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U1536;
+    type LENCBytes = Quot<Self::LENC, U8>;
     type NLeafCommit = U2;
 
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
@@ -736,12 +756,15 @@ impl OWFParameters for OWF256EM {
 
     type NK = U8;
     type NST = U8;
+    type NSTBytes = Prod<Self::NST, U4>;
+    type NSTBits = Prod<Self::NSTBytes, U8>;
     type BETA = U1;
     type R = U14;
     type SKE = U60;
     type LKE = U448;
     type LKEBytes = Quot<Self::LKE, U8>;
     type LENC = U1536;
+    type LENCBytes = Quot<Self::LENC, U8>;
     type NLeafCommit = U2;
 
     type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;

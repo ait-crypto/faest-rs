@@ -13,10 +13,7 @@ use generic_array::{
 };
 use itertools::{chain, izip};
 
-use crate::{
-    aes::FieldCommitDegTwo,
-    fields::{BigGaloisField, Field, GF128, GF192, GF256, GF384, GF576, GF64, GF768},
-};
+use crate::fields::{field_commitment::{FieldCommitDegOne, FieldCommitDegThree}, BigGaloisField, Field, GF128, GF192, GF256, GF384, GF576, GF64, GF768};
 
 type BBits = U16;
 // Additional bytes returned by VOLE hash
@@ -263,12 +260,26 @@ where
         }
     }
 
+    pub(crate) fn update(&mut self, val: &FieldCommitDegThree<F>){
+        // Degree 0
+        self.a0_hasher.update(&val.tag[0]);
+        // Degree 1
+        self.a1_hasher.update(&val.tag[1]);
+        // Degree 2
+        self.a2_hasher.update(&val.tag[2]);
+
+        // Should be a commitment to 0
+        // debug_assert_eq!(val.key, F::ZERO);
+        println!("{:?}", val.key);
+    }
+
+
     pub(crate) fn lift_and_process<I1, I2, I3, I4>(&mut self, a: I1, a_sq: I2, b: I3, b_sq: I4)
     where
-        for<'a> I1: Iterator<Item = FieldCommitDegTwo<F>>,
-        for<'a> I2: Iterator<Item = FieldCommitDegTwo<F>>,
-        for<'a> I3: Iterator<Item = FieldCommitDegTwo<F>>,
-        for<'a> I4: Iterator<Item = FieldCommitDegTwo<F>>,
+        for<'a> I1: Iterator<Item = FieldCommitDegOne<F>>,
+        for<'a> I2: Iterator<Item = FieldCommitDegOne<F>>,
+        for<'a> I3: Iterator<Item = FieldCommitDegOne<F>>,
+        for<'a> I4: Iterator<Item = FieldCommitDegOne<F>>,
     {
         // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
         for (a, a_sq, b, b_sq) in izip!(a, a_sq, b, b_sq) {

@@ -69,8 +69,8 @@ pub use signature::{self, Error, Keypair, Signer, Verifier};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-mod aes;
-// mod em;
+mod zk_constraints;
+mod witness;
 mod bavc;
 mod faest;
 mod fields;
@@ -82,6 +82,7 @@ mod rijndael_32;
 mod universal_hashing;
 mod utils;
 mod vole;
+mod aes;
 
 // use crate::{
 //     faest::{faest_keygen, faest_sign, faest_verify},

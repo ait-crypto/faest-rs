@@ -1,5 +1,7 @@
 pub(crate) mod large_fields;
 pub(crate) mod small_fields;
+pub(crate) mod field_commitment;
+
 #[cfg(all(
     feature = "opt-simd",
     target_arch = "x86_64",
@@ -19,7 +21,7 @@ pub(crate) use large_fields::{BigGaloisField, ByteCombine, ByteCombineConstants,
     target_feature = "pclmulqdq"
 )))]
 pub(crate) use large_fields::{GF128, GF192, GF256, GF384, GF576, GF768};
-pub(crate) use small_fields::GF64;
+pub(crate) use small_fields::{GF64, GF8};
 #[cfg(all(
     feature = "opt-simd",
     target_feature = "avx2",
