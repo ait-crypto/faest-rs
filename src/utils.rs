@@ -92,6 +92,20 @@ pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> GenericArr
     first_half.chain(second_half).collect()
 }
 
+/// Returns all the individual bits of the input byte
+pub(crate) fn get_bits(byte: u8) -> [u8; 8] {
+    [
+        byte & 1,
+        (byte & 0b10) >> 1,
+        (byte & 0b100) >> 2,
+        (byte & 0b1000) >> 3,
+        (byte & 0b10000) >> 4,
+        (byte & 0b100000) >> 5,
+        (byte & 0b1000000) >> 6,
+        (byte & 0b10000000) >> 7,
+    ]
+}
+
 // pub(crate) type Field<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
 
 // pub(crate) fn transpose_and_into_field<O>(
