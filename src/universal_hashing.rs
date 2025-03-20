@@ -13,7 +13,10 @@ use generic_array::{
 };
 use itertools::{chain, izip};
 
-use crate::fields::{field_commitment::{FieldCommitDegOne, FieldCommitDegThree}, BigGaloisField, Field, GF128, GF192, GF256, GF384, GF576, GF64, GF768};
+use crate::fields::{
+    field_commitment::{FieldCommitDegOne, FieldCommitDegThree},
+    BigGaloisField, Field, GF128, GF192, GF256, GF384, GF576, GF64, GF768,
+};
 
 type BBits = U16;
 // Additional bytes returned by VOLE hash
@@ -260,7 +263,7 @@ where
         }
     }
 
-    pub(crate) fn update(&mut self, val: &FieldCommitDegThree<F>){
+    pub(crate) fn update(&mut self, val: &FieldCommitDegThree<F>) {
         // Degree 0
         self.a0_hasher.update(&val.tag[0]);
         // Degree 1
@@ -272,7 +275,6 @@ where
         // debug_assert_eq!(val.key, F::ZERO);
         println!("{:?}", val.key);
     }
-
 
     pub(crate) fn lift_and_process<I1, I2, I3, I4>(&mut self, a: I1, a_sq: I2, b: I3, b_sq: I4)
     where

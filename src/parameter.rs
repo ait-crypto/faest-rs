@@ -21,8 +21,6 @@ use generic_array::{
 use rand_core::RngCore;
 
 use crate::{
-    zk_constraints::{CstrntsVal, aes_prove},
-    witness::aes_extendedwitness,
     bavc::{
         BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast, BAVC192FastEM,
         BAVC192Small, BAVC192SmallEM, BAVC256Fast, BAVC256FastEM, BAVC256Small, BAVC256SmallEM,
@@ -34,6 +32,8 @@ use crate::{
     random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake256},
     rijndael_32::{Rijndael192, Rijndael256},
     universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
+    witness::aes_extendedwitness,
+    zk_constraints::{aes_prove, CstrntsVal},
 };
 
 pub type GetBytes<BitLen> = Quot<BitLen, U8>;
@@ -152,7 +152,6 @@ pub(crate) type QSProof<O> = (
     <<O as OWFParameters>::BaseParams as BaseParameters>::Field,
     <<O as OWFParameters>::BaseParams as BaseParameters>::Field,
 );
-
 
 pub(crate) trait OWFParameters: Sized {
     // Base parameters of the OWF

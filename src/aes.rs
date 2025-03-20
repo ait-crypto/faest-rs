@@ -155,7 +155,6 @@ where
     };
 
     for c in 0..O::NST::USIZE {
-
         // Save the 4 state's columns that will be modified in this round
         let tmp = GenericArray::<_, U4>::from_slice(&state[4 * c..4 * c + 4]).to_owned();
 

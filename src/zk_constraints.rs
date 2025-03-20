@@ -536,7 +536,6 @@ pub(crate) mod encryption {
                 add_round_key::<O>(&mut state, round_key)
             }
         }
-        
     }
 
     fn aes_round<O, T>(

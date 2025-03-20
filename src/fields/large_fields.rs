@@ -963,84 +963,83 @@ impl Betas for GF192 {
     ];
 }
 
-
-impl Sigmas for GF192{
+impl Sigmas for GF192 {
     const SIGMA: [Self; 9] = [
         Self([
             0x7bf61f19d5633f26b233619e7cf450bau128,
-            0xda933726d491db34u128
+            0xda933726d491db34u128,
         ]),
         Self([
             0x8232e37706328d199c6d2c13f5398a0cu128,
-            0x0c3b0d703c754ef6u128
+            0x0c3b0d703c754ef6u128,
         ]),
         Self([
             0x638227a707652828fb039539490f3262u128,
-            0x7170a38d85840211u128
+            0x7170a38d85840211u128,
         ]),
         Self([
             0x73e093aeb2bd81a26ae66d7cf63a7b42u128,
-            0x0cee234c9f37ab71u128
+            0x0cee234c9f37ab71u128,
         ]),
         Self([
             0x9a46dbc9d4349a17d55dd8b4c0c2e8d5u128,
-            0xa7d899db6d6097d3u128
+            0xa7d899db6d6097d3u128,
         ]),
         Self([
             0x00000000000000000000000000000001u128,
-            0x0000000000000000u128
+            0x0000000000000000u128,
         ]),
         Self([
             0x69ac2c678be3ba5f425244c22e17096eu128,
-            0x8e7e2484040c7d90u128
+            0x8e7e2484040c7d90u128,
         ]),
         Self([
             0x7fb8d6607c39e6061702b39a83f3c8a5u128,
-            0x20dfa416e9086710u128
+            0x20dfa416e9086710u128,
         ]),
         Self([
             0x1d99ac75ae672326831233410b235d20u128,
-            0xced061212ca1ac64u128
+            0xced061212ca1ac64u128,
         ]),
     ];
     const SIGMA_SQUARES: [Self; 9] = [
         Self([
             0x7a5542ab0058d22edd20747cbd2bf75cu128,
-            0x45ec519c94bc1251u128
+            0x45ec519c94bc1251u128,
         ]),
         Self([
             0xf3eaf7ae5fd72048970f9c76eed5e1bbu128,
-            0x29a6bd5f696cea43u128
+            0x29a6bd5f696cea43u128,
         ]),
         Self([
             0x9d93c875430d82cc7efbc24b13ccc7d9u128,
-            0xeb98ff32dafaed56u128
+            0xeb98ff32dafaed56u128,
         ]),
         Self([
             0x786dc5dceb00feddbca4a96550fde7a8u128,
-            0x6c9fc2ff5e921d95u128
+            0x6c9fc2ff5e921d95u128,
         ]),
         Self([
             0x142c7d701c8270aa34d42a414032d13fu128,
-            0x87d213f1272a1544u128
+            0x87d213f1272a1544u128,
         ]),
         Self([
             0x00000000000000000000000000000001u128,
-            0x0000000000000000u128
+            0x0000000000000000u128,
         ]),
         Self([
             0x187438bed206170e4930f4a735fb62d8u128,
-            0xabe394ab5115d925u128
+            0xabe394ab5115d925u128,
         ]),
         Self([
             0x8c5221ce23eec64e800d2fec6d26291fu128,
-            0x0979194980648d53u128
+            0x0979194980648d53u128,
         ]),
         Self([
             0x7596dda0f0bf7471ae536261e4ebf3a8u128,
-            0xdfd1231f68801891u128
+            0xdfd1231f68801891u128,
         ]),
-    ]; 
+    ];
 }
 
 impl ByteCombineConstants for BigGF<u128, 2, 192> {
@@ -1238,81 +1237,81 @@ impl Betas for GF256 {
     ];
 }
 
-impl Sigmas for GF256{
+impl Sigmas for GF256 {
     const SIGMA: [Self; 9] = [
         Self([
             0x2ba5c48d2c42072fa95af52ad52289c0,
-            0x064e4d699c5b4af1d14a0d376c00b0ea
+            0x064e4d699c5b4af1d14a0d376c00b0ea,
         ]),
         Self([
             0x1771831e533b0f5755dab3833f809d1c,
-            0x6195e3db7011f68dfb96573fad3fac10
+            0x6195e3db7011f68dfb96573fad3fac10,
         ]),
         Self([
             0x8748a24b4ab3a892372f5a920b67efff,
-            0xc6737a464da16302214b28089e99af95
+            0xc6737a464da16302214b28089e99af95,
         ]),
         Self([
             0x30611f596cb383ad319800033ca8b976,
-            0x24694604ed0c050dfef404a31149196b
+            0x24694604ed0c050dfef404a31149196b,
         ]),
         Self([
             0xbb9ce5d835caa0eacbaf1c3be1c5fb22,
-            0xa1a8d4f4a1ebdf7e0b9772005fa6b36f
+            0xa1a8d4f4a1ebdf7e0b9772005fa6b36f,
         ]),
         Self([
             0x00000000000000000000000000000001,
-            0x00000000000000000000000000000000
+            0x00000000000000000000000000000000,
         ]),
         Self([
             0x1771831e533b0f5655dab3823f819c28,
-            0x6195e3db7011f68dfb96573fad3fac11
+            0x6195e3db7011f68dfb96573fad3fac11,
         ]),
         Self([
             0xd0350e7dfa862912d0547873524e02b1,
-            0x702cec741ee89ff7da9be967cd26e8d5
+            0x702cec741ee89ff7da9be967cd26e8d5,
         ]),
         Self([
             0x09ff302a864765599020d2d23c10a95b,
-            0xe6d3948d80643e3c009db4ee77215795
+            0xe6d3948d80643e3c009db4ee77215795,
         ]),
     ];
     const SIGMA_SQUARES: [Self; 9] = [
         Self([
             0x752758911a30e3f6de010519b01bcdd4,
-            0x56c24fd64f7688382a0778b6489ea03f
+            0x56c24fd64f7688382a0778b6489ea03f,
         ]),
         Self([
             0xaced66c666f1afbc9e75afb9de44670a,
-            0xc03d372fd1fa29f3f001253ff2991f7e
+            0xc03d372fd1fa29f3f001253ff2991f7e,
         ]),
         Self([
             0x957349b58c0549483fcd7d68defc7727,
-            0x0287e5a6bc9212c20e68957294f15180
+            0x0287e5a6bc9212c20e68957294f15180,
         ]),
         Self([
             0xfedaa2104349c0b0243619206d778eb5,
-            0xd303dd260391524bdf640e1506710a3a
+            0xd303dd260391524bdf640e1506710a3a,
         ]),
         Self([
             0x4cb977e2f0c405027fb9d7c8b0a3ddf8,
-            0x94789d5f221eb309d46ec8fb2ef6eec1
+            0x94789d5f221eb309d46ec8fb2ef6eec1,
         ]),
         Self([
             0x00000000000000000000000000000001,
-            0x00000000000000000000000000000000
+            0x00000000000000000000000000000000,
         ]),
         Self([
             0xaced66c666f1afbd9e75afb8de45663f,
-            0xc03d372fd1fa29f3f001253ff2991f7f
+            0xc03d372fd1fa29f3f001253ff2991f7f,
         ]),
         Self([
             0x7cd868bb9c7786ae4e21d7ca8c0a65ba,
-            0xb011db5bcf12b6042a9acc583fbff7ab
+            0xb011db5bcf12b6042a9acc583fbff7ab,
         ]),
         Self([
             0x400c2f28e30e8ed6b2a1916366a87167,
-            0xd7ca75e923580a7800469650fe80eb51
+            0xd7ca75e923580a7800469650fe80eb51,
         ]),
     ];
 }

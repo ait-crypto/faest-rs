@@ -1,6 +1,6 @@
+pub(crate) mod field_commitment;
 pub(crate) mod large_fields;
 pub(crate) mod small_fields;
-pub(crate) mod field_commitment;
 
 #[cfg(all(
     feature = "opt-simd",
@@ -14,7 +14,7 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use generic_array::{ArrayLength, GenericArray};
 
-pub(crate) use large_fields::{BigGaloisField, ByteCombine, ByteCombineConstants, SumPoly, Sigmas};
+pub(crate) use large_fields::{BigGaloisField, ByteCombine, ByteCombineConstants, Sigmas, SumPoly};
 #[cfg(not(all(
     feature = "opt-simd",
     target_feature = "avx2",

@@ -177,7 +177,6 @@ fn round_with_save<O>(
     }
 }
 
-
 #[cfg(test)]
 mod test {
     #![allow(clippy::needless_range_loop)]
@@ -267,17 +266,14 @@ mod test {
                 }
             }
         }
-
     }
     #[test]
     fn aes_extended_witness_test() {
         let database: Vec<AesExtendedWitness> = read_test_data("AesExtendedWitness.json");
-        
+
         // Tests witness extension both in EM and normal mode
         for data in database {
             assert!(data.test())
         }
-
-
     }
 }

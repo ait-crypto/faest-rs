@@ -184,7 +184,7 @@ where
 }
 
 /// Binary field `2^3`
-pub (crate) type GF8 = SmallGF<u8>;
+pub(crate) type GF8 = SmallGF<u8>;
 impl Square for GF8 {
     type Output = GF8;
 
