@@ -122,6 +122,19 @@ impl <F> Mul<&FieldCommitDegTwo<F>> for FieldCommitDegOne<F> where F: BigGaloisF
     }
 }
 
+impl <F> Mul<&F> for FieldCommitDegOne<F> where F: BigGaloisField{
+    type Output = FieldCommitDegOne<F>;
+
+    #[inline]
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn mul(self, rhs: &F) -> Self::Output {
+        FieldCommitDegOne{
+            key: self.key * rhs,
+            tag: self.tag
+        }
+    }
+}
+
 impl<F> Square for FieldCommitDegOne<F> where F: BigGaloisField{
     type Output = FieldCommitDegTwo<F>;
 
@@ -145,7 +158,18 @@ where
     pub(crate) tag: [F; 2],
 }
 
-/// Lifts field element to degree 2
+impl <F> FieldCommitDegTwo<F>
+where F: BigGaloisField{
+    /// Lifts a field element to a degree 2 polynomial commitment
+    pub(crate) fn from_field(c: &F) -> Self{
+        FieldCommitDegTwo{
+            key: *c,
+            tag: [F::ZERO, F::ZERO]
+        }
+    }
+}
+
+
 impl <F> Mul<F> for FieldCommitDegTwo<F>
 where F: BigGaloisField{
     type Output = Self;
@@ -156,7 +180,6 @@ where F: BigGaloisField{
     }
 }
 
-/// Lifts field element to degree 2
 impl <F> Mul<&F> for FieldCommitDegTwo<F>
 where F: BigGaloisField{
     type Output = Self;
@@ -180,6 +203,28 @@ impl <F> AddAssign<&Self> for FieldCommitDegTwo<F>
 where F: BigGaloisField{
     fn add_assign(&mut self, rhs: &Self) {
         (*self) += rhs.clone();
+    }
+}
+
+impl <F> AddAssign<&FieldCommitDegOne<F>> for FieldCommitDegTwo<F>
+where F: BigGaloisField{
+    fn add_assign(&mut self, rhs: &FieldCommitDegOne<F>) {
+        self.key += rhs.key;
+        self.tag[1] += rhs.tag;
+    }
+}
+
+impl <F> AddAssign<F> for FieldCommitDegTwo<F>
+where F: BigGaloisField{
+    fn add_assign(&mut self, rhs: F) {
+        self.key += rhs;
+    }
+}
+
+impl <F> AddAssign<&F> for FieldCommitDegTwo<F>
+where F: BigGaloisField{
+    fn add_assign(&mut self, rhs: &F) {
+        self.key += rhs;
     }
 }
 
@@ -288,7 +333,23 @@ where F: BigGaloisField{
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(mut self, rhs: &FieldCommitDegOne<F>) -> Self::Output {
-        self.tag[0] += rhs.tag;
+        self.tag[2] += rhs.tag;
+        Self{
+            key: self.key + rhs.key,
+            tag: self.tag 
+        }
+    }
+}
+
+impl<F> Add<&FieldCommitDegTwo<F>> for FieldCommitDegThree<F>
+where F: BigGaloisField{
+    type Output = FieldCommitDegThree<F>;
+
+    #[inline]
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn add(mut self, rhs: &FieldCommitDegTwo<F>) -> Self::Output {
+        self.tag[2] += rhs.tag[1];
+        self.tag[1] += rhs.tag[0];
         Self{
             key: self.key + rhs.key,
             tag: self.tag 
@@ -310,7 +371,7 @@ where
 }
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub(crate) struct BitCommitsRef<'a, F, L>
 where
     F: BigGaloisField,
@@ -319,7 +380,22 @@ where
     pub(crate) keys: &'a GenericArray<u8, L>,
     pub(crate) tags: &'a GenericArray<F, Prod<L, U8>>,
 }
+impl<'a, F,L> BitCommitsRef<'a, F,L>
+where
+    F: BigGaloisField,
+    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+{
+    pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> BitCommitsRef<F,L2>
+    where L2: ArrayLength + Mul<U8, Output: ArrayLength>{
+        
+        debug_assert!(start_byte + L2::USIZE <=L::USIZE);
 
+        BitCommitsRef{
+            keys: GenericArray::from_slice(&self.keys[start_byte .. start_byte + L2::USIZE]),
+            tags: GenericArray::from_slice(&self.tags[start_byte * 8 .. (start_byte + L2::USIZE) * 8])
+        }
+    }
+}
 
 #[cfg(test)]
 mod test {
