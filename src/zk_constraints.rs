@@ -13,7 +13,7 @@ use std::{
 };
 
 use crate::{
-    aes::{state_to_bytes, CommittedState, CommittedStateSquared},
+    aes::{state_to_bytes, CommittedStateBytes, CommittedStateBytesSquared},
     fields::{
         field_commitment::{
             BitCommits, BitCommitsRef, FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo,
@@ -63,7 +63,7 @@ where
             chall_2,
         );
 
-    // Step 1:
+    // ::1:
     // let w_tag: GenericArray<OWFField<O>, O::L> = v
     //     .iter()
     //     .take(O::LBYTES::USIZE)
@@ -86,7 +86,7 @@ where
         })
         .collect();
 
-    // Step 6
+    // ::6
     let u0_star = OWFField::<O>::from(&u[..O::LAMBDABYTES::USIZE]);
     let u1_star = OWFField::<O>::from(&u[O::LAMBDABYTES::USIZE..]);
 
@@ -243,26 +243,26 @@ pub(crate) mod key_expansion {
     where
         O: OWFParameters,
     {
-        // Step 1
+        // ::1
         let mut y = GenericArray::default_boxed();
         let mut y_0 = GenericArray::default_boxed();
         y[..O::LAMBDABYTES::USIZE].copy_from_slice(&w[..O::LAMBDABYTES::USIZE]);
         y_0[..O::LAMBDA::USIZE].copy_from_slice(&w_0[..O::LAMBDA::USIZE]);
 
-        // Step 2
+        // ::2
         let mut i_wd = O::LAMBDA::USIZE;
 
         for j in O::NK::USIZE..(4 * (O::R::USIZE + 1)) {
-            // Step 5
+            // ::5
             if (j % O::NK::USIZE == 0) || ((O::NK::USIZE > 6) && (j % O::NK::USIZE == 4)) {
-                // Step 6
+                // ::6
                 y[4 * j..4 * j + 4].copy_from_slice(&w[i_wd / 8..i_wd / 8 + 4]);
                 y_0[32 * j..32 * j + 32].copy_from_slice(&w_0[i_wd..i_wd + 32]);
 
-                // Step 7
+                // ::7
                 i_wd += 32;
             } else {
-                // Step 9-10
+                // ::9-10
                 for i in 0..4 {
                     y[4 * j + i] = y[4 * (j - O::NK::USIZE) + i] ^ y[4 * (j - 1) + i];
 
@@ -297,21 +297,21 @@ pub(crate) mod key_expansion {
         let rcon_evry = 4 * (O::LAMBDA::USIZE / 128);
 
         for j in 0..O::SKE::USIZE {
-            // Step 7
+            // ::7
             let mut x_tilde = x[j] ^ xk[iwd / 8 + (j % 4)];
 
             let xt_0: GenericArray<OWFField<O>, U8> = (0..8)
                 .map(|i| x_tag[8 * j + i] + xk_tag[iwd + 8 * (j % 4) + i])
                 .collect();
 
-            // Step 8
+            // ::8
             if j % rcon_evry == 0 {
                 x_tilde ^= RCON_TABLE[j / rcon_evry];
             }
 
             inverse_affine_byte::<O>(x_tilde, &xt_0, &mut y[j], &mut y_tag[8 * j..8 * j + 8]);
 
-            // Step 12
+            // ::12
             if j % 4 == 3 {
                 if O::LAMBDA::USIZE != 256 {
                     iwd += O::LAMBDA::USIZE;
@@ -337,7 +337,7 @@ pub(crate) mod key_expansion {
         OWFField<O>: BigGaloisField + ByteCombine,
         <<O as OWFParameters>::BaseParams as BaseParameters>::Field: PartialEq,
     {
-        // Step 1-2
+        // ::1-2
         let (k, k_tag) = aes_key_exp_fwd::<O>(w, w_tag);
         let (w_flat, w_flat_tag) = aes_key_exp_bkwd::<O>(
             GenericArray::from_slice(&w[O::LAMBDABYTES::USIZE..]),
@@ -350,14 +350,14 @@ pub(crate) mod key_expansion {
 
         let mut do_rot_word = true;
 
-        // Step 7
+        // ::7
         // TODO: is it really more efficient than initializing 4 GenericArrays and copying values?
         let (k_hat, k_hat_sq, w_hat, w_hat_sq): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) =
             multiunzip(iproduct!(0..O::SKE::USIZE / 4, 0..4).map(|(j, r)| {
-                // Step 11
+                // ::11
                 let r_prime_inv = if do_rot_word { (4 + r - 3) % 4 } else { r };
 
-                // Step 12
+                // ::12
                 // k_hat[(r+3) mod 3] = k[r] <=> k_hat[r] = k[(r-3) mod 3]
                 let k_hat = FieldCommitDegOne {
                     key: OWFField::<O>::byte_combine_bits(k[iwd / 8 + r_prime_inv]),
@@ -366,7 +366,7 @@ pub(crate) mod key_expansion {
                     ),
                 };
 
-                // Step 13
+                // ::13
                 let k_hat_sq = FieldCommitDegOne {
                     key: OWFField::<O>::byte_combine_bits_sq(k[iwd / 8 + r_prime_inv]),
                     tag: OWFField::<O>::byte_combine_sq(
@@ -374,7 +374,7 @@ pub(crate) mod key_expansion {
                     ),
                 };
 
-                // Step 14
+                // ::14
                 let w_hat = FieldCommitDegOne {
                     key: OWFField::<O>::byte_combine_bits(w_flat[4 * j + r]),
                     tag: OWFField::<O>::byte_combine_slice(
@@ -382,7 +382,7 @@ pub(crate) mod key_expansion {
                     ),
                 };
 
-                // Step 15
+                // ::15
                 let w_hat_sq = FieldCommitDegOne {
                     key: OWFField::<O>::byte_combine_bits_sq(w_flat[4 * j + r]),
                     tag: OWFField::<O>::byte_combine_sq(
@@ -391,12 +391,12 @@ pub(crate) mod key_expansion {
                 };
 
                 if r == 3 {
-                    // Step 16
+                    // ::16
                     if O::LAMBDA::USIZE == 256 {
                         do_rot_word = !do_rot_word;
                     }
 
-                    // Step 21
+                    // ::21
                     if O::LAMBDA::USIZE == 192 {
                         iwd += 192;
                     } else {
@@ -407,7 +407,7 @@ pub(crate) mod key_expansion {
                 (k_hat, k_hat_sq, w_hat, w_hat_sq)
             }));
 
-        // Steps 19-20 (directly update zk_hahser with constraints)
+        // ::s 19-20 (directly update zk_hahser with constraints)
         zk_hasher.lift_and_process(
             k_hat.into_iter(),
             k_hat_sq.into_iter(),
@@ -420,6 +420,14 @@ pub(crate) mod key_expansion {
 }
 
 pub(crate) mod encryption {
+    use std::ops::AddAssign;
+
+    use crate::aes::{
+        add_round_key, add_round_key_bytes, bytewise_mix_columns, inverse_affine,
+        inverse_shift_rows, mix_columns, s_box_affine, shift_rows, CommittedStateBits,
+        CommittedStateBitsSquared,
+    };
+
     use super::*;
 
     pub(crate) fn aes_enc_cstrnts<O>(
@@ -433,8 +441,8 @@ pub(crate) mod encryption {
     {
         // debug_assert!(extended_key.len() == O::R::USIZE + 1);
 
-        // Step 1
-        let state = BitCommits {
+        // ::1
+        let mut state = BitCommits {
             keys: input
                 .iter()
                 .zip(&extended_key.keys[..O::NSTBytes::USIZE])
@@ -445,49 +453,114 @@ pub(crate) mod encryption {
             ),
         };
 
-        // Step 2
+        // ::2
         for r in 0..O::R::USIZE / 2 {
-            let state_conj = f256_f2_conjugates::<O>(&state);
             println!("r = {}", r);
 
-            let w_key_off = 3 * O::NSTBytes::USIZE * r / 2;
-            let w_tag_off = 3 * O::NSTBits::USIZE * r / 2;
-            let mut state_prime = CommittedStateSquared::<O>::default();
+            // ::4
+            let state_conj = f256_f2_conjugates::<O>(&state);
 
-            // Step 7
+            // ::6
+            let n_key_off = 3 * O::NSTBytes::USIZE * r / 2;
+            let n_tag_off = 3 * O::NSTBits::USIZE * r / 2;
+
+            let mut state_prime = CommittedStateBitsSquared::<O>::default();
+
+            // ::7
             for i in 0..O::NSTBytes::USIZE {
-                let x_val = (w.keys[w_key_off + i / 2] >> ((i % 2) * 4)) & 0xf;
-
-                // Step 9
+                // ::9
                 let ys = invnorm_to_conjugates_prover::<O>(
-                    x_val,
-                    &w.tags[w_tag_off + 4 * i..w_tag_off + 4 * i + 4],
+                    (w.keys[n_key_off + i / 2] >> ((i % 2) * 4)) & 0xf,
+                    &w.tags[n_tag_off + 4 * i..n_tag_off + 4 * i + 4],
                 );
 
-                // Step 11
+                // ::11
                 aes_inv_norm_constraints_prover::<O>(
                     hasher,
                     GenericArray::from_slice(&state_conj[8 * i..8 * i + 8]),
                     &ys[0],
                 );
 
-                // Step 12
-                for j in 0..7 {
-                    state_prime[r*8 + j] = state_conj[8 * i + (j + 4) % 8].clone() * &ys[j % 4];
+                // ::12
+                for j in 0..8 {
+                    state_prime[i * 8 + j] = state_conj[8 * i + (j + 4) % 8].clone() * &ys[j % 4];
                 }
             }
 
-            // Step 16, 17
-            let round_key = state_to_bytes::<O>(&state);
+            // ::16-17
+            let round_key =
+                extended_key.get_commits_ref::<O::NSTBytes>((2 * r + 1) * O::NSTBytes::USIZE);
+            let round_key = state_to_bytes::<O>(round_key);
             let round_key_sq = round_key
                 .iter()
                 .map(|commit| commit.clone().square())
-                .collect::<CommittedStateSquared<O>>();
+                .collect::<CommittedStateBytesSquared<O>>();
 
-            
+            // ::18-22
+            let st_0 =
+                aes_round::<O, FieldCommitDegOne<OWFField<O>>>(&state_prime, &round_key, false);
+            let st_1 =
+                aes_round::<O, FieldCommitDegTwo<OWFField<O>>>(&state_prime, &round_key_sq, true);
 
-            todo!("Implement round functions")
+            if r != O::R::USIZE / 2 - 1 {
+                // ::25
+                let s_tilde = w.get_commits_ref::<O::NSTBytes>(
+                    O::NSTBytes::USIZE / 2 + 3 * O::NSTBytes::USIZE * r / 2,
+                );
+
+                // ::29-30
+                let mut s = inverse_shift_rows::<O>(s_tilde);
+                inverse_affine::<O>(&mut s);
+
+                for i in 0..O::NSTBytes::USIZE {
+                    let si = FieldCommitDegOne {
+                        key: OWFField::<O>::byte_combine_bits(s.keys[i]),
+                        tag: OWFField::<O>::byte_combine_slice(&s.tags[i * 8..i * 8 + 8]),
+                    };
+
+                    let si_sq = FieldCommitDegOne {
+                        key: OWFField::<O>::byte_combine_bits_sq(s.keys[i]),
+                        tag: OWFField::<O>::byte_combine_sq(&s.tags[i * 8..i * 8 + 8]),
+                    };
+
+                    hasher.update(&(si_sq * &st_0[i] + &si));
+                    hasher.update(&(si * &st_1[i] + &st_0[i]));
+                }
+
+                // ::40
+                state = bytewise_mix_columns::<O>(s_tilde);
+
+                let round_key =
+                    extended_key.get_commits_ref::<O::NSTBytes>((2 * r + 2) * O::NSTBytes::USIZE);
+
+                add_round_key::<O>(&mut state, round_key)
+            }
         }
+        
+    }
+
+    fn aes_round<O, T>(
+        state: &CommittedStateBitsSquared<O>,
+        key_bytes: &GenericArray<T, O::NSTBytes>,
+        sq: bool,
+    ) -> CommittedStateBytesSquared<O>
+    where
+        O: OWFParameters,
+        for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a T>,
+    {
+        // ::19
+        let mut st = s_box_affine::<O>(state, sq);
+
+        // ::20
+        shift_rows::<O>(&mut st);
+
+        // ::21
+        mix_columns::<O>(&mut st, sq);
+
+        // ::22
+        add_round_key_bytes::<O, T>(&mut st, key_bytes);
+
+        st
     }
 
     fn aes_inv_norm_constraints_prover<O>(
