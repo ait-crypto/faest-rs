@@ -14,7 +14,7 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use generic_array::{ArrayLength, GenericArray};
 
-pub(crate) use large_fields::{BigGaloisField, ByteCombine, ByteCombineConstants, SumPoly};
+pub(crate) use large_fields::{BigGaloisField, ByteCombine, ByteCombineConstants, SumPoly, Sigmas};
 #[cfg(not(all(
     feature = "opt-simd",
     target_feature = "avx2",
