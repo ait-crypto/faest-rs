@@ -14,7 +14,7 @@ use generic_array::{
         U2048, U212, U216, U218, U22, U234, U24, U245, U246, U256, U280, U288, U3, U312, U32, U320,
         U32768, U336, U384, U388, U4, U40, U408, U4096, U44, U448, U460, U470, U476, U48, U5, U500,
         U511, U512, U52, U56, U576, U584, U596, U6, U60, U600, U64, U640, U65536, U672, U7, U752,
-        U8, U8192, U832, U96, U960, U992,
+        U8, U8192, U832, U96, U960, U992, U410, U828, U33, U948
     },
     ArrayLength, GenericArray,
 };
@@ -160,7 +160,7 @@ pub(crate) trait OWFParameters: Sized {
     type InputSize: ArrayLength + Mul<U8, Output: ArrayLength>;
 
     type B: ArrayLength;
-    type LAMBDA: ArrayLength;
+    type LAMBDA: ArrayLength + Mul<U2, Output: ArrayLength>;
     type LAMBDABYTES: SecurityParameter
         + Mul<Self::NLeafCommit, Output: ArrayLength>
         + Mul<U2, Output = Self::LAMBDABYTESTWO>
@@ -1068,7 +1068,7 @@ impl TauParameters for Tau256FastEM {
 
 pub(crate) trait FAESTParameters {
     type OWF: OWFParameters;
-    type Tau: TauParameters;
+    type Tau: TauParameters<Tau = <<Self as FAESTParameters>::BAVC as BatchVectorCommitment>::Tau>;
 
     /// Associated BAVC
     type BAVC: BatchVectorCommitment<
@@ -1079,6 +1079,7 @@ pub(crate) trait FAESTParameters {
         NLeafCommit = <Self::OWF as OWFParameters>::NLeafCommit,
     >;
 
+    type WGRIND: ArrayLength;
     type N0: ArrayLength;
     type N1: ArrayLength;
     type POWK0: ArrayLength;
@@ -1095,6 +1096,7 @@ impl FAESTParameters for FAEST128sParameters {
     type Tau = Tau128Small;
     type BAVC = BAVC128Small;
 
+    type WGRIND = U7;
     type N0 = U4096;
     type POWK0 = Diff<U8192, U1>;
     type N1 = U2048;
@@ -1111,6 +1113,7 @@ impl FAESTParameters for FAEST128fParameters {
     type Tau = Tau128Fast;
     type BAVC = BAVC128Fast;
 
+    type WGRIND = U8;
     type N0 = U256;
     type POWK0 = U511;
     type N1 = U256;
@@ -1126,6 +1129,7 @@ impl FAESTParameters for FAEST192sParameters {
     type Tau = Tau192Small;
     type BAVC = BAVC192Small;
 
+    type WGRIND = U16;
     type N0 = U4096;
     type POWK0 = Diff<U8192, U1>;
     type N1 = U4096;
@@ -1141,6 +1145,7 @@ impl FAESTParameters for FAEST192fParameters {
     type Tau = Tau192Fast;
     type BAVC = BAVC192Fast;
 
+    type WGRIND = U24;
     type N0 = U256;
     type POWK0 = U511;
     type N1 = U256;
@@ -1156,6 +1161,7 @@ impl FAESTParameters for FAEST256sParameters {
     type Tau = Tau256Small;
     type BAVC = BAVC256Small;
 
+    type WGRIND = U22;
     type N0 = U4096;
     type POWK0 = Diff<U8192, U1>;
     type N1 = U2048;
@@ -1171,6 +1177,7 @@ impl FAESTParameters for FAEST256fParameters {
     type Tau = Tau256Fast;
     type BAVC = BAVC256Fast;
 
+    type WGRIND = U33;
     type N0 = U256;
     type POWK0 = U511;
     type N1 = U256;
@@ -1186,6 +1193,7 @@ impl FAESTParameters for FAESTEM128sParameters {
     type Tau = Tau128SmallEM;
     type BAVC = BAVC128SmallEM;
 
+    type WGRIND = U11;
     type N0 = U4096;
     type POWK0 = Diff<U8192, U1>;
     type N1 = U2048;
@@ -1201,11 +1209,12 @@ impl FAESTParameters for FAESTEM128fParameters {
     type Tau = Tau128FastEM;
     type BAVC = BAVC128FastEM;
 
+    type WGRIND = U16;
     type N0 = U256;
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type SignatureSize = Sum<U576, Sum<U1024, U4096>>;
+    type SignatureSize = U4506;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1216,11 +1225,12 @@ impl FAESTParameters for FAESTEM192sParameters {
     type Tau = Tau192SmallEM;
     type BAVC = BAVC192SmallEM;
 
+    type WGRIND = U16;
     type N0 = U4096;
     type POWK0 = Diff<U8192, U1>;
     type N1 = U4096;
     type POWK1 = Diff<U8192, U1>;
-    type SignatureSize = Sum<U584, Sum<U2048, U8192>>;
+    type SignatureSize = U5924;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1231,6 +1241,7 @@ impl FAESTParameters for FAESTEM192fParameters {
     type Tau = Tau192FastEM;
     type BAVC = BAVC192FastEM;
 
+    type WGRIND = U24;
     type N0 = U256;
     type POWK0 = U511;
     type N1 = U256;
@@ -1246,6 +1257,7 @@ impl FAESTParameters for FAESTEM256sParameters {
     type Tau = Tau256SmallEM;
     type BAVC = BAVC256SmallEM;
 
+    type WGRIND = U22;
     type N0 = U4096;
     type POWK0 = Diff<U8192, U1>;
     type N1 = U2048;
@@ -1261,12 +1273,17 @@ impl FAESTParameters for FAESTEM256fParameters {
     type Tau = Tau256FastEM;
     type BAVC = BAVC256FastEM;
 
+    type WGRIND = U32;
     type N0 = U256;
     type POWK0 = U511;
     type N1 = U256;
     type POWK1 = U511;
-    type SignatureSize = Sum<U112, Sum<U2048, Sum<U8192, U16384>>>;
+    type SignatureSize = U23476;
 }
+
+type U4506 = Sum<U4096, U410>;
+type U5924 = Sum<U4096, Sum<U1000, U828>>;
+type U23476 = Sum<Prod<U2048, U11>, U948>;
 
 // #[cfg(test)]
 // mod test {
