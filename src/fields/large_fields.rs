@@ -97,6 +97,7 @@ pub trait ByteCombineConstants: Field {
 pub trait SumPoly: Field {
     /// Compute polynomial sum
     fn sum_poly(v: &[Self]) -> Self;
+    fn sum_poly_bits(v: &[u8]) -> Self;
 }
 
 // Trait providing methods for byte squaring, where each byte is represented by 8 field elements.
@@ -128,6 +129,37 @@ where
             .rev()
             .skip(1)
             .fold(v[v.len() - 1], |sum, val| sum.double() + val)
+    }
+
+    fn sum_poly_bits(v: &[u8]) -> Self {
+        // let mut ret = if ((v[127 / 8] >> (127 % 8)) & 1) != 0 {
+        //     T::ONE
+        // } else {
+        //     T::ZERO
+        // };
+
+        // // let n_bits = v.len() * 8;
+        // for i in 1..128 {
+        //     ret = ret.double();
+        //     let bit_idx = 127 - i;
+        //     if ((v[bit_idx / 8] >> (bit_idx % 8)) & 1) != 0 {
+        //         ret += T::ONE;
+        //     }
+        // }
+
+        // ret
+
+        let init = if (v[v.len() - 1] & (1<<7)) != 0 {T::ONE} else {T::ZERO};
+        (0..v.len()*8)
+            .rev()
+            .skip(1)
+            .fold(init,  |mut sum, i| {
+                sum = sum.double();
+                if v[i/8] & (1<<(i%8)) != 0 {
+                    sum += T::ONE;
+                }
+                sum
+            })
     }
 }
 
