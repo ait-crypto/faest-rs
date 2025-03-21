@@ -272,8 +272,7 @@ where
         self.a2_hasher.update(&val.tag[2]);
 
         // Should be a commitment to 0
-        // debug_assert_eq!(val.key, F::ZERO);
-        println!("{:?}", val.key);
+        debug_assert_eq!(val.key, F::ZERO);
     }
 
     pub(crate) fn lift_and_process<I1, I2, I3, I4>(&mut self, a: I1, a_sq: I2, b: I3, b_sq: I4)
