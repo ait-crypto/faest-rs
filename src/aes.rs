@@ -33,6 +33,19 @@ use crate::{
     zk_constraints::OWFField,
 };
 
+
+pub(crate) type CommittedStateBits<O> =
+Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
+
+pub(crate) type CommittedStateBitsSquared<O> =
+Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
+
+pub(crate) type CommittedStateBytes<O> =
+Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
+
+pub(crate) type CommittedStateBytesSquared<O> =
+Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
+
 pub(crate) fn add_round_key<O>(
     input: &mut BitCommits<OWFField<O>, Prod<O::NST, U4>>,
     key: BitCommitsRef<OWFField<O>, Prod<O::NST, U4>>,
@@ -52,17 +65,17 @@ pub(crate) fn add_round_key<O>(
         .for_each(|(x, k)| *x += k);
 }
 
-pub(crate) type CommittedStateBits<O> =
-    Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
-
-pub(crate) type CommittedStateBitsSquared<O> =
-    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
-
-pub(crate) type CommittedStateBytes<O> =
-    Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
-
-pub(crate) type CommittedStateBytesSquared<O> =
-    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
+pub(crate) fn add_round_key_bytes<O, T>(
+    state: &mut CommittedStateBytesSquared<O>,
+    key_bytes: &GenericArray<T, O::NSTBytes>,
+) where
+    O: OWFParameters,
+    for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a T>,
+{
+    for (st, k) in izip!(state.iter_mut(), key_bytes) {
+        (*st) += k;
+    }
+}
 
 pub(crate) fn state_to_bytes<O>(
     state: BitCommitsRef<OWFField<O>, O::NSTBytes>,
@@ -125,18 +138,6 @@ where
     }
 
     state_prime
-}
-
-pub(crate) fn add_round_key_bytes<O, T>(
-    state: &mut CommittedStateBytesSquared<O>,
-    key_bytes: &GenericArray<T, O::NSTBytes>,
-) where
-    O: OWFParameters,
-    for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a T>,
-{
-    for (st, k) in izip!(state.iter_mut(), key_bytes) {
-        (*st) += k;
-    }
 }
 
 pub(crate) fn mix_columns<O>(state: &mut CommittedStateBytesSquared<O>, sq: bool)
