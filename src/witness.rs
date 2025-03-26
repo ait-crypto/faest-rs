@@ -15,7 +15,7 @@ use std::{
 use crate::{
     fields::{
         field_commitment::{
-            BitCommits, BitCommitsRef, FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo,
+            ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo,
         },
         large_fields::{Betas, ByteCombineSquared, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},

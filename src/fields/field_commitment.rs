@@ -1,9 +1,9 @@
-use crate::fields::{BigGaloisField, Square};
+use crate::fields::{BigGaloisField, Square, GF8};
 use generic_array::{
     typenum::{Prod, U8},
     ArrayLength, GenericArray,
 };
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg};
+use std::ops::{Add, AddAssign, Index, Mul, MulAssign, Neg};
 
 /// Represents a polynomial commitment in GF of degree one
 #[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
@@ -439,17 +439,35 @@ where
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Default)]
-pub(crate) struct ByteCommit<F>
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub(crate) struct ByteCommitment<F>
 where
     F: BigGaloisField,
 {
     pub(crate) key: u8,
-    pub(crate) tags: [F; 8],
+    pub(crate) tags: GenericArray<F, U8>,
 }
 
+impl<F> ByteCommitment<F>
+where
+    F: BigGaloisField,
+{
+    pub fn square_inplace(&mut self) {
+        F::square_byte_inplace(self.tags.as_mut_slice());
+        GF8::square_bits_inplace(&mut self.key);
+    }
+
+    pub fn combine(&self) -> FieldCommitDegOne<F> {
+        FieldCommitDegOne {
+            key: F::byte_combine_bits(self.key),
+            tag: F::byte_combine_slice(self.tags.as_slice()),
+        }
+    }
+}
+
+
 #[derive(Clone, Debug, PartialEq, Default)]
-pub(crate) struct BitCommits<F, L>
+pub(crate) struct ByteCommits<F, L>
 where
     F: BigGaloisField,
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
@@ -457,7 +475,7 @@ where
     pub(crate) keys: Box<GenericArray<u8, L>>,
     pub(crate) tags: Box<GenericArray<F, Prod<L, U8>>>,
 }
-impl<F, L> BitCommits<F, L>
+impl<F, L> ByteCommits<F, L>
 where
     F: BigGaloisField,
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
@@ -466,7 +484,7 @@ where
         keys: Box<GenericArray<u8, L>>,
         tags: Box<GenericArray<F, Prod<L, U8>>>,
     ) -> Self {
-        BitCommits { keys, tags }
+        ByteCommits { keys, tags }
     }
 
     pub(crate) fn get_field_commit(&self, index: usize) -> FieldCommitDegOne<F> {
@@ -483,17 +501,25 @@ where
         }
     }
 
-    pub fn get_commits_ref(&self) -> BitCommitsRef<F, L> {
-        BitCommitsRef {
+    pub fn get_commits_ref(&self) -> ByteCommitsRef<F, L> {
+        ByteCommitsRef {
             keys: &self.keys,
             tags: &self.tags,
         }
     }
+
+    pub fn get(&self, idx: usize) -> ByteCommitment<F> {
+        ByteCommitment {
+            key: self.keys[idx],
+            tags: GenericArray::from_slice(&self.tags[idx * 8..idx * 8 + 8]).to_owned(),
+        }
+    }
+
 }
 
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub(crate) struct BitCommitsRef<'a, F, L>
+pub(crate) struct ByteCommitsRef<'a, F, L>
 where
     F: BigGaloisField,
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
@@ -501,7 +527,7 @@ where
     pub(crate) keys: &'a GenericArray<u8, L>,
     pub(crate) tags: &'a GenericArray<F, Prod<L, U8>>,
 }
-impl<'a, F, L> BitCommitsRef<'a, F, L>
+impl<'a, F, L> ByteCommitsRef<'a, F, L>
 where
     F: BigGaloisField,
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
@@ -527,13 +553,13 @@ where
         }
     }
 
-    pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> BitCommitsRef<F, L2>
+    pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<F, L2>
     where
         L2: ArrayLength + Mul<U8, Output: ArrayLength>,
     {
         debug_assert!(start_byte + L2::USIZE <= L::USIZE);
 
-        BitCommitsRef {
+        ByteCommitsRef {
             keys: GenericArray::from_slice(&self.keys[start_byte..start_byte + L2::USIZE]),
             tags: GenericArray::from_slice(
                 &self.tags[start_byte * 8..(start_byte + L2::USIZE) * 8],

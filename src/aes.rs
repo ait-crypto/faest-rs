@@ -15,7 +15,7 @@ use std::{
 use crate::{
     fields::{
         field_commitment::{
-            BitCommits, BitCommitsRef, FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo,
+            ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo,
         },
         large_fields::{Betas, ByteCombineSquared, ByteCombineSquaredConstants, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
@@ -47,8 +47,8 @@ pub(crate) type CommittedStateBytesSquared<O> =
 Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
 
 pub(crate) fn add_round_key<O>(
-    input: &mut BitCommits<OWFField<O>, Prod<O::NST, U4>>,
-    key: BitCommitsRef<OWFField<O>, Prod<O::NST, U4>>,
+    input: &mut ByteCommits<OWFField<O>, Prod<O::NST, U4>>,
+    key: ByteCommitsRef<OWFField<O>, Prod<O::NST, U4>>,
 ) where
     O: OWFParameters,
 {
@@ -78,7 +78,7 @@ pub(crate) fn add_round_key_bytes<O, T>(
 }
 
 pub(crate) fn state_to_bytes<O>(
-    state: BitCommitsRef<OWFField<O>, O::NSTBytes>,
+    state: ByteCommitsRef<OWFField<O>, O::NSTBytes>,
 ) -> CommittedStateBytes<O>
 where
     O: OWFParameters,
@@ -114,12 +114,12 @@ where
 }
 
 pub(crate) fn inverse_shift_rows<O>(
-    state: BitCommitsRef<OWFField<O>, O::NSTBytes>,
-) -> BitCommits<OWFField<O>, O::NSTBytes>
+    state: ByteCommitsRef<OWFField<O>, O::NSTBytes>,
+) -> ByteCommits<OWFField<O>, O::NSTBytes>
 where
     O: OWFParameters,
 {
-    let mut state_prime = BitCommits::<OWFField<O>, O::NSTBytes>::default();
+    let mut state_prime = ByteCommits::<OWFField<O>, O::NSTBytes>::default();
 
     for r in 0..4 {
         for c in 0..O::NST::USIZE {
@@ -186,12 +186,12 @@ where
 }
 
 pub(crate) fn bytewise_mix_columns<O>(
-    state: BitCommitsRef<OWFField<O>, O::NSTBytes>,
-) -> BitCommits<OWFField<O>, O::NSTBytes>
+    state: ByteCommitsRef<OWFField<O>, O::NSTBytes>,
+) -> ByteCommits<OWFField<O>, O::NSTBytes>
 where
     O: OWFParameters,
 {
-    let mut o = BitCommits::<_, O::NSTBytes>::default();
+    let mut o = ByteCommits::<_, O::NSTBytes>::default();
 
     for c in 0..O::NST::USIZE {
         for r in 0..4 {
@@ -283,7 +283,7 @@ where
         .collect()
 }
 
-pub(crate) fn inverse_affine<O>(state: &mut BitCommits<OWFField<O>, O::NSTBytes>)
+pub(crate) fn inverse_affine<O>(state: &mut ByteCommits<OWFField<O>, O::NSTBytes>)
 where
     O: OWFParameters,
 {
