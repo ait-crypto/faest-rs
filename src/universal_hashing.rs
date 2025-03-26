@@ -203,8 +203,8 @@ pub(crate) struct ZKHasher<F>
 where
     F: BigGaloisField,
 {
-    pub(crate) h0: F,
-    pub(crate) h1: F,
+    h0: F,
+    h1: F,
     s: F,
     t: GF64,
     r0: F,
@@ -242,7 +242,7 @@ pub(crate) struct ZKProofHasher<F>
 where
     F: BigGaloisField,
 {
-    pub(crate) a0_hasher: ZKHasher<F>,
+    a0_hasher: ZKHasher<F>,
     a1_hasher: ZKHasher<F>,
     a2_hasher: ZKHasher<F>,
 }
@@ -275,33 +275,30 @@ where
         debug_assert_eq!(val.key, F::ZERO);
     }
 
-    pub(crate) fn lift_and_process<I1, I2, I3, I4>(&mut self, a: I1, a_sq: I2, b: I3, b_sq: I4)
-    where
-        for<'a> I1: Iterator<Item = FieldCommitDegOne<F>>,
-        for<'a> I2: Iterator<Item = FieldCommitDegOne<F>>,
-        for<'a> I3: Iterator<Item = FieldCommitDegOne<F>>,
-        for<'a> I4: Iterator<Item = FieldCommitDegOne<F>>,
+    pub(crate) fn lift_and_process(
+        &mut self,
+        a: &FieldCommitDegOne<F>,
+        a_sq: &FieldCommitDegOne<F>,
+        b: &FieldCommitDegOne<F>,
+        b_sq: &FieldCommitDegOne<F>,
+    ) where
+        F: BigGaloisField,
     {
         // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
-        for (a, a_sq, b, b_sq) in izip!(a, a_sq, b, b_sq) {
-            // Degree 0
-            self.a0_hasher.update(&F::ZERO);
-            self.a0_hasher.update(&F::ZERO);
 
-            // Degree 1
-            self.a1_hasher.update(&(a_sq.tag * b.tag - a.tag));
-            self.a1_hasher.update(&(b_sq.tag * a.tag - b.tag));
+        // Degree 1
+        self.a1_hasher.update(&(a_sq.tag * b.tag));
+        self.a1_hasher.update(&(b_sq.tag * a.tag));
 
-            // Degree 2
-            self.a2_hasher
-                .update(&(a_sq.key * b.tag + a_sq.tag * b.key - a.key));
-            self.a2_hasher
-                .update(&(b_sq.key * a.tag + b_sq.tag * a.key - b.key));
+        // Degree 2
+        self.a2_hasher
+            .update(&(a_sq.key * b.tag + a_sq.tag * b.key - a.tag));
+        self.a2_hasher
+            .update(&(b_sq.key * a.tag + b_sq.tag * a.key - b.tag));
 
-            // Degree 3 (i.e., commitments) should be zero
-            debug_assert_eq!(a_sq.key * b.key - a.key, F::ZERO);
-            debug_assert_eq!(b_sq.key * a.key - b.key, F::ZERO);
-        }
+        // Degree 3 (i.e., commitments) should be zero
+        debug_assert_eq!(a_sq.key * b.key - a.key, F::ZERO);
+        debug_assert_eq!(b_sq.key * a.key - b.key, F::ZERO);
     }
 
     pub(crate) fn finalize(self, u: &F, u_plus_v: &F, v: &F) -> (F, F, F) {
