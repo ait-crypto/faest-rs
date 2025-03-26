@@ -1,8 +1,12 @@
 use std::{
-    array, fmt::Debug, mem, num::Wrapping, ops::{
+    array,
+    fmt::Debug,
+    mem,
+    num::Wrapping,
+    ops::{
         Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitXor, BitXorAssign, Mul, MulAssign, Neg,
         Shl, Shr, Sub, SubAssign,
-    }
+    },
 };
 
 use super::{Double, Field, Square, GF64, GF8};
@@ -113,8 +117,8 @@ pub trait ByteCombineSquared: Field {
 }
 
 // Trait providing for deriving a field element from a bit value
-pub trait FromBit: Field{
-    /// Takes the first bit from the input byte `x`, and returns the respective Field representation. 
+pub trait FromBit: Field {
+    /// Takes the first bit from the input byte `x`, and returns the respective Field representation.
     fn from_bit(x: u8) -> Self;
 }
 
@@ -155,17 +159,18 @@ where
 
         // ret
 
-        let init = if (v[v.len() - 1] & (1<<7)) != 0 {T::ONE} else {T::ZERO};
-        (0..v.len()*8)
-            .rev()
-            .skip(1)
-            .fold(init,  |mut sum, i| {
-                sum = sum.double();
-                if v[i/8] & (1<<(i%8)) != 0 {
-                    sum += T::ONE;
-                }
-                sum
-            })
+        let init = if (v[v.len() - 1] & (1 << 7)) != 0 {
+            T::ONE
+        } else {
+            T::ZERO
+        };
+        (0..v.len() * 8).rev().skip(1).fold(init, |mut sum, i| {
+            sum = sum.double();
+            if v[i / 8] & (1 << (i % 8)) != 0 {
+                sum += T::ONE;
+            }
+            sum
+        })
     }
 }
 
@@ -184,18 +189,17 @@ where
 
 // generic implementation of FromBit
 impl<T, const N: usize, const LENGTH: usize> FromBit for BigGF<T, N, LENGTH>
-where Self: Field{
-
+where
+    Self: Field,
+{
     fn from_bit(x: u8) -> Self {
-
         if (x & 1) == 0 {
             return Self::ZERO;
         }
 
         Self::ONE
-    }   
+    }
 }
-
 
 // generic implementation of ByteCombine
 
@@ -254,7 +258,6 @@ where
     }
 
     fn square_byte_inplace(x: &mut [Self]) {
-
         let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
 
         // x0 = x0 + x4 + x6
