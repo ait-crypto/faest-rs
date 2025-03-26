@@ -440,6 +440,15 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
+pub(crate) struct ByteCommit<F>
+where
+    F: BigGaloisField,
+{
+    pub(crate) key: u8,
+    pub(crate) tags: [F; 8],
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
 pub(crate) struct BitCommits<F, L>
 where
     F: BigGaloisField,
@@ -448,6 +457,40 @@ where
     pub(crate) keys: Box<GenericArray<u8, L>>,
     pub(crate) tags: Box<GenericArray<F, Prod<L, U8>>>,
 }
+impl<F, L> BitCommits<F, L>
+where
+    F: BigGaloisField,
+    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+{
+    pub(crate) fn new(
+        keys: Box<GenericArray<u8, L>>,
+        tags: Box<GenericArray<F, Prod<L, U8>>>,
+    ) -> Self {
+        BitCommits { keys, tags }
+    }
+
+    pub(crate) fn get_field_commit(&self, index: usize) -> FieldCommitDegOne<F> {
+        FieldCommitDegOne {
+            key: F::byte_combine_bits(self.keys[index]),
+            tag: F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
+        }
+    }
+
+    pub(crate) fn get_field_commit_sq(&self, index: usize) -> FieldCommitDegOne<F> {
+        FieldCommitDegOne {
+            key: F::byte_combine_bits_sq(self.keys[index]),
+            tag: F::byte_combine_sq(&self.tags[index * 8..index * 8 + 8]),
+        }
+    }
+
+    pub fn get_commits_ref(&self) -> BitCommitsRef<F, L> {
+        BitCommitsRef {
+            keys: &self.keys,
+            tags: &self.tags,
+        }
+    }
+}
+
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub(crate) struct BitCommitsRef<'a, F, L>
@@ -463,6 +506,27 @@ where
     F: BigGaloisField,
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
 {
+    pub(crate) fn new(
+        keys: &'a GenericArray<u8, L>,
+        tags: &'a GenericArray<F, Prod<L, U8>>,
+    ) -> Self {
+        Self { keys, tags }
+    }
+
+    pub(crate) fn get_field_commit(&self, index: usize) -> FieldCommitDegOne<F> {
+        FieldCommitDegOne {
+            key: F::byte_combine_bits(self.keys[index]),
+            tag: F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
+        }
+    }
+
+    pub(crate) fn get_field_commit_sq(&self, index: usize) -> FieldCommitDegOne<F> {
+        FieldCommitDegOne {
+            key: F::byte_combine_bits_sq(self.keys[index]),
+            tag: F::byte_combine_sq(&self.tags[index * 8..index * 8 + 8]),
+        }
+    }
+
     pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> BitCommitsRef<F, L2>
     where
         L2: ArrayLength + Mul<U8, Output: ArrayLength>,

@@ -168,7 +168,7 @@ pub(crate) trait OWFParameters: Sized {
     type LAMBDABYTESTWO: ArrayLength + Add<Self::LBYTES, Output = Self::LAMBDALBYTES>;
 
     type L: ArrayLength;
-    type LBYTES: ArrayLength + Mul<U8, Output: ArrayLength>;
+    type LBYTES: ArrayLength + Mul<U8, Output = Self::L>;
     type LHATBYTES: ArrayLength + Mul<U8, Output: ArrayLength>;
 
     type BETA: ArrayLength;
@@ -176,7 +176,7 @@ pub(crate) trait OWFParameters: Sized {
     type R: ArrayLength;
     type SKE: ArrayLength + Mul<U8, Output: ArrayLength>;
     type LKE: ArrayLength;
-    type LKEBytes: ArrayLength + Mul<U8, Output: ArrayLength>;
+    type LKEBytes: ArrayLength + Mul<U8, Output = Self::LKE>;
     type LENC: ArrayLength;
     type LENCBytes: ArrayLength + Mul<U8, Output: ArrayLength>;
     type NST: ArrayLength + Mul<U4, Output = Self::NSTBytes>;
