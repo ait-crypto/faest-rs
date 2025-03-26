@@ -12,9 +12,9 @@ use generic_array::{
         Diff, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1000, U102, U1024, U103, U11, U110, U112,
         U12, U120, U128, U13, U14, U142, U152, U16, U160, U162, U163, U16384, U176, U192, U2, U200,
         U2048, U212, U216, U218, U22, U234, U24, U245, U246, U256, U280, U288, U3, U312, U32, U320,
-        U32768, U336, U384, U388, U4, U40, U408, U4096, U44, U448, U460, U470, U476, U48, U5, U500,
-        U511, U512, U52, U56, U576, U584, U596, U6, U60, U600, U64, U640, U65536, U672, U7, U752,
-        U8, U8192, U832, U96, U960, U992, U410, U828, U33, U948
+        U32768, U33, U336, U384, U388, U4, U40, U408, U4096, U410, U44, U448, U460, U470, U476,
+        U48, U5, U500, U511, U512, U52, U56, U576, U584, U596, U6, U60, U600, U64, U640, U65536,
+        U672, U7, U752, U8, U8192, U828, U832, U948, U96, U960, U992,
     },
     ArrayLength, GenericArray,
 };
@@ -1086,6 +1086,17 @@ pub(crate) trait FAESTParameters {
     type POWK1: ArrayLength;
     /// Size of the signature (in bytes)
     type SignatureSize: ArrayLength;
+    #[inline]
+    fn get_decom_size() -> usize {
+        // coms
+        <<Self as FAESTParameters>::OWF as OWFParameters>::NLeafCommit::USIZE
+            * <<Self as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES::USIZE
+            * <<Self as FAESTParameters>::Tau as TauParameters>::Tau::USIZE
+            + 
+            // nodes
+            <<Self as FAESTParameters>::Tau as TauParameters>::Topen::USIZE
+                * <<Self as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES::USIZE
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
