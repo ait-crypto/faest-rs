@@ -1,10 +1,8 @@
 use std::{
-    array, mem,
-    num::Wrapping,
-    ops::{
+    array, fmt::Debug, mem, num::Wrapping, ops::{
         Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitXor, BitXorAssign, Mul, MulAssign, Neg,
         Shl, Shr, Sub, SubAssign,
-    },
+    }
 };
 
 use super::{Double, Field, Square, GF64, GF8};
@@ -42,6 +40,7 @@ pub(crate) trait Sigmas: Sized {
 /// only called with slices of the correct length.
 pub(crate) trait BigGaloisField:
     Field
+    + FromBit
     + Copy
     + Double<Output = Self>
     + Mul<u8, Output = Self>
@@ -55,6 +54,7 @@ pub(crate) trait BigGaloisField:
     + SumPoly
     + Betas
     + Sigmas
+    + Debug
 where
     Self: for<'a> From<&'a [u8]>,
     Self: for<'a> AddAssign<&'a Self>,
@@ -110,6 +110,12 @@ pub trait SquareBytes: Field {
 pub trait ByteCombineSquared: Field {
     fn byte_combine_sq(x: &[Self]) -> Self;
     fn byte_combine_bits_sq(x: u8) -> Self;
+}
+
+// Trait providing for deriving a field element from a bit value
+pub trait FromBit: Field{
+    /// Takes the first bit from the input byte `x`, and returns the respective Field representation. 
+    fn from_bit(x: u8) -> Self;
 }
 
 /// Pre-computed values from [`ByteCombineSquared`]
@@ -176,6 +182,21 @@ where
     }
 }
 
+// generic implementation of FromBit
+impl<T, const N: usize, const LENGTH: usize> FromBit for BigGF<T, N, LENGTH>
+where Self: Field{
+
+    fn from_bit(x: u8) -> Self {
+
+        if (x & 1) == 0 {
+            return Self::ZERO;
+        }
+
+        Self::ONE
+    }   
+}
+
+
 // generic implementation of ByteCombine
 
 impl<T, const N: usize, const LENGTH: usize> ByteCombine for BigGF<T, N, LENGTH>
@@ -226,26 +247,33 @@ where
 
         // x[4] + (x[6] + x[7])
         sq[1] = x[4] + sq[7];
-        // x[5] + (x[4] + x[6] + x[7])
+        // (x[5] + x[6]) + (x[4] + x[7])
         sq[3] = x[5] + sq[1];
 
         sq
     }
 
     fn square_byte_inplace(x: &mut [Self]) {
-        let tmp: [Self; 8] = std::array::from_fn(|i| x[i]);
 
-        x[0] = tmp[0] + tmp[4] + tmp[6];
-        x[2] = tmp[1] + tmp[5];
-        x[4] = tmp[2] + tmp[4] + tmp[7];
-        x[5] = tmp[5] + tmp[6];
-        x[6] = tmp[3] + tmp[5];
-        x[7] = tmp[6] + tmp[7];
+        let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
 
-        // x[4] + (x[6] + x[7])
-        x[1] = tmp[4] + tmp[7];
-        // x[5] + (x[4] + x[6] + x[7])
-        x[3] = tmp[5] + tmp[1];
+        // x0 = x0 + x4 + x6
+        x[0] += x[4] + x[6];
+        // x2 = x1 + x5
+        x[2] = x[1] + x[5];
+        // x4 = x4 + x2 + x7
+        x[4] += i2 + x[7];
+        // x5 = x5 + x6
+        x[5] += x[6];
+        // x6 = x3 + x5
+        x[6] = x[3] + i5;
+        // x7 = x6 + x7
+        x[7] += i6;
+
+        // x1 = x4 + (x6 + x7)
+        x[1] = i4 + x[7];
+        // x3 = x5 + (x4 + x6 + x7)
+        x[3] = i5 + x[1];
     }
 }
 
