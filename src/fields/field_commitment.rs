@@ -179,7 +179,7 @@ where
     fn square(self) -> Self::Output {
         FieldCommitDegTwo {
             key: self.key.square(),
-            tag: [self.tag.square(), (self.key * self.tag).double()],
+            tag: [self.tag.square(), F::ZERO],
         }
     }
 }
@@ -215,6 +215,9 @@ where
 
     fn mul(mut self, rhs: F) -> Self::Output {
         self.key *= rhs;
+        self.tag[0] *= rhs;
+        self.tag[1] *= rhs;
+
         self
     }
 }
@@ -227,6 +230,8 @@ where
 
     fn mul(mut self, rhs: &F) -> Self::Output {
         self.key *= rhs;
+        self.tag[0] *= rhs;
+        self.tag[1] *= rhs;
         self
     }
 }
@@ -247,7 +252,9 @@ where
     F: BigGaloisField,
 {
     fn add_assign(&mut self, rhs: &Self) {
-        (*self) += rhs.clone();
+        self.key += rhs.key;
+        self.tag[0] += rhs.tag[0];
+        self.tag[1] += rhs.tag[1];
     }
 }
 
