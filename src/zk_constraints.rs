@@ -15,12 +15,10 @@ use std::{
 use crate::{
     aes::{state_to_bytes, CommittedStateBytes, CommittedStateBytesSquared},
     fields::{
-        field_commitment::{
-            ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo,
-        },
         large_fields::{Betas, ByteCombineSquared, FromBit, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Square, SumPoly,
+        BigGaloisField, ByteCombine, ByteCombineConstants, ByteCommits, ByteCommitsRef, Field,
+        FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo, Square, SumPoly,
     },
     internal_keys::PublicKey,
     parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},
@@ -219,7 +217,6 @@ where
 {
     (0..O::NSTBytes::USIZE)
         .flat_map(|i| {
-
             let mut x0 = state.get(i);
 
             // ::4-8
@@ -232,7 +229,6 @@ where
                 }
             }
             y
-
         })
         .collect()
 }

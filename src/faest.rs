@@ -177,8 +177,12 @@ where
     true
 }
 
-fn save_decom_and_ctr(decom_sig: &mut [u8], ctr_sig: &mut[u8], decom_i: &BavcOpenResult, ctr: u32) {
-    
+fn save_decom_and_ctr(
+    decom_sig: &mut [u8],
+    ctr_sig: &mut [u8],
+    decom_i: &BavcOpenResult,
+    ctr: u32,
+) {
     let BavcOpenResult { coms, nodes } = decom_i;
 
     // Save decom_i
@@ -190,13 +194,13 @@ fn save_decom_and_ctr(decom_sig: &mut [u8], ctr_sig: &mut[u8], decom_i: &BavcOpe
 
     // Save ctr
     ctr_sig.copy_from_slice(&ctr.to_le_bytes());
-    
 }
 
-
-fn save_zk_constraints<'a>(signature: &'a mut [u8], a1_tilde: &[u8], a2_tilde: &[u8]) -> &'a mut [u8]
-{
-
+fn save_zk_constraints<'a>(
+    signature: &'a mut [u8],
+    a1_tilde: &[u8],
+    a2_tilde: &[u8],
+) -> &'a mut [u8] {
     let (a1, signature) = signature.split_at_mut(a1_tilde.len());
     let (a2, signature) = signature.split_at_mut(a2_tilde.len());
 
@@ -308,29 +312,33 @@ fn sign<P, O>(
     );
     // Save a1_tilde, a2_tilde in signature
     let signature = save_zk_constraints(signature, &a1_tilde.as_bytes(), &a2_tilde.as_bytes());
-         
+
     // ::19
     let (decom_i_sig, chall3) = signature.split_at_mut(P::get_decom_size());
     for ctr in 0u32.. {
-
         // ::20
-        RO::<P>::hash_challenge_3(chall3, &chall2, &a0_tilde.as_bytes(), &a1_tilde.as_bytes(), &a2_tilde.as_bytes(), ctr);
+        RO::<P>::hash_challenge_3(
+            chall3,
+            &chall2,
+            &a0_tilde.as_bytes(),
+            &a1_tilde.as_bytes(),
+            &a2_tilde.as_bytes(),
+            ctr,
+        );
 
         // ::21
         if check_challenge_3::<O>(chall3, P::WGRIND::USIZE) {
-            
             // ::24
             let i_delta = decode_all_chall_3::<P::Tau>(&chall3);
 
             // ::26
             if let Some(decom_i) = <P as FAESTParameters>::BAVC::open(&decom, &i_delta) {
                 // Save decom_i and ctr bits
-                save_decom_and_ctr(decom_i_sig, ctr_s, &decom_i,ctr);
+                save_decom_and_ctr(decom_i_sig, ctr_s, &decom_i, ctr);
                 break;
             }
         }
     }
-
 }
 
 // opening_to_signature(

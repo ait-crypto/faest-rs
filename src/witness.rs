@@ -14,12 +14,10 @@ use std::{
 
 use crate::{
     fields::{
-        field_commitment::{
-            ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo,
-        },
         large_fields::{Betas, ByteCombineSquared, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field, SumPoly,
+        BigGaloisField, ByteCombine, ByteCombineConstants, ByteCommits, ByteCommitsRef, Field,
+        FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo, SumPoly,
     },
     internal_keys::PublicKey,
     parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},

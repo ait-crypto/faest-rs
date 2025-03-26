@@ -1092,7 +1092,7 @@ pub(crate) trait FAESTParameters {
         <<Self as FAESTParameters>::OWF as OWFParameters>::NLeafCommit::USIZE
             * <<Self as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES::USIZE
             * <<Self as FAESTParameters>::Tau as TauParameters>::Tau::USIZE
-            + 
+            +
             // nodes
             <<Self as FAESTParameters>::Tau as TauParameters>::Topen::USIZE
                 * <<Self as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES::USIZE

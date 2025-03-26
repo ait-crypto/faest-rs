@@ -14,12 +14,10 @@ use std::{
 
 use crate::{
     fields::{
-        field_commitment::{
-            ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo,
-        },
         large_fields::{Betas, ByteCombineSquared, ByteCombineSquaredConstants, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Sigmas, SumPoly,
+        BigGaloisField, ByteCombine, ByteCombineConstants, ByteCommits, ByteCommitsRef, Field,
+        FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo, Sigmas, SumPoly,
     },
     internal_keys::PublicKey,
     parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},
@@ -33,18 +31,17 @@ use crate::{
     zk_constraints::OWFField,
 };
 
-
 pub(crate) type CommittedStateBits<O> =
-Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
+    Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
 
 pub(crate) type CommittedStateBitsSquared<O> =
-Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
+    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
 
 pub(crate) type CommittedStateBytes<O> =
-Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
+    Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
 
 pub(crate) type CommittedStateBytesSquared<O> =
-Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
+    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
 
 pub(crate) fn add_round_key<O>(
     input: &mut ByteCommits<OWFField<O>, Prod<O::NST, U4>>,
