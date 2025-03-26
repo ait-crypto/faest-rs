@@ -1102,7 +1102,7 @@ impl FAESTParameters for FAEST128sParameters {
     type N1 = U2048;
     type POWK1 = Diff<U4096, U1>;
 
-    type SignatureSize = Sum<U142, Sum<U256, Sum<U512, U4096>>>;
+    type SignatureSize = Sum<U4096, U410>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
