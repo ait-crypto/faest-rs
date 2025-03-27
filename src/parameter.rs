@@ -9,7 +9,13 @@ use aes::{
 };
 use generic_array::{
     typenum::{
-        self, Diff, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1000, U102, U1024, U103, U11, U110, U112, U12, U120, U128, U13, U14, U142, U152, U16, U160, U162, U163, U16384, U176, U192, U2, U20, U200, U2048, U212, U216, U218, U22, U234, U24, U245, U246, U256, U26, U260, U280, U288, U3, U312, U32, U320, U32768, U33, U336, U384, U388, U4, U40, U408, U4096, U410, U44, U448, U460, U470, U476, U48, U5, U500, U506, U511, U512, U52, U548, U56, U576, U584, U596, U6, U60, U600, U64, U640, U65536, U672, U68, U696, U7, U752, U756, U8, U8192, U828, U832, U924, U948, U96, U960, U992
+        self, Diff, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1000, U102, U1024, U103, U11, U110,
+        U112, U12, U120, U128, U13, U14, U142, U152, U16, U160, U162, U163, U16384, U176, U192, U2,
+        U20, U200, U2048, U212, U216, U218, U22, U234, U24, U245, U246, U256, U26, U260, U280,
+        U288, U3, U312, U32, U320, U32768, U33, U336, U384, U388, U4, U40, U408, U4096, U410, U44,
+        U448, U460, U470, U476, U48, U5, U500, U506, U511, U512, U52, U548, U56, U576, U584, U596,
+        U6, U60, U600, U64, U640, U65536, U672, U68, U696, U7, U752, U756, U8, U8192, U828, U832,
+        U924, U948, U96, U960, U992,
     },
     ArrayLength, GenericArray,
 };
@@ -1119,7 +1125,6 @@ impl FAESTParameters for FAEST128sParameters {
     type SignatureSize = U4506;
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FAEST128fParameters;
 
@@ -1302,7 +1307,6 @@ type U11260 = Sum<Prod<U11, U1000>, U260>;
 type U14948 = Sum<Prod<U14, U1000>, U948>;
 type U20696 = Sum<Prod<U20, U1000>, U696>;
 type U26548 = Sum<Prod<U26, U1000>, U548>;
-
 
 type U23476 = Sum<Prod<U2048, U11>, U948>;
 

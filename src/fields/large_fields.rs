@@ -293,17 +293,16 @@ where
         + SquareBytes,
     u8: ToMask<T>,
 {
-
     /// "Square and Combine" field elements.
-    /// 
+    ///
     /// Each input field element is associated to a bit. The function computes bitwise squaring of the input and combines the result.
     fn byte_combine_sq(x: &[Self; 8]) -> Self {
         let sq = Self::square_byte(x);
         Self::byte_combine(&sq)
     }
 
-    /// "Square and Combine" field elements 
-    /// 
+    /// "Square and Combine" field elements
+    ///
     /// This is the same as [`Self::byte_combine_sq`] but takes a slice instead. It
     /// panics if the slice has less than `8` elements.
     fn byte_combine_sq_slice(x: &[Self]) -> Self {
@@ -319,8 +318,6 @@ where
         let sq_bits = GF8::square_bits(x);
         Self::byte_combine_bits(sq_bits)
     }
-
-    
 }
 
 // generic implementations of Add and AddAssign

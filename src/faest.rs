@@ -543,15 +543,17 @@ mod test {
         hashed_sig_s: Vec<u8>,
         hashed_sig_f: Vec<u8>,
     }
-    impl FaestProveData{
-
-        fn try_signing<P: FAESTParameters<OWF = O>, O: OWFParameters>(sk: &SecretKey<O>, hashed_sig: &[u8]){
+    impl FaestProveData {
+        fn try_signing<P: FAESTParameters<OWF = O>, O: OWFParameters>(
+            sk: &SecretKey<O>,
+            hashed_sig: &[u8],
+        ) {
             let mut signature = GenericArray::default();
             sign::<P, O>(&MSG, &sk, &RHO, &mut signature);
             assert_eq!(hashed_sig, hash_array(signature.as_slice()).as_slice());
         }
 
-        pub fn test_signature(&self){
+        pub fn test_signature(&self) {
             match self.lambda {
                 128 => {
                     let sk = SecretKey::<OWF128>::try_from(self.sk.as_slice()).unwrap();
@@ -581,20 +583,18 @@ mod test {
 
                     println!("FAEST-256f - testing FAEST.sign..");
                     Self::try_signing::<FAEST256fParameters, OWF256>(&sk, &self.hashed_sig_f);
-                
                 }
             }
         }
     }
 
     #[test]
-    fn faest_sign_test(){
+    fn faest_sign_test() {
         let database: Vec<FaestProveData> = read_test_data("FaestProve.json");
-        for data in database{
+        for data in database {
             data.test_signature();
         }
     }
-
 }
 
 // #[cfg(test)]
