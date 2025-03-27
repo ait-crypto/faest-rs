@@ -6,7 +6,7 @@ use sha3::{
 use crate::utils::Reader;
 
 pub(crate) trait RandomOracle {
-    type Hasher<const SEP: u8>: Hasher + Default;
+    type Hasher<const SEP: u8>: Hasher + Default + Clone;
 
     /// Create hasher for `H0`
     fn h0_init() -> Self::Hasher<0> {
@@ -88,7 +88,7 @@ pub(crate) trait Hasher {
 pub(crate) struct RandomOracleShake128 {}
 
 /// Hasher based on `SHAKE128`
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct Hasher128<const SEP: u8> {
     hasher: Shake128,
 }
@@ -134,7 +134,7 @@ impl<const SEP: u8> Hasher for Hasher256<SEP> {
 pub(crate) struct RandomOracleShake256 {}
 
 /// Hasher based on SHAKE256
-#[derive(Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct Hasher256<const SEP: u8> {
     hasher: Shake256,
 }
