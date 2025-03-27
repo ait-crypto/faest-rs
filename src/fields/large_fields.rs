@@ -112,7 +112,8 @@ pub trait SquareBytes: Field {
 
 /// Trait providing methods for "squared byte combination"
 pub trait ByteCombineSquared: Field {
-    fn byte_combine_sq(x: &[Self]) -> Self;
+    fn byte_combine_sq(x: &[Self; 8]) -> Self;
+    fn byte_combine_sq_slice(x: &[Self]) -> Self;
     fn byte_combine_bits_sq(x: u8) -> Self;
 }
 
@@ -292,15 +293,34 @@ where
         + SquareBytes,
     u8: ToMask<T>,
 {
+
+    /// "Square and Combine" field elements.
+    /// 
+    /// Each input field element is associated to a bit. The function computes bitwise squaring of the input and combines the result.
+    fn byte_combine_sq(x: &[Self; 8]) -> Self {
+        let sq = Self::square_byte(x);
+        Self::byte_combine(&sq)
+    }
+
+    /// "Square and Combine" field elements 
+    /// 
+    /// This is the same as [`Self::byte_combine_sq`] but takes a slice instead. It
+    /// panics if the slice has less than `8` elements.
+    fn byte_combine_sq_slice(x: &[Self]) -> Self {
+        let sq = Self::square_byte(x);
+        Self::byte_combine(&sq)
+    }
+
+    /// "Square and Combine" bits
+    ///
+    /// This is equivalient to calling the other functions with each bit
+    /// expressed a `0` or `1` field elements.`
     fn byte_combine_bits_sq(x: u8) -> Self {
         let sq_bits = GF8::square_bits(x);
         Self::byte_combine_bits(sq_bits)
     }
 
-    fn byte_combine_sq(x: &[Self]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
+    
 }
 
 // generic implementations of Add and AddAssign

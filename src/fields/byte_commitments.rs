@@ -62,7 +62,7 @@ where
     pub(crate) fn get_field_commit_sq(&self, index: usize) -> FieldCommitDegOne<F> {
         FieldCommitDegOne {
             key: F::byte_combine_bits_sq(self.keys[index]),
-            tag: F::byte_combine_sq(&self.tags[index * 8..index * 8 + 8]),
+            tag: F::byte_combine_sq_slice(&self.tags[index * 8..index * 8 + 8]),
         }
     }
 
@@ -112,7 +112,7 @@ where
     pub(crate) fn get_field_commit_sq(&self, index: usize) -> FieldCommitDegOne<F> {
         FieldCommitDegOne {
             key: F::byte_combine_bits_sq(self.keys[index]),
-            tag: F::byte_combine_sq(&self.tags[index * 8..index * 8 + 8]),
+            tag: F::byte_combine_sq_slice(&self.tags[index * 8..index * 8 + 8]),
         }
     }
 
