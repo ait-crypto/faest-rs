@@ -47,8 +47,7 @@ where
     O: OWFParameters,
 {
     // Step 0
-    let mut input: GenericArray<u8, O::InputSize> = GenericArray::default();
-    input.copy_from_slice(owf_input);
+    let mut input: GenericArray<u8, O::InputSize> = owf_input.to_owned();
 
     // Step 3
     let mut witness = GenericArray::default_boxed();

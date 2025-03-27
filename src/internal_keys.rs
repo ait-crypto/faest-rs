@@ -163,7 +163,7 @@ where
     O: OWFParameters,
 {
     pub(crate) owf_input: GenericArray<u8, O::InputSize>,
-    pub(crate) owf_output: GenericArray<u8, O::InputSize>,
+    pub(crate) owf_output: GenericArray<u8, O::OutputSize>,
 }
 
 impl<O> Clone for PublicKey<O>

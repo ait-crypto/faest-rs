@@ -117,7 +117,7 @@ fn owf_constraints<O>(
     O: OWFParameters,
     <<O as OWFParameters>::BaseParams as BaseParameters>::Field: PartialEq,
 {
-    if (O::LAMBDA::USIZE != 128 || O::is_em()) {
+    if O::is_em() {
         todo!("AES verison not yet supported");
     }
 
@@ -126,7 +126,8 @@ fn owf_constraints<O>(
         owf_input,
         owf_output,
     } = pk;
-    let in_keys = owf_input.to_owned();
+
+    let mut owf_input = owf_input.to_owned();
 
     // ::5
     {
@@ -143,23 +144,22 @@ fn owf_constraints<O>(
 
     let k = aes_key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKEBytes>(0));
 
-    let mut w_tilde_keys = GenericArray::from_slice(
-        &w.keys[O::LKEBytes::USIZE..O::LKEBytes::USIZE + O::LENCBytes::USIZE],
-    );
-    let mut w_tilde_tags =
-        GenericArray::from_slice(&w.tags[O::LKE::USIZE..O::LKE::USIZE + O::LENC::USIZE]);
+    for b in 0..O::BETA::USIZE {
+        // println!("before key_cnstr:\n h0: {:?} - {:?} - {:?}\nh1: {:?} - {:?} - {:?}", zk_hasher.a0_hasher.h0, zk_hasher.a1_hasher.h0, zk_hasher.a2_hasher.h0, zk_hasher.a0_hasher.h1, zk_hasher.a1_hasher.h1, zk_hasher.a2_hasher.h1);
 
-    // println!("before key_cnstr:\n h0: {:?} - {:?} - {:?}\nh1: {:?} - {:?} - {:?}", zk_hasher.a0_hasher.h0, zk_hasher.a1_hasher.h0, zk_hasher.a2_hasher.h0, zk_hasher.a0_hasher.h1, zk_hasher.a1_hasher.h1, zk_hasher.a2_hasher.h1);
-    encryption::aes_enc_cstrnts::<O>(
-        zk_hasher,
-        owf_input,
-        owf_output,
-        ByteCommitsRef {
-            keys: w_tilde_keys,
-            tags: w_tilde_tags,
-        },
-        k.get_commits_ref(),
-    );
+        let w_tilde =
+            w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE + b * O::LENCBytes::USIZE);
+
+        encryption::aes_enc_cstrnts::<O>(
+            zk_hasher,
+            &owf_input,
+            GenericArray::from_slice(&owf_output[16 * b..16 * (b + 1)]),
+            w_tilde,
+            k.get_commits_ref(),
+        );
+
+        owf_input[0] ^= 1;
+    }
     // println!("after key_cnstr:\n h0: {:?} - {:?} - {:?}\nh1: {:?} - {:?} - {:?}", zk_hasher.a0_hasher.h0, zk_hasher.a1_hasher.h0, zk_hasher.a2_hasher.h0, zk_hasher.a0_hasher.h1, zk_hasher.a1_hasher.h1, zk_hasher.a2_hasher.h1);
 }
 

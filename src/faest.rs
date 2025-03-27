@@ -42,13 +42,16 @@ trait FaestHash: RandomOracle {
         chall2: &mut [u8],
         d: &[u8],
     );
-    /// Generate third challenge
-    fn hash_challenge_3(
-        chall3: &mut [u8],
+    /// Generate third challenge in an init-finalize style
+    fn hash_challenge_3_init(
         chall2: &[u8],
         a0_t: &[u8],
         a1_t: &[u8],
         a2_t: &[u8],
+    ) -> <Self as RandomOracle>::Hasher<11>;
+    fn hash_challenge_3_finalize(
+        hasher: &<Self as RandomOracle>::Hasher<11>,
+        chall3: &mut [u8],
         ctr: u32,
     );
 }
@@ -115,21 +118,28 @@ where
         hasher.finish().read(chall2);
     }
 
-    fn hash_challenge_3(
-        chall3: &mut [u8],
+    fn hash_challenge_3_init(
         chall2: &[u8],
         a0_t: &[u8],
         a1_t: &[u8],
         a2_t: &[u8],
-        ctr: u32,
-    ) {
+    ) -> <Self as RandomOracle>::Hasher<11> {
         let mut h2_hasher = Self::h2_3_init();
         h2_hasher.update(chall2);
         h2_hasher.update(a0_t);
         h2_hasher.update(a1_t);
         h2_hasher.update(a2_t);
-        h2_hasher.update(&ctr.to_le_bytes());
-        h2_hasher.finish().read(chall3);
+        h2_hasher
+    }
+
+    fn hash_challenge_3_finalize(
+        hasher: &<Self as RandomOracle>::Hasher<11>,
+        chall3: &mut [u8],
+        ctr: u32,
+    ) {
+        let mut hasher = (*hasher).clone();
+        hasher.update(&ctr.to_le_bytes());
+        hasher.finish().read(chall3);
     }
 }
 
@@ -315,17 +325,15 @@ fn sign<P, O>(
 
     // ::19
     let (decom_i_sig, chall3) = signature.split_at_mut(P::get_decom_size());
+    let hasher = RO::<P>::hash_challenge_3_init(
+        &chall2,
+        &a0_tilde.as_bytes(),
+        &a1_tilde.as_bytes(),
+        &a2_tilde.as_bytes(),
+    );
     for ctr in 0u32.. {
         // ::20
-        RO::<P>::hash_challenge_3(
-            chall3,
-            &chall2,
-            &a0_tilde.as_bytes(),
-            &a1_tilde.as_bytes(),
-            &a2_tilde.as_bytes(),
-            ctr,
-        );
-
+        RO::<P>::hash_challenge_3_finalize(&hasher, chall3, ctr);
         // ::21
         if check_challenge_3::<O>(chall3, P::WGRIND::USIZE) {
             // ::24
@@ -505,47 +513,88 @@ mod test {
             FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
             FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters, FAESTEM128sParameters,
             FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters,
-            FAESTEM256sParameters, FAESTParameters, OWF128,
+            FAESTEM256sParameters, FAESTParameters, OWF128, OWF192, OWF256,
         },
-        utils::test::hash_array,
+        utils::test::{hash_array, read_test_data},
     };
+    use core::hash;
+    use serde::Deserialize;
+
+    const MSG: [u8; 76] = [
+        0x54, 0x68, 0x69, 0x73, 0x20, 0x64, 0x6f, 0x63, 0x75, 0x6d, 0x65, 0x6e, 0x74, 0x20, 0x64,
+        0x65, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x73, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x70,
+        0x65, 0x63, 0x69, 0x66, 0x69, 0x65, 0x73, 0x20, 0x74, 0x68, 0x65, 0x20, 0x46, 0x41, 0x45,
+        0x53, 0x54, 0x20, 0x64, 0x69, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x20, 0x73, 0x69, 0x67, 0x6e,
+        0x61, 0x74, 0x75, 0x72, 0x65, 0x20, 0x61, 0x6c, 0x67, 0x6f, 0x72, 0x69, 0x74, 0x68, 0x6d,
+        0x2e,
+    ];
+
+    const RHO: [u8; 16] = [
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
+        0x0f,
+    ];
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct FaestProveData {
+        lambda: u16,
+        em: bool,
+        sk: Vec<u8>,
+        hashed_sig_s: Vec<u8>,
+        hashed_sig_f: Vec<u8>,
+    }
+    impl FaestProveData{
+
+        fn try_signing<P: FAESTParameters<OWF = O>, O: OWFParameters>(sk: &SecretKey<O>, hashed_sig: &[u8]){
+            let mut signature = GenericArray::default();
+            sign::<P, O>(&MSG, &sk, &RHO, &mut signature);
+            assert_eq!(hashed_sig, hash_array(signature.as_slice()).as_slice());
+        }
+
+        pub fn test_signature(&self){
+            match self.lambda {
+                128 => {
+                    let sk = SecretKey::<OWF128>::try_from(self.sk.as_slice()).unwrap();
+
+                    println!("FAEST-128s - testing FAEST.sign..");
+                    Self::try_signing::<FAEST128sParameters, OWF128>(&sk, &self.hashed_sig_s);
+
+                    println!("FAEST-128f - testing FAEST.sign..");
+                    Self::try_signing::<FAEST128fParameters, OWF128>(&sk, &self.hashed_sig_f);
+                }
+
+                192 => {
+                    let sk = SecretKey::<OWF192>::try_from(self.sk.as_slice()).unwrap();
+
+                    println!("FAEST-192s - testing FAEST.sign..");
+                    Self::try_signing::<FAEST192sParameters, OWF192>(&sk, &self.hashed_sig_s);
+
+                    println!("FAEST-192f - testing FAEST.sign..");
+                    Self::try_signing::<FAEST192fParameters, OWF192>(&sk, &self.hashed_sig_f);
+                }
+
+                _ => {
+                    let sk = SecretKey::<OWF256>::try_from(self.sk.as_slice()).unwrap();
+
+                    println!("FAEST-256s - testing FAEST.sign..");
+                    Self::try_signing::<FAEST256sParameters, OWF256>(&sk, &self.hashed_sig_s);
+
+                    println!("FAEST-256f - testing FAEST.sign..");
+                    Self::try_signing::<FAEST256fParameters, OWF256>(&sk, &self.hashed_sig_f);
+                
+                }
+            }
+        }
+    }
 
     #[test]
-    fn sign_128s_test() {
-        let msg = [
-            0x54, 0x68, 0x69, 0x73, 0x20, 0x64, 0x6f, 0x63, 0x75, 0x6d, 0x65, 0x6e, 0x74, 0x20,
-            0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x73, 0x20, 0x61, 0x6e, 0x64, 0x20,
-            0x73, 0x70, 0x65, 0x63, 0x69, 0x66, 0x69, 0x65, 0x73, 0x20, 0x74, 0x68, 0x65, 0x20,
-            0x46, 0x41, 0x45, 0x53, 0x54, 0x20, 0x64, 0x69, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x20,
-            0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x20, 0x61, 0x6c, 0x67, 0x6f,
-            0x72, 0x69, 0x74, 0x68, 0x6d, 0x2e,
-        ];
-
-        let sk_bytes = [
-            0xc1, 0xa3, 0xc0, 0x22, 0xe7, 0x18, 0x93, 0x5f, 0x46, 0x63, 0x03, 0x86, 0xaf, 0xa3,
-            0xd3, 0xf2, 0xc0, 0x72, 0x0b, 0x10, 0xbf, 0x26, 0x6c, 0x19, 0x24, 0x18, 0x87, 0x72,
-            0xc5, 0x1f, 0xbe, 0x52,
-        ];
-
-        let rho = [
-            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
-            0x0e, 0x0f,
-        ];
-
-        let hashed_sig = [
-            113, 174, 23, 230, 230, 128, 4, 161, 247, 71, 199, 153, 69, 241, 28, 169, 87, 176, 165,
-            35, 117, 118, 50, 226, 193, 86, 182, 117, 26, 101, 165, 119, 90, 38, 21, 209, 48, 99,
-            0, 144, 95, 216, 227, 245, 8, 215, 117, 211, 213, 91, 154, 4, 155, 238, 61, 64, 39,
-            255, 183, 22, 225, 155, 164, 52,
-        ];
-
-        let sk = SecretKey::<OWF128>::try_from(sk_bytes.as_slice()).unwrap();
-
-        let mut signature = GenericArray::default();
-        sign::<FAEST128sParameters, OWF128>(&msg, &sk, &rho, &mut signature);
-
-        assert_eq!(hashed_sig, hash_array(signature.as_slice()).as_slice());
+    fn faest_sign_test(){
+        let database: Vec<FaestProveData> = read_test_data("FaestProve.json");
+        for data in database{
+            data.test_signature();
+        }
     }
+
 }
 
 // #[cfg(test)]
