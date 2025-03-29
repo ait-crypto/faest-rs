@@ -9,13 +9,13 @@ use aes::{
 };
 use generic_array::{
     typenum::{
-        self, Diff, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1000, U102, U1024, U103, U11, U110,
+        self, Diff, Prod, Quot, Sum, Unsigned, U0, U1, U23, U984, U17, U380, U340, U9, U906, U10, U1000, U102, U1024, U103, U11, U110,
         U112, U12, U120, U128, U13, U14, U142, U152, U16, U160, U162, U163, U16384, U176, U192, U2,
         U20, U200, U2048, U212, U216, U218, U22, U234, U24, U245, U246, U256, U26, U260, U280,
         U288, U3, U312, U32, U320, U32768, U33, U336, U384, U388, U4, U40, U408, U4096, U410, U44,
         U448, U460, U470, U476, U48, U5, U500, U506, U511, U512, U52, U548, U56, U576, U584, U596,
         U6, U60, U600, U64, U640, U65536, U672, U68, U696, U7, U752, U756, U8, U8192, U828, U832,
-        U924, U948, U96, U960, U992,
+        U924, U948, U96, U960, U992, Equal, U688
     },
     ArrayLength, GenericArray,
 };
@@ -261,6 +261,7 @@ pub(crate) trait OWFParameters: Sized {
     //     }
     // }
 }
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct OWF128;
@@ -564,6 +565,7 @@ impl OWFParameters for OWF256 {
     // }
 }
 
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct OWF128EM;
 
@@ -586,7 +588,7 @@ impl OWFParameters for OWF128EM {
     type NSTBytes = Prod<Self::NST, U4>;
     type NSTBits = Prod<Self::NSTBytes, U8>;
     type R = U10;
-    type SKE = U44;
+    type SKE = U40;
     type BETA = U1;
     type LKE = U128;
     type LKEBytes = Quot<Self::LKE, U8>;
@@ -685,7 +687,7 @@ impl OWFParameters for OWF192EM {
     type LENCBytes = Quot<Self::LENC, U8>;
     type NLeafCommit = U2;
 
-    type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128 = Prod<Sum<Self::R, U1>, Self::LAMBDA>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
 
     type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
@@ -744,6 +746,8 @@ impl OWFParameters for OWF192EM {
 }
 
 type U2432 = Sum<U2048, U384>;
+type U2688 = Sum<Prod<U1000, U2>, U688>;
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct OWF256EM;
@@ -751,14 +755,14 @@ pub(crate) struct OWF256EM;
 impl OWFParameters for OWF256EM {
     type BaseParams = BaseParams256;
     type InputSize = U32;
-    type OutputSize = U64;
+    type OutputSize = U32;
 
     type B = U16;
     type LAMBDA = U256;
     type LAMBDABYTES = U32;
     type LAMBDABYTESTWO = Prod<Self::LAMBDABYTES, U2>;
-    type L = L<Self::LBYTES>;
     type LBYTES = U336;
+    type L = L<Self::LBYTES>;
     type LHATBYTES = LHatBytes<Self::LBYTES, Self::LAMBDABYTES, Self::B>;
     type LAMBDALBYTES = Sum<Self::LAMBDABYTESTWO, Self::LBYTES>;
 
@@ -769,13 +773,13 @@ impl OWFParameters for OWF256EM {
     type BETA = U1;
     type R = U14;
     type SKE = U60;
-    type LKE = U448;
+    type LKE = U256;
     type LKEBytes = Quot<Self::LKE, U8>;
-    type LENC = U1536;
+    type LENC = U2432;
     type LENCBytes = Quot<Self::LENC, U8>;
     type NLeafCommit = U2;
 
-    type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
+    type PRODRUN128 = Prod<Sum<Self::R, U1>, Self::LAMBDA>;
     type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
 
     type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
@@ -1089,12 +1093,9 @@ pub(crate) trait FAESTParameters {
     >;
 
     type WGRIND: ArrayLength;
-    type N0: ArrayLength;
-    type N1: ArrayLength;
-    type POWK0: ArrayLength;
-    type POWK1: ArrayLength;
     /// Size of the signature (in bytes)
     type SignatureSize: ArrayLength;
+    
     #[inline]
     fn get_decom_size() -> usize {
         // coms
@@ -1117,11 +1118,6 @@ impl FAESTParameters for FAEST128sParameters {
     type BAVC = BAVC128Small;
 
     type WGRIND = U7;
-    type N0 = U4096;
-    type POWK0 = Diff<U8192, U1>;
-    type N1 = U2048;
-    type POWK1 = Diff<U4096, U1>;
-
     type SignatureSize = U4506;
 }
 
@@ -1134,10 +1130,6 @@ impl FAESTParameters for FAEST128fParameters {
     type BAVC = BAVC128Fast;
 
     type WGRIND = U8;
-    type N0 = U256;
-    type POWK0 = U511;
-    type N1 = U256;
-    type POWK1 = U511;
     type SignatureSize = U5924;
 }
 
@@ -1150,10 +1142,6 @@ impl FAESTParameters for FAEST192sParameters {
     type BAVC = BAVC192Small;
 
     type WGRIND = U12;
-    type N0 = U4096;
-    type POWK0 = Diff<U8192, U1>;
-    type N1 = U4096;
-    type POWK1 = Diff<U8192, U1>;
     type SignatureSize = U11260;
 }
 
@@ -1166,10 +1154,6 @@ impl FAESTParameters for FAEST192fParameters {
     type BAVC = BAVC192Fast;
 
     type WGRIND = U8;
-    type N0 = U256;
-    type POWK0 = U511;
-    type N1 = U256;
-    type POWK1 = U511;
     type SignatureSize = U14948;
 }
 
@@ -1182,10 +1166,6 @@ impl FAESTParameters for FAEST256sParameters {
     type BAVC = BAVC256Small;
 
     type WGRIND = U6;
-    type N0 = U4096;
-    type POWK0 = Diff<U8192, U1>;
-    type N1 = U2048;
-    type POWK1 = Diff<U4096, U1>;
     type SignatureSize = U20696;
 }
 
@@ -1198,10 +1178,6 @@ impl FAESTParameters for FAEST256fParameters {
     type BAVC = BAVC256Fast;
 
     type WGRIND = U8;
-    type N0 = U256;
-    type POWK0 = U511;
-    type N1 = U256;
-    type POWK1 = U511;
     type SignatureSize = U26548;
 }
 
@@ -1214,11 +1190,7 @@ impl FAESTParameters for FAESTEM128sParameters {
     type BAVC = BAVC128SmallEM;
 
     type WGRIND = U7;
-    type N0 = U4096;
-    type POWK0 = Diff<U8192, U1>;
-    type N1 = U2048;
-    type POWK1 = Diff<U4096, U1>;
-    type SignatureSize = Sum<U470, U4096>;
+    type SignatureSize = U3906;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1230,11 +1202,7 @@ impl FAESTParameters for FAESTEM128fParameters {
     type BAVC = BAVC128FastEM;
 
     type WGRIND = U8;
-    type N0 = U256;
-    type POWK0 = U511;
-    type N1 = U256;
-    type POWK1 = U511;
-    type SignatureSize = U4506;
+    type SignatureSize = U5060;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1246,11 +1214,7 @@ impl FAESTParameters for FAESTEM192sParameters {
     type BAVC = BAVC192SmallEM;
 
     type WGRIND = U8;
-    type N0 = U4096;
-    type POWK0 = Diff<U8192, U1>;
-    type N1 = U4096;
-    type POWK1 = Diff<U8192, U1>;
-    type SignatureSize = U11260;
+    type SignatureSize = U9340;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1262,11 +1226,7 @@ impl FAESTParameters for FAESTEM192fParameters {
     type BAVC = BAVC192FastEM;
 
     type WGRIND = U8;
-    type N0 = U256;
-    type POWK0 = U511;
-    type N1 = U256;
-    type POWK1 = U511;
-    type SignatureSize = U14948;
+    type SignatureSize = U12380;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1278,11 +1238,7 @@ impl FAESTParameters for FAESTEM256sParameters {
     type BAVC = BAVC256SmallEM;
 
     type WGRIND = U6;
-    type N0 = U4096;
-    type POWK0 = Diff<U8192, U1>;
-    type N1 = U2048;
-    type POWK1 = Diff<U4096, U1>;
-    type SignatureSize = U20696;
+    type SignatureSize = U17984;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1294,13 +1250,10 @@ impl FAESTParameters for FAESTEM256fParameters {
     type BAVC = BAVC256FastEM;
 
     type WGRIND = U8;
-    type N0 = U256;
-    type POWK0 = U511;
-    type N1 = U256;
-    type POWK1 = U511;
-    type SignatureSize = U26548;
+    type SignatureSize = U23476;
 }
 
+// FAEST signature sizes
 type U4506 = Sum<Prod<U4, U1000>, U506>;
 type U5924 = Sum<Prod<U5, U1000>, U924>;
 type U11260 = Sum<Prod<U11, U1000>, U260>;
@@ -1308,7 +1261,13 @@ type U14948 = Sum<Prod<U14, U1000>, U948>;
 type U20696 = Sum<Prod<U20, U1000>, U696>;
 type U26548 = Sum<Prod<U26, U1000>, U548>;
 
-type U23476 = Sum<Prod<U2048, U11>, U948>;
+// FAEST-EM signature sizes
+type U3906 = Sum<Prod<U1000, U3>, U906>;
+type U5060 = Sum<Prod<U1000, U5>, U60>;
+type U9340 = Sum<Prod<U1000, U9>, U340>;
+type U12380 = Sum<Prod<U1000, U12>, U380>;
+type U17984 = Sum<Prod<U1000, U17>, U984>;
+type U23476 = Sum<Prod<U1000, U23>, U476>;
 
 // #[cfg(test)]
 // mod test {
