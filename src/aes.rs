@@ -271,7 +271,6 @@ where
             let mut y_i = FieldCommitDegTwo::from_field(&sigmas[8]);
 
             for sigma_idx in 0..8 {
-                // TODO: produce y_i by iterating over state and avoiding clone
                 y_i += state[i * 8 + (sigma_idx + t) % 8].clone() * &sigmas[sigma_idx];
             }
 

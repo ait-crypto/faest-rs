@@ -31,7 +31,7 @@ use crate::{
     utils::contains_zeros,
 };
 
-use key_expansion::{aes_key_exp_bkwd, aes_key_exp_cstrnts, aes_key_exp_fwd};
+use key_expansion::{key_exp_bkwd, key_exp_cstrnts, key_exp_fwd};
 
 pub(crate) type KeyCstrnts<O> = (
     Box<GenericArray<u8, <O as OWFParameters>::PRODRUN128Bytes>>,
@@ -117,17 +117,11 @@ fn owf_constraints<O>(
     O: OWFParameters,
     <<O as OWFParameters>::BaseParams as BaseParameters>::Field: PartialEq,
 {
-    if O::is_em() {
-        todo!("AES verison not yet supported");
-    }
-
     // ::1
     let PublicKey {
-        owf_input,
-        owf_output,
+        owf_input: x,
+        owf_output: y,
     } = pk;
-
-    let mut owf_input = owf_input.to_owned();
 
     // ::5
     {
@@ -142,25 +136,64 @@ fn owf_constraints<O>(
         });
     }
 
-    let k = aes_key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKEBytes>(0));
+    // ::7
+    if O::is_em() {
 
-    for b in 0..O::BETA::USIZE {
-        // println!("before key_cnstr:\n h0: {:?} - {:?} - {:?}\nh1: {:?} - {:?} - {:?}", zk_hasher.a0_hasher.h0, zk_hasher.a1_hasher.h0, zk_hasher.a2_hasher.h0, zk_hasher.a0_hasher.h1, zk_hasher.a1_hasher.h1, zk_hasher.a2_hasher.h1);
+        let (k, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(&x, O::SKE::USIZE);
 
+
+        let k: Vec<u8> = k.chunks_exact(8).flat_map(
+            |chunk| convert_from_batchblocks(inv_bitslice(&chunk)).take(O::NST::USIZE).flatten()
+        ).collect();
+        
+        
+        let ext_key: &GenericArray<u8, <O as OWFParameters>::PRODRUN128Bytes> = GenericArray::from_slice(&k[..O::PRODRUN128Bytes::USIZE]);
+        // println!("key: {:?}", &ext_key[14*O::NSTBytes::USIZE..]);
+
+
+        let owf_input = w.get_commits_ref::<O::InputSize>(0);
+
+        let owf_output_keys: GenericArray<u8, O::NSTBytes> = owf_input
+            .keys
+            .iter()
+            .zip(y.iter())
+            .map(|(k, out)| k ^ out)
+            .collect();
+
+        let owf_output = ByteCommitsRef {
+            keys: GenericArray::from_slice(&owf_output_keys),
+            tags: GenericArray::from_slice(owf_input.tags),
+        };
+
+        // :: 19
         let w_tilde =
-            w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE + b * O::LENCBytes::USIZE);
+            w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE);
 
-        encryption::aes_enc_cstrnts::<O>(
-            zk_hasher,
-            &owf_input,
-            GenericArray::from_slice(&owf_output[16 * b..16 * (b + 1)]),
-            w_tilde,
-            k.get_commits_ref(),
-        );
 
-        owf_input[0] ^= 1;
+        encryption::enc_cstrnts_em::<O>(zk_hasher, owf_input, owf_output, w_tilde, &ext_key);
+    } else {
+        let mut owf_input = x.to_owned();
+        let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKEBytes>(0));
+
+        for b in 0..O::BETA::USIZE {
+            let w_tilde =
+                w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE + b * O::LENCBytes::USIZE);
+
+            let owf_output = GenericArray::from_slice(
+                &y[O::InputSize::USIZE * b..O::InputSize::USIZE * (b + 1)],
+            );
+
+            encryption::enc_cstrnts::<O>(
+                zk_hasher,
+                & owf_input,
+                owf_output,
+                w_tilde,
+                k.get_commits_ref(),
+            );
+
+            owf_input[0] ^= 1;
+        }
     }
-    // println!("after key_cnstr:\n h0: {:?} - {:?} - {:?}\nh1: {:?} - {:?} - {:?}", zk_hasher.a0_hasher.h0, zk_hasher.a1_hasher.h0, zk_hasher.a2_hasher.h0, zk_hasher.a0_hasher.h1, zk_hasher.a1_hasher.h1, zk_hasher.a2_hasher.h1);
 }
 
 fn invnorm_to_conjugates_prover<O>(
@@ -236,7 +269,7 @@ where
 pub(crate) mod key_expansion {
     use super::*;
 
-    pub(crate) fn aes_key_exp_fwd<O>(
+    pub(crate) fn key_exp_fwd<O>(
         w: ByteCommitsRef<OWFField<O>, O::LKEBytes>,
     ) -> ByteCommits<OWFField<O>, O::PRODRUN128Bytes>
     where
@@ -276,7 +309,7 @@ pub(crate) mod key_expansion {
         ByteCommits::new(y, y_tags)
     }
 
-    pub(crate) fn aes_key_exp_bkwd<O>(
+    pub(crate) fn key_exp_bkwd<O>(
         x: ByteCommitsRef<OWFField<O>, O::DIFFLKELAMBDABytes>,
         xk: ByteCommitsRef<OWFField<O>, O::PRODRUN128Bytes>,
     ) -> ByteCommits<OWFField<O>, O::SKE>
@@ -318,7 +351,7 @@ pub(crate) mod key_expansion {
         ByteCommits::new(y, y_tag)
     }
 
-    pub(crate) fn aes_key_exp_cstrnts<O>(
+    pub(crate) fn key_exp_cstrnts<O>(
         zk_hasher: &mut ZKProofHasher<OWFField<O>>,
         w: ByteCommitsRef<OWFField<O>, O::LKEBytes>,
     ) -> ByteCommits<OWFField<O>, O::PRODRUN128Bytes>
@@ -328,10 +361,10 @@ pub(crate) mod key_expansion {
         <<O as OWFParameters>::BaseParams as BaseParameters>::Field: PartialEq,
     {
         // ::1
-        let k = aes_key_exp_fwd::<O>(w);
+        let k = key_exp_fwd::<O>(w);
 
         // ::2
-        let w_flat = aes_key_exp_bkwd::<O>(
+        let w_flat = key_exp_bkwd::<O>(
             w.get_commits_ref::<O::DIFFLKELAMBDABytes>(O::LAMBDABYTES::USIZE),
             k.get_commits_ref(),
         );
@@ -386,7 +419,119 @@ pub(crate) mod encryption {
 
     use super::*;
 
-    pub(crate) fn aes_enc_cstrnts<O>(
+    pub(crate) fn enc_cstrnts_em<O>(
+        zk_hasher: &mut ZKProofHasher<OWFField<O>>,
+        input: ByteCommitsRef<OWFField<O>, O::InputSize>,
+        output: ByteCommitsRef<OWFField<O>, O::OutputSize>,
+        w: ByteCommitsRef<OWFField<O>, O::LENCBytes>,
+        extended_key: &GenericArray<u8, O::PRODRUN128Bytes>,
+    ) where
+        O: OWFParameters,
+    {
+        let mut state = ByteCommits::new(
+            input
+                .keys
+                .iter()
+                .zip(&extended_key[..O::NSTBytes::USIZE])
+                .map(|(x, k)| x ^ k)
+                .collect(),
+            Box::<GenericArray<OWFField<O>, O::NSTBits>>::from_iter(
+                input.tags[..O::NSTBits::USIZE].to_owned(),
+            ),
+        );
+
+        // ::2
+        for r in 0..O::R::USIZE / 2 {
+            // ::4
+            let state_conj = f256_f2_conjugates::<O>(&state);
+
+            // ::6
+            let n_key_off = 3 * O::NSTBytes::USIZE * r / 2;
+            let n_tag_off = 3 * O::NSTBits::USIZE * r / 2;
+
+            let mut state_prime = CommittedStateBitsSquared::<O>::default();
+
+            // ::7
+            for i in 0..O::NSTBytes::USIZE {
+                // ::9
+                let norm = (w.keys[n_key_off + i / 2] >> ((i % 2) * 4)) & 0xf;
+                let ys = invnorm_to_conjugates_prover::<O>(
+                    norm,
+                    &w.tags[n_tag_off + 4 * i..n_tag_off + 4 * i + 4],
+                );
+
+                // ::11
+                inv_norm_constraints_prover::<O>(
+                    zk_hasher,
+                    GenericArray::from_slice(&state_conj[8 * i..8 * i + 8]),
+                    &ys[0],
+                );
+
+                // ::12
+                for j in 0..8 {
+                    state_prime[i * 8 + j] = state_conj[8 * i + (j + 4) % 8].clone() * &ys[j % 4];
+                }
+            }
+
+            // ::16-17
+            let rk_tags = GenericArray::default();
+            let round_key = state_to_bytes::<O>(ByteCommitsRef {
+                keys: GenericArray::from_slice(
+                    &extended_key[(2 * r + 1) * O::NSTBytes::USIZE
+                        ..(2 * r + 1) * O::NSTBytes::USIZE + O::NSTBytes::USIZE],
+                ),
+                tags: &rk_tags,
+            });
+            let round_key_sq = square_key::<O>(&round_key);
+
+            // ::18-22
+            let st_0 =
+                aes_round::<O, FieldCommitDegOne<OWFField<O>>>(&state_prime, &round_key, false);
+            let st_1 =
+                aes_round::<O, FieldCommitDegTwo<OWFField<O>>>(&state_prime, &round_key_sq, true);
+
+            let round_key = ByteCommitsRef {
+                keys: GenericArray::from_slice(
+                    &extended_key[(2 * r + 2) * O::NSTBytes::USIZE
+                        ..(2 * r + 2) * O::NSTBytes::USIZE + O::NSTBytes::USIZE],
+                ),
+                tags: &rk_tags,
+            };
+
+            if r != O::R::USIZE / 2 - 1 {
+                // ::25
+                let s_tilde = w.get_commits_ref::<O::NSTBytes>(
+                    O::NSTBytes::USIZE / 2 + 3 * O::NSTBytes::USIZE * r / 2,
+                );
+
+                // ::29-38
+                odd_round_cnstrnts::<O>(zk_hasher, s_tilde, &st_0, &st_1);
+
+                // ::40
+                state = bytewise_mix_columns::<O>(s_tilde);
+
+                // ::41
+                add_round_key::<O>(&mut state, round_key)
+            } else {
+                let s_tilde_keys: GenericArray<u8, O::NSTBytes> = output
+                    .keys
+                    .iter()
+                    .zip(round_key.keys)
+                    .map(|(x, k)| x ^ k)
+                    .collect();
+
+                let s_tilde = ByteCommitsRef {
+                    keys: &s_tilde_keys,
+                    tags: GenericArray::from_slice(output.tags),
+                };
+
+                // ::29-38
+                odd_round_cnstrnts::<O>(zk_hasher, s_tilde, &st_0, &st_1);
+            }
+        }
+    }
+
+    pub(crate) fn enc_cstrnts<O>(
         zk_hasher: &mut ZKProofHasher<OWFField<O>>,
         input: &GenericArray<u8, O::InputSize>,
         output: &GenericArray<u8, O::InputSize>,
@@ -395,8 +540,6 @@ pub(crate) mod encryption {
     ) where
         O: OWFParameters,
     {
-        // debug_assert!(extended_key.len() == O::R::USIZE + 1);
-
         // ::1
         let mut state = ByteCommits::new(
             input
@@ -430,7 +573,7 @@ pub(crate) mod encryption {
                 );
 
                 // ::11
-                aes_inv_norm_constraints_prover::<O>(
+                inv_norm_constraints_prover::<O>(
                     zk_hasher,
                     GenericArray::from_slice(&state_conj[8 * i..8 * i + 8]),
                     &ys[0],
@@ -541,7 +684,7 @@ pub(crate) mod encryption {
         st
     }
 
-    fn aes_inv_norm_constraints_prover<O>(
+    fn inv_norm_constraints_prover<O>(
         hasher: &mut ZKProofHasher<OWFField<O>>,
         conjugates: &GenericArray<FieldCommitDegOne<OWFField<O>>, U8>,
         y: &FieldCommitDegOne<OWFField<O>>,
@@ -557,7 +700,7 @@ pub(crate) mod encryption {
 mod test {
     #![allow(clippy::needless_range_loop)]
 
-    use super::key_expansion::{aes_key_exp_bkwd, aes_key_exp_fwd};
+    use super::key_expansion::{key_exp_bkwd, key_exp_fwd};
     use super::*;
     use crate::{
         fields::{GF128, GF192, GF256},
@@ -625,7 +768,7 @@ mod test {
         let w_tags = GenericArray::default();
         let k_tags = GenericArray::default();
 
-        let res = aes_key_exp_bkwd::<OWF128>(
+        let res = key_exp_bkwd::<OWF128>(
             ByteCommitsRef::new(&w, &w_tags),
             ByteCommitsRef::new(&k, &k_tags),
         );
@@ -654,7 +797,7 @@ mod test {
         let hasher = ZKHasher::<GF128>::new_zk_hasher(&GenericArray::default());
         let mut hasher = ZKProofHasher::<GF128>::new(hasher.clone(), hasher.clone(), hasher);
 
-        aes_key_exp_cstrnts::<OWF128>(
+        key_exp_cstrnts::<OWF128>(
             &mut hasher,
             ByteCommitsRef::new(
                 &GenericArray::from_slice(&w[..lke]),

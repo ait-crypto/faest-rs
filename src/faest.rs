@@ -513,7 +513,8 @@ mod test {
             FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
             FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters, FAESTEM128sParameters,
             FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters,
-            FAESTEM256sParameters, FAESTParameters, OWF128, OWF192, OWF256,
+            FAESTEM256sParameters, FAESTParameters, OWF128, OWF128EM, OWF192, OWF192EM, OWF256,
+            OWF256EM,
         },
         utils::test::{hash_array, read_test_data},
     };
@@ -553,7 +554,41 @@ mod test {
             assert_eq!(hashed_sig, hash_array(signature.as_slice()).as_slice());
         }
 
-        pub fn test_signature(&self) {
+        fn test_signature_em(&self) {
+            match self.lambda {
+                128 => {
+                    let sk = SecretKey::<OWF128EM>::try_from(self.sk.as_slice()).unwrap();
+
+                    println!("FAEST-EM-128s - testing FAEST.sign..");
+                    Self::try_signing::<FAESTEM128sParameters, OWF128EM>(&sk, &self.hashed_sig_s);
+
+                    println!("FAEST-EM-128f - testing FAEST.sign..");
+                    Self::try_signing::<FAESTEM128fParameters, OWF128EM>(&sk, &self.hashed_sig_f);
+                }
+
+                192 => {
+                    let sk = SecretKey::<OWF192EM>::try_from(self.sk.as_slice()).unwrap();
+
+                    println!("FAEST-EM-192s - testing FAEST.sign..");
+                    Self::try_signing::<FAESTEM192sParameters, OWF192EM>(&sk, &self.hashed_sig_s);
+
+                    println!("FAEST-EM-192f - testing FAEST.sign..");
+                    Self::try_signing::<FAESTEM192fParameters, OWF192EM>(&sk, &self.hashed_sig_f);
+                }
+
+                _ => {
+                    let sk = SecretKey::<OWF256EM>::try_from(self.sk.as_slice()).unwrap();
+
+                    println!("FAEST-EM-256s - testing FAEST.sign..");
+                    Self::try_signing::<FAESTEM256sParameters, OWF256EM>(&sk, &self.hashed_sig_s);
+
+                    println!("FAEST-EM-256f - testing FAEST.sign..");
+                    Self::try_signing::<FAESTEM256fParameters, OWF256EM>(&sk, &self.hashed_sig_f);
+                }
+            }
+        }
+
+        fn test_signature_aes(&self) {
             match self.lambda {
                 128 => {
                     let sk = SecretKey::<OWF128>::try_from(self.sk.as_slice()).unwrap();
@@ -586,6 +621,14 @@ mod test {
                 }
             }
         }
+
+        pub fn test_signature(&self) {
+            if self.em {
+                self.test_signature_em();
+            } else {
+                self.test_signature_aes();
+            }
+        }
     }
 
     #[test]
@@ -595,6 +638,7 @@ mod test {
             data.test_signature();
         }
     }
+
 }
 
 // #[cfg(test)]
