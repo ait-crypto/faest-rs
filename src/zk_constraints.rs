@@ -1,7 +1,7 @@
 use aes::cipher::KeyInit;
 use generic_array::{
     functional::FunctionalSequence,
-    typenum::{Prod, Unsigned, U1, U10, U2, U3, U32, U4, U8},
+    typenum::{Prod, Quot, Unsigned, U1, U10, U2, U3, U32, U4, U8},
     ArrayLength, GenericArray,
 };
 use itertools::multiunzip;
@@ -28,7 +28,7 @@ use crate::{
         sub_bytes_nots, State, RCON_TABLE,
     },
     universal_hashing::{ZKHasher, ZKHasherInit, ZKHasherProcess, ZKProofHasher, ZKVerifyHasher},
-    utils::contains_zeros,
+    utils::xor_arrays,
 };
 
 use key_expansion::{key_exp_bkwd, key_exp_cstrnts, key_exp_fwd};
@@ -138,44 +138,36 @@ fn owf_constraints<O>(
 
     // ::7
     if O::is_em() {
+        // ::8-9
+        let ext_key = key_schedule_bytes::<O>(&x);
 
-        let (k, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(&x, O::SKE::USIZE);
-
-
-        let k: Vec<u8> = k.chunks_exact(8).flat_map(
-            |chunk| convert_from_batchblocks(inv_bitslice(&chunk)).take(O::NST::USIZE).flatten()
-        ).collect();
-        
-        
-        let ext_key: &GenericArray<u8, <O as OWFParameters>::PRODRUN128Bytes> = GenericArray::from_slice(&k[..O::PRODRUN128Bytes::USIZE]);
-        // println!("key: {:?}", &ext_key[14*O::NSTBytes::USIZE..]);
-
-
+        // ::10
         let owf_input = w.get_commits_ref::<O::InputSize>(0);
 
-        let owf_output_keys: GenericArray<u8, O::NSTBytes> = owf_input
-            .keys
-            .iter()
-            .zip(y.iter())
-            .map(|(k, out)| k ^ out)
-            .collect();
-
+        // ::11
+        // TODO: find a better way to do this
+        let owf_output_keys: GenericArray<u8, O::NSTBytes> =
+            xor_arrays(owf_input.keys.as_slice(), y.as_slice()).collect();
         let owf_output = ByteCommitsRef {
             keys: GenericArray::from_slice(&owf_output_keys),
             tags: GenericArray::from_slice(owf_input.tags),
         };
 
-        // :: 19
-        let w_tilde =
-            w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE);
+        // ::19
+        let w_tilde = w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE);
 
-
+        // ::21
         encryption::enc_cstrnts_em::<O>(zk_hasher, owf_input, owf_output, w_tilde, &ext_key);
     } else {
+        // ::13
         let mut owf_input = x.to_owned();
+
+        // ::16
         let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKEBytes>(0));
 
+        // ::18-22
         for b in 0..O::BETA::USIZE {
+            // ::19
             let w_tilde =
                 w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE + b * O::LENCBytes::USIZE);
 
@@ -185,7 +177,7 @@ fn owf_constraints<O>(
 
             encryption::enc_cstrnts::<O>(
                 zk_hasher,
-                & owf_input,
+                &owf_input,
                 owf_output,
                 w_tilde,
                 k.get_commits_ref(),
@@ -194,6 +186,25 @@ fn owf_constraints<O>(
             owf_input[0] ^= 1;
         }
     }
+}
+
+#[inline]
+fn key_schedule_bytes<O>(
+    key: &GenericArray<u8, O::InputSize>,
+) -> Box<GenericArray<u8, O::PRODRUN128Bytes>>
+where
+    O: OWFParameters,
+{
+    rijndael_key_schedule::<O::NST, O::NK, O::R>(&key, O::SKE::USIZE)
+        .0
+        .chunks_exact(8)
+        .flat_map(|chunk| {
+            convert_from_batchblocks(inv_bitslice(&chunk))
+                .take(O::NST::USIZE)
+                .flatten()
+        })
+        .take(O::PRODRUN128Bytes::USIZE)
+        .collect()
 }
 
 fn invnorm_to_conjugates_prover<O>(
@@ -411,6 +422,8 @@ pub(crate) mod key_expansion {
 pub(crate) mod encryption {
     use std::ops::AddAssign;
 
+    use generic_array::typenum::Xor;
+
     use crate::aes::{
         add_round_key, add_round_key_bytes, bytewise_mix_columns, inverse_affine,
         inverse_shift_rows, mix_columns, s_box_affine, shift_rows, CommittedStateBits,
@@ -429,12 +442,7 @@ pub(crate) mod encryption {
         O: OWFParameters,
     {
         let mut state = ByteCommits::new(
-            input
-                .keys
-                .iter()
-                .zip(&extended_key[..O::NSTBytes::USIZE])
-                .map(|(x, k)| x ^ k)
-                .collect(),
+            xor_arrays(input.keys.as_slice(), &extended_key[..O::NSTBytes::USIZE]).collect(),
             Box::<GenericArray<OWFField<O>, O::NSTBits>>::from_iter(
                 input.tags[..O::NSTBits::USIZE].to_owned(),
             ),
@@ -442,38 +450,15 @@ pub(crate) mod encryption {
 
         // ::2
         for r in 0..O::R::USIZE / 2 {
-            // ::4
-            let state_conj = f256_f2_conjugates::<O>(&state);
-
-            // ::6
-            let n_key_off = 3 * O::NSTBytes::USIZE * r / 2;
-            let n_tag_off = 3 * O::NSTBits::USIZE * r / 2;
-
-            let mut state_prime = CommittedStateBitsSquared::<O>::default();
-
-            // ::7
-            for i in 0..O::NSTBytes::USIZE {
-                // ::9
-                let norm = (w.keys[n_key_off + i / 2] >> ((i % 2) * 4)) & 0xf;
-                let ys = invnorm_to_conjugates_prover::<O>(
-                    norm,
-                    &w.tags[n_tag_off + 4 * i..n_tag_off + 4 * i + 4],
-                );
-
-                // ::11
-                inv_norm_constraints_prover::<O>(
-                    zk_hasher,
-                    GenericArray::from_slice(&state_conj[8 * i..8 * i + 8]),
-                    &ys[0],
-                );
-
-                // ::12
-                for j in 0..8 {
-                    state_prime[i * 8 + j] = state_conj[8 * i + (j + 4) % 8].clone() * &ys[j % 4];
-                }
-            }
+            // ::3-15
+            let state_prime = enc_cstrnts_even::<O>(
+                zk_hasher,
+                &state,
+                w.get_commits_ref::<Quot<O::NSTBytes, U2>>(3 * O::NSTBytes::USIZE * r / 2),
+            );
 
             // ::16-17
+            // TODO: design a better way to do this (e.g., ConstantCommitment trait)
             let rk_tags = GenericArray::default();
             let round_key = state_to_bytes::<O>(ByteCommitsRef {
                 keys: GenericArray::from_slice(
@@ -504,21 +489,10 @@ pub(crate) mod encryption {
                     O::NSTBytes::USIZE / 2 + 3 * O::NSTBytes::USIZE * r / 2,
                 );
 
-                // ::29-38
-                odd_round_cnstrnts::<O>(zk_hasher, s_tilde, &st_0, &st_1);
-
-                // ::40
-                state = bytewise_mix_columns::<O>(s_tilde);
-
-                // ::41
-                add_round_key::<O>(&mut state, round_key)
+                enc_cstrnts_odd::<O>(zk_hasher, &mut state, s_tilde, &st_0, &st_1, round_key);
             } else {
-                let s_tilde_keys: GenericArray<u8, O::NSTBytes> = output
-                    .keys
-                    .iter()
-                    .zip(round_key.keys)
-                    .map(|(x, k)| x ^ k)
-                    .collect();
+                let s_tilde_keys: GenericArray<u8, O::NSTBytes> =
+                    xor_arrays(output.keys, round_key.keys).collect();
 
                 let s_tilde = ByteCommitsRef {
                     keys: &s_tilde_keys,
@@ -542,11 +516,7 @@ pub(crate) mod encryption {
     {
         // ::1
         let mut state = ByteCommits::new(
-            input
-                .iter()
-                .zip(&extended_key.keys[..O::NSTBytes::USIZE])
-                .map(|(x, k)| x ^ k)
-                .collect(),
+            xor_arrays(input.as_slice(), &extended_key.keys[..O::NSTBytes::USIZE]).collect(),
             Box::<GenericArray<OWFField<O>, O::NSTBits>>::from_iter(
                 extended_key.tags[..O::NSTBits::USIZE].to_owned(),
             ),
@@ -554,41 +524,18 @@ pub(crate) mod encryption {
 
         // ::2
         for r in 0..O::R::USIZE / 2 {
-            // ::4
-            let state_conj = f256_f2_conjugates::<O>(&state);
-
-            // ::6
-            let n_key_off = 3 * O::NSTBytes::USIZE * r / 2;
-            let n_tag_off = 3 * O::NSTBits::USIZE * r / 2;
-
-            let mut state_prime = CommittedStateBitsSquared::<O>::default();
-
-            // ::7
-            for i in 0..O::NSTBytes::USIZE {
-                // ::9
-                let norm = (w.keys[n_key_off + i / 2] >> ((i % 2) * 4)) & 0xf;
-                let ys = invnorm_to_conjugates_prover::<O>(
-                    norm,
-                    &w.tags[n_tag_off + 4 * i..n_tag_off + 4 * i + 4],
-                );
-
-                // ::11
-                inv_norm_constraints_prover::<O>(
-                    zk_hasher,
-                    GenericArray::from_slice(&state_conj[8 * i..8 * i + 8]),
-                    &ys[0],
-                );
-
-                // ::12
-                for j in 0..8 {
-                    state_prime[i * 8 + j] = state_conj[8 * i + (j + 4) % 8].clone() * &ys[j % 4];
-                }
-            }
+            // ::3-15
+            let state_prime = enc_cstrnts_even::<O>(
+                zk_hasher,
+                &state,
+                w.get_commits_ref::<Quot<O::NSTBytes, U2>>(3 * O::NSTBytes::USIZE * r / 2),
+            );
 
             // ::16-17
             let round_key = state_to_bytes::<O>(
                 extended_key.get_commits_ref::<O::NSTBytes>((2 * r + 1) * O::NSTBytes::USIZE),
             );
+
             let round_key_sq = square_key::<O>(&round_key);
 
             // ::18-22
@@ -606,20 +553,11 @@ pub(crate) mod encryption {
                     O::NSTBytes::USIZE / 2 + 3 * O::NSTBytes::USIZE * r / 2,
                 );
 
-                // ::29-38
-                odd_round_cnstrnts::<O>(zk_hasher, s_tilde, &st_0, &st_1);
-
-                // ::40
-                state = bytewise_mix_columns::<O>(s_tilde);
-
-                // ::41
-                add_round_key::<O>(&mut state, round_key)
+                // ::
+                enc_cstrnts_odd::<O>(zk_hasher, &mut state, s_tilde, &st_0, &st_1, round_key);
             } else {
-                let s_tilde_keys: GenericArray<u8, O::NSTBytes> = output
-                    .iter()
-                    .zip(round_key.keys)
-                    .map(|(x, k)| x ^ k)
-                    .collect();
+                let s_tilde_keys: GenericArray<u8, O::NSTBytes> =
+                    xor_arrays(output.as_slice(), round_key.keys.as_slice()).collect();
 
                 let s_tilde = ByteCommitsRef {
                     keys: &s_tilde_keys,
@@ -637,6 +575,61 @@ pub(crate) mod encryption {
         O: OWFParameters,
     {
         key.iter().map(|ki| ki.clone().square()).collect()
+    }
+
+    fn enc_cstrnts_even<O>(
+        zk_hasher: &mut ZKProofHasher<OWFField<O>>,
+        state: &ByteCommits<OWFField<O>, O::NSTBytes>,
+        w: ByteCommitsRef<OWFField<O>, Quot<O::NSTBytes, U2>>,
+    ) -> CommittedStateBitsSquared<O>
+    where
+        O: OWFParameters,
+    {
+        // ::4
+        let state_conj = f256_f2_conjugates::<O>(&state);
+
+        let mut state_prime = CommittedStateBitsSquared::<O>::default();
+
+        // ::7
+        for i in 0..O::NSTBytes::USIZE {
+            // ::9
+            let norm = (w.keys[i / 2] >> ((i % 2) * 4)) & 0xf;
+            let ys = invnorm_to_conjugates_prover::<O>(norm, &w.tags[4 * i..4 * i + 4]);
+
+            // ::11
+            inv_norm_constraints_prover::<O>(
+                zk_hasher,
+                GenericArray::from_slice(&state_conj[8 * i..8 * i + 8]),
+                &ys[0],
+            );
+
+            // ::12
+            for j in 0..8 {
+                state_prime[i * 8 + j] = state_conj[8 * i + (j + 4) % 8].clone() * &ys[j % 4];
+            }
+        }
+
+        state_prime
+    }
+
+    fn enc_cstrnts_odd<O>(
+        zk_hasher: &mut ZKProofHasher<OWFField<O>>,
+        state: &mut ByteCommits<OWFField<O>, O::NSTBytes>,
+        s_tilde: ByteCommitsRef<OWFField<O>, O::NSTBytes>,
+        st_0: &CommittedStateBytesSquared<O>,
+        st_1: &CommittedStateBytesSquared<O>,
+        round_key: ByteCommitsRef<OWFField<O>, O::NSTBytes>,
+    ) where
+        O: OWFParameters,
+    {
+        // ::29-38
+        odd_round_cnstrnts::<O>(zk_hasher, s_tilde, &st_0, &st_1);
+
+        // ::40
+        *state = bytewise_mix_columns::<O>(s_tilde);
+
+        // ::41
+        add_round_key::<O>(state, round_key);
     }
 
     fn odd_round_cnstrnts<O>(
