@@ -171,6 +171,17 @@ pub(crate) fn contains_zeros(buf: &[u8]) -> bool {
     buf.contains(&0)
 }
 
+/// Xors the input slices and retuns an iterator over the resulting elements.
+///
+/// The length of the resulting iterator is equal to the length of the shortest input slice.
+pub(crate) fn xor_arrays<'a>(lhs: &'a [u8], rhs: &'a [u8]) -> impl Iterator<Item = u8> + use<'a> {
+
+    lhs.iter()
+        .zip(rhs.iter())
+        .map(|(lhs, rhs)| lhs ^ rhs)
+
+}
+
 // struct BitCommitment<F>
 // where
 //     F: Field,
