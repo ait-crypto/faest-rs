@@ -1,7 +1,7 @@
 use aes::cipher::KeyInit;
 use generic_array::{
     functional::FunctionalSequence,
-    typenum::{Prod, Unsigned, B1, U1, U10, U3, U32, U4, U8},
+    typenum::{Prod, Unsigned, Zero, B1, U1, U10, U3, U32, U4, U8},
     ArrayLength, GenericArray,
 };
 use itertools::multiunzip;
@@ -20,75 +20,200 @@ use crate::{
         FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo, Sigmas, SumPoly,
     },
     internal_keys::PublicKey,
-    parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},
+    parameter::{BaseParameters, OWFParameters, QSProof, TauParameters, OWFField},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes, sub_bytes,
         sub_bytes_nots, State, RCON_TABLE,
     },
     universal_hashing::{ZKHasher, ZKHasherInit, ZKHasherProcess, ZKProofHasher, ZKVerifyHasher},
-    utils::{contains_zeros, get_bits},
-    zk_constraints::OWFField,
+    utils::{contains_zeros, get_bits, xor_arrays},
 };
 
-pub(crate) type CommittedStateBits<O> =
+// Helper type aliases
+pub(crate) type StateBitsCommits<O> =
     Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
 
-pub(crate) type CommittedStateBitsSquared<O> =
+pub(crate) type StateBitsSquaredCommits<O> =
     Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
 
-pub(crate) type CommittedStateBytes<O> =
+pub(crate) type StateBytesCommits<O> =
     Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
 
-pub(crate) type CommittedStateBytesSquared<O> =
+pub(crate) type StateBytesSquaredCommits<O> =
     Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
 
-pub(crate) fn add_round_key<O>(
-    input: &mut ByteCommits<OWFField<O>, Prod<O::NST, U4>>,
-    key: ByteCommitsRef<OWFField<O>, Prod<O::NST, U4>>,
-) where
-    O: OWFParameters,
-{
-    input
-        .keys
-        .iter_mut()
-        .zip(key.keys.iter())
-        .for_each(|(x, k)| *x ^= k);
 
-    input
-        .tags
-        .iter_mut()
-        .zip(key.tags.iter())
-        .for_each(|(x, k)| *x += k);
+/// Trait for adding a round key to some state, generating a new state
+pub(crate) trait AddRoundKey<Rhs = Self> {
+    type Output;
+
+    fn add_round_key(&self, rhs: Rhs) -> Self::Output;
 }
 
-pub(crate) fn add_round_key_bytes<O, T>(
-    state: &mut CommittedStateBytesSquared<O>,
-    key_bytes: &GenericArray<T, O::NSTBytes>,
-) where
+/// Trait for adding a round key to some state in-place 
+pub(crate) trait AddRoundKeyAssign<Rhs = Self> {
+    fn add_round_key_assign(&mut self, rhs: Rhs);
+}
+
+/// Trait for combining commitments to some state bits into commitments to the state bytes
+pub(crate) trait StateToBytes<O: OWFParameters> {
+    fn state_to_bytes(&self) -> StateBytesCommits<O>;
+}
+
+
+// implementations of StateToBytes
+
+// Committed state
+impl<O, L> StateToBytes<O> for ByteCommitsRef<'_, OWFField<O>, L>
+where
+    L: ArrayLength + Mul<U8, Output: ArrayLength>,
     O: OWFParameters,
-    for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a T>,
 {
-    for (st, k) in izip!(state.iter_mut(), key_bytes) {
-        (*st) += k;
+    fn state_to_bytes(&self) -> StateBytesCommits<O>
+where {
+        (0..O::NSTBytes::USIZE)
+            .map(|i| FieldCommitDegOne {
+                key: OWFField::<O>::byte_combine_bits(self.keys[i]),
+                tag: OWFField::<O>::byte_combine_slice(&self.tags[i * 8..i * 8 + 8]),
+            })
+            .collect()
     }
 }
 
-pub(crate) fn state_to_bytes<O>(
-    state: ByteCommitsRef<OWFField<O>, O::NSTBytes>,
-) -> CommittedStateBytes<O>
+// Scalr commitments to known state
+impl<O, L> StateToBytes<O> for GenericArray<u8, L>
 where
+    L: ArrayLength + Mul<U8, Output: ArrayLength>,
     O: OWFParameters,
 {
-    (0..O::NSTBytes::USIZE)
-        .map(|i| FieldCommitDegOne {
-            key: OWFField::<O>::byte_combine_bits(state.keys[i]),
-            tag: OWFField::<O>::byte_combine_slice(&state.tags[i * 8..i * 8 + 8]),
-        })
-        .collect()
+    fn state_to_bytes(&self) -> StateBytesCommits<O> {
+        self.iter()
+            .map(|k| FieldCommitDegOne {
+                key: OWFField::<O>::byte_combine_bits(*k),
+                tag: OWFField::<O>::ZERO,
+            })
+            .collect()
+    }
 }
 
-pub(crate) fn shift_rows<O>(state: &mut CommittedStateBytesSquared<O>)
+
+
+// Implementations of AddRound key
+
+// Known state, owned hidden key 
+impl<F, L> AddRoundKey<&GenericArray<u8, L>> for ByteCommits<F, L>
+where
+    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    F: BigGaloisField,
+{
+    type Output = ByteCommits<F, L>;
+
+    fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
+        ByteCommits {
+            keys: self.keys.iter().zip(rhs).map(|(a, b)| a ^ b).collect(),
+            tags: <Box<GenericArray<F, Prod<L, U8>>>>::from_iter(self.tags.to_owned()),
+        }
+    }
+}
+
+// Known state, ref to hidden key 
+impl<F, L> AddRoundKey<&GenericArray<u8, L>> for ByteCommitsRef<'_, F, L>
+where
+    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    F: BigGaloisField,
+{
+    type Output = ByteCommits<F, L>;
+
+    fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
+        ByteCommits {
+            keys: self.keys.iter().zip(rhs).map(|(a, b)| a ^ b).collect(),
+            tags: <Box<GenericArray<F, Prod<L, U8>>>>::from_iter(self.tags.to_owned()),
+        }
+    }
+}
+
+// Committed state, ref to hidden known key 
+impl<F, L> AddRoundKey<&ByteCommitsRef<'_, F, L>> for &GenericArray<u8, L>
+where
+    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    F: BigGaloisField,
+{
+    type Output = ByteCommits<F, L>;
+
+    fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
+        ByteCommits {
+            keys: self
+                .into_iter()
+                .zip(rhs.keys.iter())
+                .map(|(a, b)| a ^ b)
+                .collect(),
+            tags: <Box<GenericArray<F, Prod<L, U8>>>>::from_iter(
+                rhs.tags[..L::USIZE * 8].to_owned(),
+            ),
+        }
+    }
+}
+
+// Committed state, hidden key 
+impl<F, L> AddRoundKey<&ByteCommitsRef<'_, F, L>> for ByteCommits<F, L>
+where
+    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    F: BigGaloisField,
+{
+    type Output = ByteCommits<F, L>;
+
+    fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
+        ByteCommits {
+            keys: self.keys.iter().zip(rhs.keys).map(|(a, b)| a ^ b).collect(),
+            tags: self
+                .tags
+                .iter()
+                .zip(rhs.tags.iter())
+                .map(|(a, b)| *a + b)
+                .collect(),
+        }
+    }
+}
+
+
+
+// Implementations for AddRoundKeyAssign
+
+// Known state, hidden key
+impl<F, L> AddRoundKeyAssign<&GenericArray<u8, L>> for ByteCommits<F, L>
+where
+    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    F: BigGaloisField,
+{
+    fn add_round_key_assign(&mut self, rhs: &GenericArray<u8, L>) {
+        self.keys
+            .iter_mut()
+            .zip(rhs.iter())
+            .for_each(|(a, b)| *a ^= b);
+    }
+}
+
+
+// Committed state, hidden key
+impl<F, L> AddRoundKeyAssign<&ByteCommitsRef<'_, F, L>> for ByteCommits<F, L>
+where
+    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    F: BigGaloisField,
+{
+    fn add_round_key_assign(&mut self, rhs: &ByteCommitsRef<'_, F, L>) {
+        self.keys
+            .iter_mut()
+            .zip(rhs.keys.iter())
+            .for_each(|(a, b)| *a ^= b);
+        self.tags
+            .iter_mut()
+            .zip(rhs.tags.iter())
+            .for_each(|(a, b)| *a += b);
+    }
+}
+
+pub(crate) fn shift_rows<O>(state: &mut StateBytesSquaredCommits<O>)
 where
     O: OWFParameters,
 {
@@ -107,6 +232,20 @@ where
                 &mut tmp[4 * ((c + r + off) % O::NST::USIZE) + r],
             );
         }
+    }
+}
+
+
+
+pub(crate) fn add_round_key_bytes<O, T>(
+    state: &mut StateBytesSquaredCommits<O>,
+    key_bytes: &GenericArray<T, O::NSTBytes>,
+) where
+    O: OWFParameters,
+    for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a T>,
+{
+    for (st, k) in izip!(state.iter_mut(), key_bytes) {
+        (*st) += k;
     }
 }
 
@@ -137,7 +276,7 @@ where
     state_prime
 }
 
-pub(crate) fn mix_columns<O>(state: &mut CommittedStateBytesSquared<O>, sq: bool)
+pub(crate) fn mix_columns<O>(state: &mut StateBytesSquaredCommits<O>, sq: bool)
 where
     O: OWFParameters,
 {
@@ -250,9 +389,9 @@ where
 }
 
 pub(crate) fn s_box_affine<O>(
-    state: &CommittedStateBitsSquared<O>,
+    state: &StateBitsSquaredCommits<O>,
     sq: bool,
-) -> CommittedStateBytesSquared<O>
+) -> StateBytesSquaredCommits<O>
 where
     O: OWFParameters,
 {
