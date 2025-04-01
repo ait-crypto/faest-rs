@@ -4,13 +4,12 @@ use crate::{
     bavc::{BatchVectorCommitment, BavcDecommitment, BavcOpenResult, BAVC},
     fields::Field,
     internal_keys::{PublicKey, SecretKey},
-    parameter::{BaseParameters, FAESTParameters, OWFParameters, TauParameters},
+    parameter::{BaseParameters, FAESTParameters, OWFParameters, TauParameters, OWFField},
     prg::{IVSize, PseudoRandomGenerator, IV},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
     utils::{decode_all_chall_3, Reader},
     vole::{volecommit, volereconstruct, VoleCommitResult, VoleCommitmentCRef},
-    zk_constraints::OWFField,
     Error,
 };
 
