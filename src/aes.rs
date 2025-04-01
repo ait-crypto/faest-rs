@@ -20,7 +20,7 @@ use crate::{
         FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo, Sigmas, SumPoly,
     },
     internal_keys::PublicKey,
-    parameter::{BaseParameters, OWFParameters, QSProof, TauParameters, OWFField},
+    parameter::{BaseParameters, OWFField, OWFParameters, QSProof, TauParameters},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes, sub_bytes,
@@ -43,7 +43,6 @@ pub(crate) type StateBytesCommits<O> =
 pub(crate) type StateBytesSquaredCommits<O> =
     Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
 
-
 /// Trait for adding a round key to some state, generating a new state
 pub(crate) trait AddRoundKey<Rhs = Self> {
     type Output;
@@ -51,7 +50,7 @@ pub(crate) trait AddRoundKey<Rhs = Self> {
     fn add_round_key(&self, rhs: Rhs) -> Self::Output;
 }
 
-/// Trait for adding a round key to some state in-place 
+/// Trait for adding a round key to some state in-place
 pub(crate) trait AddRoundKeyAssign<Rhs = Self> {
     fn add_round_key_assign(&mut self, rhs: Rhs);
 }
@@ -60,7 +59,6 @@ pub(crate) trait AddRoundKeyAssign<Rhs = Self> {
 pub(crate) trait StateToBytes<O: OWFParameters> {
     fn state_to_bytes(&self) -> StateBytesCommits<O>;
 }
-
 
 // implementations of StateToBytes
 
@@ -97,11 +95,9 @@ where
     }
 }
 
-
-
 // Implementations of AddRound key
 
-// Known state, owned hidden key 
+// Known state, owned hidden key
 impl<F, L> AddRoundKey<&GenericArray<u8, L>> for ByteCommits<F, L>
 where
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
@@ -117,7 +113,7 @@ where
     }
 }
 
-// Known state, ref to hidden key 
+// Known state, ref to hidden key
 impl<F, L> AddRoundKey<&GenericArray<u8, L>> for ByteCommitsRef<'_, F, L>
 where
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
@@ -133,7 +129,7 @@ where
     }
 }
 
-// Committed state, ref to hidden known key 
+// Committed state, ref to hidden known key
 impl<F, L> AddRoundKey<&ByteCommitsRef<'_, F, L>> for &GenericArray<u8, L>
 where
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
@@ -155,7 +151,7 @@ where
     }
 }
 
-// Committed state, hidden key 
+// Committed state, hidden key
 impl<F, L> AddRoundKey<&ByteCommitsRef<'_, F, L>> for ByteCommits<F, L>
 where
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
@@ -176,8 +172,6 @@ where
     }
 }
 
-
-
 // Implementations for AddRoundKeyAssign
 
 // Known state, hidden key
@@ -193,7 +187,6 @@ where
             .for_each(|(a, b)| *a ^= b);
     }
 }
-
 
 // Committed state, hidden key
 impl<F, L> AddRoundKeyAssign<&ByteCommitsRef<'_, F, L>> for ByteCommits<F, L>
@@ -234,8 +227,6 @@ where
         }
     }
 }
-
-
 
 pub(crate) fn add_round_key_bytes<O, T>(
     state: &mut StateBytesSquaredCommits<O>,

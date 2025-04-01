@@ -4,7 +4,7 @@ use crate::{
     bavc::{BatchVectorCommitment, BavcDecommitment, BavcOpenResult, BAVC},
     fields::Field,
     internal_keys::{PublicKey, SecretKey},
-    parameter::{BaseParameters, FAESTParameters, OWFParameters, TauParameters, OWFField},
+    parameter::{BaseParameters, FAESTParameters, OWFField, OWFParameters, TauParameters},
     prg::{IVSize, PseudoRandomGenerator, IV},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
@@ -637,7 +637,6 @@ mod test {
             data.test_signature();
         }
     }
-
 }
 
 // #[cfg(test)]

@@ -9,13 +9,13 @@ use aes::{
 };
 use generic_array::{
     typenum::{
-        self, Diff, Prod, Quot, Sum, Unsigned, U0, U1, U23, U984, U17, U380, U340, U9, U906, U10, U1000, U102, U1024, U103, U11, U110,
-        U112, U12, U120, U128, U13, U14, U142, U152, U16, U160, U162, U163, U16384, U176, U192, U2,
-        U20, U200, U2048, U212, U216, U218, U22, U234, U24, U245, U246, U256, U26, U260, U280,
-        U288, U3, U312, U32, U320, U32768, U33, U336, U384, U388, U4, U40, U408, U4096, U410, U44,
-        U448, U460, U470, U476, U48, U5, U500, U506, U511, U512, U52, U548, U56, U576, U584, U596,
-        U6, U60, U600, U64, U640, U65536, U672, U68, U696, U7, U752, U756, U8, U8192, U828, U832,
-        U924, U948, U96, U960, U992, Equal, U688
+        self, Diff, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1000, U102, U1024, U103, U11, U110,
+        U112, U12, U120, U128, U13, U14, U142, U152, U16, U160, U162, U163, U16384, U17, U176,
+        U192, U2, U20, U200, U2048, U212, U216, U218, U22, U23, U234, U24, U245, U246, U256, U26,
+        U260, U280, U288, U3, U312, U32, U320, U32768, U33, U336, U340, U380, U384, U388, U4, U40,
+        U408, U4096, U410, U44, U448, U460, U470, U476, U48, U5, U500, U506, U511, U512, U52, U548,
+        U56, U576, U584, U596, U6, U60, U600, U64, U640, U65536, U672, U68, U688, U696, U7, U752,
+        U756, U8, U8192, U828, U832, U9, U906, U924, U948, U96, U960, U984, U992,
     },
     ArrayLength, GenericArray,
 };
@@ -154,6 +154,8 @@ pub(crate) type QSProof<O> = (
     <<O as OWFParameters>::BaseParams as BaseParameters>::Field,
 );
 
+pub(crate) type OWFField<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
+
 pub(crate) trait OWFParameters: Sized {
     // Base parameters of the OWF
     type BaseParams: BaseParameters<Lambda = Self::LAMBDA, LambdaBytes = Self::LAMBDABYTES>;
@@ -183,7 +185,9 @@ pub(crate) trait OWFParameters: Sized {
     type LENC: ArrayLength;
     type LENCBytes: ArrayLength + Mul<U8, Output: ArrayLength>;
     type NST: ArrayLength + Mul<U4, Output = Self::NSTBytes>;
-    type NSTBytes: ArrayLength + Mul<U8, Output = Self::NSTBits> + Div<U2, Output: ArrayLength + Mul<U8, Output: ArrayLength>> ;
+    type NSTBytes: ArrayLength
+        + Mul<U8, Output = Self::NSTBits>
+        + Div<U2, Output: ArrayLength + Mul<U8, Output: ArrayLength>>;
     type NSTBits: ArrayLength + Mul<U4, Output: ArrayLength>;
     type NLeafCommit: ArrayLength;
     type LAMBDALBYTES: ArrayLength + Mul<U8, Output: ArrayLength>;
@@ -261,7 +265,6 @@ pub(crate) trait OWFParameters: Sized {
     //     }
     // }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct OWF128;
@@ -565,7 +568,6 @@ impl OWFParameters for OWF256 {
     // }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct OWF128EM;
 
@@ -747,7 +749,6 @@ impl OWFParameters for OWF192EM {
 
 type U2432 = Sum<U2048, U384>;
 type U2688 = Sum<Prod<U1000, U2>, U688>;
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct OWF256EM;
@@ -1095,7 +1096,7 @@ pub(crate) trait FAESTParameters {
     type WGRIND: ArrayLength;
     /// Size of the signature (in bytes)
     type SignatureSize: ArrayLength;
-    
+
     #[inline]
     fn get_decom_size() -> usize {
         // coms

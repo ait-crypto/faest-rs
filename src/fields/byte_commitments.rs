@@ -3,7 +3,7 @@ use generic_array::{
     typenum::{Prod, U8},
     ArrayLength, GenericArray,
 };
-use std::ops::{Mul, Add};
+use std::ops::{Add, Mul};
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub(crate) struct ByteCommitment<F>
@@ -79,9 +79,7 @@ where
             tags: GenericArray::from_slice(&self.tags[idx * 8..idx * 8 + 8]).to_owned(),
         }
     }
-
 }
-
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub(crate) struct ByteCommitsRef<'a, F, L>
@@ -131,5 +129,4 @@ where
             ),
         }
     }
-
 }
