@@ -21,7 +21,7 @@ use crate::{
         FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo, Square, SumPoly,
     },
     internal_keys::PublicKey,
-    parameter::{BaseParameters, OWFField, OWFParameters, QSProof, TauParameters},
+    parameter::{BaseParameters, Lambda, OWFField, OWFParameters, QSProof, TauParameters},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes, sub_bytes,
@@ -43,7 +43,29 @@ pub(crate) type CstrntsVal<'a, O> = &'a GenericArray<
     <O as OWFParameters>::LAMBDALBYTES,
 >;
 
-#[allow(unused)]
+// Reshapes a matrix of size (l_hat/8) x lambda into a matrix of size l_hat x (lambda/8).
+// Then, it converts all rows in the interval [row_start, rowstart + nrows) to field elements.
+fn reshape_and_to_field<O: OWFParameters>(
+    v: CstrntsVal<O>,
+    row_start: usize,
+    nrows: usize,
+) -> Vec<OWFField<O>> {
+    (row_start..row_start + nrows)
+        .flat_map(|row| {
+            let mut ret = vec![GenericArray::<u8, O::LAMBDABYTES>::default(); 8];
+
+            (0..O::LAMBDA::USIZE).for_each(|col| {
+                for i in 0..8 {
+                    ret[i][col / 8] |= ((v[row][col] >> i) & 1) << (col % 8);
+                }
+            });
+
+            ret.into_iter()
+                .map(|r_i| OWFField::<O>::from(r_i.as_slice()))
+        })
+        .collect()
+}
+
 pub(crate) fn aes_prove<O>(
     w: &GenericArray<u8, O::LBYTES>,
     u: &GenericArray<u8, O::LAMBDABYTESTWO>,
@@ -60,36 +82,10 @@ where
         );
 
     // ::1:
-    let w_tag: GenericArray<OWFField<O>, O::L> = (0..O::LBYTES::USIZE)
-        .flat_map(|row| {
-            let mut ret = vec![GenericArray::<u8, O::LAMBDABYTES>::default(); 8];
+    let w_tag = reshape_and_to_field::<O>(v, 0, O::LBYTES::USIZE);
 
-            (0..O::LAMBDA::USIZE).for_each(|col| {
-                for i in 0..8 {
-                    ret[i][col / 8] |= (((v[row][col] >> i) & 1) << (col % 8));
-                }
-            });
-
-            ret.into_iter()
-                .map(|r_i| OWFField::<O>::from(r_i.as_slice()))
-        })
-        .collect();
-
-    let v: GenericArray<OWFField<O>, Prod<O::LAMBDA, U2>> = (O::LBYTES::USIZE
-        ..O::LBYTES::USIZE + O::LAMBDABYTESTWO::USIZE)
-        .flat_map(|row| {
-            let mut ret = vec![GenericArray::<u8, O::LAMBDABYTES>::default(); 8];
-
-            (0..O::LAMBDA::USIZE).for_each(|col| {
-                for i in 0..8 {
-                    ret[i][col / 8] |= (((v[row][col] >> i) & 1) << (col % 8));
-                }
-            });
-
-            ret.into_iter()
-                .map(|r_i| OWFField::<O>::from(r_i.as_slice()))
-        })
-        .collect();
+    // ::4
+    let v = reshape_and_to_field::<O>(v, O::LBYTES::USIZE, O::LAMBDABYTESTWO::USIZE);
 
     // ::7
     let u0_star = OWFField::<O>::sum_poly_bits(&u[..O::LAMBDABYTES::USIZE]);
@@ -100,11 +96,16 @@ where
     let v1_star = OWFField::<O>::sum_poly(&v[O::LAMBDA::USIZE..O::LAMBDA::USIZE * 2]);
 
     // ::12
-    owf_constraints::<O>(&mut zk_hasher, ByteCommitsRef::new(w, &w_tag), pk);
+    owf_constraints::<O>(
+        &mut zk_hasher,
+        ByteCommitsRef::new(w, GenericArray::from_slice(w_tag.as_slice())),
+        pk,
+    );
 
     // ::13-18
     zk_hasher.finalize(&v0_star, &(u0_star + &v1_star), &u1_star)
 }
+
 
 #[allow(unused)]
 fn owf_constraints<O>(

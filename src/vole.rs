@@ -81,8 +81,41 @@ where
     rj.into_iter().next().unwrap() // Move rj[0] (after last swap, rj[0] will contain r_d,0)
 }
 
-/// Reference to storage area in signature for all `c`s.
-pub(crate) struct VoleCommitmentCRef<'a, LHatBytes>(&'a mut [u8], PhantomData<LHatBytes>);
+/// Mutable eference to storage area in signature for all `c`s.
+pub(crate) struct VoleCommitmentCRefMut<'a, LHatBytes>(&'a mut [u8], PhantomData<LHatBytes>);
+impl<LHatBytes> Index<usize> for VoleCommitmentCRefMut<'_, LHatBytes>
+where
+    LHatBytes: ArrayLength,
+{
+    type Output = [u8];
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index * LHatBytes::USIZE..(index + 1) * LHatBytes::USIZE]
+    }
+}
+
+impl<LHatBytes> IndexMut<usize> for VoleCommitmentCRefMut<'_, LHatBytes>
+where
+    LHatBytes: ArrayLength,
+{
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index * LHatBytes::USIZE..(index + 1) * LHatBytes::USIZE]
+    }
+}
+
+impl<'a, LHatBytes> VoleCommitmentCRefMut<'a, LHatBytes>
+where
+    LHatBytes: ArrayLength,
+{
+    pub(crate) fn new(buffer: &'a mut [u8]) -> Self {
+        Self(buffer, PhantomData)
+    }
+}
+
+
+/// Mutable eference to storage area in signature for all `c`s.
+pub(crate) struct VoleCommitmentCRef<'a, LHatBytes>(&'a [u8], PhantomData<LHatBytes>);
+
 impl<LHatBytes> Index<usize> for VoleCommitmentCRef<'_, LHatBytes>
 where
     LHatBytes: ArrayLength,
@@ -94,20 +127,11 @@ where
     }
 }
 
-impl<LHatBytes> IndexMut<usize> for VoleCommitmentCRef<'_, LHatBytes>
-where
-    LHatBytes: ArrayLength,
-{
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.0[index * LHatBytes::USIZE..(index + 1) * LHatBytes::USIZE]
-    }
-}
-
 impl<'a, LHatBytes> VoleCommitmentCRef<'a, LHatBytes>
 where
     LHatBytes: ArrayLength,
 {
-    pub(crate) fn new(buffer: &'a mut [u8]) -> Self {
+    pub(crate) fn new(buffer: &'a [u8]) -> Self {
         Self(buffer, PhantomData)
     }
 }
@@ -140,7 +164,7 @@ where
 
 #[allow(clippy::type_complexity)]
 pub fn volecommit<BAVC, LHatBytes>(
-    mut c: VoleCommitmentCRef<LHatBytes>,
+    mut c: VoleCommitmentCRefMut<LHatBytes>,
     r: &GenericArray<u8, BAVC::LambdaBytes>,
     iv: &IV,
 ) -> VoleCommitResult<
@@ -399,7 +423,7 @@ mod test {
         ];
 
         let res_commit =
-            volecommit::<BAVC, OWF::LHATBYTES>(VoleCommitmentCRef::new(&mut c), r, &iv);
+            volecommit::<BAVC, OWF::LHATBYTES>(VoleCommitmentCRefMut::new(&mut c), r, &iv);
 
         let i_delta = decode_all_chall_3::<BAVC::TAU>(&chall);
         let decom_i = BAVC::open(&res_commit.decom, &i_delta).unwrap();
@@ -407,7 +431,7 @@ mod test {
         let res_rec = volereconstruct::<BAVC, OWF::LHATBYTES>(
             GenericArray::from_slice(&chall),
             &decom_i,
-            VoleCommitmentCRef::new(&mut c),
+            VoleCommitmentCRef::new(&c),
             &iv,
         )
         .unwrap();

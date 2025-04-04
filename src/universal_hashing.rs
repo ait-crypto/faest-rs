@@ -315,18 +315,34 @@ where
     F: BigGaloisField,
 {
     b_hasher: ZKHasher<F>,
-    delta_squared: F,
+    pub(crate) delta: F,
+    pub(crate) delta_squared: F,
 }
 
 impl<F> ZKVerifyHasher<F>
 where
     F: BigGaloisField,
 {
-    fn new(b_hasher: ZKHasher<F>, delta: F) -> Self {
+    pub(crate) fn new(b_hasher: ZKHasher<F>, delta: F) -> Self {
         Self {
             b_hasher,
+            delta,
             delta_squared: delta.square(),
         }
+    }
+
+
+    pub(crate) fn update(&mut self, val: &F){
+        self.b_hasher.update(val);
+    }
+
+    pub(crate) fn mul_and_update(&mut self, a: &F, b: &F){
+        self.b_hasher.update(&(self.delta * a * b));
+    }
+
+    pub(crate) fn inv_norm_constraints(&mut self, conjugates: &[F], y: &F){
+        let cnstr = *y * &conjugates[1] * &conjugates[4] + self.delta_squared * &conjugates[0];
+        self.b_hasher.update(&cnstr);
     }
 
     pub(crate) fn process<I1, I2>(&mut self, qs: I1, qs_b: I2)

@@ -188,7 +188,7 @@ pub(crate) trait OWFParameters: Sized {
     type NSTBytes: ArrayLength
         + Mul<U8, Output = Self::NSTBits>
         + Div<U2, Output: ArrayLength + Mul<U8, Output: ArrayLength>>;
-    type NSTBits: ArrayLength + Mul<U4, Output: ArrayLength>;
+    type NSTBits: ArrayLength + Mul<U4, Output: ArrayLength> + Div<U2, Output: ArrayLength + Mul<U8, Output: ArrayLength>>;
     type NLeafCommit: ArrayLength;
     type LAMBDALBYTES: ArrayLength + Mul<U8, Output: ArrayLength>;
 

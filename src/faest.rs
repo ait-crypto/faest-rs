@@ -9,7 +9,7 @@ use crate::{
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
     utils::{decode_all_chall_3, Reader},
-    vole::{volecommit, volereconstruct, VoleCommitResult, VoleCommitmentCRef},
+    vole::{volecommit, volereconstruct, VoleCommitResult, VoleCommitmentCRef, VoleCommitmentCRefMut},
     Error,
 };
 
@@ -261,7 +261,7 @@ fn sign<P, O>(
         decom,
         u,
         mut v,
-    } = volecommit::<P::BAVC, O::LHATBYTES>(VoleCommitmentCRef::new(volecommit_cs), &r, &iv);
+    } = volecommit::<P::BAVC, O::LHATBYTES>(VoleCommitmentCRefMut::new(volecommit_cs), &r, &iv);
 
     // ::8
     let mut chall1 =
@@ -380,129 +380,140 @@ fn opening_to_signature<'a>(
     });
 }
 
-// #[inline]
-// pub(crate) fn faest_verify<P>(
-//     msg: &[u8],
-//     pk: &PublicKey<P::OWF>,
-//     sigma: &GenericArray<u8, P::SignatureSize>,
-// ) -> Result<(), Error>
-// where
-//     P: FAESTParameters,
-// {
-//     verify::<P, P::OWF>(msg, pk, sigma)
-// }
+#[inline]
+pub(crate) fn faest_verify<P>(
+    msg: &[u8],
+    pk: &PublicKey<P::OWF>,
+    sigma: &GenericArray<u8, P::SignatureSize>,
+) -> Result<(), Error>
+where
+    P: FAESTParameters,
+{
+    verify::<P, P::OWF>(msg, pk, sigma)
+}
 
-// fn verify<P, O>(
-//     msg: &[u8],
-//     pk: &PublicKey<O>,
-//     sigma: &GenericArray<u8, P::SignatureSize>,
-// ) -> Result<(), Error>
-// where
-//     P: FAESTParameters<OWF = O>,
-//     O: OWFParameters,
-// {
-//     let chall3 = GenericArray::from_slice(
-//         &sigma[P::SignatureSize::USIZE - (IVSize::USIZE + O::LAMBDABYTES::USIZE)
-//             ..P::SignatureSize::USIZE - IVSize::USIZE],
-//     );
-//     let iv = IV::from_slice(&sigma[P::SignatureSize::USIZE - IVSize::USIZE..]);
+fn verify<P, O>(
+    msg: &[u8],
+    pk: &PublicKey<O>,
+    sigma: &GenericArray<u8, P::SignatureSize>,
+) -> Result<(), Error>
+where
+    P: FAESTParameters<OWF = O>,
+    O: OWFParameters,
+{
+    let mut offset = P::SignatureSize::USIZE;
 
-//     let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
-//         GenericArray::default();
-//     RO::<P>::hash_mu(&mut mu, &pk.owf_input, &pk.owf_output, msg);
+    let ctr = u32::from_le_bytes(sigma[offset ..  offset - size_of::<u32>()].try_into().unwrap());
+    offset -= size_of::<u32>();
 
-//     let (hcom, mut gq) =
-//         volereconstruct::<<O::BaseParams as BaseParameters>::VC, P::Tau, O::LHATBYTES>(
-//             chall3,
-//             &sigma[(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1))
-//                 + (2 * O::LAMBDABYTES::USIZE)
-//                 + O::LBYTES::USIZE
-//                 + 2..P::SignatureSize::USIZE - (16 + O::LAMBDABYTES::USIZE)],
-//             iv,
-//         );
+    let iv = IV::from_slice(&sigma[offset .. offset - IVSize::USIZE]);
+    offset -= IVSize::USIZE;
+    
+    let chall3: &GenericArray<u8, O::LAMBDABYTES> = GenericArray::from_slice(
+        &sigma[offset .. offset - O::LAMBDABYTES::USIZE]
+    );
 
-//     let mut chall1 =
-//         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
-//     let c = &sigma[..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)];
-//     RO::<P>::hash_challenge_1(&mut chall1, &mu, &hcom, c, iv);
+    let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
+        GenericArray::default();
+    RO::<P>::hash_mu(&mut mu, &pk.owf_input, &pk.owf_output, msg);
 
-//     for (i, c_chunk) in c.chunks(O::LHATBYTES::USIZE).enumerate() {
-//         let (index, size) = <P::Tau as TauParameters>::convert_index_and_size(i + 1);
-//         for gq_i in zip(
-//             &mut gq[index..index + size],
-//             P::Tau::decode_challenge_as_iter(chall3, i + 1),
-//         )
-//         .filter_map(|(gq_i, d)| if d == 1 { Some(gq_i) } else { None })
-//         {
-//             for (t, r) in izip!(gq_i, c_chunk) {
-//                 *t ^= r;
-//             }
-//         }
-//     }
+    // TODO: Check on chall 3
+    let c = VoleCommitmentCRef::<O::LHATBYTES>::new(&sigma[..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE -1)]);
 
-//     let u_t = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
-//         ..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
-//             + O::LAMBDABYTES::USIZE
-//             + 2];
-//     let mut h1_hasher = RO::<P>::h1_init();
-//     {
-//         let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
-//         for (q, d) in zip(
-//             gq.iter(),
-//             (0..<P::Tau as TauParameters>::Tau::USIZE)
-//                 .flat_map(|i| P::Tau::decode_challenge_as_iter(chall3, i)),
-//         ) {
-//             let mut q = vole_hasher.process(q);
-//             if d == 1 {
-//                 for (qi, d) in zip(q.iter_mut(), u_t) {
-//                     *qi ^= d;
-//                 }
-//             }
-//             h1_hasher.update(&q);
-//         }
-//     }
-//     let hv: GenericArray<_, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
-//         h1_hasher.finish().read_into();
+    // let (com, mut q) =
+    //     volereconstruct::<P::BAVC, O::LHATBYTES>(
+    //         chall3,
+    //         &sigma[(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1))
+    //             + (2 * O::LAMBDABYTES::USIZE)
+    //             + O::LBYTES::USIZE
+    //             + 2..P::SignatureSize::USIZE - (16 + O::LAMBDABYTES::USIZE)],
+    //         iv,
+    //     );
 
-//     let d = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
-//         + O::LAMBDABYTES::USIZE
-//         + 2
-//         ..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
-//             + O::LAMBDABYTES::USIZE
-//             + 2
-//             + O::LBYTES::USIZE];
-//     let mut chall2 =
-//         GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>::default();
-//     RO::<P>::hash_challenge_2(&mut chall2, &chall1, u_t, &hv, d);
+    // let mut chall1 =
+    //     GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
+    // let c = &sigma[..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)];
+    // RO::<P>::hash_challenge_1(&mut chall1, &mu, &hcom, c, iv);
 
-//     let a_t = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
-//         + O::LAMBDABYTES::USIZE
-//         + 2
-//         + O::LBYTES::USIZE
-//         ..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
-//             + 2 * O::LAMBDABYTES::USIZE
-//             + 2
-//             + O::LBYTES::USIZE];
-//     let b_t = P::OWF::verify::<P::Tau>(
-//         GenericArray::from_slice(d),
-//         Box::<GenericArray<_, _>>::from_iter(
-//             gq.into_iter()
-//                 .map(|x| GenericArray::from_slice(&x[..O::LAMBDALBYTES::USIZE]).clone()),
-//         ),
-//         GenericArray::from_slice(a_t),
-//         &chall2,
-//         chall3,
-//         pk,
-//     );
+    // for (i, c_chunk) in c.chunks(O::LHATBYTES::USIZE).enumerate() {
+    //     let (index, size) = <P::Tau as TauParameters>::convert_index_and_size(i + 1);
+    //     for gq_i in zip(
+    //         &mut gq[index..index + size],
+    //         P::Tau::decode_challenge_as_iter(chall3, i + 1),
+    //     )
+    //     .filter_map(|(gq_i, d)| if d == 1 { Some(gq_i) } else { None })
+    //     {
+    //         for (t, r) in izip!(gq_i, c_chunk) {
+    //             *t ^= r;
+    //         }
+    //     }
+    // }
 
-//     let mut chall3_p = GenericArray::default();
-//     RO::<P>::hash_challenge_3(&mut chall3_p, &chall2, a_t, &b_t);
-//     if *chall3 == chall3_p {
-//         Ok(())
-//     } else {
-//         Err(Error::new())
-//     }
-// }
+    // let u_t = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+    //     ..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+    //         + O::LAMBDABYTES::USIZE
+    //         + 2];
+    // let mut h1_hasher = RO::<P>::h1_init();
+    // {
+    //     let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
+    //     for (q, d) in zip(
+    //         gq.iter(),
+    //         (0..<P::Tau as TauParameters>::Tau::USIZE)
+    //             .flat_map(|i| P::Tau::decode_challenge_as_iter(chall3, i)),
+    //     ) {
+    //         let mut q = vole_hasher.process(q);
+    //         if d == 1 {
+    //             for (qi, d) in zip(q.iter_mut(), u_t) {
+    //                 *qi ^= d;
+    //             }
+    //         }
+    //         h1_hasher.update(&q);
+    //     }
+    // }
+    // let hv: GenericArray<_, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
+    //     h1_hasher.finish().read_into();
+
+    // let d = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+    //     + O::LAMBDABYTES::USIZE
+    //     + 2
+    //     ..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+    //         + O::LAMBDABYTES::USIZE
+    //         + 2
+    //         + O::LBYTES::USIZE];
+    // let mut chall2 =
+    //     GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>::default();
+    // RO::<P>::hash_challenge_2(&mut chall2, &chall1, u_t, &hv, d);
+
+    // let a_t = &sigma[O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+    //     + O::LAMBDABYTES::USIZE
+    //     + 2
+    //     + O::LBYTES::USIZE
+    //     ..O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1)
+    //         + 2 * O::LAMBDABYTES::USIZE
+    //         + 2
+    //         + O::LBYTES::USIZE];
+    // let b_t = P::OWF::verify::<P::Tau>(
+    //     GenericArray::from_slice(d),
+    //     Box::<GenericArray<_, _>>::from_iter(
+    //         gq.into_iter()
+    //             .map(|x| GenericArray::from_slice(&x[..O::LAMBDALBYTES::USIZE]).clone()),
+    //     ),
+    //     GenericArray::from_slice(a_t),
+    //     &chall2,
+    //     chall3,
+    //     pk,
+    // );
+
+    // let mut chall3_p = GenericArray::default();
+    // RO::<P>::hash_challenge_3(&mut chall3_p, &chall2, a_t, &b_t);
+    // if *chall3 == chall3_p {
+    //     Ok(())
+    // } else {
+    //     Err(Error::new())
+    // }
+
+    todo!("Implement")
+}
 
 #[cfg(test)]
 mod test {

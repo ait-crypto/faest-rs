@@ -83,6 +83,7 @@ mod utils;
 mod vole;
 mod witness;
 mod zk_constraints;
+mod verifier;
 
 // use crate::{
 //     faest::{faest_keygen, faest_sign, faest_verify},
