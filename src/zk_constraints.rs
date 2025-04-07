@@ -45,7 +45,7 @@ pub(crate) type CstrntsVal<'a, O> = &'a GenericArray<
 
 // Reshapes a matrix of size (l_hat/8) x lambda into a matrix of size l_hat x (lambda/8).
 // Then, it converts all rows in the interval [row_start, rowstart + nrows) to field elements.
-fn reshape_and_to_field<O: OWFParameters>(
+pub(crate) fn reshape_and_to_field<O: OWFParameters>(
     v: CstrntsVal<O>,
     row_start: usize,
     nrows: usize,
@@ -105,7 +105,6 @@ where
     // ::13-18
     zk_hasher.finalize(&v0_star, &(u0_star + &v1_star), &u1_star)
 }
-
 
 #[allow(unused)]
 fn owf_constraints<O>(
