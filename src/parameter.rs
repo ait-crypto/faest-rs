@@ -33,6 +33,7 @@ use crate::{
     random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake256},
     rijndael_32::{Rijndael192, Rijndael256},
     universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
+    verifier::zk_constraints::aes_verify,
     witness::aes_extendedwitness,
     zk_constraints::{aes_prove, CstrntsVal},
 };
@@ -188,7 +189,9 @@ pub(crate) trait OWFParameters: Sized {
     type NSTBytes: ArrayLength
         + Mul<U8, Output = Self::NSTBits>
         + Div<U2, Output: ArrayLength + Mul<U8, Output: ArrayLength>>;
-    type NSTBits: ArrayLength + Mul<U4, Output: ArrayLength> + Div<U2, Output: ArrayLength + Mul<U8, Output: ArrayLength>>;
+    type NSTBits: ArrayLength
+        + Mul<U4, Output: ArrayLength>
+        + Div<U2, Output: ArrayLength + Mul<U8, Output: ArrayLength>>;
     type NLeafCommit: ArrayLength;
     type LAMBDALBYTES: ArrayLength + Mul<U8, Output: ArrayLength>;
 
@@ -228,16 +231,15 @@ pub(crate) trait OWFParameters: Sized {
         chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self>;
 
-    // fn verify<Tau>(
-    //     d: &GenericArray<u8, Self::LBYTES>,
-    //     gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
-    //     a_t: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    //     chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     pk: &PublicKey<Self>,
-    // ) -> GenericArray<u8, Self::LAMBDABYTES>
-    // where
-    //     Tau: TauParameters;
+    fn verify(
+        q: CstrntsVal<Self>,
+        d: &GenericArray<u8, Self::LBYTES>,
+        pk: &PublicKey<Self>,
+        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        a1_tilde: &OWFField<Self>,
+        a2_tilde: &OWFField<Self>,
+    ) -> OWFField<Self>;
 
     // fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<Self> {
     //     loop {
@@ -344,20 +346,18 @@ impl OWFParameters for OWF128 {
         aes_prove::<Self>(w, u, v, pk, chall_2)
     }
 
-    // #[inline]
-    // fn verify<Tau>(
-    //     d: &GenericArray<u8, Self::LBYTES>,
-    //     gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
-    //     a_t: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    //     chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     pk: &PublicKey<Self>,
-    // ) -> GenericArray<u8, Self::LAMBDABYTES>
-    // where
-    //     Tau: TauParameters,
-    // {
-    //     aes_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, pk)
-    // }
+    #[inline]
+    fn verify(
+        q: CstrntsVal<Self>,
+        d: &GenericArray<u8, Self::LBYTES>,
+        pk: &PublicKey<Self>,
+        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        a1_tilde: &OWFField<Self>,
+        a2_tilde: &OWFField<Self>,
+    ) -> OWFField<Self> {
+        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -456,20 +456,18 @@ impl OWFParameters for OWF192 {
         aes_prove::<Self>(w, u, v, pk, chall_2)
     }
 
-    // #[inline]
-    // fn verify<Tau>(
-    //     d: &GenericArray<u8, Self::LBYTES>,
-    //     gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
-    //     a_t: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    //     chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     pk: &PublicKey<Self>,
-    // ) -> GenericArray<u8, Self::LAMBDABYTES>
-    // where
-    //     Tau: TauParameters,
-    // {
-    //     aes_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, pk)
-    // }
+    #[inline]
+    fn verify(
+        q: CstrntsVal<Self>,
+        d: &GenericArray<u8, Self::LBYTES>,
+        pk: &PublicKey<Self>,
+        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        a1_tilde: &OWFField<Self>,
+        a2_tilde: &OWFField<Self>,
+    ) -> OWFField<Self> {
+        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
+    }
 }
 
 type U1216 = Sum<U1024, U192>;
@@ -552,20 +550,18 @@ impl OWFParameters for OWF256 {
         aes_prove::<Self>(w, u, v, pk, chall_2)
     }
 
-    // #[inline]
-    // fn verify<Tau>(
-    //     d: &GenericArray<u8, Self::LBYTES>,
-    //     gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
-    //     a_t: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    //     chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     pk: &PublicKey<Self>,
-    // ) -> GenericArray<u8, Self::LAMBDABYTES>
-    // where
-    //     Tau: TauParameters,
-    // {
-    //     aes_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, pk)
-    // }
+    #[inline]
+    fn verify(
+        q: CstrntsVal<Self>,
+        d: &GenericArray<u8, Self::LBYTES>,
+        pk: &PublicKey<Self>,
+        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        a1_tilde: &OWFField<Self>,
+        a2_tilde: &OWFField<Self>,
+    ) -> OWFField<Self> {
+        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -641,20 +637,18 @@ impl OWFParameters for OWF128EM {
         aes_prove::<Self>(w, u, v, pk, chall_2)
     }
 
-    // #[inline]
-    // fn verify<Tau>(
-    //     d: &GenericArray<u8, Self::LBYTES>,
-    //     gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
-    //     a_t: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    //     chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     pk: &PublicKey<Self>,
-    // ) -> GenericArray<u8, Self::LAMBDABYTES>
-    // where
-    //     Tau: TauParameters,
-    // {
-    //     em_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, pk)
-    // }
+    #[inline]
+    fn verify(
+        q: CstrntsVal<Self>,
+        d: &GenericArray<u8, Self::LBYTES>,
+        pk: &PublicKey<Self>,
+        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        a1_tilde: &OWFField<Self>,
+        a2_tilde: &OWFField<Self>,
+    ) -> OWFField<Self> {
+        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -731,20 +725,18 @@ impl OWFParameters for OWF192EM {
         aes_prove::<Self>(w, u, v, pk, chall_2)
     }
 
-    // #[inline]
-    // fn verify<Tau>(
-    //     d: &GenericArray<u8, Self::LBYTES>,
-    //     gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
-    //     a_t: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    //     chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     pk: &PublicKey<Self>,
-    // ) -> GenericArray<u8, Self::LAMBDABYTES>
-    // where
-    //     Tau: TauParameters,
-    // {
-    //     em_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, pk)
-    // }
+    #[inline]
+    fn verify(
+        q: CstrntsVal<Self>,
+        d: &GenericArray<u8, Self::LBYTES>,
+        pk: &PublicKey<Self>,
+        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        a1_tilde: &OWFField<Self>,
+        a2_tilde: &OWFField<Self>,
+    ) -> OWFField<Self> {
+        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
+    }
 }
 
 type U2432 = Sum<U2048, U384>;
@@ -823,20 +815,18 @@ impl OWFParameters for OWF256EM {
         aes_prove::<Self>(w, u, v, pk, chall_2)
     }
 
-    // #[inline]
-    // fn verify<Tau>(
-    //     d: &GenericArray<u8, Self::LBYTES>,
-    //     gq: Box<GenericArray<GenericArray<u8, Self::LAMBDALBYTES>, Self::LAMBDA>>,
-    //     a_t: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     chall2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    //     chall3: &GenericArray<u8, Self::LAMBDABYTES>,
-    //     pk: &PublicKey<Self>,
-    // ) -> GenericArray<u8, Self::LAMBDABYTES>
-    // where
-    //     Tau: TauParameters,
-    // {
-    //     em_verify::<Self, Tau>(d, gq, a_t, chall2, chall3, pk)
-    // }
+    #[inline]
+    fn verify(
+        q: CstrntsVal<Self>,
+        d: &GenericArray<u8, Self::LBYTES>,
+        pk: &PublicKey<Self>,
+        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        a1_tilde: &OWFField<Self>,
+        a2_tilde: &OWFField<Self>,
+    ) -> OWFField<Self> {
+        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
+    }
 }
 
 pub(crate) trait TauParameters {
@@ -851,21 +841,20 @@ pub(crate) trait TauParameters {
     //     Self::decode_challenge_as_iter(chal, i).collect()
     // }
 
-    // fn decode_challenge_as_iter(chal: &[u8], i: usize) -> impl Iterator<Item = u8> + '_ {
-    //     let (lo, hi) = if i < Self::Tau0::USIZE {
-    //         let lo = i * Self::K0::USIZE;
-    //         let hi = (i + 1) * Self::K0::USIZE - 1;
-    //         (lo, hi)
-    //     } else {
-    //         debug_assert!(i < Self::Tau0::USIZE + Self::Tau1::USIZE);
-    //         let t = i - Self::Tau0::USIZE;
-    //         let lo = Self::Tau0::USIZE * Self::K0::USIZE + t * Self::K1::USIZE;
-    //         let hi = Self::Tau0::USIZE * Self::K0::USIZE + (t + 1) * Self::K1::USIZE - 1;
-    //         (lo, hi)
-    //     };
+    fn decode_challenge_as_iter(chal: &[u8], i: usize) -> impl Iterator<Item = u8> + '_ {
+        let (lo, hi) = if i < Self::Tau1::USIZE {
+            let lo = Self::tau1_offset_unchecked(i);
+            let hi = lo + Self::K::USIZE - 1;
+            (lo, hi)
+        } else {
+            debug_assert!(i < Self::Tau0::USIZE + Self::Tau1::USIZE);
+            let lo = Self::tau0_offset_unchecked(i);
+            let hi = lo + (Self::K::USIZE - 1) - 1;
+            (lo, hi)
+        };
 
-    //     (lo..=hi).map(move |j| (chal[j / 8] >> (j % 8)) & 1)
-    // }
+        (lo..=hi).map(move |j| (chal[j / 8] >> (j % 8)) & 1)
+    }
 
     #[inline]
     fn tau1_offset_unchecked(i: usize) -> usize {
