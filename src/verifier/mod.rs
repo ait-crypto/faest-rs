@@ -1,11 +1,13 @@
-use crate::{aes::{AddRoundKey, AddRoundKeyAssign}, fields::BigGaloisField};
+use crate::{
+    aes::{AddRoundKey, AddRoundKeyAssign},
+    fields::BigGaloisField,
+};
+use generic_array::{typenum::U8, ArrayLength, GenericArray};
 use std::ops::{Add, Mul};
-use generic_array::{GenericArray, ArrayLength, typenum::U8};
 
-
-pub(crate) mod zk_constraints;
-mod encryption;
 mod aes;
+mod encryption;
+pub(crate) mod zk_constraints;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub(crate) struct ScalarCommitment<'a, F>
@@ -167,6 +169,28 @@ where
     }
 }
 
+impl<F, L> AddRoundKey<&GenericArray<F, L>> for ScalarCommitsRef<'_, F, L>
+where
+    F: BigGaloisField,
+    L: ArrayLength,
+{
+    type Output = ScalarCommits<F, L>;
+
+    fn add_round_key(&self, rhs: &GenericArray<F, L>) -> Self::Output {
+        let scalars = self
+            .scalars
+            .into_iter()
+            .zip(rhs.into_iter())
+            .map(|(x, y)| *x + y)
+            .collect();
+
+        ScalarCommits {
+            scalars,
+            vole_challenge: *self.vole_challenge,
+        }
+    }
+}
+
 impl<F, L, L2> AddRoundKey<&GenericArray<u8, L>> for ScalarCommitsRef<'_, F, L2>
 where
     F: BigGaloisField,
@@ -196,18 +220,33 @@ where
     }
 }
 
-
-impl<F,L,L2> AddRoundKeyAssign<&GenericArray<u8, L>> for ScalarCommits<F,L2>
-where F: BigGaloisField, L: ArrayLength + Mul<U8, Output = L2>, L2: ArrayLength{
+impl<F, L, L2> AddRoundKeyAssign<&GenericArray<u8, L>> for ScalarCommits<F, L2>
+where
+    F: BigGaloisField,
+    L: ArrayLength + Mul<U8, Output = L2>,
+    L2: ArrayLength,
+{
     fn add_round_key_assign(&mut self, rhs: &GenericArray<u8, L>) {
-        self.scalars.iter_mut().enumerate().for_each(
-            |(i, comm_i)| {
-                let scal_i = (rhs[i / 8] >> (i % 8)) & 1;
-                if scal_i == 1{
-                    *comm_i += self.vole_challenge;
-                }
+        self.scalars.iter_mut().enumerate().for_each(|(i, comm_i)| {
+            let scal_i = (rhs[i / 8] >> (i % 8)) & 1;
+            if scal_i == 1 {
+                *comm_i += self.vole_challenge;
             }
-        )
+        })
     }
 }
 
+impl<F, L> AddRoundKeyAssign<&GenericArray<F, L>> for ScalarCommits<F, L>
+where
+    F: BigGaloisField,
+    L: ArrayLength,
+{
+    fn add_round_key_assign(&mut self, rhs: &GenericArray<F, L>) {
+        self.scalars
+            .iter_mut()
+            .zip(rhs.into_iter())
+            .for_each(|(x, y)| {
+                *x += y;
+            })
+    }
+}
