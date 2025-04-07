@@ -203,8 +203,8 @@ pub(crate) struct ZKHasher<F>
 where
     F: BigGaloisField,
 {
-    h0: F,
-    h1: F,
+    pub(crate) h0: F,
+    pub(crate) h1: F,
     s: F,
     t: GF64,
     r0: F,
@@ -314,7 +314,7 @@ pub(crate) struct ZKVerifyHasher<F>
 where
     F: BigGaloisField,
 {
-    b_hasher: ZKHasher<F>,
+    pub(crate) b_hasher: ZKHasher<F>,
     pub(crate) delta: F,
     pub(crate) delta_squared: F,
 }
@@ -331,16 +331,15 @@ where
         }
     }
 
-
-    pub(crate) fn update(&mut self, val: &F){
+    pub(crate) fn update(&mut self, val: &F) {
         self.b_hasher.update(val);
     }
 
-    pub(crate) fn mul_and_update(&mut self, a: &F, b: &F){
+    pub(crate) fn mul_and_update(&mut self, a: &F, b: &F) {
         self.b_hasher.update(&(self.delta * a * b));
     }
 
-    pub(crate) fn inv_norm_constraints(&mut self, conjugates: &[F], y: &F){
+    pub(crate) fn inv_norm_constraints(&mut self, conjugates: &[F], y: &F) {
         let cnstr = *y * &conjugates[1] * &conjugates[4] + self.delta_squared * &conjugates[0];
         self.b_hasher.update(&cnstr);
     }
