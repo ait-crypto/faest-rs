@@ -178,6 +178,23 @@ pub(crate) fn xor_arrays<'a>(lhs: &'a [u8], rhs: &'a [u8]) -> impl Iterator<Item
     lhs.iter().zip(rhs.iter()).map(|(lhs, rhs)| lhs ^ rhs)
 }
 
+/// Xors the input slices overwriting the first slice with the resulting elements.
+pub(crate) fn xor_arrays_inplace<'a>(lhs: &mut [u8], rhs: &[u8]) {
+    lhs.iter_mut()
+        .zip(rhs.iter())
+        .for_each(|(lhs, rhs)| *lhs ^= rhs);
+}
+
+/// Returns the bit at the given index in the input byte array.
+///
+/// Panics if the index is out of bounds.
+#[inline]
+pub(crate) fn get_bit(input: &[u8], index: usize) -> u8 {
+    let byte_index = index / 8;
+    let bit_offset = index % 8;
+    (input[byte_index] >> bit_offset) & 1
+}
+
 // struct BitCommitment<F>
 // where
 //     F: Field,
