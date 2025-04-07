@@ -175,9 +175,11 @@ mod bavc_common {
             }
         }
 
-        // Step 22: in BAVC::open we don't actually pad decom with 0s => we must have reached the end of the iterator
-        if decom_iter.next().is_some() {
-            return None;
+        // Step 22
+        while let Some(&pad) = decom_iter.next() {
+            if pad.iter().any(|&x| x != 0) {
+                return None;
+            }
         }
 
         // Steps 25..27
