@@ -137,7 +137,7 @@ pub(crate) fn add_round_key_bytes<O>(
 ) where
     O: OWFParameters,
 {
-    if !sq {
+    if sq {
         for (st, k) in izip!(state.iter_mut(), key_bytes) {
             (*st) += k;
         }
@@ -187,7 +187,7 @@ where
             for j in 1..4 {
                 let off = 32 * c + 8 * ((r + j) % 4);
 
-                o[off .. off + 8]
+                o[off..off + 8]
                     .iter_mut()
                     .zip(a_key.iter())
                     .for_each(|(o, a)| {
@@ -197,7 +197,10 @@ where
         }
     }
 
-    ScalarCommits { scalars: o, vole_challenge: *state.vole_challenge }
+    ScalarCommits {
+        scalars: o,
+        vole_challenge: *state.vole_challenge,
+    }
 }
 
 pub(crate) fn inverse_shift_rows<O>(
@@ -223,5 +226,8 @@ where
         }
     }
 
-    ScalarCommits { scalars: state_prime, vole_challenge: *state.vole_challenge }
+    ScalarCommits {
+        scalars: state_prime,
+        vole_challenge: *state.vole_challenge,
+    }
 }
