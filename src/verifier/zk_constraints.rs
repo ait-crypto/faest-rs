@@ -31,10 +31,9 @@ use crate::{
         sub_bytes_nots, State, RCON_TABLE,
     },
     universal_hashing::{ZKHasher, ZKHasherInit, ZKHasherProcess, ZKProofHasher, ZKVerifyHasher},
-    utils::xor_arrays,
+    utils::{get_bit, xor_arrays},
+    zk_constraints::reshape_and_to_field,
 };
-
-// use key_expansion::{key_exp_bkwd, key_exp_cstrnts, key_exp_fwd};
 
 pub(crate) type KeyCstrnts<O> = (
     Box<GenericArray<u8, <O as OWFParameters>::PRODRUN128Bytes>>,
@@ -46,103 +45,49 @@ pub(crate) type CstrntsVal<'a, O> = &'a GenericArray<
     <O as OWFParameters>::LAMBDALBYTES,
 >;
 
-// Reshapes a matrix of size (l_hat/8) x lambda into a matrix of size l_hat x (lambda/8).
-// Then, it converts all rows in the interval [row_start, rowstart + nrows) to field elements.
-fn reshape_and_to_field_verifier<O: OWFParameters>(
-    v: CstrntsVal<O>,
-    d: &GenericArray<u8, O::LBYTES>,
-    delta: &OWFField<O>,
-    row_start: usize,
-    nrows: usize,
-) -> Vec<OWFField<O>> {
-    (row_start..row_start + nrows)
-        .flat_map(|row| {
-            let mut ret = vec![GenericArray::<u8, O::LAMBDABYTES>::default(); 8];
-
-            (0..O::LAMBDA::USIZE).for_each(|col| {
-                for i in 0..8 {
-                    ret[i][col / 8] |= ((v[row][col] >> i) & 1) << (col % 8);
-                }
-            });
-
-            ret.into_iter().enumerate().map(|(i, r_i)| {
-                let mut elem = OWFField::<O>::from(r_i.as_slice());
-
-                if ((d[i / 8] >> (i % 8)) & 1) != 0 {
-                    elem += delta
-                }
-
-                elem
-            })
-        })
-        .collect()
-}
-
-// struct VoleChallenge<F>(F)
-// where F: BigGaloisField;
-
-// impl<F> VoleChallenge<F> where F: BigGaloisField{
-
-//     pub(crate) fn mul(&self, lhs: &F, rhs: &F) -> F {
-//         self.0 * rhs * rhs
-//     }
-
-//     pub(crate) fn add_scalars<L>(&self, commits: &ScalarCommits<F, Prod<L, U8>>, scalars: &GenericArray<u8, L>) -> Box<GenericArray<F, L>>
-//     where L: ArrayLength + Mul<U8, Output: ArrayLength>{
-//         commits.iter().enumerate().map(
-//             |(i, comm_i)| {
-//                 let scal_i = (scalars[i/8]>>(i%8)) & 1;
-//                 if scal_i == 1{
-//                     return *comm_i + &self.0;
-//                 }
-//                 *comm_i
-//             }
-//         ).collect()
-//     }
-
-// }
-
-fn aes_verify<O>(
-    q: &CstrntsVal<O>,
+pub(crate) fn aes_verify<O>(
+    q: CstrntsVal<O>,
     d: &GenericArray<u8, O::LBYTES>,
     pk: &PublicKey<O>,
     chall_2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
-    chall_3: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
+    chall_3: &GenericArray<u8, O::LAMBDABYTES>,
     a1_tilde: &OWFField<O>,
     a2_tilde: &OWFField<O>,
-) -> OWFField<O> 
+) -> OWFField<O>
 where
     O: OWFParameters,
 {
     // ::1
     let delta = OWFField::<O>::from(chall_3.as_slice());
 
-    let w_scalars = reshape_and_to_field_verifier::<O>(q, d, &delta, 0, O::LBYTES::USIZE);
+    let mut w_scalars = reshape_and_to_field::<O>(q, 0, O::LBYTES::USIZE);
+    for i in 0..O::L::USIZE {
+        if get_bit(d, i) != 0 {
+            w_scalars[i] += delta;
+        }
+    }
 
-    let w = ScalarCommitsRef{
+    let w = ScalarCommitsRef {
         scalars: GenericArray::from_slice(&w_scalars),
-        vole_challenge: &delta
+        vole_challenge: &delta,
     };
 
-    let q = reshape_and_to_field_verifier::<O>(
-        q,
-        d,
-        &delta,
-        O::LBYTES::USIZE,
-        O::LAMBDABYTESTWO::USIZE,
-    );
+    let q = reshape_and_to_field::<O>(q, O::LBYTES::USIZE, O::LAMBDABYTESTWO::USIZE);
 
     let q0_star = OWFField::<O>::sum_poly(&q[..O::LAMBDA::USIZE]);
-    let q1_star = OWFField::<O>::sum_poly(&q[O::LAMBDA::USIZE..O::LAMBDABYTESTWO::USIZE]);
+    let q1_star = OWFField::<O>::sum_poly(&q[O::LAMBDA::USIZE..O::LAMBDA::USIZE * 2]);
 
     let q_star = delta * &q1_star + &q0_star;
 
-    let mut zk_hasher = <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_verify_hasher(&chall_2, delta);
-
+    let mut zk_hasher =
+        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_verify_hasher(
+            &chall_2, delta,
+        );
 
     owf_constraints::<O>(&mut zk_hasher, w, &delta, pk);
 
     let q_tilde = zk_hasher.finalize(&q_star);
+    // println!("q_tilde: {:?}", q_tilde.as_bytes());
 
     q_tilde - delta * a1_tilde - delta.square() * a2_tilde
 }
@@ -166,30 +111,51 @@ fn owf_constraints<O>(
     // ::5
     zk_hasher.mul_and_update(&w.scalars[0], &w.scalars[1]);
 
-
     // ::7
     if O::is_em() {
         // ::8-9
         let ext_key = key_schedule_bytes::<O>(&x);
 
+        let ext_key: Vec<_> = ext_key
+            .iter()
+            .map(|key_i| {
+                (0..O::NSTBits::USIZE)
+                    .map(|i| {
+                        if get_bit(key_i, i) != 0 {
+                            return *delta;
+                        }
+                        OWFField::<O>::ZERO
+                    })
+                    .collect::<GenericArray<_, O::NSTBits>>()
+            })
+            .collect();
+
         // ::10
         let owf_input = w.get_commits_ref::<O::NSTBits>(0);
 
         // ::11
-        let owf_output = owf_input.add_round_key(&GenericArray::<u8, O::NSTBytes>::from_slice(y));
+        let owf_output = owf_input.add_round_key(GenericArray::<u8, O::NSTBytes>::from_slice(y));
 
         // ::19 - EM = true
         let w_tilde = w.get_commits_ref::<O::LENC>(O::LKE::USIZE);
 
         // ::21 - EM = true
+        // println!(
+        //     "before encryption: {:?}, {:?}",
+        //     zk_hasher.b_hasher.h0, zk_hasher.b_hasher.h1
+        // );
         encryption::enc_cstrnts::<O>(
             zk_hasher,
             owf_input,
             owf_output.as_ref(),
             w_tilde,
             ext_key.as_slice(),
-            delta
+            delta,
         );
+        // println!(
+        //     "after encryption: {:?}, {:?}",
+        //     zk_hasher.b_hasher.h0, zk_hasher.b_hasher.h1
+        // );
     } else {
         todo!("Verification not yet supported")
         // // ::13
@@ -244,7 +210,6 @@ where
         .take(O::R::USIZE + 1)
         .collect()
 }
-
 
 // #[cfg(test)]
 // mod test {
