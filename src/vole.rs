@@ -82,6 +82,7 @@ where
 }
 
 /// Mutable eference to storage area in signature for all `c`s.
+#[derive(Debug, PartialEq)]
 pub(crate) struct VoleCommitmentCRefMut<'a, LHatBytes>(&'a mut [u8], PhantomData<LHatBytes>);
 impl<LHatBytes> Index<usize> for VoleCommitmentCRefMut<'_, LHatBytes>
 where
@@ -112,8 +113,8 @@ where
     }
 }
 
-
-/// Mutable eference to storage area in signature for all `c`s.
+/// Immutable reference to storage area in signature for all `c`s.
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct VoleCommitmentCRef<'a, LHatBytes>(&'a [u8], PhantomData<LHatBytes>);
 
 impl<LHatBytes> Index<usize> for VoleCommitmentCRef<'_, LHatBytes>
@@ -133,6 +134,10 @@ where
 {
     pub(crate) fn new(buffer: &'a [u8]) -> Self {
         Self(buffer, PhantomData)
+    }
+
+    pub(crate) fn as_slice(&self) -> &[u8] {
+        self.0
     }
 }
 
