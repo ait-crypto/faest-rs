@@ -451,7 +451,7 @@ pub(crate) mod encryption {
         extended_key: &[K],
     ) where
         O: OWFParameters,
-        K: StateToBytes<O>,
+        K: StateToBytes<O, Output = StateBytesCommits<O>>,
         ByteCommits<OWFField<O>, O::NSTBytes>: for<'a> AddRoundKeyAssign<&'a K>,
     {
         // ::1
