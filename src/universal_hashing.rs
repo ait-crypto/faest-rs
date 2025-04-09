@@ -344,6 +344,17 @@ where
         self.b_hasher.update(&cnstr);
     }
 
+    pub(crate) fn lift_and_process(&mut self, a: &F, a_sq: &F, b: &F, b_sq: &F)
+    where
+        F: BigGaloisField,
+    {
+        // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
+
+        // Raise to degree 3 and update
+        self.update(&(self.delta * (*a_sq * b - self.delta * a)));
+        self.update(&(self.delta * (*a * b_sq - self.delta * b)));
+    }
+
     pub(crate) fn process<I1, I2>(&mut self, qs: I1, qs_b: I2)
     where
         I1: Iterator<Item = F>,
