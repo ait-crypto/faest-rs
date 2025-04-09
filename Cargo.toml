@@ -53,11 +53,12 @@ serde = ["dep:serde", "generic-array/serde"]
 # enable SIMD optimization implementations
 opt-simd = []
 
-#[[bench]]
-#name = "bench"
-#required-features = ["randomized-signer"]
-#harness = false
-#test = false
+[[bench]]
+name = "faest"
+path = "benches/bench.rs"
+required-features = ["randomized-signer"]
+harness = false
+test = false
 
 #[[example]]
 #name = "simple"
