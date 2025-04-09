@@ -57,7 +57,41 @@ pub(crate) trait AddRoundKeyAssign<Rhs = Self> {
 
 /// Trait for combining commitments to some state bits into commitments to the state bytes
 pub(crate) trait StateToBytes<O: OWFParameters> {
-    fn state_to_bytes(&self) -> StateBytesCommits<O>;
+    type Output;
+
+    fn state_to_bytes(&self) -> Self::Output;
+}
+
+
+pub(crate) trait InverseShiftRows<O: OWFParameters>{
+    type Output;
+    fn inverse_shift_rows(&self) -> Self::Output;
+}
+
+pub(crate) trait BytewiseMixColumns<O: OWFParameters>{
+    type Output;
+    fn bytewise_mix_columns(&self) -> Self::Output;
+}
+
+pub(crate) trait SBoxAffine<O: OWFParameters>{
+    type Output;
+    fn s_box_affine(&self, sq: bool) -> Self::Output;
+}
+
+pub(crate) trait ShiftRows {
+    fn shift_rows<O: OWFParameters>(&mut self);
+}
+
+pub(crate) trait InverseAffine{
+    fn inverse_affine<O: OWFParameters>(&mut self);
+}
+
+pub(crate) trait MixColumns<O: OWFParameters> {
+    fn mix_columns(&mut self, sq: bool);
+}
+
+pub(crate) trait AddRoundKeyBytes<Rhs = Self> {
+    fn add_round_key_bytes(&mut self, rhs: Rhs, sq: bool);
 }
 
 // implementations of StateToBytes
@@ -68,7 +102,10 @@ where
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
     O: OWFParameters,
 {
-    fn state_to_bytes(&self) -> StateBytesCommits<O>
+
+    type Output = StateBytesCommits<O>;
+
+    fn state_to_bytes(&self) -> Self::Output
 where {
         (0..O::NSTBytes::USIZE)
             .map(|i| FieldCommitDegOne {
@@ -86,7 +123,9 @@ where
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
     O: OWFParameters,
 {
-    fn state_to_bytes(&self) -> StateBytesCommits<O> {
+    type Output = StateBytesCommits<O>;
+
+    fn state_to_bytes(&self) -> Self::Output {
         self.iter()
             .map(|k| FieldCommitDegOne {
                 key: OWFField::<O>::byte_combine_bits(*k),
