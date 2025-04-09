@@ -62,18 +62,17 @@ pub(crate) trait StateToBytes<O: OWFParameters> {
     fn state_to_bytes(&self) -> Self::Output;
 }
 
-
-pub(crate) trait InverseShiftRows<O: OWFParameters>{
+pub(crate) trait InverseShiftRows<O: OWFParameters> {
     type Output;
     fn inverse_shift_rows(&self) -> Self::Output;
 }
 
-pub(crate) trait BytewiseMixColumns<O: OWFParameters>{
+pub(crate) trait BytewiseMixColumns<O: OWFParameters> {
     type Output;
     fn bytewise_mix_columns(&self) -> Self::Output;
 }
 
-pub(crate) trait SBoxAffine<O: OWFParameters>{
+pub(crate) trait SBoxAffine<O: OWFParameters> {
     type Output;
     fn s_box_affine(&self, sq: bool) -> Self::Output;
 }
@@ -82,7 +81,7 @@ pub(crate) trait ShiftRows {
     fn shift_rows<O: OWFParameters>(&mut self);
 }
 
-pub(crate) trait InverseAffine{
+pub(crate) trait InverseAffine {
     fn inverse_affine<O: OWFParameters>(&mut self);
 }
 
@@ -102,7 +101,6 @@ where
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
     O: OWFParameters,
 {
-
     type Output = StateBytesCommits<O>;
 
     fn state_to_bytes(&self) -> Self::Output

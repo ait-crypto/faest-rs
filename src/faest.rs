@@ -145,7 +145,6 @@ where
     }
 }
 
-
 #[inline]
 pub(crate) fn faest_keygen<O, R>(rng: R) -> SecretKey<O>
 where
@@ -379,7 +378,6 @@ fn sign<P, O>(
         }
     }
 }
-
 
 #[inline]
 pub(crate) fn faest_verify<P>(
