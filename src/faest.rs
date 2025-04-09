@@ -1,4 +1,4 @@
-use std::{io::Write, iter::zip};
+use std::{io::Write, iter::zip, slice::RChunks};
 
 use crate::{
     bavc::{BatchVectorCommitment, BavcDecommitment, BavcOpenResult, BAVC},
@@ -28,22 +28,29 @@ type VoleHasher<P> =
 
 /// Hashes required for FAEST implementation
 trait FaestHash: RandomOracle {
-    /// Generate `µ`
-    fn hash_mu(mu: &mut [u8], input: &[u8], output: &[u8], msg: &[u8]);
+    /// Generate a reader for `µ`
+    fn hash_mu(input: &[u8], output: &[u8], msg: &[u8]) -> <<Self as RandomOracle>::Hasher<8> as Hasher>::Reader;
     /// Generate `r` and `iv_pre`
-    fn hash_r_iv(r: &mut [u8], iv: &mut IV, key: &[u8], mu: &[u8], rho: &[u8]);
+    fn hash_r_iv(r: &mut [u8], iv_pre: &mut IV, key: &[u8], mu: &[u8], rho: &[u8]);
     /// Generate `iv`
-    fn hash_iv(iv_pre: &mut IV);
-    /// Generate first challange
-    fn hash_challenge_1(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: &[u8], iv: &[u8]);
-    /// Generate second challenge in an init-update-finalize style
+    fn hash_iv(iv: &mut IV);
+    /// Generate a Reader for the first challenge
+    fn hash_challenge_1(mu: &[u8], hcom: &[u8], c: &[u8], iv: &[u8]) -> <<Self as RandomOracle>::Hasher<9> as Hasher>::Reader;
+    /// Generate a Reader for second challenge in an init-update-finalize style
     fn hash_challenge_2_init(chall1: &[u8], u_t: &[u8]) -> <Self as RandomOracle>::Hasher<10>;
     fn hash_challenge_2_update(hasher: &mut <Self as RandomOracle>::Hasher<10>, v_row: &[u8]);
     fn hash_challenge_2_finalize(
         hasher: <Self as RandomOracle>::Hasher<10>,
-        chall2: &mut [u8],
         d: &[u8],
-    );
+    )-><<Self as RandomOracle>::Hasher<10> as Hasher>::Reader;
+    /// Generate a Reader for the third challenge
+    fn hash_challenge_3(
+        chall2: &[u8],
+        a0_t: &[u8],
+        a1_t: &[u8],
+        a2_t: &[u8],
+        ctr: u32,
+    ) -> <<Self as RandomOracle>::Hasher<11> as Hasher>::Reader;
     /// Generate third challenge in an init-finalize style
     fn hash_challenge_3_init(
         chall2: &[u8],
@@ -56,19 +63,20 @@ trait FaestHash: RandomOracle {
         chall3: &mut [u8],
         ctr: u32,
     );
+
 }
 
 impl<RO> FaestHash for RO
 where
     RO: RandomOracle,
 {
-    fn hash_mu(mu: &mut [u8], input: &[u8], output: &[u8], msg: &[u8]) {
+    fn hash_mu(input: &[u8], output: &[u8], msg: &[u8]) -><<Self as RandomOracle>::Hasher<8> as Hasher>::Reader {
         // Step 3
         let mut h2_hasher = Self::h2_0_init();
         h2_hasher.update(input);
         h2_hasher.update(output);
         h2_hasher.update(msg);
-        h2_hasher.finish().read(mu);
+        h2_hasher.finish()
     }
 
     fn hash_r_iv(r: &mut [u8], iv: &mut IV, key: &[u8], mu: &[u8], rho: &[u8]) {
@@ -92,13 +100,13 @@ where
         *iv_pre = h4_reader.read_into();
     }
 
-    fn hash_challenge_1(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: &[u8], iv: &[u8]) {
+    fn hash_challenge_1(mu: &[u8], hcom: &[u8], c: &[u8], iv: &[u8]) -><<Self as RandomOracle>::Hasher<9> as Hasher>::Reader{
         let mut h2_hasher = Self::h2_1_init();
         h2_hasher.update(mu);
         h2_hasher.update(hcom);
         h2_hasher.update(c);
         h2_hasher.update(iv);
-        h2_hasher.finish().read(chall1);
+        h2_hasher.finish()
     }
 
     fn hash_challenge_2_init(chall1: &[u8], u_t: &[u8]) -> Self::Hasher<10> {
@@ -113,11 +121,10 @@ where
     }
     fn hash_challenge_2_finalize(
         mut hasher: <Self as RandomOracle>::Hasher<10>,
-        chall2: &mut [u8],
         d: &[u8],
-    ) {
+    ) -> <<Self as RandomOracle>::Hasher<10> as Hasher>::Reader {
         hasher.update(d);
-        hasher.finish().read(chall2);
+        hasher.finish()
     }
 
     fn hash_challenge_3_init(
@@ -142,6 +149,22 @@ where
         let mut hasher = (*hasher).clone();
         hasher.update(&ctr.to_le_bytes());
         hasher.finish().read(chall3);
+    }
+
+    fn hash_challenge_3(
+            chall2: &[u8],
+            a0_t: &[u8],
+            a1_t: &[u8],
+            a2_t: &[u8],
+            ctr: u32,
+        ) -> <<Self as RandomOracle>::Hasher<11> as Hasher>::Reader{
+            let mut h2_hasher = Self::h2_3_init();
+            h2_hasher.update(chall2);
+            h2_hasher.update(a0_t);
+            h2_hasher.update(a1_t);
+            h2_hasher.update(a2_t);
+            h2_hasher.update(&ctr.to_le_bytes());
+            h2_hasher.finish()
     }
 }
 
@@ -176,12 +199,23 @@ where
     (0..m.len()).map(|row| m[row][column]).collect()
 }
 
-fn check_challenge_3<O>(chall3: &[u8], w_grind: usize) -> bool
+fn check_challenge_3<P, O>(chall3: &[u8]) -> bool
 where
+    P: FAESTParameters,
     O: OWFParameters,
 {
-    for i in O::LAMBDA::USIZE - w_grind..O::LAMBDA::USIZE {
-        if (chall3[i / 8] >> (i % 8)) & 1 != 0 {
+    let start_byte = (O::LAMBDA::USIZE - P::WGRIND::USIZE) / 8;
+
+    // Discard all bits before position "lambda - w_grind"
+    let start_byte_0s = chall3[start_byte] >> ((O::LAMBDA::USIZE - P::WGRIND::USIZE) % 8);
+
+    if start_byte_0s != 0 {
+        return false;
+    }
+
+    // Check that all the following bytes are 0s
+    for i in start_byte + 1 .. chall3.len() {
+        if chall3[i] != 0 {
             return false;
         }
     }
@@ -270,9 +304,7 @@ fn sign<P, O>(
     let (signature, ctr_s) = signature.split_at_mut(P::SignatureSize::USIZE - size_of::<u32>());
 
     // ::3
-    let mut mu =
-        GenericArray::<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2>::default();
-    RO::<P>::hash_mu(&mut mu, &sk.pk.owf_input, &sk.pk.owf_output, msg);
+    let mu: GenericArray<u8, O::LAMBDABYTESTWO> = RO::<P>::hash_mu(&sk.pk.owf_input, &sk.pk.owf_output, msg).read_into();
 
     // ::4
     let mut r = GenericArray::<u8, O::LAMBDABYTES>::default();
@@ -295,10 +327,8 @@ fn sign<P, O>(
     } = volecommit::<P::BAVC, O::LHATBYTES>(VoleCommitmentCRefMut::new(volecommit_cs), &r, &iv);
 
     // ::8
-    let mut chall1 =
-        GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
     //Contrarly to specification, faest-ref uses iv instead of iv_pre
-    RO::<P>::hash_challenge_1(&mut chall1, &mu, &com, volecommit_cs, iv.as_slice());
+    let mut chall1 = RO::<P>::hash_challenge_1(&mu, &com, volecommit_cs, iv.as_slice()).read_into();
 
     // ::10
     let mut vole_hasher_u = VoleHasher::<P>::new_vole_hasher(&chall1);
@@ -333,9 +363,7 @@ fn sign<P, O>(
     mask_witness(d, &w, &u[..<O as OWFParameters>::LBYTES::USIZE]);
 
     // ::14
-    let mut chall2 =
-        GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>::default();
-    RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, d);
+    let mut chall2 = RO::<P>::hash_challenge_2_finalize(h2_hasher, d).read_into();
 
     // Free space
     (d);
@@ -365,7 +393,7 @@ fn sign<P, O>(
         // ::20
         RO::<P>::hash_challenge_3_finalize(&hasher, chall3, ctr);
         // ::21
-        if check_challenge_3::<O>(chall3, P::WGRIND::USIZE) {
+        if check_challenge_3::<P, O>(chall3) {
             // ::24
             let i_delta = decode_all_chall_3::<P::Tau>(&chall3);
 
@@ -405,20 +433,22 @@ where
 
     let (sigma, iv) = sigma.split_at(sigma.len() - IVSize::USIZE);
     let mut iv = GenericArray::from_slice(iv).to_owned();
+    // ::3
     RO::<P>::hash_iv(&mut iv);
 
     let (sigma, chall3) = sigma.split_at(sigma.len() - O::LAMBDABYTES::USIZE);
     let chall3: &GenericArray<u8, O::LAMBDABYTES> = GenericArray::from_slice(chall3);
 
-    let mut mu: GenericArray<u8, <O::BaseParams as BaseParameters>::LambdaBytesTimes2> =
-        GenericArray::default();
-    RO::<P>::hash_mu(&mut mu, &pk.owf_input, &pk.owf_output, msg);
+    // ::2
+    let mu: GenericArray<u8, O::LAMBDABYTESTWO> = RO::<P>::hash_mu(&pk.owf_input, &pk.owf_output, msg).read_into();
 
-    // TODO: Check on chall 3
+    // ::4
+    if !check_challenge_3::<P, O>(chall3) {
+        return Err(Error::new());
+    }
 
     let (c, sigma) =
         sigma.split_at(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
-
     let c = VoleCommitmentCRef::<O::LHATBYTES>::new(c);
 
     let (sigma, coms, nodes) = parse_decom::<O, P>(sigma);
@@ -428,20 +458,20 @@ where
         nodes: nodes.iter().map(|node_i| node_i.as_slice()).collect(),
     };
 
+    // ::7
     let res = volereconstruct::<P::BAVC, O::LHATBYTES>(chall3, &decom_i, c, &iv);
-
+    
+    // ::8
     if res.is_none() {
         return Err(Error::new());
     }
-
     let VoleReconstructResult { com, q } = res.unwrap();
 
-    // TODO: modify volereconstruct so that it directly takes a slice
+    // TODO: consider to modify volereconstruct so that it directly takes a slice
     let c = c.as_slice();
 
-    let mut chall1 =
-        GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall1>::default();
-    RO::<P>::hash_challenge_1(&mut chall1, &mu, com.as_slice(), c, &iv);
+    // ::10
+    let chall1 = RO::<P>::hash_challenge_1( &mu, com.as_slice(), c, &iv).read_into();
 
     let (u_tilde, sigma) = sigma.split_at(
         <<O as OWFParameters>::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE,
@@ -473,12 +503,12 @@ where
 
     let (d, sigma) = sigma.split_at(O::LBYTES::USIZE);
 
-    let mut chall2 =
-        GenericArray::<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>::default();
-    RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, d);
+    // ::15
+    let chall2 = RO::<P>::hash_challenge_2_finalize(h2_hasher, d).read_into();
 
     let (a1_tilde, a2_tilde) = sigma.split_at(O::LAMBDABYTES::USIZE);
 
+    // ::17
     let a0_tilde = P::OWF::verify(
         GenericArray::from_slice(&q[..O::LBYTES::USIZE + O::LAMBDABYTESTWO::USIZE]),
         GenericArray::from_slice(d),
@@ -489,14 +519,14 @@ where
         &OWFField::<O>::from(a2_tilde),
     );
 
-    let mut chall3_prime = GenericArray::default();
-    let h3_hasher = RO::<P>::hash_challenge_3_init(
+
+    let chall3_prime = RO::<P>::hash_challenge_3(
         &chall2,
         a0_tilde.as_bytes().as_slice(),
         &a1_tilde,
         &a2_tilde,
-    );
-    RO::<P>::hash_challenge_3_finalize(&h3_hasher, &mut chall3_prime, ctr);
+        ctr    
+    ).read_into();
 
     if *chall3 == chall3_prime {
         Ok(())
