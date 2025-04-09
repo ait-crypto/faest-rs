@@ -359,7 +359,5 @@ mod test {
         assert_eq!(GF8::invnorm(2), 1 << 3 | 1 << 2 | 1);
         assert_eq!(GF8::invnorm(0x80), 1 << 3 | 1 << 2 | 1);
         assert_eq!(GF8::invnorm(0x88), 1 << 2 | 1);
-
-        let v = Vec::from_iter((0..=255).map(|i| GF8::invnorm(i)));
     }
 }
