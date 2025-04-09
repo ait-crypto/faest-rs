@@ -361,6 +361,5 @@ mod test {
         assert_eq!(GF8::invnorm(0x88), 1 << 2 | 1);
 
         let v = Vec::from_iter((0..=255).map(|i| GF8::invnorm(i)));
-        println!("{:?}", v.as_slice());
     }
 }
