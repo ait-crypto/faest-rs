@@ -36,6 +36,7 @@ use crate::{
     verifier::zk_constraints::aes_verify,
     witness::aes_extendedwitness,
     zk_constraints::{aes_prove, CstrntsVal},
+    utils::get_bit
 };
 
 pub type GetBytes<BitLen> = Quot<BitLen, U8>;
@@ -241,31 +242,31 @@ pub(crate) trait OWFParameters: Sized {
         a2_tilde: &OWFField<Self>,
     ) -> OWFField<Self>;
 
-    // fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<Self> {
-    //     loop {
-    //         // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
-    //         let mut sk: GenericArray<u8, Self::SK> = GenericArray::default();
-    //         rng.fill_bytes(&mut sk);
+    fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<Self> {
+        loop {
+            // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
+            let mut sk: GenericArray<u8, Self::SK> = GenericArray::default();
+            rng.fill_bytes(&mut sk);
 
-    //         let owf_input = GenericArray::from_slice(&sk[..Self::InputSize::USIZE]);
-    //         let owf_key = GenericArray::from_slice(&sk[Self::InputSize::USIZE..]);
+            let owf_input = GenericArray::from_slice(&sk[..Self::InputSize::USIZE]);
+            let owf_key = GenericArray::from_slice(&sk[Self::InputSize::USIZE..]);
 
-    //         if Self::extendwitness(owf_key, owf_input).is_none() {
-    //             continue;
-    //         }
+            if get_bit(&owf_key, 0) & get_bit(&owf_key, 1) != 0 {
+                continue;
+            }
 
-    //         let mut owf_output = GenericArray::default();
-    //         Self::evaluate_owf(owf_key, owf_input, &mut owf_output);
+            let mut owf_output = GenericArray::default();
+            Self::evaluate_owf(owf_key, owf_input, &mut owf_output);
 
-    //         return SecretKey {
-    //             owf_key: owf_key.clone(),
-    //             pk: PublicKey {
-    //                 owf_input: owf_input.clone(),
-    //                 owf_output,
-    //             },
-    //         };
-    //     }
-    // }
+            return SecretKey {
+                owf_key: owf_key.clone(),
+                pk: PublicKey {
+                    owf_input: owf_input.clone(),
+                    owf_output,
+                },
+            };
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
