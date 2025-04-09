@@ -9,7 +9,7 @@
 //!
 //! Key generation, signing and verification can be implemented as follows:
 //! ```
-//! use faest::{FAEST128fSigningKey, FAEST128fSignature}
+//! use faest::{FAEST128fSigningKey, FAEST128fSignature};
 //! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
 //!
 //! let sk = FAEST128fSigningKey::generate(rand::thread_rng());
@@ -22,7 +22,7 @@
 //!
 //! Due to the size of the signatures, all variants support signing into boxed signatures:
 //! ```
-//! use faest::{FAEST128fSigningKey, FAEST128fSignature}
+//! use faest::{FAEST128fSigningKey, FAEST128fSignature};
 //! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
 //!
 //! let sk = FAEST128fSigningKey::generate(rand::thread_rng());
@@ -80,21 +80,21 @@ mod random_oracles;
 mod rijndael_32;
 mod universal_hashing;
 mod utils;
+mod verifier;
 mod vole;
 mod witness;
 mod zk_constraints;
-mod verifier;
 
-// use crate::{
-//     faest::{faest_keygen, faest_sign, faest_verify},
-//     internal_keys::{PublicKey, SecretKey},
-//     parameter::{
-//         FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
-//         FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters, FAESTEM128sParameters,
-//         FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters, FAESTEM256sParameters,
-//         FAESTParameters, OWFParameters,
-//     },
-// };
+use crate::{
+    faest::{faest_keygen, faest_sign, faest_verify},
+    internal_keys::{PublicKey, SecretKey},
+    parameter::{
+        FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
+        FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters, FAESTEM128sParameters,
+        FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters, FAESTEM256sParameters,
+        FAESTParameters, OWFParameters,
+    },
+};
 
 /// Generate a key pair from a cryptographically secure RNG
 pub trait KeypairGenerator: Keypair {
@@ -137,308 +137,308 @@ pub trait ByteEncoding: Clone + Sized + for<'a> TryFrom<&'a [u8]> + TryInto<Self
     fn encoded_len(&self) -> usize;
 }
 
-// macro_rules! define_impl {
-//     ($param:ident) => {
-//         paste! {
-//             struct $param;
+macro_rules! define_impl {
+    ($param:ident) => {
+        paste! {
+            struct $param;
 
-//             impl $param {
-//                 #[inline(always)]
-//                 fn sign(
-//                     msg: &[u8],
-//                     sk: &SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
-//                     rho: &[u8],
-//                     signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
-//                 ) {
-//                     faest_sign::<[<$param Parameters>]>(msg, sk, rho, signature);
-//                 }
+            impl $param {
+                #[inline(always)]
+                fn sign(
+                    msg: &[u8],
+                    sk: &SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
+                    rho: &[u8],
+                    signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
+                ) {
+                    faest_sign::<[<$param Parameters>]>(msg, sk, rho, signature);
+                }
 
-//                 #[inline(always)]
-//                 fn verify(
-//                     msg: &[u8],
-//                     pk: &PublicKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
-//                     sigma: &GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
-//                 ) -> Result<(), Error>
-//                 {
-//                     faest_verify::<[<$param Parameters>]>(msg, pk, sigma)
-//                 }
-//             }
+                #[inline(always)]
+                fn verify(
+                    msg: &[u8],
+                    pk: &PublicKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
+                    sigma: &GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
+                ) -> Result<(), Error>
+                {
+                    faest_verify::<[<$param Parameters>]>(msg, pk, sigma)
+                }
+            }
 
-//             #[doc = "Signing key for " $param]
-//             /// ```
-//             #[doc = "use faest::{" $param "SigningKey as SK, " $param "Signature as Sig};"]
-//             /// use faest::{Signer, Verifier, Keypair, KeypairGenerator};
-//             ///
-//             /// let sk = SK::generate(rand::thread_rng());
-//             /// let msg = "some message".as_bytes();
-//             /// let signature: Sig = sk.sign(msg);
-//             ///
-//             /// // verify with verification key
-//             /// let verification_key = sk.verifying_key();
-//             /// verification_key.verify(msg, &signature).expect("Verification failed");
-//             /// // secret keys can also verify
-//             /// sk.verify(msg, &signature).expect("Verification failed");
-//             /// ```
-//             #[derive(Debug, Clone, PartialEq, Eq)]
-//             #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
-//             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-//             pub struct [<$param SigningKey>](SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>);
+            #[doc = "Signing key for " $param]
+            /// ```
+            #[doc = "use faest::{" $param "SigningKey as SK, " $param "Signature as Sig};"]
+            /// use faest::{Signer, Verifier, Keypair, KeypairGenerator};
+            ///
+            /// let sk = SK::generate(rand::thread_rng());
+            /// let msg = "some message".as_bytes();
+            /// let signature: Sig = sk.sign(msg);
+            ///
+            /// // verify with verification key
+            /// let verification_key = sk.verifying_key();
+            /// verification_key.verify(msg, &signature).expect("Verification failed");
+            /// // secret keys can also verify
+            /// sk.verify(msg, &signature).expect("Verification failed");
+            /// ```
+            #[derive(Debug, Clone, PartialEq, Eq)]
+            #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
+            #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+            pub struct [<$param SigningKey>](SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>);
 
-//             impl TryFrom<&[u8]> for [<$param SigningKey>] {
-//                 type Error = Error;
+            impl TryFrom<&[u8]> for [<$param SigningKey>] {
+                type Error = Error;
 
-//                 fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-//                     SecretKey::try_from(value).map(|sk| Self(sk))
-//                 }
-//             }
+                fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+                    SecretKey::try_from(value).map(|sk| Self(sk))
+                }
+            }
 
-//             impl From<&[<$param SigningKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE] {
-//                 fn from(value: &[<$param SigningKey>]) -> Self {
-//                     value.to_bytes()
-//                 }
-//             }
+            impl From<&[<$param SigningKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE] {
+                fn from(value: &[<$param SigningKey>]) -> Self {
+                    value.to_bytes()
+                }
+            }
 
-//             impl From<[<$param SigningKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE] {
-//                 fn from(value: [<$param SigningKey>]) -> Self {
-//                     value.to_bytes()
-//                 }
-//             }
+            impl From<[<$param SigningKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE] {
+                fn from(value: [<$param SigningKey>]) -> Self {
+                    value.to_bytes()
+                }
+            }
 
-//             impl ByteEncoding for [<$param SigningKey>] {
-//                 type Repr = [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE];
+            impl ByteEncoding for [<$param SigningKey>] {
+                type Repr = [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE];
 
-//                 fn to_bytes(&self) -> Self::Repr {
-//                     self.0.to_bytes().into_array()
-//                 }
+                fn to_bytes(&self) -> Self::Repr {
+                    self.0.to_bytes().into_array()
+                }
 
-//                 fn to_vec(&self) -> Vec<u8> {
-//                     self.0.to_vec()
-//                 }
+                fn to_vec(&self) -> Vec<u8> {
+                    self.0.to_vec()
+                }
 
-//                 fn encoded_len(&self) -> usize {
-//                     self.0.encoded_len()
-//                 }
-//             }
+                fn encoded_len(&self) -> usize {
+                    self.0.encoded_len()
+                }
+            }
 
-//             #[doc = "Verification key for " $param]
-//             #[derive(Debug, Clone, PartialEq, Eq)]
-//             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-//             pub struct [<$param VerificationKey>](PublicKey<<[<$param Parameters>] as FAESTParameters>::OWF>);
+            #[doc = "Verification key for " $param]
+            #[derive(Debug, Clone, PartialEq, Eq)]
+            #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+            pub struct [<$param VerificationKey>](PublicKey<<[<$param Parameters>] as FAESTParameters>::OWF>);
 
-//             impl TryFrom<&[u8]> for [<$param VerificationKey>] {
-//                 type Error = Error;
+            impl TryFrom<&[u8]> for [<$param VerificationKey>] {
+                type Error = Error;
 
-//                 fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-//                     PublicKey::try_from(value).map(|pk| Self(pk))
-//                 }
-//             }
+                fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+                    PublicKey::try_from(value).map(|pk| Self(pk))
+                }
+            }
 
-//             impl From<&[<$param VerificationKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE] {
-//                 fn from(value: &[<$param VerificationKey>]) -> Self {
-//                     value.to_bytes()
-//                 }
-//             }
+            impl From<&[<$param VerificationKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE] {
+                fn from(value: &[<$param VerificationKey>]) -> Self {
+                    value.to_bytes()
+                }
+            }
 
-//             impl From<[<$param VerificationKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE] {
-//                 fn from(value: [<$param VerificationKey>]) -> Self {
-//                     value.to_bytes()
-//                 }
-//             }
+            impl From<[<$param VerificationKey>]> for [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE] {
+                fn from(value: [<$param VerificationKey>]) -> Self {
+                    value.to_bytes()
+                }
+            }
 
-//             impl ByteEncoding for [<$param VerificationKey>] {
-//                 type Repr = [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE];
+            impl ByteEncoding for [<$param VerificationKey>] {
+                type Repr = [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE];
 
-//                 fn to_bytes(&self) -> Self::Repr {
-//                     self.0.to_bytes().into_array()
-//                 }
+                fn to_bytes(&self) -> Self::Repr {
+                    self.0.to_bytes().into_array()
+                }
 
-//                 fn to_vec(&self) -> Vec<u8> {
-//                     self.0.to_vec()
-//                 }
+                fn to_vec(&self) -> Vec<u8> {
+                    self.0.to_vec()
+                }
 
-//                 fn encoded_len(&self) -> usize {
-//                     self.0.encoded_len()
-//                 }
-//             }
+                fn encoded_len(&self) -> usize {
+                    self.0.encoded_len()
+                }
+            }
 
-//             impl Keypair for [<$param SigningKey>] {
-//                 type VerifyingKey = [<$param VerificationKey>];
+            impl Keypair for [<$param SigningKey>] {
+                type VerifyingKey = [<$param VerificationKey>];
 
-//                 fn verifying_key(&self) -> Self::VerifyingKey {
-//                     [<$param VerificationKey>](self.0.as_public_key())
-//                 }
-//             }
+                fn verifying_key(&self) -> Self::VerifyingKey {
+                    [<$param VerificationKey>](self.0.as_public_key())
+                }
+            }
 
-//             impl KeypairGenerator for [<$param SigningKey>] {
-//                 fn generate<R>(rng: R) -> Self
-//                 where
-//                     R: CryptoRngCore,
-//                 {
-//                     Self(faest_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng))
-//                 }
-//             }
+            impl KeypairGenerator for [<$param SigningKey>] {
+                fn generate<R>(rng: R) -> Self
+                where
+                    R: CryptoRngCore,
+                {
+                    Self(faest_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng))
+                }
+            }
 
-//             #[doc = "Signature for " $param]
-//             #[derive(Debug, Clone, PartialEq, Eq)]
-//             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-//             pub struct [<$param Signature>](GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>);
+            #[doc = "Signature for " $param]
+            #[derive(Debug, Clone, PartialEq, Eq)]
+            #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+            pub struct [<$param Signature>](GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>);
 
-//             impl Signer<[<$param Signature>]> for [<$param SigningKey>] {
-//                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
-//                     Ok(self.sign(msg))
-//                 }
+            impl Signer<[<$param Signature>]> for [<$param SigningKey>] {
+                fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
+                    Ok(self.sign(msg))
+                }
 
-//                 fn sign(&self, msg: &[u8]) -> [<$param Signature>] {
-//                     let mut signature = GenericArray::default();
-//                     $param::sign(msg, &self.0, &[], &mut signature);
-//                     [<$param Signature>](signature)
-//                 }
-//             }
+                fn sign(&self, msg: &[u8]) -> [<$param Signature>] {
+                    let mut signature = GenericArray::default();
+                    $param::sign(msg, &self.0, &[], &mut signature);
+                    [<$param Signature>](signature)
+                }
+            }
 
-//             impl Signer<Box<[<$param Signature>]>> for [<$param SigningKey>] {
-//                 fn try_sign(&self, msg: &[u8]) -> Result<Box<[<$param Signature>]>, Error> {
-//                     Ok(self.sign(msg))
-//                 }
+            impl Signer<Box<[<$param Signature>]>> for [<$param SigningKey>] {
+                fn try_sign(&self, msg: &[u8]) -> Result<Box<[<$param Signature>]>, Error> {
+                    Ok(self.sign(msg))
+                }
 
-//                 fn sign(&self, msg: &[u8]) -> Box<[<$param Signature>]> {
-//                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));
-//                     $param::sign(msg, &self.0, &[], &mut signature.0);
-//                     signature
-//                 }
-//             }
+                fn sign(&self, msg: &[u8]) -> Box<[<$param Signature>]> {
+                    let mut signature = Box::new([<$param Signature>](GenericArray::default()));
+                    $param::sign(msg, &self.0, &[], &mut signature.0);
+                    signature
+                }
+            }
 
-//             impl Verifier<[<$param Signature>]> for [<$param VerificationKey>] {
-//                 fn verify(&self, msg: &[u8], signature: &[<$param Signature>]) -> Result<(), Error> {
-//                     $param::verify(msg, &self.0, &signature.0)
-//                 }
-//             }
+            impl Verifier<[<$param Signature>]> for [<$param VerificationKey>] {
+                fn verify(&self, msg: &[u8], signature: &[<$param Signature>]) -> Result<(), Error> {
+                    $param::verify(msg, &self.0, &signature.0)
+                }
+            }
 
-//             impl Verifier<Box<[<$param Signature>]>> for [<$param VerificationKey>] {
-//                 fn verify(&self, msg: &[u8], signature: &Box<[<$param Signature>]>) -> Result<(), Error> {
-//                     $param::verify(msg, &self.0, &signature.0)
-//                 }
-//             }
+            impl Verifier<Box<[<$param Signature>]>> for [<$param VerificationKey>] {
+                fn verify(&self, msg: &[u8], signature: &Box<[<$param Signature>]>) -> Result<(), Error> {
+                    $param::verify(msg, &self.0, &signature.0)
+                }
+            }
 
-//             impl Verifier<SignatureRef<'_>> for [<$param VerificationKey>] {
-//                 fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
-//                     GenericArray::try_from_slice(signature.0)
-//                         .map_err(|_| Error::new())
-//                         .and_then(|sig| $param::verify(msg, &self.0, sig))
-//                 }
-//             }
+            impl Verifier<SignatureRef<'_>> for [<$param VerificationKey>] {
+                fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
+                    GenericArray::try_from_slice(signature.0)
+                        .map_err(|_| Error::new())
+                        .and_then(|sig| $param::verify(msg, &self.0, sig))
+                }
+            }
 
-//             impl Verifier<[<$param Signature>]> for [<$param SigningKey>] {
-//                 fn verify(&self, msg: &[u8], signature: &[<$param Signature>]) -> Result<(), Error> {
-//                     $param::verify(msg, &self.0.pk, &signature.0)
-//                 }
-//             }
+            impl Verifier<[<$param Signature>]> for [<$param SigningKey>] {
+                fn verify(&self, msg: &[u8], signature: &[<$param Signature>]) -> Result<(), Error> {
+                    $param::verify(msg, &self.0.pk, &signature.0)
+                }
+            }
 
-//             impl Verifier<Box<[<$param Signature>]>> for [<$param SigningKey>] {
-//                 fn verify(&self, msg: &[u8], signature: &Box<[<$param Signature>]>) -> Result<(), Error> {
-//                     $param::verify(msg, &self.0.pk, &signature.0)
-//                 }
-//             }
+            impl Verifier<Box<[<$param Signature>]>> for [<$param SigningKey>] {
+                fn verify(&self, msg: &[u8], signature: &Box<[<$param Signature>]>) -> Result<(), Error> {
+                    $param::verify(msg, &self.0.pk, &signature.0)
+                }
+            }
 
-//             impl Verifier<SignatureRef<'_>> for [<$param SigningKey>] {
-//                 fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
-//                     GenericArray::try_from_slice(signature.0)
-//                         .map_err(|_| Error::new())
-//                         .and_then(|sig| $param::verify(msg, &self.0.pk, sig))
-//                 }
-//             }
+            impl Verifier<SignatureRef<'_>> for [<$param SigningKey>] {
+                fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
+                    GenericArray::try_from_slice(signature.0)
+                        .map_err(|_| Error::new())
+                        .and_then(|sig| $param::verify(msg, &self.0.pk, sig))
+                }
+            }
 
-//             #[cfg(feature = "randomized-signer")]
-//             impl RandomizedSigner<[<$param Signature>]> for [<$param SigningKey>] {
-//                 fn try_sign_with_rng(
-//                     &self,
-//                     rng: &mut impl CryptoRngCore,
-//                     msg: &[u8],
-//                 ) -> Result<[<$param Signature>], Error> {
-//                     let mut rho = GenericArray::<
-//                         u8,
-//                         <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES,
-//                     >::default();
-//                     rng.fill_bytes(&mut rho);
-//                     let mut signature = GenericArray::default();
-//                     $param::sign(msg, &self.0, &rho, &mut signature);
-//                     Ok([<$param Signature>](signature))
-//                 }
-//             }
+            #[cfg(feature = "randomized-signer")]
+            impl RandomizedSigner<[<$param Signature>]> for [<$param SigningKey>] {
+                fn try_sign_with_rng(
+                    &self,
+                    rng: &mut impl CryptoRngCore,
+                    msg: &[u8],
+                ) -> Result<[<$param Signature>], Error> {
+                    let mut rho = GenericArray::<
+                        u8,
+                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES,
+                    >::default();
+                    rng.fill_bytes(&mut rho);
+                    let mut signature = GenericArray::default();
+                    $param::sign(msg, &self.0, &rho, &mut signature);
+                    Ok([<$param Signature>](signature))
+                }
+            }
 
-//             #[cfg(feature = "randomized-signer")]
-//             impl RandomizedSigner<Box<[<$param Signature>]>> for [<$param SigningKey>] {
-//                 fn try_sign_with_rng(
-//                     &self,
-//                     rng: &mut impl CryptoRngCore,
-//                     msg: &[u8],
-//                 ) -> Result<Box<[<$param Signature>]>, Error> {
-//                     let mut rho = GenericArray::<
-//                         u8,
-//                         <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES,
-//                     >::default();
-//                     rng.fill_bytes(&mut rho);
-//                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));
-//                     $param::sign(msg, &self.0, &rho, &mut signature.0);
-//                     Ok(signature)
-//                 }
-//             }
+            #[cfg(feature = "randomized-signer")]
+            impl RandomizedSigner<Box<[<$param Signature>]>> for [<$param SigningKey>] {
+                fn try_sign_with_rng(
+                    &self,
+                    rng: &mut impl CryptoRngCore,
+                    msg: &[u8],
+                ) -> Result<Box<[<$param Signature>]>, Error> {
+                    let mut rho = GenericArray::<
+                        u8,
+                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES,
+                    >::default();
+                    rng.fill_bytes(&mut rho);
+                    let mut signature = Box::new([<$param Signature>](GenericArray::default()));
+                    $param::sign(msg, &self.0, &rho, &mut signature.0);
+                    Ok(signature)
+                }
+            }
 
-//             impl AsRef<[u8]> for [<$param Signature>] {
-//                 fn as_ref(&self) -> &[u8] {
-//                     self.0.as_slice()
-//                 }
-//             }
+            impl AsRef<[u8]> for [<$param Signature>] {
+                fn as_ref(&self) -> &[u8] {
+                    self.0.as_slice()
+                }
+            }
 
-//             impl TryFrom<&[u8]> for [<$param Signature>] {
-//                 type Error = Error;
+            impl TryFrom<&[u8]> for [<$param Signature>] {
+                type Error = Error;
 
-//                 fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-//                     GenericArray::try_from_slice(value)
-//                         .map_err(|_| Error::new())
-//                         .map(|arr| Self(arr.clone()))
-//                 }
-//             }
+                fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+                    GenericArray::try_from_slice(value)
+                        .map_err(|_| Error::new())
+                        .map(|arr| Self(arr.clone()))
+                }
+            }
 
-//             impl From<[<$param Signature>]> for [u8; <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE] {
-//                 fn from(value: [<$param Signature>]) -> Self {
-//                     value.to_bytes()
-//                 }
-//             }
+            impl From<[<$param Signature>]> for [u8; <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE] {
+                fn from(value: [<$param Signature>]) -> Self {
+                    value.to_bytes()
+                }
+            }
 
-//             impl SignatureEncoding for [<$param Signature>] {
-//                 type Repr = [u8; <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE];
+            impl SignatureEncoding for [<$param Signature>] {
+                type Repr = [u8; <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE];
 
-//                 fn to_bytes(&self) -> Self::Repr {
-//                     // NOTE: this could be done with Into if it would be supported
-//                     let mut ret = [0; <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE];
-//                     ret.copy_from_slice(self.0.as_slice());
-//                     ret
-//                 }
+                fn to_bytes(&self) -> Self::Repr {
+                    // NOTE: this could be done with Into if it would be supported
+                    let mut ret = [0; <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE];
+                    ret.copy_from_slice(self.0.as_slice());
+                    ret
+                }
 
-//                 fn to_vec(&self) -> Vec<u8> {
-//                     self.0.to_vec()
-//                 }
+                fn to_vec(&self) -> Vec<u8> {
+                    self.0.to_vec()
+                }
 
-//                 fn encoded_len(&self) -> usize {
-//                     <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE
-//                 }
-//             }
-//         }
-//     };
-// }
+                fn encoded_len(&self) -> usize {
+                    <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE
+                }
+            }
+        }
+    };
+}
 
-// define_impl!(FAEST128f);
-// define_impl!(FAEST128s);
-// define_impl!(FAEST192f);
-// define_impl!(FAEST192s);
-// define_impl!(FAEST256f);
-// define_impl!(FAEST256s);
-// define_impl!(FAESTEM128f);
-// define_impl!(FAESTEM128s);
-// define_impl!(FAESTEM192f);
-// define_impl!(FAESTEM192s);
-// define_impl!(FAESTEM256f);
-// define_impl!(FAESTEM256s);
+define_impl!(FAEST128f);
+define_impl!(FAEST128s);
+define_impl!(FAEST192f);
+define_impl!(FAEST192s);
+define_impl!(FAEST256f);
+define_impl!(FAEST256s);
+define_impl!(FAESTEM128f);
+define_impl!(FAESTEM128s);
+define_impl!(FAESTEM192f);
+define_impl!(FAESTEM192s);
+define_impl!(FAESTEM256f);
+define_impl!(FAESTEM256s);
 
 #[cfg(test)]
 #[generic_tests::define]
@@ -563,39 +563,39 @@ mod tests {
         assert_eq!(kp, kp2);
     }
 
-    // #[instantiate_tests(<FAEST128fSigningKey, FAEST128fSignature>)]
-    // mod faest_128f {}
+    #[instantiate_tests(<FAEST128fSigningKey, FAEST128fSignature>)]
+    mod faest_128f {}
 
-    // #[instantiate_tests(<FAEST128sSigningKey, FAEST128sSignature>)]
-    // mod faest_128s {}
+    #[instantiate_tests(<FAEST128sSigningKey, FAEST128sSignature>)]
+    mod faest_128s {}
 
-    // #[instantiate_tests(<FAEST192fSigningKey, FAEST192fSignature>)]
-    // mod faest_192f {}
+    #[instantiate_tests(<FAEST192fSigningKey, FAEST192fSignature>)]
+    mod faest_192f {}
 
-    // #[instantiate_tests(<FAEST192sSigningKey, FAEST192sSignature>)]
-    // mod faest_192s {}
+    #[instantiate_tests(<FAEST192sSigningKey, FAEST192sSignature>)]
+    mod faest_192s {}
 
-    // #[instantiate_tests(<FAEST256fSigningKey, FAEST256fSignature>)]
-    // mod faest_256f {}
+    #[instantiate_tests(<FAEST256fSigningKey, FAEST256fSignature>)]
+    mod faest_256f {}
 
-    // #[instantiate_tests(<FAEST256sSigningKey, FAEST256sSignature>)]
-    // mod faest_256s {}
+    #[instantiate_tests(<FAEST256sSigningKey, FAEST256sSignature>)]
+    mod faest_256s {}
 
-    // #[instantiate_tests(<FAESTEM128fSigningKey, FAESTEM128fSignature>)]
-    // mod faest_em_128f {}
+    #[instantiate_tests(<FAESTEM128fSigningKey, FAESTEM128fSignature>)]
+    mod faest_em_128f {}
 
-    // #[instantiate_tests(<FAESTEM128sSigningKey, FAESTEM128sSignature>)]
-    // mod faest_em_128s {}
+    #[instantiate_tests(<FAESTEM128sSigningKey, FAESTEM128sSignature>)]
+    mod faest_em_128s {}
 
-    // #[instantiate_tests(<FAESTEM192fSigningKey, FAESTEM192fSignature>)]
-    // mod faest_em_192f {}
+    #[instantiate_tests(<FAESTEM192fSigningKey, FAESTEM192fSignature>)]
+    mod faest_em_192f {}
 
-    // #[instantiate_tests(<FAESTEM192sSigningKey, FAESTEM192sSignature>)]
-    // mod faest_em_192s {}
+    #[instantiate_tests(<FAESTEM192sSigningKey, FAESTEM192sSignature>)]
+    mod faest_em_192s {}
 
-    // #[instantiate_tests(<FAESTEM256fSigningKey, FAESTEM256fSignature>)]
-    // mod faest_em_256f {}
+    #[instantiate_tests(<FAESTEM256fSigningKey, FAESTEM256fSignature>)]
+    mod faest_em_256f {}
 
-    // #[instantiate_tests(<FAESTEM256sSigningKey, FAESTEM256sSignature>)]
-    // mod faest_em_256s {}
+    #[instantiate_tests(<FAESTEM256sSigningKey, FAESTEM256sSignature>)]
+    mod faest_em_256s {}
 }
