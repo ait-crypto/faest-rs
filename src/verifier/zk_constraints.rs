@@ -13,7 +13,11 @@ use std::{
     ops::{Add, Deref, Mul, Sub},
 };
 
-use super::{encryption, ScalarCommitment, ScalarCommitmentRef, ScalarCommits, ScalarCommitsRef};
+use super::{
+    encryption,
+    key_expansion::key_exp_cstrnts,
+    vole_commitments::{VoleCommits, VoleCommitsRef},
+};
 
 use crate::{
     aes::{AddRoundKey, StateBytesCommits, StateBytesSquaredCommits},
@@ -67,9 +71,9 @@ where
         }
     }
 
-    let w = ScalarCommitsRef {
+    let w = VoleCommitsRef {
         scalars: GenericArray::from_slice(&w_scalars),
-        vole_challenge: &delta,
+        delta: &delta,
     };
 
     let q = reshape_and_to_field::<O>(q, O::LBYTES::USIZE, O::LAMBDABYTESTWO::USIZE);
@@ -95,7 +99,7 @@ where
 #[allow(unused)]
 fn owf_constraints<O>(
     zk_hasher: &mut ZKVerifyHasher<OWFField<O>>,
-    w: ScalarCommitsRef<'_, OWFField<O>, O::L>,
+    w: VoleCommitsRef<'_, OWFField<O>, O::L>,
     delta: &OWFField<O>,
     pk: &PublicKey<O>,
 ) where
@@ -119,14 +123,16 @@ fn owf_constraints<O>(
         let ext_key: Vec<_> = ext_key
             .iter()
             .map(|key_i| {
-                (0..O::NSTBits::USIZE)
+                let scalars = (0..O::NSTBits::USIZE)
                     .map(|i| {
                         if get_bit(key_i, i) != 0 {
                             return *delta;
                         }
                         OWFField::<O>::ZERO
                     })
-                    .collect::<GenericArray<_, O::NSTBits>>()
+                    .collect();
+
+                VoleCommits { scalars, delta }
             })
             .collect();
 
@@ -140,55 +146,50 @@ fn owf_constraints<O>(
         let w_tilde = w.get_commits_ref::<O::LENC>(O::LKE::USIZE);
 
         // ::21 - EM = true
-        // println!(
-        //     "before encryption: {:?}, {:?}",
-        //     zk_hasher.b_hasher.h0, zk_hasher.b_hasher.h1
-        // );
-        encryption::enc_cstrnts::<O>(
+        encryption::enc_cstrnts::<O, _>(
             zk_hasher,
             owf_input,
-            owf_output.as_ref(),
+            owf_output.get_ref(),
             w_tilde,
             ext_key.as_slice(),
+        );
+    } else {
+        // ::13
+        let mut owf_input: VoleCommits<_, O::NSTBits> = VoleCommits::from_constant(
+            GenericArray::<u8, O::NSTBytes>::from_slice(x.as_slice()),
             delta,
         );
-        // println!(
-        //     "after encryption: {:?}, {:?}",
-        //     zk_hasher.b_hasher.h0, zk_hasher.b_hasher.h1
-        // );
-    } else {
-        todo!("Verification not yet supported")
-        // // ::13
-        // let mut owf_input = GenericArray::from_slice(&x).to_owned();
 
-        // // ::16
-        // let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKEBytes>(0));
-        // let extended_key = k.get_ref();
-        // let extended_key: Vec<_> = (0..O::R::USIZE + 1)
-        //     .map(|i| extended_key.get_commits_ref::<O::NSTBytes>(i * O::NSTBytes::USIZE))
-        //     .collect();
+        // ::16
+        let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKE>(0));
 
-        // // ::18-22
-        // for b in 0..O::BETA::USIZE {
-        //     // ::19 - EM = false
-        //     let w_tilde =
-        //         w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE + b * O::LENCBytes::USIZE);
+        let extended_key = k.get_ref();
+        let extended_key: Vec<_> = (0..O::R::USIZE + 1)
+            .map(|i| extended_key.get_commits_ref::<O::NSTBits>(i * O::NSTBits::USIZE))
+            .collect();
 
-        //     let owf_output = GenericArray::from_slice(
-        //         &y[O::InputSize::USIZE * b..O::InputSize::USIZE * (b + 1)],
-        //     );
+        // ::18-22
+        for b in 0..O::BETA::USIZE {
+            // ::19 - EM = false
+            let w_tilde = w.get_commits_ref::<O::LENC>(O::LKE::USIZE + b * O::LENC::USIZE);
 
-        //     // ::21 - EM = false
-        //     encryption::enc_cstrnts::<O, _>(
-        //         zk_hasher,
-        //         &owf_input,
-        //         owf_output,
-        //         w_tilde,
-        //         extended_key.as_slice(),
-        //     );
+            let owf_output = GenericArray::<u8, O::NSTBytes>::from_slice(
+                &y[O::InputSize::USIZE * b..O::InputSize::USIZE * (b + 1)],
+            );
+            let owf_output = VoleCommits::from_constant(owf_output, delta);
 
-        //     // ::20
-        //     owf_input[0] ^= 1;
+            // ::21 - EM = false
+            encryption::enc_cstrnts::<O, _>(
+                zk_hasher,
+                owf_input.get_ref(),
+                owf_output.get_ref(),
+                w_tilde,
+                extended_key.as_slice(),
+            );
+
+            // ::20
+            owf_input.scalars[0] += delta;
+        }
     }
 }
 
