@@ -9,7 +9,7 @@ use crate::{
     },
     parameter::{BaseParameters, OWFField, OWFParameters},
     utils::get_bit,
-    verifier::{VoleCommits,VoleCommitsRef},
+    verifier::{VoleCommits, VoleCommitsRef},
 };
 use generic_array::{
     typenum::{marker_traits::Unsigned, U4, U8},
@@ -17,7 +17,6 @@ use generic_array::{
 };
 use itertools::izip;
 use std::ops::Mul;
-
 
 impl<O> StateToBytes<O> for VoleCommits<'_, OWFField<O>, O::NSTBits>
 where

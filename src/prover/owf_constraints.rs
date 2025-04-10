@@ -5,20 +5,23 @@ use crate::{
     },
     fields::{
         large_fields::{Betas, ByteCombineSquared, SquareBytes},
-        ByteCombine, Field, FromBit, Sigmas, Square, BigGaloisField
+        BigGaloisField, ByteCombine, Field, FromBit, Sigmas, Square,
     },
-    parameter::{OWFField, OWFParameters, BaseParameters},
-    rijndael_32::{RCON_TABLE, inv_bitslice, rijndael_key_schedule, convert_from_batchblocks},
+    internal_keys::PublicKey,
+    parameter::{BaseParameters, OWFField, OWFParameters},
+    rijndael_32::{convert_from_batchblocks, inv_bitslice, rijndael_key_schedule, RCON_TABLE},
     universal_hashing::ZKProofHasher,
     utils::{get_bit, xor_arrays},
-    internal_keys::PublicKey,
 };
 use generic_array::{
     typenum::{Prod, Quot, Unsigned, U2, U4, U8},
     ArrayLength, GenericArray,
 };
 
-use super::{encryption::enc_cstrnts, key_expansion::key_exp_cstrnts, FieldCommitDegOne, FieldCommitDegTwo, FieldCommitDegThree, ByteCommitment, ByteCommits, ByteCommitsRef};
+use super::{
+    encryption::enc_cstrnts, key_expansion::key_exp_cstrnts, ByteCommitment, ByteCommits,
+    ByteCommitsRef, FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo,
+};
 
 #[allow(unused)]
 pub(crate) fn owf_constraints<O>(

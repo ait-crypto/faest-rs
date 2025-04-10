@@ -14,8 +14,8 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use generic_array::{ArrayLength, GenericArray};
 
 pub(crate) use large_fields::{
-    BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquared,
-    ByteCombineSquaredConstants, Sigmas, SumPoly, Betas, FromBit
+    Betas, BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquared,
+    ByteCombineSquaredConstants, FromBit, Sigmas, SumPoly,
 };
 #[cfg(not(all(
     feature = "opt-simd",

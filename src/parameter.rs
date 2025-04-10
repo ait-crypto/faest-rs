@@ -34,8 +34,8 @@ use crate::{
     rijndael_32::{Rijndael192, Rijndael256},
     universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
     utils::get_bit,
-    zk_constraints::aes_verify,
     witness::aes_extendedwitness,
+    zk_constraints::aes_verify,
     zk_constraints::{aes_prove, CstrntsVal},
 };
 

@@ -16,11 +16,14 @@ use crate::{
     fields::{
         large_fields::{Betas, ByteCombineSquared, ByteCombineSquaredConstants, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field,
-        Sigmas, SumPoly,
+        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Sigmas, SumPoly,
     },
     internal_keys::PublicKey,
     parameter::{BaseParameters, OWFField, OWFParameters, QSProof, TauParameters},
+    prover::{
+        byte_commitments::{ByteCommits, ByteCommitsRef},
+        field_commitment::{FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo},
+    },
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes, sub_bytes,
@@ -28,7 +31,6 @@ use crate::{
     },
     universal_hashing::{ZKHasher, ZKHasherInit, ZKHasherProcess, ZKProofHasher, ZKVerifyHasher},
     utils::{contains_zeros, get_bits, xor_arrays},
-    prover::{field_commitment::{FieldCommitDegOne, FieldCommitDegTwo, FieldCommitDegThree}, byte_commitments::{ByteCommits, ByteCommitsRef}},
 };
 
 /// Trait for adding a round key to the state, generating a new state

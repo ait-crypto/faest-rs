@@ -5,13 +5,13 @@ use crate::{
     },
     fields::{
         large_fields::{Betas, ByteCombineSquared, SquareBytes},
-        ByteCombine, Sigmas, Square, BigGaloisField
+        BigGaloisField, ByteCombine, Sigmas, Square,
     },
-    parameter::{OWFField, OWFParameters, BaseParameters},
+    parameter::{BaseParameters, OWFField, OWFParameters},
+    prover::{ByteCommitment, ByteCommits, ByteCommitsRef},
     rijndael_32::RCON_TABLE,
     universal_hashing::ZKProofHasher,
     utils::get_bit,
-    prover::{ByteCommitment, ByteCommits, ByteCommitsRef}
 };
 
 use generic_array::{
@@ -21,7 +21,6 @@ use generic_array::{
 use itertools::iproduct;
 use std::ops::{AddAssign, Deref, Index};
 use std::{convert::AsRef, process::Output};
-
 
 // TODO: (crate)
 pub fn key_exp_fwd<O>(
@@ -161,7 +160,6 @@ where
 
     k
 }
-
 
 fn inverse_affine_byte<O>(
     x: u8,

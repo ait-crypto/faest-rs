@@ -76,6 +76,7 @@ mod fields;
 mod internal_keys;
 mod parameter;
 mod prg;
+mod prover;
 mod random_oracles;
 mod rijndael_32;
 mod universal_hashing;
@@ -84,7 +85,6 @@ mod verifier;
 mod vole;
 mod witness;
 mod zk_constraints;
-mod prover; 
 
 use crate::{
     faest::{faest_keygen, faest_sign, faest_verify},

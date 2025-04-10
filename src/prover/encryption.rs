@@ -1,21 +1,22 @@
+use super::{ByteCommitment, ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use crate::{
-    aes::{
-        AddRoundKey, AddRoundKeyAssign, StateToBytes,
-    },
-    fields::{BigGaloisField, Square, Betas, FromBit},
+    aes::{AddRoundKey, AddRoundKeyAssign, StateToBytes},
+    fields::{Betas, BigGaloisField, FromBit, Square},
     parameter::{OWFField, OWFParameters},
+    prover::aes::{
+        add_round_key_bytes, bytewise_mix_columns, inverse_affine, inverse_shift_rows, mix_columns,
+        s_box_affine, shift_rows, StateBitsSquaredCommits, StateBytesCommits,
+        StateBytesSquaredCommits,
+    },
     universal_hashing::ZKProofHasher,
     utils::get_bit,
-    prover::aes::{add_round_key_bytes, bytewise_mix_columns, inverse_affine, inverse_shift_rows,
-        mix_columns, s_box_affine, shift_rows, StateBitsSquaredCommits, StateBytesSquaredCommits, StateBytesCommits}
 };
-use std::convert::AsRef;
-use std::ops::{AddAssign, Deref, Index};
 use generic_array::{
     typenum::{Prod, Quot, Unsigned, U2, U4, U8},
     ArrayLength, GenericArray,
 };
-use super::{FieldCommitDegOne, FieldCommitDegTwo, ByteCommitment, ByteCommits, ByteCommitsRef};
+use std::convert::AsRef;
+use std::ops::{AddAssign, Deref, Index};
 
 pub(crate) fn enc_cstrnts<O, K>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,
@@ -46,8 +47,7 @@ pub(crate) fn enc_cstrnts<O, K>(
         let round_key_sq = square_key::<O>(&round_key);
 
         // ::18-22
-        let st_0 =
-            aes_round::<O, FieldCommitDegOne<OWFField<O>>>(&state_prime, &round_key, false);
+        let st_0 = aes_round::<O, FieldCommitDegOne<OWFField<O>>>(&state_prime, &round_key, false);
         let st_1 =
             aes_round::<O, FieldCommitDegTwo<OWFField<O>>>(&state_prime, &round_key_sq, true);
 
@@ -182,8 +182,6 @@ fn inv_norm_constraints_prover<O>(
     hasher.update(&z);
 }
 
-
-
 fn invnorm_to_conjugates<O>(
     x_val: u8,
     x_tag: &[OWFField<O>],
@@ -214,7 +212,6 @@ where
         })
         .collect()
 }
-
 
 pub(crate) fn f256_f2_conjugates<O>(
     state: &ByteCommits<OWFField<O>, O::NSTBytes>,

@@ -20,12 +20,11 @@ use super::{
 };
 
 use crate::{
-    aes::{AddRoundKey},
+    aes::AddRoundKey,
     fields::{
         large_fields::{Betas, ByteCombineSquared, FromBit, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field,
-        Square, SumPoly,
+        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Square, SumPoly,
     },
     internal_keys::PublicKey,
     parameter::{BaseParameters, Lambda, OWFField, OWFParameters, QSProof, TauParameters},
@@ -38,7 +37,6 @@ use crate::{
     utils::{get_bit, xor_arrays},
     zk_constraints::reshape_and_to_field,
 };
-
 
 pub(crate) fn owf_constraints<O>(
     zk_hasher: &mut ZKVerifyHasher<OWFField<O>>,

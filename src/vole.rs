@@ -183,8 +183,7 @@ where
 {
     let BavcCommitResult { com, decom, seeds } = BAVC::commit(r, iv);
 
-    let mut v: Box<GenericArray<GenericArray<u8, BAVC::Lambda>, LHatBytes>> =
-        GenericArray::default_boxed();
+    let mut v = GenericArray::default_boxed();
 
     // Step 3.0
     let u = convert_to_vole::<BAVC, LHatBytes>(

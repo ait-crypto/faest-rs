@@ -3,23 +3,21 @@ use crate::{
     fields::{
         large_fields::{Betas, ByteCombineSquared, ByteCombineSquaredConstants, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field,
-        Sigmas, SumPoly,
+        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Sigmas, SumPoly,
     },
-    parameter::{OWFField, OWFParameters, BaseParameters},
+    parameter::{BaseParameters, OWFField, OWFParameters},
     universal_hashing::ZKProofHasher,
-    utils::get_bits
+    utils::get_bits,
 };
 
-use std::convert::AsRef;
-use std::ops::{AddAssign, Mul, Deref, Index};
+use super::{ByteCommitment, ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use generic_array::{
     typenum::{Prod, Quot, Unsigned, U2, U4, U8},
     ArrayLength, GenericArray,
 };
 use itertools::izip;
-use super::{FieldCommitDegOne, FieldCommitDegTwo, ByteCommitment, ByteCommits, ByteCommitsRef};
-
+use std::convert::AsRef;
+use std::ops::{AddAssign, Deref, Index, Mul};
 
 // Helper type aliases
 pub(crate) type StateBitsCommits<O> =
@@ -33,8 +31,6 @@ pub(crate) type StateBytesCommits<O> =
 
 pub(crate) type StateBytesSquaredCommits<O> =
     Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
-
-    
 
 // implementations of StateToBytes
 

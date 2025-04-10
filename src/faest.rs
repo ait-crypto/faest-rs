@@ -29,24 +29,13 @@ type VoleHasher<P> =
 /// Hashes required for FAEST implementation
 trait FaestHash: RandomOracle {
     /// Generate `µ`
-    fn hash_mu(
-        mu: &mut [u8],
-        input: &[u8],
-        output: &[u8],
-        msg: &[u8],
-    );
+    fn hash_mu(mu: &mut [u8], input: &[u8], output: &[u8], msg: &[u8]);
     /// Generate `r` and `iv_pre`
     fn hash_r_iv(r: &mut [u8], iv_pre: &mut IV, key: &[u8], mu: &[u8], rho: &[u8]);
     /// Generate `iv`
     fn hash_iv(iv: &mut IV);
     /// Generate first challenge
-    fn hash_challenge_1(
-        chall1: &mut [u8],
-        mu: &[u8],
-        hcom: &[u8],
-        c: &[u8],
-        iv: &[u8],
-    );
+    fn hash_challenge_1(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: &[u8], iv: &[u8]);
     /// Generate second challenge in an init-update-finalize style
     fn hash_challenge_2_init(chall1: &[u8], u_t: &[u8]) -> <Self as RandomOracle>::Hasher<10>;
     fn hash_challenge_2_update(hasher: &mut <Self as RandomOracle>::Hasher<10>, v_row: &[u8]);
@@ -82,12 +71,7 @@ impl<RO> FaestHash for RO
 where
     RO: RandomOracle,
 {
-    fn hash_mu(
-        mu: &mut [u8],
-        input: &[u8],
-        output: &[u8],
-        msg: &[u8],
-    ){
+    fn hash_mu(mu: &mut [u8], input: &[u8], output: &[u8], msg: &[u8]) {
         // Step 3
         let mut h2_hasher = Self::h2_0_init();
         h2_hasher.update(input);
@@ -117,13 +101,7 @@ where
         *iv_pre = h4_reader.read_into();
     }
 
-    fn hash_challenge_1(
-        chall1: &mut [u8],
-        mu: &[u8],
-        hcom: &[u8],
-        c: &[u8],
-        iv: &[u8],
-    ) {
+    fn hash_challenge_1(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: &[u8], iv: &[u8]) {
         let mut h2_hasher = Self::h2_1_init();
         h2_hasher.update(mu);
         h2_hasher.update(hcom);
@@ -182,7 +160,7 @@ where
         a1_t: &[u8],
         a2_t: &[u8],
         ctr: u32,
-    ){
+    ) {
         let mut h2_hasher = Self::h2_3_init();
         h2_hasher.update(chall2);
         h2_hasher.update(a0_t);
@@ -315,7 +293,6 @@ fn mask_witness<'a>(d: &'a mut [u8], w: &[u8], u: &[u8]) {
     }
 }
 
-use std::time::Instant;
 
 #[allow(unused)]
 fn sign<P, O>(
@@ -334,7 +311,7 @@ fn sign<P, O>(
 
     // ::3
     let mut mu = GenericArray::<u8, O::LAMBDABYTESTWO>::default();
-    RO::<P>::hash_mu(&mut mu,&sk.pk.owf_input, &sk.pk.owf_output, msg);
+    RO::<P>::hash_mu(&mut mu, &sk.pk.owf_input, &sk.pk.owf_output, msg);
 
     // ::4
     let mut r = GenericArray::<u8, O::LAMBDABYTES>::default();
@@ -345,9 +322,7 @@ fn sign<P, O>(
     // ::5
     let mut iv = GenericArray::from_slice(iv_pre).to_owned();
     RO::<P>::hash_iv(&mut iv);
-    // println!("first hashes: {:?}", t.elapsed());
 
-    // let t = Instant::now();
     // ::7
     let (volecommit_cs, signature) =
         signature.split_at_mut(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
@@ -357,7 +332,6 @@ fn sign<P, O>(
         u,
         mut v,
     } = volecommit::<P::BAVC, O::LHATBYTES>(VoleCommitmentCRefMut::new(volecommit_cs), &r, &iv);
-    // println!("vole commit: {:?}", t.elapsed());
 
     // ::8
     //Contrarly to specification, faest-ref uses iv instead of iv_pre
@@ -374,7 +348,6 @@ fn sign<P, O>(
     u_t.copy_from_slice(vole_hasher_u.process(&u).as_slice());
 
     // ::11
-    // let t = Instant::now();
     let mut h2_hasher = RO::<P>::hash_challenge_2_init(&chall1.as_slice(), u_t);
     {
         let row_len = O::LHATBYTES::USIZE;
@@ -387,13 +360,10 @@ fn sign<P, O>(
             );
         }
     }
-    // println!("hash_v: {:?}", t.elapsed());
 
     // ::12
-    // let t = Instant::now();
     // TODO: compute once and store in SecretKey
     let w = P::OWF::witness(sk);
-    // println!("extend witness: {:?}", t.elapsed());
 
     // ::13
     // compute and write masked witness 'd' in signature
@@ -408,7 +378,6 @@ fn sign<P, O>(
     (d);
 
     // ::18
-    // let t = Instant::now();
     let (a0_tilde, a1_tilde, a2_tilde) = P::OWF::prove(
         &w,
         // ::16
@@ -418,7 +387,6 @@ fn sign<P, O>(
         &sk.pk,
         &chall2,
     );
-    // println!("prove: {:?}", t.elapsed());
 
     // Save a1_tilde, a2_tilde in signature
     let signature = save_zk_constraints(signature, &a1_tilde.as_bytes(), &a2_tilde.as_bytes());
@@ -432,7 +400,6 @@ fn sign<P, O>(
         &a2_tilde.as_bytes(),
     );
 
-    // let t = Instant::now();
     for ctr in 0u32.. {
         // ::20
         RO::<P>::hash_challenge_3_finalize(&hasher, chall3, ctr);
@@ -449,8 +416,6 @@ fn sign<P, O>(
             }
         }
     }
-    // println!("gen ctr: {:?}", t.elapsed());
-
 }
 
 #[inline]
@@ -568,7 +533,7 @@ where
         &OWFField::<O>::from(a2_tilde),
     );
 
-    let mut chall3_prime = GenericArray::default(); 
+    let mut chall3_prime = GenericArray::default();
     RO::<P>::hash_challenge_3(
         &mut chall3_prime,
         &chall2,
@@ -692,8 +657,6 @@ mod test {
     #[instantiate_tests(<FAESTEM256sParameters>)]
     mod faest_em_256s {}
 }
-
-
 
 // Test signature against TVs and verify
 // #[cfg(test)]

@@ -16,22 +16,21 @@ use crate::{
     fields::{
         large_fields::{Betas, ByteCombineSquared, FromBit, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field,
-        Square, SumPoly
+        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Square, SumPoly,
     },
     internal_keys::PublicKey,
     parameter::{BaseParameters, Lambda, OWFField, OWFParameters, QSProof, TauParameters},
+    prover,
+    prover::byte_commitments::ByteCommitsRef,
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes, sub_bytes,
         sub_bytes_nots, State, RCON_TABLE,
     },
     universal_hashing::{ZKHasher, ZKHasherInit, ZKHasherProcess, ZKProofHasher, ZKVerifyHasher},
-    utils::{xor_arrays, get_bit},
-    prover::byte_commitments::ByteCommitsRef,
-    verifier::{VoleCommits, VoleCommitsRef},
-    prover,
+    utils::{get_bit, xor_arrays},
     verifier,
+    verifier::{VoleCommits, VoleCommitsRef},
 };
 
 // use key_expansion::{key_exp_bkwd, key_exp_cstrnts, key_exp_fwd};
@@ -48,16 +47,14 @@ pub(crate) type CstrntsVal<'a, O> = &'a GenericArray<
 
 // Reshapes a matrix of size (l_hat/8) x lambda into a matrix of size l_hat x (lambda/8).
 // Then, it converts all rows in the interval [row_start, rowstart + nrows) to field elements.
-pub(crate) fn reshape_and_to_field<O: OWFParameters>(
-    m: CstrntsVal<O>,
-) -> Vec<OWFField<O>> {
-    (0 .. O::LBYTES::USIZE + O::LAMBDABYTESTWO::USIZE)
+pub(crate) fn reshape_and_to_field<O: OWFParameters>(m: CstrntsVal<O>) -> Vec<OWFField<O>> {
+    (0..O::LBYTES::USIZE + O::LAMBDABYTESTWO::USIZE)
         .flat_map(|row| {
             let mut ret = vec![GenericArray::<u8, O::LAMBDABYTES>::default(); 8];
 
             (0..O::LAMBDA::USIZE).for_each(|col| {
                 for i in 0..8 {
-                    ret[i][col / 8] |= get_bit(&[m[row][col]] ,i) << (col % 8);
+                    ret[i][col / 8] |= get_bit(&[m[row][col]], i) << (col % 8);
                 }
             });
 
@@ -90,8 +87,8 @@ where
     let u1_star = OWFField::<O>::sum_poly_bits(&u[O::LAMBDABYTES::USIZE..]);
 
     // ::8
-    let v0_star = OWFField::<O>::sum_poly(&v[O::L::USIZE .. O::L::USIZE + O::LAMBDA::USIZE]);
-    let v1_star = OWFField::<O>::sum_poly(&v[O::L::USIZE + O::LAMBDA::USIZE ..]);
+    let v0_star = OWFField::<O>::sum_poly(&v[O::L::USIZE..O::L::USIZE + O::LAMBDA::USIZE]);
+    let v1_star = OWFField::<O>::sum_poly(&v[O::L::USIZE + O::LAMBDA::USIZE..]);
 
     // ::12
     prover::owf_constraints::<O>(
@@ -103,7 +100,6 @@ where
     // ::13-18
     zk_hasher.finalize(&v0_star, &(u0_star + &v1_star), &u1_star)
 }
-
 
 pub(crate) fn aes_verify<O>(
     q: CstrntsVal<O>,
@@ -172,33 +168,33 @@ where
 //     use generic_array::{sequence::GenericSequence, ArrayLength, GenericArray};
 //     use serde::Deserialize;
 
-    // #[test]
-    // fn aes_enc_fwd_prover_128_test() {
-    //     let w: GenericArray<u8, _> = GenericArray::from_array([
-    //         17, 114, 181, 111, 55, 1, 111, 109, 39, 0, 190, 122, 209, 86, 174, 250, 161, 150, 152,
-    //         81, 219, 2, 253, 129, 241, 75, 93, 95, 57, 172, 5, 217, 225, 238, 21, 13, 45, 134, 80,
-    //         97, 15, 126, 161, 50, 27, 253, 118, 137, 35, 0, 176, 94, 230, 199, 184, 147
-    //     ]);
+// #[test]
+// fn aes_enc_fwd_prover_128_test() {
+//     let w: GenericArray<u8, _> = GenericArray::from_array([
+//         17, 114, 181, 111, 55, 1, 111, 109, 39, 0, 190, 122, 209, 86, 174, 250, 161, 150, 152,
+//         81, 219, 2, 253, 129, 241, 75, 93, 95, 57, 172, 5, 217, 225, 238, 21, 13, 45, 134, 80,
+//         97, 15, 126, 161, 50, 27, 253, 118, 137, 35, 0, 176, 94, 230, 199, 184, 147
+//     ]);
 
-    //     let exp_k: GenericArray<u8, _> = GenericArray::from_array([
-    //         17, 114, 181, 111, 55, 1, 111, 109, 39, 0, 190, 122, 209, 86, 174, 250, 161, 150, 152,
-    //         81, 150, 151, 247, 60, 177, 151, 73, 70, 96, 193, 231, 188, 219, 2, 253, 129, 77, 149,
-    //         10, 189, 252, 2, 67, 251, 156, 195, 164, 71, 241, 75, 93, 95, 188, 222, 87, 226, 64,
-    //         220, 20, 25, 220, 31, 176, 94, 57, 172, 5, 217, 133, 114, 82, 59, 197, 174, 70, 34, 25,
-    //         177, 246, 124, 225, 238, 21, 13, 100, 156, 71, 54, 161, 50, 1, 20, 184, 131, 247, 104,
-    //         45, 134, 80, 97, 73, 26, 23, 87, 232, 40, 22, 67, 80, 171, 225, 43, 15, 126, 161, 50,
-    //         70, 100, 182, 101, 174, 76, 160, 38, 254, 231, 65, 13, 27, 253, 118, 137, 93, 153, 192,
-    //         236, 243, 213, 96, 202, 13, 50, 33, 199, 35, 0, 176, 94, 126, 153, 112, 178, 141, 76,
-    //         16, 120, 128, 126, 49, 191, 230, 199, 184, 147, 152, 94, 200, 33, 21, 18, 216, 89, 149,
-    //         108, 233, 230,
-    //     ]);
+//     let exp_k: GenericArray<u8, _> = GenericArray::from_array([
+//         17, 114, 181, 111, 55, 1, 111, 109, 39, 0, 190, 122, 209, 86, 174, 250, 161, 150, 152,
+//         81, 150, 151, 247, 60, 177, 151, 73, 70, 96, 193, 231, 188, 219, 2, 253, 129, 77, 149,
+//         10, 189, 252, 2, 67, 251, 156, 195, 164, 71, 241, 75, 93, 95, 188, 222, 87, 226, 64,
+//         220, 20, 25, 220, 31, 176, 94, 57, 172, 5, 217, 133, 114, 82, 59, 197, 174, 70, 34, 25,
+//         177, 246, 124, 225, 238, 21, 13, 100, 156, 71, 54, 161, 50, 1, 20, 184, 131, 247, 104,
+//         45, 134, 80, 97, 73, 26, 23, 87, 232, 40, 22, 67, 80, 171, 225, 43, 15, 126, 161, 50,
+//         70, 100, 182, 101, 174, 76, 160, 38, 254, 231, 65, 13, 27, 253, 118, 137, 93, 153, 192,
+//         236, 243, 213, 96, 202, 13, 50, 33, 199, 35, 0, 176, 94, 126, 153, 112, 178, 141, 76,
+//         16, 120, 128, 126, 49, 191, 230, 199, 184, 147, 152, 94, 200, 33, 21, 18, 216, 89, 149,
+//         108, 233, 230,
+//     ]);
 
-    //     let tags = GenericArray::default();
+//     let tags = GenericArray::default();
 
-    //     let res = aes_key_exp_fwd::<OWF128>(BitCommitsRef { keys: &w, tags: &tags });
+//     let res = aes_key_exp_fwd::<OWF128>(BitCommitsRef { keys: &w, tags: &tags });
 
-    //     assert!(*res.keys == exp_k);
-    // }
+//     assert!(*res.keys == exp_k);
+// }
 
 //     #[test]
 //     fn aes_enc_bkwd_prover_128_test() {
