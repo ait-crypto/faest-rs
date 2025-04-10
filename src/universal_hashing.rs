@@ -383,6 +383,7 @@ where
 
     Self::ExtensionField: for<'a> From<&'a [u8]>
         + for<'a> Mul<&'a Self::F, Output = Self::ExtensionField>
+        + for<'a> Add<&'a Self::ExtensionField, Output = Self::ExtensionField>
         + Mul<Self::F, Output = Self::ExtensionField>,
 {
     type F: Field + for<'a> From<&'a [u8]>;
@@ -404,7 +405,7 @@ where
             &x[<<Self as LeafHasher>::F as Field>::Length::USIZE..],
         );
 
-        let h = (u * x0) + x1;
+        let h = (u * &x0) + &x1;
 
         h.as_bytes()
     }
@@ -603,7 +604,9 @@ mod test {
             let uhash = GenericArray::from_slice(&data.uhash);
             let expected_h = GenericArray::from_slice(&data.expected_h);
 
+            let t = std::time::Instant::now();
             let h = LeafHasher256::hash(&uhash, &x);
+            println!("Time taken: {:?}", t.elapsed());
             assert_eq!(h, *expected_h)
         }
     }
