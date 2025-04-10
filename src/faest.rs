@@ -28,38 +28,42 @@ type VoleHasher<P> =
 
 /// Hashes required for FAEST implementation
 trait FaestHash: RandomOracle {
-    /// Generate a reader for `µ`
+    /// Generate `µ`
     fn hash_mu(
+        mu: &mut [u8],
         input: &[u8],
         output: &[u8],
         msg: &[u8],
-    ) -> <<Self as RandomOracle>::Hasher<8> as Hasher>::Reader;
+    );
     /// Generate `r` and `iv_pre`
     fn hash_r_iv(r: &mut [u8], iv_pre: &mut IV, key: &[u8], mu: &[u8], rho: &[u8]);
     /// Generate `iv`
     fn hash_iv(iv: &mut IV);
-    /// Generate a Reader for the first challenge
+    /// Generate first challenge
     fn hash_challenge_1(
+        chall1: &mut [u8],
         mu: &[u8],
         hcom: &[u8],
         c: &[u8],
         iv: &[u8],
-    ) -> <<Self as RandomOracle>::Hasher<9> as Hasher>::Reader;
-    /// Generate a Reader for second challenge in an init-update-finalize style
+    );
+    /// Generate second challenge in an init-update-finalize style
     fn hash_challenge_2_init(chall1: &[u8], u_t: &[u8]) -> <Self as RandomOracle>::Hasher<10>;
     fn hash_challenge_2_update(hasher: &mut <Self as RandomOracle>::Hasher<10>, v_row: &[u8]);
     fn hash_challenge_2_finalize(
         hasher: <Self as RandomOracle>::Hasher<10>,
+        chall2: &mut [u8],
         d: &[u8],
-    ) -> <<Self as RandomOracle>::Hasher<10> as Hasher>::Reader;
-    /// Generate a Reader for the third challenge
+    );
+    /// Generate third challenge
     fn hash_challenge_3(
+        chall3: &mut [u8],
         chall2: &[u8],
         a0_t: &[u8],
         a1_t: &[u8],
         a2_t: &[u8],
         ctr: u32,
-    ) -> <<Self as RandomOracle>::Hasher<11> as Hasher>::Reader;
+    );
     /// Generate third challenge in an init-finalize style
     fn hash_challenge_3_init(
         chall2: &[u8],
@@ -79,16 +83,17 @@ where
     RO: RandomOracle,
 {
     fn hash_mu(
+        mu: &mut [u8],
         input: &[u8],
         output: &[u8],
         msg: &[u8],
-    ) -> <<Self as RandomOracle>::Hasher<8> as Hasher>::Reader {
+    ){
         // Step 3
         let mut h2_hasher = Self::h2_0_init();
         h2_hasher.update(input);
         h2_hasher.update(output);
         h2_hasher.update(msg);
-        h2_hasher.finish()
+        h2_hasher.finish().read(mu);
     }
 
     fn hash_r_iv(r: &mut [u8], iv: &mut IV, key: &[u8], mu: &[u8], rho: &[u8]) {
@@ -113,17 +118,18 @@ where
     }
 
     fn hash_challenge_1(
+        chall1: &mut [u8],
         mu: &[u8],
         hcom: &[u8],
         c: &[u8],
         iv: &[u8],
-    ) -> <<Self as RandomOracle>::Hasher<9> as Hasher>::Reader {
+    ) {
         let mut h2_hasher = Self::h2_1_init();
         h2_hasher.update(mu);
         h2_hasher.update(hcom);
         h2_hasher.update(c);
         h2_hasher.update(iv);
-        h2_hasher.finish()
+        h2_hasher.finish().read(chall1);
     }
 
     fn hash_challenge_2_init(chall1: &[u8], u_t: &[u8]) -> Self::Hasher<10> {
@@ -138,10 +144,11 @@ where
     }
     fn hash_challenge_2_finalize(
         mut hasher: <Self as RandomOracle>::Hasher<10>,
+        chall2: &mut [u8],
         d: &[u8],
-    ) -> <<Self as RandomOracle>::Hasher<10> as Hasher>::Reader {
+    ) {
         hasher.update(d);
-        hasher.finish()
+        hasher.finish().read(chall2);
     }
 
     fn hash_challenge_3_init(
@@ -169,19 +176,20 @@ where
     }
 
     fn hash_challenge_3(
+        chall3: &mut [u8],
         chall2: &[u8],
         a0_t: &[u8],
         a1_t: &[u8],
         a2_t: &[u8],
         ctr: u32,
-    ) -> <<Self as RandomOracle>::Hasher<11> as Hasher>::Reader {
+    ){
         let mut h2_hasher = Self::h2_3_init();
         h2_hasher.update(chall2);
         h2_hasher.update(a0_t);
         h2_hasher.update(a1_t);
         h2_hasher.update(a2_t);
         h2_hasher.update(&ctr.to_le_bytes());
-        h2_hasher.finish()
+        h2_hasher.finish().read(chall3)
     }
 }
 
@@ -307,6 +315,8 @@ fn mask_witness<'a>(d: &'a mut [u8], w: &[u8], u: &[u8]) {
     }
 }
 
+use std::time::Instant;
+
 #[allow(unused)]
 fn sign<P, O>(
     msg: &[u8],
@@ -317,12 +327,14 @@ fn sign<P, O>(
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
+    // let t = Instant::now();
+
     // ::1
     let (signature, ctr_s) = signature.split_at_mut(P::SignatureSize::USIZE - size_of::<u32>());
 
     // ::3
-    let mu: GenericArray<u8, O::LAMBDABYTESTWO> =
-        RO::<P>::hash_mu(&sk.pk.owf_input, &sk.pk.owf_output, msg).read_into();
+    let mut mu = GenericArray::<u8, O::LAMBDABYTESTWO>::default();
+    RO::<P>::hash_mu(&mut mu,&sk.pk.owf_input, &sk.pk.owf_output, msg);
 
     // ::4
     let mut r = GenericArray::<u8, O::LAMBDABYTES>::default();
@@ -333,7 +345,9 @@ fn sign<P, O>(
     // ::5
     let mut iv = GenericArray::from_slice(iv_pre).to_owned();
     RO::<P>::hash_iv(&mut iv);
+    // println!("first hashes: {:?}", t.elapsed());
 
+    // let t = Instant::now();
     // ::7
     let (volecommit_cs, signature) =
         signature.split_at_mut(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
@@ -343,10 +357,12 @@ fn sign<P, O>(
         u,
         mut v,
     } = volecommit::<P::BAVC, O::LHATBYTES>(VoleCommitmentCRefMut::new(volecommit_cs), &r, &iv);
+    // println!("vole commit: {:?}", t.elapsed());
 
     // ::8
     //Contrarly to specification, faest-ref uses iv instead of iv_pre
-    let mut chall1 = RO::<P>::hash_challenge_1(&mu, &com, volecommit_cs, iv.as_slice()).read_into();
+    let mut chall1 = GenericArray::default();
+    RO::<P>::hash_challenge_1(&mut chall1, &mu, &com, volecommit_cs, iv.as_slice());
 
     // ::10
     let mut vole_hasher_u = VoleHasher::<P>::new_vole_hasher(&chall1);
@@ -358,6 +374,7 @@ fn sign<P, O>(
     u_t.copy_from_slice(vole_hasher_u.process(&u).as_slice());
 
     // ::11
+    // let t = Instant::now();
     let mut h2_hasher = RO::<P>::hash_challenge_2_init(&chall1.as_slice(), u_t);
     {
         let row_len = O::LHATBYTES::USIZE;
@@ -370,10 +387,13 @@ fn sign<P, O>(
             );
         }
     }
+    // println!("hash_v: {:?}", t.elapsed());
 
     // ::12
+    // let t = Instant::now();
     // TODO: compute once and store in SecretKey
     let w = P::OWF::witness(sk);
+    // println!("extend witness: {:?}", t.elapsed());
 
     // ::13
     // compute and write masked witness 'd' in signature
@@ -381,12 +401,14 @@ fn sign<P, O>(
     mask_witness(d, &w, &u[..<O as OWFParameters>::LBYTES::USIZE]);
 
     // ::14
-    let mut chall2 = RO::<P>::hash_challenge_2_finalize(h2_hasher, d).read_into();
+    let mut chall2 = GenericArray::default();
+    RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, d);
 
     // Free space
     (d);
 
     // ::18
+    // let t = Instant::now();
     let (a0_tilde, a1_tilde, a2_tilde) = P::OWF::prove(
         &w,
         // ::16
@@ -396,6 +418,8 @@ fn sign<P, O>(
         &sk.pk,
         &chall2,
     );
+    // println!("prove: {:?}", t.elapsed());
+
     // Save a1_tilde, a2_tilde in signature
     let signature = save_zk_constraints(signature, &a1_tilde.as_bytes(), &a2_tilde.as_bytes());
 
@@ -407,6 +431,8 @@ fn sign<P, O>(
         &a1_tilde.as_bytes(),
         &a2_tilde.as_bytes(),
     );
+
+    // let t = Instant::now();
     for ctr in 0u32.. {
         // ::20
         RO::<P>::hash_challenge_3_finalize(&hasher, chall3, ctr);
@@ -423,6 +449,8 @@ fn sign<P, O>(
             }
         }
     }
+    // println!("gen ctr: {:?}", t.elapsed());
+
 }
 
 #[inline]
@@ -458,8 +486,8 @@ where
     let chall3: &GenericArray<u8, O::LAMBDABYTES> = GenericArray::from_slice(chall3);
 
     // ::2
-    let mu: GenericArray<u8, O::LAMBDABYTESTWO> =
-        RO::<P>::hash_mu(&pk.owf_input, &pk.owf_output, msg).read_into();
+    let mut mu = GenericArray::<u8, O::LAMBDABYTESTWO>::default();
+    RO::<P>::hash_mu(&mut mu, &pk.owf_input, &pk.owf_output, msg);
 
     // ::4
     if !check_challenge_3::<P, O>(chall3) {
@@ -490,7 +518,8 @@ where
     let c = c.as_slice();
 
     // ::10
-    let chall1 = RO::<P>::hash_challenge_1(&mu, com.as_slice(), c, &iv).read_into();
+    let mut chall1 = GenericArray::default();
+    RO::<P>::hash_challenge_1(&mut chall1, &mu, com.as_slice(), c, &iv);
 
     let (u_tilde, sigma) = sigma.split_at(
         <<O as OWFParameters>::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE,
@@ -523,7 +552,8 @@ where
     let (d, sigma) = sigma.split_at(O::LBYTES::USIZE);
 
     // ::15
-    let chall2 = RO::<P>::hash_challenge_2_finalize(h2_hasher, d).read_into();
+    let mut chall2 = GenericArray::default();
+    RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, d);
 
     let (a1_tilde, a2_tilde) = sigma.split_at(O::LAMBDABYTES::USIZE);
 
@@ -538,14 +568,15 @@ where
         &OWFField::<O>::from(a2_tilde),
     );
 
-    let chall3_prime = RO::<P>::hash_challenge_3(
+    let mut chall3_prime = GenericArray::default(); 
+    RO::<P>::hash_challenge_3(
+        &mut chall3_prime,
         &chall2,
         a0_tilde.as_bytes().as_slice(),
         &a1_tilde,
         &a2_tilde,
         ctr,
-    )
-    .read_into();
+    );
 
     if *chall3 == chall3_prime {
         Ok(())
@@ -662,6 +693,9 @@ mod test {
     mod faest_em_256s {}
 }
 
+
+
+// Test signature against TVs and verify
 // #[cfg(test)]
 // mod test {
 //     use super::*;
@@ -853,52 +887,11 @@ mod test {
 //     }
 
 //     #[test]
-//     fn faest_sign_test() {
+//     fn faest_sign_tvs_test() {
 //         let database: Vec<FaestProveData> = read_test_data("FaestProve.json");
 //         for data in database {
 //             data.test_signature();
-//         }
-//     }
-
-//     #[test]
-//     fn faest_verify_em_test() {
-//         let database: Vec<FaestProveData> = read_test_data("FaestProve.json");
-
-//         for data in database {
-//             if data.em {
-//                 match data.lambda {
-//                     128 => {
-//                         let sk = SecretKey::<OWF128EM>::try_from(data.sk.as_slice()).unwrap();
-//                         let pk = sk.as_public_key();
-//                         let mut signature = GenericArray::default();
-//                         sign::<FAESTEM128sParameters, OWF128EM>(&MSG, &sk, &RHO, &mut signature);
-//                         assert!(
-//                             verify::<FAESTEM128sParameters, OWF128EM>(&MSG, &pk, &signature)
-//                                 .is_ok()
-//                         );
-//                     }
-//                     192 => {
-//                         let sk = SecretKey::<OWF192EM>::try_from(data.sk.as_slice()).unwrap();
-//                         let pk = sk.as_public_key();
-//                         let mut signature = GenericArray::default();
-//                         sign::<FAESTEM192sParameters, OWF192EM>(&MSG, &sk, &RHO, &mut signature);
-//                         assert!(
-//                             verify::<FAESTEM192sParameters, OWF192EM>(&MSG, &pk, &signature)
-//                                 .is_ok()
-//                         );
-//                     }
-//                     _ => {
-//                         let sk = SecretKey::<OWF256EM>::try_from(data.sk.as_slice()).unwrap();
-//                         let pk = sk.as_public_key();
-//                         let mut signature = GenericArray::default();
-//                         sign::<FAESTEM256sParameters, OWF256EM>(&MSG, &sk, &RHO, &mut signature);
-//                         assert!(
-//                             verify::<FAESTEM256sParameters, OWF256EM>(&MSG, &pk, &signature)
-//                                 .is_ok()
-//                         );
-//                     }
-//                 }
-//             }
+//             break;
 //         }
 //     }
 // }
