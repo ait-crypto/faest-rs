@@ -87,11 +87,11 @@ where
         let hash: GenericArray<u8, Self::LambdaByesTimesFour> =
             PRG::new_prg(&r, iv, tweak).read_into();
 
-        let mut sd = GenericArray::default();
-        sd.copy_from_slice(&hash[..Self::LambdaBytes::USIZE]);
+        let com = LH::hash(&uhash, &hash);
 
-        // Step 3
-        return (sd, LH::hash(&uhash, &hash));
+        let sd = hash.into_iter().take(Self::LambdaBytes::USIZE).collect();
+
+        (sd, com)
     }
 
     fn commit_em(
@@ -336,8 +336,9 @@ where
 
         // Setps 8..13
         let mut com_hasher = RO::h1_init();
-        let mut seeds = vec![GenericArray::default(); TAU::L::USIZE];
-        let mut coms = vec![GenericArray::default(); TAU::L::USIZE];
+        let mut seeds = Vec::with_capacity(TAU::L::USIZE);
+        let mut coms = Vec::with_capacity(TAU::L::USIZE);
+
         for i in 0..TAU::Tau::U32 {
             // Step 2
             let mut hi_hasher = RO::h1_init();
@@ -347,11 +348,14 @@ where
             let n_i = TAU::bavc_max_node_index(i as usize);
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
-                let idx = TAU::bavc_index_offset(i as usize) + j;
                 let tweak = i + TAU::L::U32 - 1;
 
-                (seeds[idx], coms[idx]) = Self::LC::commit(&keys[alpha], &iv, tweak, &uhash_i);
-                hi_hasher.update(&coms[idx]);
+                let (sd, com) = Self::LC::commit(&keys[alpha], &iv, tweak, &uhash_i);
+
+                hi_hasher.update(&com);
+
+                seeds.push(sd);
+                coms.push(com);
             }
 
             // Step 14
@@ -497,21 +501,24 @@ where
 
         // Setps 8..13
         let mut com_hasher = RO::h1_init();
-        let mut seeds = vec![GenericArray::default(); TAU::L::USIZE];
-        let mut coms = vec![GenericArray::default(); TAU::L::USIZE];
+        let mut seeds = Vec::with_capacity(TAU::L::USIZE);
+        let mut coms = Vec::with_capacity(TAU::L::USIZE);
+
         for i in 0..TAU::Tau::U32 {
             let mut hi_hasher = RO::h1_init();
 
             let n_i = TAU::bavc_max_node_index(i as usize);
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
-                let idx = TAU::bavc_index_offset(i as usize) + j;
                 let tweak = i + TAU::L::U32 - 1;
 
-                (seeds[idx], coms[idx]) = Self::LC::commit_em(&keys[alpha], &iv, tweak);
+                let (seed, com) = Self::LC::commit_em(&keys[alpha], &iv, tweak);
 
                 // Step 13
-                hi_hasher.update(&coms[idx]);
+                hi_hasher.update(&com);
+
+                seeds.push(seed);
+                coms.push(com);
             }
 
             // Step 14
