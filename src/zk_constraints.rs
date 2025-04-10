@@ -13,12 +13,11 @@ use std::{
 };
 
 use crate::{
-    aes::{StateBytesCommits, StateBytesSquaredCommits},
     fields::{
         large_fields::{Betas, ByteCombineSquared, FromBit, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, ByteCommits, ByteCommitsRef, Field,
-        FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo, Square, SumPoly,
+        BigGaloisField, ByteCombine, ByteCombineConstants, Field,
+        Square, SumPoly
     },
     internal_keys::PublicKey,
     parameter::{BaseParameters, Lambda, OWFField, OWFParameters, QSProof, TauParameters},
@@ -28,10 +27,14 @@ use crate::{
         sub_bytes_nots, State, RCON_TABLE,
     },
     universal_hashing::{ZKHasher, ZKHasherInit, ZKHasherProcess, ZKProofHasher, ZKVerifyHasher},
-    utils::xor_arrays,
+    utils::{xor_arrays, get_bit},
+    prover::byte_commitments::ByteCommitsRef,
+    verifier::{VoleCommits, VoleCommitsRef},
+    prover,
+    verifier,
 };
 
-use key_expansion::{key_exp_bkwd, key_exp_cstrnts, key_exp_fwd};
+// use key_expansion::{key_exp_bkwd, key_exp_cstrnts, key_exp_fwd};
 
 pub(crate) type KeyCstrnts<O> = (
     Box<GenericArray<u8, <O as OWFParameters>::PRODRUN128Bytes>>,
@@ -46,17 +49,15 @@ pub(crate) type CstrntsVal<'a, O> = &'a GenericArray<
 // Reshapes a matrix of size (l_hat/8) x lambda into a matrix of size l_hat x (lambda/8).
 // Then, it converts all rows in the interval [row_start, rowstart + nrows) to field elements.
 pub(crate) fn reshape_and_to_field<O: OWFParameters>(
-    v: CstrntsVal<O>,
-    row_start: usize,
-    nrows: usize,
+    m: CstrntsVal<O>,
 ) -> Vec<OWFField<O>> {
-    (row_start..row_start + nrows)
+    (0 .. O::LBYTES::USIZE + O::LAMBDABYTESTWO::USIZE)
         .flat_map(|row| {
             let mut ret = vec![GenericArray::<u8, O::LAMBDABYTES>::default(); 8];
 
             (0..O::LAMBDA::USIZE).for_each(|col| {
                 for i in 0..8 {
-                    ret[i][col / 8] |= ((v[row][col] >> i) & 1) << (col % 8);
+                    ret[i][col / 8] |= get_bit(&[m[row][col]] ,i) << (col % 8);
                 }
             });
 
@@ -81,24 +82,21 @@ where
             chall_2,
         );
 
-    // ::1:
-    let w_tag = reshape_and_to_field::<O>(v, 0, O::LBYTES::USIZE);
-
-    // ::4
-    let v = reshape_and_to_field::<O>(v, O::LBYTES::USIZE, O::LAMBDABYTESTWO::USIZE);
+    // ::1
+    let v = reshape_and_to_field::<O>(v);
 
     // ::7
     let u0_star = OWFField::<O>::sum_poly_bits(&u[..O::LAMBDABYTES::USIZE]);
     let u1_star = OWFField::<O>::sum_poly_bits(&u[O::LAMBDABYTES::USIZE..]);
 
     // ::8
-    let v0_star = OWFField::<O>::sum_poly(&v[..O::LAMBDA::USIZE]);
-    let v1_star = OWFField::<O>::sum_poly(&v[O::LAMBDA::USIZE..O::LAMBDA::USIZE * 2]);
+    let v0_star = OWFField::<O>::sum_poly(&v[O::L::USIZE .. O::L::USIZE + O::LAMBDA::USIZE]);
+    let v1_star = OWFField::<O>::sum_poly(&v[O::L::USIZE + O::LAMBDA::USIZE ..]);
 
     // ::12
-    owf_constraints::<O>(
+    prover::owf_constraints::<O>(
         &mut zk_hasher,
-        ByteCommitsRef::new(w, GenericArray::from_slice(w_tag.as_slice())),
+        ByteCommitsRef::new(w, GenericArray::from_slice(&v[..O::L::USIZE])),
         pk,
     );
 
@@ -106,523 +104,73 @@ where
     zk_hasher.finalize(&v0_star, &(u0_star + &v1_star), &u1_star)
 }
 
-#[allow(unused)]
-fn owf_constraints<O>(
-    zk_hasher: &mut ZKProofHasher<OWFField<O>>,
-    w: ByteCommitsRef<OWFField<O>, O::LBYTES>,
+
+pub(crate) fn aes_verify<O>(
+    q: CstrntsVal<O>,
+    d: &GenericArray<u8, O::LBYTES>,
     pk: &PublicKey<O>,
-) where
+    chall_2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
+    chall_3: &GenericArray<u8, O::LAMBDABYTES>,
+    a1_tilde: &OWFField<O>,
+    a2_tilde: &OWFField<O>,
+) -> OWFField<O>
+where
     O: OWFParameters,
-    <<O as OWFParameters>::BaseParams as BaseParameters>::Field: PartialEq,
 {
     // ::1
-    let PublicKey {
-        owf_input: x,
-        owf_output: y,
-    } = pk;
+    let delta = OWFField::<O>::from(chall_3.as_slice());
 
-    // ::5
-    {
-        let (k_0, k_1) = ((w.keys[0] & 0b1), (w.keys[0] & 0b10) >> 1);
-        zk_hasher.update(&FieldCommitDegThree {
-            key: OWFField::<O>::from_bit(k_0 & k_1),
-            tag: [
-                OWFField::<O>::ZERO,
-                w.tags[0] * w.tags[1],
-                w.tags[0] * k_1 + w.tags[1] * k_0,
-            ],
-        });
+    // ::2-5
+    let mut q = reshape_and_to_field::<O>(q);
+
+    // Convert first L elements to VOLE
+    for i in 0..O::L::USIZE {
+        if get_bit(d, i) != 0 {
+            q[i] += delta;
+        }
     }
+    let w = VoleCommitsRef {
+        scalars: GenericArray::from_slice(&q[..O::L::USIZE]),
+        delta: &delta,
+    };
 
     // ::7
-    if O::is_em() {
-        // ::8-9
-        let ext_key = key_schedule_bytes::<O>(&x);
+    let q0_star = OWFField::<O>::sum_poly(&q[O::L::USIZE..O::L::USIZE + O::LAMBDA::USIZE]);
+    let q1_star = OWFField::<O>::sum_poly(
+        &q[O::L::USIZE + O::LAMBDA::USIZE..O::L::USIZE + O::LAMBDA::USIZE * 2],
+    );
 
-        // ::10
-        let owf_input = w.get_commits_ref::<O::NSTBytes>(0);
+    // ::10
+    let q_star = delta * &q1_star + &q0_star;
 
-        // ::11
-        // TODO: find a better way to do this
-        let owf_output_keys: GenericArray<u8, O::NSTBytes> =
-            xor_arrays(owf_input.keys.as_slice(), y.as_slice()).collect();
-        let owf_output = ByteCommitsRef {
-            keys: GenericArray::from_slice(&owf_output_keys),
-            tags: GenericArray::from_slice(owf_input.tags),
-        };
-
-        // ::19 - EM = true
-        let w_tilde = w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE);
-
-        // ::21 - EM = true
-        encryption::enc_cstrnts::<O, _>(
-            zk_hasher,
-            owf_input,
-            owf_output,
-            w_tilde,
-            ext_key.as_slice(),
-        );
-    } else {
-        // ::13
-        let mut owf_input = GenericArray::from_slice(&x).to_owned();
-
-        // ::16
-        let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKEBytes>(0));
-        let extended_key = k.get_ref();
-        let extended_key: Vec<_> = (0..O::R::USIZE + 1)
-            .map(|i| extended_key.get_commits_ref::<O::NSTBytes>(i * O::NSTBytes::USIZE))
-            .collect();
-
-        // ::18-22
-        for b in 0..O::BETA::USIZE {
-            // ::19 - EM = false
-            let w_tilde =
-                w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE + b * O::LENCBytes::USIZE);
-
-            let owf_output = GenericArray::from_slice(
-                &y[O::InputSize::USIZE * b..O::InputSize::USIZE * (b + 1)],
-            );
-
-            // ::21 - EM = false
-            encryption::enc_cstrnts::<O, _>(
-                zk_hasher,
-                &owf_input,
-                owf_output,
-                w_tilde,
-                extended_key.as_slice(),
-            );
-
-            // ::20
-            owf_input[0] ^= 1;
-        }
-    }
-}
-
-#[inline]
-fn key_schedule_bytes<O>(key: &GenericArray<u8, O::InputSize>) -> Vec<GenericArray<u8, O::NSTBytes>>
-where
-    O: OWFParameters,
-{
-    rijndael_key_schedule::<O::NST, O::NK, O::R>(&key, O::SKE::USIZE)
-        .0
-        .chunks_exact(8)
-        .map(|chunk| {
-            GenericArray::from_iter(
-                convert_from_batchblocks(inv_bitslice(&chunk))
-                    .take(O::NST::USIZE)
-                    .flatten(),
-            )
-        })
-        .take(O::R::USIZE + 1)
-        .collect()
-}
-
-fn invnorm_to_conjugates_prover<O>(
-    x_val: u8,
-    x_tag: &[OWFField<O>],
-) -> GenericArray<FieldCommitDegOne<OWFField<O>>, U4>
-where
-    O: OWFParameters,
-{
-    let x_bits = [
-        x_val & 1,
-        (x_val >> 1) & 1,
-        (x_val >> 2) & 1,
-        (x_val >> 3) & 1,
-    ];
-
-    (0..4)
-        .map(|j| {
-            let key = OWFField::<O>::from_bit(x_bits[0])
-                + OWFField::<O>::BETA_SQUARES[j] * x_bits[1]
-                + OWFField::<O>::BETA_SQUARES[j + 1] * x_bits[2]
-                + OWFField::<O>::BETA_CUBES[j] * x_bits[3];
-
-            let tag = x_tag[0]
-                + OWFField::<O>::BETA_SQUARES[j] * x_tag[1]
-                + OWFField::<O>::BETA_SQUARES[j + 1] * x_tag[2]
-                + OWFField::<O>::BETA_CUBES[j] * x_tag[3];
-
-            FieldCommitDegOne { key, tag }
-        })
-        .collect()
-}
-
-fn inverse_affine_byte<O>(
-    x: u8,
-    x_0: &GenericArray<OWFField<O>, U8>,
-    y: &mut u8,
-    y_0: &mut [OWFField<O>],
-) where
-    O: OWFParameters,
-{
-    *y = x.rotate_right(7) ^ x.rotate_right(5) ^ x.rotate_right(2) ^ 0x5;
-
-    for i in 0..8 {
-        y_0[i] = x_0[(i + 8 - 1) % 8] + x_0[(i + 8 - 3) % 8] + x_0[(i + 8 - 6) % 8];
-    }
-}
-
-pub(crate) fn f256_f2_conjugates<O>(
-    state: &ByteCommits<OWFField<O>, O::NSTBytes>,
-) -> Box<GenericArray<FieldCommitDegOne<OWFField<O>>, O::NSTBits>>
-where
-    O: OWFParameters,
-{
-    (0..O::NSTBytes::USIZE)
-        .flat_map(|i| {
-            let mut x0 = state.get(i);
-
-            // ::4-8
-            let mut y: GenericArray<FieldCommitDegOne<OWFField<O>>, U8> = GenericArray::default();
-            for j in 0..8 {
-                y[j] = x0.combine();
-
-                if j != 7 {
-                    x0.square_inplace();
-                }
-            }
-            y
-        })
-        .collect()
-}
-
-pub(crate) mod key_expansion {
-    use super::*;
-
-    pub(crate) fn key_exp_fwd<O>(
-        w: ByteCommitsRef<OWFField<O>, O::LKEBytes>,
-    ) -> ByteCommits<OWFField<O>, O::PRODRUN128Bytes>
-    where
-        O: OWFParameters,
-    {
-        // ::1
-        let mut y = GenericArray::default_boxed();
-        let mut y_tags = GenericArray::default_boxed();
-        y[..O::LAMBDABYTES::USIZE].copy_from_slice(&w.keys[..O::LAMBDABYTES::USIZE]);
-        y_tags[..O::LAMBDA::USIZE].copy_from_slice(&w.tags[..O::LAMBDA::USIZE]);
-
-        // ::2
-        let mut i_wd = O::LAMBDA::USIZE;
-
-        for j in O::NK::USIZE..(4 * (O::R::USIZE + 1)) {
-            // ::5
-            if (j % O::NK::USIZE == 0) || ((O::NK::USIZE > 6) && (j % O::NK::USIZE == 4)) {
-                // ::6
-                y[4 * j..4 * j + 4].copy_from_slice(&w.keys[i_wd / 8..i_wd / 8 + 4]);
-                y_tags[32 * j..32 * j + 32].copy_from_slice(&w.tags[i_wd..i_wd + 32]);
-
-                // ::7
-                i_wd += 32;
-            } else {
-                // ::9-10
-                for i in 0..4 {
-                    y[4 * j + i] = y[4 * (j - O::NK::USIZE) + i] ^ y[4 * (j - 1) + i];
-
-                    for i_0 in 8 * i..8 * i + 8 {
-                        y_tags[32 * j + i_0] =
-                            y_tags[32 * (j - O::NK::USIZE) + i_0] + y_tags[32 * (j - 1) + i_0];
-                    }
-                }
-            }
-        }
-
-        ByteCommits::new(y, y_tags)
-    }
-
-    pub(crate) fn key_exp_bkwd<O>(
-        x: ByteCommitsRef<OWFField<O>, O::DIFFLKELAMBDABytes>,
-        xk: ByteCommitsRef<OWFField<O>, O::PRODRUN128Bytes>,
-    ) -> ByteCommits<OWFField<O>, O::SKE>
-    where
-        O: OWFParameters,
-    {
-        let mut y = GenericArray::default_boxed();
-        let mut y_tag = GenericArray::default_boxed();
-
-        let mut iwd = 0;
-
-        let rcon_evry = 4 * (O::LAMBDA::USIZE / 128);
-
-        for j in 0..O::SKE::USIZE {
-            // ::7
-            let mut x_tilde = x.keys[j] ^ xk.keys[iwd / 8 + (j % 4)];
-
-            let xt_0: GenericArray<OWFField<O>, U8> = (0..8)
-                .map(|i| x.tags[8 * j + i] + xk.tags[iwd + 8 * (j % 4) + i])
-                .collect();
-
-            // ::8
-            if j % rcon_evry == 0 {
-                x_tilde ^= RCON_TABLE[j / rcon_evry];
-            }
-
-            inverse_affine_byte::<O>(x_tilde, &xt_0, &mut y[j], &mut y_tag[8 * j..8 * j + 8]);
-
-            // ::12
-            if j % 4 == 3 {
-                if O::LAMBDA::USIZE != 256 {
-                    iwd += O::LAMBDA::USIZE;
-                } else {
-                    iwd += 128;
-                }
-            }
-        }
-
-        ByteCommits::new(y, y_tag)
-    }
-
-    pub(crate) fn key_exp_cstrnts<O>(
-        zk_hasher: &mut ZKProofHasher<OWFField<O>>,
-        w: ByteCommitsRef<OWFField<O>, O::LKEBytes>,
-    ) -> ByteCommits<OWFField<O>, O::PRODRUN128Bytes>
-    where
-        O: OWFParameters,
-        OWFField<O>: BigGaloisField + ByteCombine,
-        <<O as OWFParameters>::BaseParams as BaseParameters>::Field: PartialEq,
-    {
-        // ::1
-        let k = key_exp_fwd::<O>(w);
-
-        // ::2
-        let w_flat = key_exp_bkwd::<O>(
-            w.get_commits_ref::<O::DIFFLKELAMBDABytes>(O::LAMBDABYTES::USIZE),
-            k.get_ref(),
+    let mut zk_hasher =
+        <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_verify_hasher(
+            &chall_2, delta,
         );
 
-        let mut iwd = 32 * (O::NK::USIZE - 1);
+    // ::12
+    verifier::owf_constraints::<O>(&mut zk_hasher, w, &delta, pk);
 
-        let mut do_rot_word = true;
+    // ::14
+    let q_tilde = zk_hasher.finalize(&q_star);
 
-        // ::7
-        iproduct!(0..O::SKE::USIZE / 4, 0..4).for_each(|(j, r)| {
-            // ::11
-            let r_prime_inv = if do_rot_word { (4 + r - 3) % 4 } else { r };
-
-            // ::12-13
-            let k_hat = k.get_field_commit(iwd / 8 + r_prime_inv);
-            let k_hat_sq = k.get_field_commit_sq(iwd / 8 + r_prime_inv);
-
-            // ::14-15
-            let w_hat = w_flat.get_field_commit(4 * j + r);
-            let w_hat_sq = w_flat.get_field_commit_sq(4 * j + r);
-
-            // :: 19-20 (directly update zk_hahser with constraints)
-            zk_hasher.lift_and_process(&k_hat, &k_hat_sq, &w_hat, &w_hat_sq);
-
-            if r == 3 {
-                // ::16
-                if O::LAMBDA::USIZE == 256 {
-                    do_rot_word = !do_rot_word;
-                }
-
-                // ::21
-                if O::LAMBDA::USIZE == 192 {
-                    iwd += 192;
-                } else {
-                    iwd += 128;
-                }
-            }
-        });
-
-        k
-    }
+    q_tilde - delta * a1_tilde - delta.square() * a2_tilde
 }
 
-pub(crate) mod encryption {
-    use crate::{
-        aes::{
-            add_round_key_bytes, bytewise_mix_columns, inverse_affine, inverse_shift_rows,
-            mix_columns, s_box_affine, shift_rows, AddRoundKey, AddRoundKeyAssign,
-            StateBitsCommits, StateBitsSquaredCommits, StateToBytes,
-        },
-        fields::ByteCommitment,
-    };
-    use std::convert::AsRef;
-    use std::ops::{AddAssign, Deref, Index};
+// #[cfg(test)]
+// mod test {
+//     #![allow(clippy::needless_range_loop)]
 
-    use super::*;
+//     use super::key_expansion::{key_exp_bkwd, key_exp_fwd};
+//     use super::*;
+//     use crate::{
+//         fields::{GF128, GF192, GF256},
+//         parameter::{Lambda, OWFParameters, OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM},
+//         utils::test::read_test_data,
+//     };
 
-    pub(crate) fn enc_cstrnts<O, K>(
-        zk_hasher: &mut ZKProofHasher<OWFField<O>>,
-        input: impl for<'a> AddRoundKey<&'a K, Output = ByteCommits<OWFField<O>, O::NSTBytes>>,
-        output: impl for<'a> AddRoundKey<&'a K, Output = ByteCommits<OWFField<O>, O::NSTBytes>>,
-        w: ByteCommitsRef<OWFField<O>, O::LENCBytes>,
-        extended_key: &[K],
-    ) where
-        O: OWFParameters,
-        K: StateToBytes<O, Output = StateBytesCommits<O>>,
-        ByteCommits<OWFField<O>, O::NSTBytes>: for<'a> AddRoundKeyAssign<&'a K>,
-    {
-        // ::1
-        let mut state = input.add_round_key(&extended_key[0]);
-
-        // ::2
-        for r in 0..O::R::USIZE / 2 {
-            // ::3-15
-            let state_prime = enc_cstrnts_even::<O>(
-                zk_hasher,
-                &state,
-                w.get_commits_ref::<Quot<O::NSTBytes, U2>>(3 * O::NSTBytes::USIZE * r / 2),
-            );
-
-            // ::16-17
-            let round_key = StateToBytes::<O>::state_to_bytes(&extended_key[2 * r + 1]);
-
-            let round_key_sq = square_key::<O>(&round_key);
-
-            // ::18-22
-            let st_0 =
-                aes_round::<O, FieldCommitDegOne<OWFField<O>>>(&state_prime, &round_key, false);
-            let st_1 =
-                aes_round::<O, FieldCommitDegTwo<OWFField<O>>>(&state_prime, &round_key_sq, true);
-
-            let round_key = &extended_key[2 * r + 2];
-
-            if r != O::R::USIZE / 2 - 1 {
-                let s_tilde = w.get_commits_ref::<O::NSTBytes>(
-                    O::NSTBytes::USIZE / 2 + 3 * O::NSTBytes::USIZE * r / 2,
-                );
-
-                // ::29-38
-                odd_round_cnstrnts::<O>(zk_hasher, s_tilde, &st_0, &st_1);
-
-                // ::39-40
-                next_round_state::<O, _>(&mut state, s_tilde, round_key);
-            } else {
-                let s_tilde = output.add_round_key(round_key);
-
-                // ::29-38
-                odd_round_cnstrnts::<O>(zk_hasher, s_tilde.get_ref(), &st_0, &st_1);
-            }
-        }
-    }
-
-    fn square_key<O>(key: &StateBytesCommits<O>) -> StateBytesSquaredCommits<O>
-    where
-        O: OWFParameters,
-    {
-        key.iter().map(|ki| ki.clone().square()).collect()
-    }
-
-    fn enc_cstrnts_even<O>(
-        zk_hasher: &mut ZKProofHasher<OWFField<O>>,
-        state: &ByteCommits<OWFField<O>, O::NSTBytes>,
-        w: ByteCommitsRef<OWFField<O>, Quot<O::NSTBytes, U2>>,
-    ) -> StateBitsSquaredCommits<O>
-    where
-        O: OWFParameters,
-    {
-        // ::4
-        let state_conj = f256_f2_conjugates::<O>(&state);
-
-        let mut state_prime = StateBitsSquaredCommits::<O>::default();
-
-        // ::7
-        for i in 0..O::NSTBytes::USIZE {
-            // ::9
-            let norm = (w.keys[i / 2] >> ((i % 2) * 4)) & 0xf;
-            let ys = invnorm_to_conjugates_prover::<O>(norm, &w.tags[4 * i..4 * i + 4]);
-
-            // ::11
-            inv_norm_constraints_prover::<O>(
-                zk_hasher,
-                GenericArray::from_slice(&state_conj[8 * i..8 * i + 8]),
-                &ys[0],
-            );
-
-            // ::12
-            for j in 0..8 {
-                state_prime[i * 8 + j] = state_conj[8 * i + (j + 4) % 8].clone() * &ys[j % 4];
-            }
-        }
-
-        state_prime
-    }
-
-    fn next_round_state<O, K>(
-        state: &mut ByteCommits<OWFField<O>, O::NSTBytes>,
-        s_tilde: ByteCommitsRef<OWFField<O>, O::NSTBytes>,
-        round_key: K,
-    ) where
-        O: OWFParameters,
-        ByteCommits<OWFField<O>, O::NSTBytes>: AddRoundKeyAssign<K>,
-    {
-        *state = bytewise_mix_columns::<O>(s_tilde);
-
-        state.add_round_key_assign(round_key);
-    }
-
-    fn odd_round_cnstrnts<O>(
-        zk_hasher: &mut ZKProofHasher<OWFField<O>>,
-        s_tilde: ByteCommitsRef<OWFField<O>, O::NSTBytes>,
-        st_0: &StateBytesSquaredCommits<O>,
-        st_1: &StateBytesSquaredCommits<O>,
-    ) where
-        O: OWFParameters,
-    {
-        // ::29-30
-        let mut s = inverse_shift_rows::<O>(s_tilde);
-        inverse_affine::<O>(&mut s);
-
-        // ::31-37
-        for byte_i in 0..O::NSTBytes::USIZE {
-            let si = s.get_field_commit(byte_i);
-            let si_sq = s.get_field_commit_sq(byte_i);
-
-            zk_hasher.update(&(si_sq * &st_0[byte_i] + &si));
-            zk_hasher.update(&(si * &st_1[byte_i] + &st_0[byte_i]));
-        }
-    }
-
-    fn aes_round<O, T>(
-        state: &StateBitsSquaredCommits<O>,
-        key_bytes: &GenericArray<T, O::NSTBytes>,
-        sq: bool,
-    ) -> StateBytesSquaredCommits<O>
-    where
-        O: OWFParameters,
-        for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a T>,
-    {
-        // ::19-22
-
-        let mut st = s_box_affine::<O>(state, sq);
-
-        shift_rows::<O>(&mut st);
-
-        mix_columns::<O>(&mut st, sq);
-
-        add_round_key_bytes::<O, T>(&mut st, key_bytes);
-
-        st
-    }
-
-    fn inv_norm_constraints_prover<O>(
-        hasher: &mut ZKProofHasher<OWFField<O>>,
-        conjugates: &GenericArray<FieldCommitDegOne<OWFField<O>>, U8>,
-        y: &FieldCommitDegOne<OWFField<O>>,
-    ) where
-        O: OWFParameters,
-    {
-        let z = y.clone() * &conjugates[1] * &conjugates[4] + &conjugates[0];
-        hasher.update(&z);
-    }
-}
-
-#[cfg(test)]
-mod test {
-    #![allow(clippy::needless_range_loop)]
-
-    use super::key_expansion::{key_exp_bkwd, key_exp_fwd};
-    use super::*;
-    use crate::{
-        fields::{GF128, GF192, GF256},
-        parameter::{Lambda, OWFParameters, OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM},
-        utils::test::read_test_data,
-    };
-
-    use generic_array::{sequence::GenericSequence, ArrayLength, GenericArray};
-    use serde::Deserialize;
+//     use generic_array::{sequence::GenericSequence, ArrayLength, GenericArray};
+//     use serde::Deserialize;
 
     // #[test]
     // fn aes_enc_fwd_prover_128_test() {
@@ -652,73 +200,73 @@ mod test {
     //     assert!(*res.keys == exp_k);
     // }
 
-    #[test]
-    fn aes_enc_bkwd_prover_128_test() {
-        let w: GenericArray<u8, _> = GenericArray::from_array([
-            168, 233, 176, 51, 172, 6, 233, 110, 215, 248, 209, 67, 11, 234, 191, 117, 60, 3, 82,
-            31, 53, 103, 128, 235, 3, 122, 147, 230, 113, 159, 193, 47, 11, 201, 121, 202, 159,
-            209, 193, 112,
-        ]);
+//     #[test]
+//     fn aes_enc_bkwd_prover_128_test() {
+//         let w: GenericArray<u8, _> = GenericArray::from_array([
+//             168, 233, 176, 51, 172, 6, 233, 110, 215, 248, 209, 67, 11, 234, 191, 117, 60, 3, 82,
+//             31, 53, 103, 128, 235, 3, 122, 147, 230, 113, 159, 193, 47, 11, 201, 121, 202, 159,
+//             209, 193, 112,
+//         ]);
 
-        let k: GenericArray<u8, _> = GenericArray::from_array([
-            188, 126, 253, 108, 122, 171, 208, 78, 219, 200, 132, 13, 132, 47, 133, 101, 168, 233,
-            176, 51, 210, 66, 96, 125, 9, 138, 228, 112, 141, 165, 97, 21, 172, 6, 233, 110, 126,
-            68, 137, 19, 119, 206, 109, 99, 250, 107, 12, 118, 215, 248, 209, 67, 169, 188, 88, 80,
-            222, 114, 53, 51, 36, 25, 57, 69, 11, 234, 191, 117, 162, 86, 231, 37, 124, 36, 210,
-            22, 88, 61, 235, 83, 60, 3, 82, 31, 158, 85, 181, 58, 226, 113, 103, 44, 186, 76, 140,
-            127, 53, 103, 128, 235, 171, 50, 53, 209, 73, 67, 82, 253, 243, 15, 222, 130, 3, 122,
-            147, 230, 168, 72, 166, 55, 225, 11, 244, 202, 18, 4, 42, 72, 113, 159, 193, 47, 217,
-            215, 103, 24, 56, 220, 147, 210, 42, 216, 185, 154, 11, 201, 121, 202, 210, 30, 30,
-            210, 234, 194, 141, 0, 192, 26, 52, 154, 159, 209, 193, 112, 77, 207, 223, 162, 167,
-            13, 82, 162, 103, 23, 102, 56,
-        ]);
+//         let k: GenericArray<u8, _> = GenericArray::from_array([
+//             188, 126, 253, 108, 122, 171, 208, 78, 219, 200, 132, 13, 132, 47, 133, 101, 168, 233,
+//             176, 51, 210, 66, 96, 125, 9, 138, 228, 112, 141, 165, 97, 21, 172, 6, 233, 110, 126,
+//             68, 137, 19, 119, 206, 109, 99, 250, 107, 12, 118, 215, 248, 209, 67, 169, 188, 88, 80,
+//             222, 114, 53, 51, 36, 25, 57, 69, 11, 234, 191, 117, 162, 86, 231, 37, 124, 36, 210,
+//             22, 88, 61, 235, 83, 60, 3, 82, 31, 158, 85, 181, 58, 226, 113, 103, 44, 186, 76, 140,
+//             127, 53, 103, 128, 235, 171, 50, 53, 209, 73, 67, 82, 253, 243, 15, 222, 130, 3, 122,
+//             147, 230, 168, 72, 166, 55, 225, 11, 244, 202, 18, 4, 42, 72, 113, 159, 193, 47, 217,
+//             215, 103, 24, 56, 220, 147, 210, 42, 216, 185, 154, 11, 201, 121, 202, 210, 30, 30,
+//             210, 234, 194, 141, 0, 192, 26, 52, 154, 159, 209, 193, 112, 77, 207, 223, 162, 167,
+//             13, 82, 162, 103, 23, 102, 56,
+//         ]);
 
-        let exp = GenericArray::from_array([
-            194, 115, 166, 150, 184, 94, 43, 2, 223, 176, 186, 125, 63, 53, 49, 85, 187, 227, 202,
-            24, 84, 247, 130, 118, 199, 144, 127, 52, 203, 152, 167, 170, 148, 142, 159, 152, 253,
-            243, 159, 11,
-        ]);
-        let w_tags = GenericArray::default();
-        let k_tags = GenericArray::default();
+//         let exp = GenericArray::from_array([
+//             194, 115, 166, 150, 184, 94, 43, 2, 223, 176, 186, 125, 63, 53, 49, 85, 187, 227, 202,
+//             24, 84, 247, 130, 118, 199, 144, 127, 52, 203, 152, 167, 170, 148, 142, 159, 152, 253,
+//             243, 159, 11,
+//         ]);
+//         let w_tags = GenericArray::default();
+//         let k_tags = GenericArray::default();
 
-        let res = key_exp_bkwd::<OWF128>(
-            ByteCommitsRef::new(&w, &w_tags),
-            ByteCommitsRef::new(&k, &k_tags),
-        );
+//         let res = key_exp_bkwd::<OWF128>(
+//             ByteCommitsRef::new(&w, &w_tags),
+//             ByteCommitsRef::new(&k, &k_tags),
+//         );
 
-        assert_eq!(exp, *res.keys);
-    }
+//         assert_eq!(exp, *res.keys);
+//     }
 
-    #[test]
-    fn test_keycnstr() {
-        let w = GenericArray::from_array([
-            0xc0, 0x72, 0x0b, 0x10, 0xbf, 0x26, 0x6c, 0x19, 0x24, 0x18, 0x87, 0x72, 0xc5, 0x1f,
-            0xbe, 0x52, 0x01, 0xdc, 0x0b, 0xb6, 0x57, 0x84, 0x78, 0x79, 0xbc, 0xb6, 0x27, 0x08,
-            0x22, 0x85, 0xf6, 0x6f, 0x43, 0x2d, 0x60, 0x56, 0x9f, 0xc5, 0x2e, 0xe4, 0x78, 0x1a,
-            0x2b, 0x68, 0x7f, 0xe1, 0xea, 0x3d, 0x6a, 0x05, 0x3a, 0x77, 0x94, 0xa8, 0x8a, 0x86,
-            0x81, 0x4d, 0xe7, 0x6b, 0x58, 0x35, 0xcd, 0xba, 0x3d, 0xd5, 0x16, 0x1c, 0x47, 0x99,
-            0x22, 0xf2, 0x75, 0x6f, 0x09, 0xd6, 0xe7, 0x1d, 0xc7, 0x42, 0x22, 0xd7, 0x54, 0x35,
-            0xc2, 0xa6, 0x73, 0x11, 0xaa, 0x32, 0x99, 0xc3, 0x3f, 0x42, 0x84, 0x1c, 0xfd, 0x5b,
-            0xdf, 0xba, 0x0c, 0x93, 0x83, 0xe8, 0x4c, 0xce, 0xde, 0xa5, 0x84, 0x3f, 0x25, 0xc9,
-            0x15, 0x5a, 0x7e, 0x0c, 0x7a, 0x29, 0xd6, 0xa0, 0x2a, 0x93, 0xb7, 0xf2, 0xeb, 0x6d,
-            0xad, 0x50, 0x54, 0x32, 0x5a, 0x4d, 0xe9, 0xc9, 0xcb, 0xac, 0x5d, 0x90, 0x10, 0x0f,
-            0x9a, 0x45, 0x54, 0xee, 0x84, 0x1a, 0xed, 0x05, 0x02, 0x96, 0x78, 0x82, 0x79, 0x22,
-            0x57, 0x1a, 0xea, 0x65, 0x19, 0xce,
-        ]);
+//     #[test]
+//     fn test_keycnstr() {
+//         let w = GenericArray::from_array([
+//             0xc0, 0x72, 0x0b, 0x10, 0xbf, 0x26, 0x6c, 0x19, 0x24, 0x18, 0x87, 0x72, 0xc5, 0x1f,
+//             0xbe, 0x52, 0x01, 0xdc, 0x0b, 0xb6, 0x57, 0x84, 0x78, 0x79, 0xbc, 0xb6, 0x27, 0x08,
+//             0x22, 0x85, 0xf6, 0x6f, 0x43, 0x2d, 0x60, 0x56, 0x9f, 0xc5, 0x2e, 0xe4, 0x78, 0x1a,
+//             0x2b, 0x68, 0x7f, 0xe1, 0xea, 0x3d, 0x6a, 0x05, 0x3a, 0x77, 0x94, 0xa8, 0x8a, 0x86,
+//             0x81, 0x4d, 0xe7, 0x6b, 0x58, 0x35, 0xcd, 0xba, 0x3d, 0xd5, 0x16, 0x1c, 0x47, 0x99,
+//             0x22, 0xf2, 0x75, 0x6f, 0x09, 0xd6, 0xe7, 0x1d, 0xc7, 0x42, 0x22, 0xd7, 0x54, 0x35,
+//             0xc2, 0xa6, 0x73, 0x11, 0xaa, 0x32, 0x99, 0xc3, 0x3f, 0x42, 0x84, 0x1c, 0xfd, 0x5b,
+//             0xdf, 0xba, 0x0c, 0x93, 0x83, 0xe8, 0x4c, 0xce, 0xde, 0xa5, 0x84, 0x3f, 0x25, 0xc9,
+//             0x15, 0x5a, 0x7e, 0x0c, 0x7a, 0x29, 0xd6, 0xa0, 0x2a, 0x93, 0xb7, 0xf2, 0xeb, 0x6d,
+//             0xad, 0x50, 0x54, 0x32, 0x5a, 0x4d, 0xe9, 0xc9, 0xcb, 0xac, 0x5d, 0x90, 0x10, 0x0f,
+//             0x9a, 0x45, 0x54, 0xee, 0x84, 0x1a, 0xed, 0x05, 0x02, 0x96, 0x78, 0x82, 0x79, 0x22,
+//             0x57, 0x1a, 0xea, 0x65, 0x19, 0xce,
+//         ]);
 
-        let lke = <OWF128 as OWFParameters>::LKEBytes::USIZE;
-        let hasher = ZKHasher::<GF128>::new_zk_hasher(&GenericArray::default());
-        let mut hasher = ZKProofHasher::<GF128>::new(hasher.clone(), hasher.clone(), hasher);
+//         let lke = <OWF128 as OWFParameters>::LKEBytes::USIZE;
+//         let hasher = ZKHasher::<GF128>::new_zk_hasher(&GenericArray::default());
+//         let mut hasher = ZKProofHasher::<GF128>::new(hasher.clone(), hasher.clone(), hasher);
 
-        key_exp_cstrnts::<OWF128>(
-            &mut hasher,
-            ByteCommitsRef::new(
-                &GenericArray::from_slice(&w[..lke]),
-                &GenericArray::default(),
-            ),
-        );
-    }
-}
+//         key_exp_cstrnts::<OWF128>(
+//             &mut hasher,
+//             ByteCommitsRef::new(
+//                 &GenericArray::from_slice(&w[..lke]),
+//                 &GenericArray::default(),
+//             ),
+//         );
+//     }
+// }
 //     #[derive(Debug, Deserialize)]
 //     #[serde(rename_all = "camelCase")]
 //     struct AesProve {

@@ -16,8 +16,8 @@ use crate::{
     fields::{
         large_fields::{Betas, ByteCombineSquared, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, ByteCommits, ByteCommitsRef, Field,
-        FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo, SumPoly,
+        BigGaloisField, ByteCombine, ByteCombineConstants, Field,
+        SumPoly,
     },
     internal_keys::PublicKey,
     parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},

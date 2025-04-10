@@ -2,12 +2,11 @@ use super::vole_commitments::{VoleCommits, VoleCommitsRef};
 use crate::{
     aes::{
         AddRoundKey, AddRoundKeyAssign, AddRoundKeyBytes, BytewiseMixColumns, InverseAffine,
-        InverseShiftRows, MixColumns, SBoxAffine, ShiftRows, StateBitsCommits,
-        StateBitsSquaredCommits, StateBytesCommits, StateBytesSquaredCommits, StateToBytes,
+        InverseShiftRows, MixColumns, SBoxAffine, ShiftRows, StateToBytes,
     },
     fields::{
         large_fields::{Betas, ByteCombineSquared, SquareBytes},
-        ByteCombine, ByteCommitment, ByteCommits, ByteCommitsRef, Sigmas, Square,
+        ByteCombine, Sigmas, Square,
     },
     parameter::{OWFField, OWFParameters},
     universal_hashing::ZKVerifyHasher,

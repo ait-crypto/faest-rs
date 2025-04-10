@@ -1,0 +1,132 @@
+use crate::{
+    aes::{
+        AddRoundKey, AddRoundKeyAssign, AddRoundKeyBytes, BytewiseMixColumns, InverseAffine,
+        InverseShiftRows, MixColumns, SBoxAffine, ShiftRows, StateToBytes,
+    },
+    fields::{
+        large_fields::{Betas, ByteCombineSquared, SquareBytes},
+        ByteCombine, Field, FromBit, Sigmas, Square, BigGaloisField
+    },
+    parameter::{OWFField, OWFParameters, BaseParameters},
+    rijndael_32::{RCON_TABLE, inv_bitslice, rijndael_key_schedule, convert_from_batchblocks},
+    universal_hashing::ZKProofHasher,
+    utils::{get_bit, xor_arrays},
+    internal_keys::PublicKey,
+};
+use generic_array::{
+    typenum::{Prod, Quot, Unsigned, U2, U4, U8},
+    ArrayLength, GenericArray,
+};
+
+use super::{encryption::enc_cstrnts, key_expansion::key_exp_cstrnts, FieldCommitDegOne, FieldCommitDegTwo, FieldCommitDegThree, ByteCommitment, ByteCommits, ByteCommitsRef};
+
+#[allow(unused)]
+pub(crate) fn owf_constraints<O>(
+    zk_hasher: &mut ZKProofHasher<OWFField<O>>,
+    w: ByteCommitsRef<OWFField<O>, O::LBYTES>,
+    pk: &PublicKey<O>,
+) where
+    O: OWFParameters,
+    <<O as OWFParameters>::BaseParams as BaseParameters>::Field: PartialEq,
+{
+    // ::1
+    let PublicKey {
+        owf_input: x,
+        owf_output: y,
+    } = pk;
+
+    // ::5
+    {
+        let (k_0, k_1) = ((w.keys[0] & 0b1), (w.keys[0] & 0b10) >> 1);
+        zk_hasher.update(&FieldCommitDegThree {
+            key: OWFField::<O>::from_bit(k_0 & k_1),
+            tag: [
+                OWFField::<O>::ZERO,
+                w.tags[0] * w.tags[1],
+                w.tags[0] * k_1 + w.tags[1] * k_0,
+            ],
+        });
+    }
+
+    // ::7
+    if O::is_em() {
+        // ::8-9
+        let ext_key = key_schedule_bytes::<O>(&x);
+
+        // ::10
+        let owf_input = w.get_commits_ref::<O::NSTBytes>(0);
+
+        // ::11
+        // TODO: find a better way to do this
+        let owf_output_keys: GenericArray<u8, O::NSTBytes> =
+            xor_arrays(owf_input.keys.as_slice(), y.as_slice()).collect();
+        let owf_output = ByteCommitsRef {
+            keys: GenericArray::from_slice(&owf_output_keys),
+            tags: GenericArray::from_slice(owf_input.tags),
+        };
+
+        // ::19 - EM = true
+        let w_tilde = w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE);
+
+        // ::21 - EM = true
+        enc_cstrnts::<O, _>(
+            zk_hasher,
+            owf_input,
+            owf_output,
+            w_tilde,
+            ext_key.as_slice(),
+        );
+    } else {
+        // ::13
+        let mut owf_input = GenericArray::from_slice(&x).to_owned();
+
+        // ::16
+        let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKEBytes>(0));
+        let extended_key = k.get_ref();
+        let extended_key: Vec<_> = (0..O::R::USIZE + 1)
+            .map(|i| extended_key.get_commits_ref::<O::NSTBytes>(i * O::NSTBytes::USIZE))
+            .collect();
+
+        // ::18-22
+        for b in 0..O::BETA::USIZE {
+            // ::19 - EM = false
+            let w_tilde =
+                w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE + b * O::LENCBytes::USIZE);
+
+            let owf_output = GenericArray::from_slice(
+                &y[O::InputSize::USIZE * b..O::InputSize::USIZE * (b + 1)],
+            );
+
+            // ::21 - EM = false
+            enc_cstrnts::<O, _>(
+                zk_hasher,
+                &owf_input,
+                owf_output,
+                w_tilde,
+                extended_key.as_slice(),
+            );
+
+            // ::20
+            owf_input[0] ^= 1;
+        }
+    }
+}
+
+#[inline]
+fn key_schedule_bytes<O>(key: &GenericArray<u8, O::InputSize>) -> Vec<GenericArray<u8, O::NSTBytes>>
+where
+    O: OWFParameters,
+{
+    rijndael_key_schedule::<O::NST, O::NK, O::R>(&key, O::SKE::USIZE)
+        .0
+        .chunks_exact(8)
+        .map(|chunk| {
+            GenericArray::from_iter(
+                convert_from_batchblocks(inv_bitslice(&chunk))
+                    .take(O::NST::USIZE)
+                    .flatten(),
+            )
+        })
+        .take(O::R::USIZE + 1)
+        .collect()
+}

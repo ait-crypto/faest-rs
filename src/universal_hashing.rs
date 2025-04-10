@@ -14,9 +14,10 @@ use generic_array::{
 use itertools::{chain, izip};
 
 use crate::fields::{
-    field_commitment::{FieldCommitDegOne, FieldCommitDegThree},
     BigGaloisField, Field, GF128, GF192, GF256, GF384, GF576, GF64, GF768,
 };
+
+use crate::prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree};
 
 type BBits = U16;
 // Additional bytes returned by VOLE hash

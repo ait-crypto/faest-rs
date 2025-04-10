@@ -1,5 +1,3 @@
-pub(crate) mod byte_commitments;
-pub(crate) mod field_commitment;
 pub(crate) mod large_fields;
 pub(crate) mod small_fields;
 
@@ -15,11 +13,9 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use generic_array::{ArrayLength, GenericArray};
 
-pub(crate) use byte_commitments::{ByteCommitment, ByteCommits, ByteCommitsRef};
-pub(crate) use field_commitment::{FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo};
 pub(crate) use large_fields::{
     BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquared,
-    ByteCombineSquaredConstants, Sigmas, SumPoly,
+    ByteCombineSquaredConstants, Sigmas, SumPoly, Betas, FromBit
 };
 #[cfg(not(all(
     feature = "opt-simd",

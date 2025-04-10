@@ -33,10 +33,10 @@ use crate::{
     random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake256},
     rijndael_32::{Rijndael192, Rijndael256},
     universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
-    verifier::zk_constraints::aes_verify,
+    utils::get_bit,
+    zk_constraints::aes_verify,
     witness::aes_extendedwitness,
     zk_constraints::{aes_prove, CstrntsVal},
-    utils::get_bit
 };
 
 pub type GetBytes<BitLen> = Quot<BitLen, U8>;

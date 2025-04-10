@@ -1,4 +1,5 @@
-use crate::fields::{BigGaloisField, FieldCommitDegOne, Square, GF8};
+use crate::fields::{BigGaloisField, Square, GF8};
+use crate::prover::field_commitment::FieldCommitDegOne;
 use generic_array::{
     typenum::{Prod, U8},
     ArrayLength, GenericArray,

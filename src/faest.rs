@@ -29,20 +29,29 @@ type VoleHasher<P> =
 /// Hashes required for FAEST implementation
 trait FaestHash: RandomOracle {
     /// Generate a reader for `µ`
-    fn hash_mu(input: &[u8], output: &[u8], msg: &[u8]) -> <<Self as RandomOracle>::Hasher<8> as Hasher>::Reader;
+    fn hash_mu(
+        input: &[u8],
+        output: &[u8],
+        msg: &[u8],
+    ) -> <<Self as RandomOracle>::Hasher<8> as Hasher>::Reader;
     /// Generate `r` and `iv_pre`
     fn hash_r_iv(r: &mut [u8], iv_pre: &mut IV, key: &[u8], mu: &[u8], rho: &[u8]);
     /// Generate `iv`
     fn hash_iv(iv: &mut IV);
     /// Generate a Reader for the first challenge
-    fn hash_challenge_1(mu: &[u8], hcom: &[u8], c: &[u8], iv: &[u8]) -> <<Self as RandomOracle>::Hasher<9> as Hasher>::Reader;
+    fn hash_challenge_1(
+        mu: &[u8],
+        hcom: &[u8],
+        c: &[u8],
+        iv: &[u8],
+    ) -> <<Self as RandomOracle>::Hasher<9> as Hasher>::Reader;
     /// Generate a Reader for second challenge in an init-update-finalize style
     fn hash_challenge_2_init(chall1: &[u8], u_t: &[u8]) -> <Self as RandomOracle>::Hasher<10>;
     fn hash_challenge_2_update(hasher: &mut <Self as RandomOracle>::Hasher<10>, v_row: &[u8]);
     fn hash_challenge_2_finalize(
         hasher: <Self as RandomOracle>::Hasher<10>,
         d: &[u8],
-    )-><<Self as RandomOracle>::Hasher<10> as Hasher>::Reader;
+    ) -> <<Self as RandomOracle>::Hasher<10> as Hasher>::Reader;
     /// Generate a Reader for the third challenge
     fn hash_challenge_3(
         chall2: &[u8],
@@ -63,14 +72,17 @@ trait FaestHash: RandomOracle {
         chall3: &mut [u8],
         ctr: u32,
     );
-
 }
 
 impl<RO> FaestHash for RO
 where
     RO: RandomOracle,
 {
-    fn hash_mu(input: &[u8], output: &[u8], msg: &[u8]) -><<Self as RandomOracle>::Hasher<8> as Hasher>::Reader {
+    fn hash_mu(
+        input: &[u8],
+        output: &[u8],
+        msg: &[u8],
+    ) -> <<Self as RandomOracle>::Hasher<8> as Hasher>::Reader {
         // Step 3
         let mut h2_hasher = Self::h2_0_init();
         h2_hasher.update(input);
@@ -100,7 +112,12 @@ where
         *iv_pre = h4_reader.read_into();
     }
 
-    fn hash_challenge_1(mu: &[u8], hcom: &[u8], c: &[u8], iv: &[u8]) -><<Self as RandomOracle>::Hasher<9> as Hasher>::Reader{
+    fn hash_challenge_1(
+        mu: &[u8],
+        hcom: &[u8],
+        c: &[u8],
+        iv: &[u8],
+    ) -> <<Self as RandomOracle>::Hasher<9> as Hasher>::Reader {
         let mut h2_hasher = Self::h2_1_init();
         h2_hasher.update(mu);
         h2_hasher.update(hcom);
@@ -152,19 +169,19 @@ where
     }
 
     fn hash_challenge_3(
-            chall2: &[u8],
-            a0_t: &[u8],
-            a1_t: &[u8],
-            a2_t: &[u8],
-            ctr: u32,
-        ) -> <<Self as RandomOracle>::Hasher<11> as Hasher>::Reader{
-            let mut h2_hasher = Self::h2_3_init();
-            h2_hasher.update(chall2);
-            h2_hasher.update(a0_t);
-            h2_hasher.update(a1_t);
-            h2_hasher.update(a2_t);
-            h2_hasher.update(&ctr.to_le_bytes());
-            h2_hasher.finish()
+        chall2: &[u8],
+        a0_t: &[u8],
+        a1_t: &[u8],
+        a2_t: &[u8],
+        ctr: u32,
+    ) -> <<Self as RandomOracle>::Hasher<11> as Hasher>::Reader {
+        let mut h2_hasher = Self::h2_3_init();
+        h2_hasher.update(chall2);
+        h2_hasher.update(a0_t);
+        h2_hasher.update(a1_t);
+        h2_hasher.update(a2_t);
+        h2_hasher.update(&ctr.to_le_bytes());
+        h2_hasher.finish()
     }
 }
 
@@ -214,7 +231,7 @@ where
     }
 
     // Check that all the following bytes are 0s
-    for i in start_byte + 1 .. chall3.len() {
+    for i in start_byte + 1..chall3.len() {
         if chall3[i] != 0 {
             return false;
         }
@@ -304,7 +321,8 @@ fn sign<P, O>(
     let (signature, ctr_s) = signature.split_at_mut(P::SignatureSize::USIZE - size_of::<u32>());
 
     // ::3
-    let mu: GenericArray<u8, O::LAMBDABYTESTWO> = RO::<P>::hash_mu(&sk.pk.owf_input, &sk.pk.owf_output, msg).read_into();
+    let mu: GenericArray<u8, O::LAMBDABYTESTWO> =
+        RO::<P>::hash_mu(&sk.pk.owf_input, &sk.pk.owf_output, msg).read_into();
 
     // ::4
     let mut r = GenericArray::<u8, O::LAMBDABYTES>::default();
@@ -440,7 +458,8 @@ where
     let chall3: &GenericArray<u8, O::LAMBDABYTES> = GenericArray::from_slice(chall3);
 
     // ::2
-    let mu: GenericArray<u8, O::LAMBDABYTESTWO> = RO::<P>::hash_mu(&pk.owf_input, &pk.owf_output, msg).read_into();
+    let mu: GenericArray<u8, O::LAMBDABYTESTWO> =
+        RO::<P>::hash_mu(&pk.owf_input, &pk.owf_output, msg).read_into();
 
     // ::4
     if !check_challenge_3::<P, O>(chall3) {
@@ -460,7 +479,7 @@ where
 
     // ::7
     let res = volereconstruct::<P::BAVC, O::LHATBYTES>(chall3, &decom_i, c, &iv);
-    
+
     // ::8
     if res.is_none() {
         return Err(Error::new());
@@ -471,7 +490,7 @@ where
     let c = c.as_slice();
 
     // ::10
-    let chall1 = RO::<P>::hash_challenge_1( &mu, com.as_slice(), c, &iv).read_into();
+    let chall1 = RO::<P>::hash_challenge_1(&mu, com.as_slice(), c, &iv).read_into();
 
     let (u_tilde, sigma) = sigma.split_at(
         <<O as OWFParameters>::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE,
@@ -519,20 +538,128 @@ where
         &OWFField::<O>::from(a2_tilde),
     );
 
-
     let chall3_prime = RO::<P>::hash_challenge_3(
         &chall2,
         a0_tilde.as_bytes().as_slice(),
         &a1_tilde,
         &a2_tilde,
-        ctr    
-    ).read_into();
+        ctr,
+    )
+    .read_into();
 
     if *chall3 == chall3_prime {
         Ok(())
     } else {
         Err(Error::new())
     }
+}
+
+#[cfg(test)]
+#[generic_tests::define]
+mod test {
+    use super::*;
+
+    use generic_array::GenericArray;
+    use rand::RngCore;
+    #[cfg(feature = "serde")]
+    use serde::{Deserialize, Serialize};
+
+    use crate::parameter::{
+        FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
+        FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters, FAESTEM128sParameters,
+        FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters, FAESTEM256sParameters,
+        FAESTParameters,
+    };
+
+    const RUNS: usize = 3;
+
+    fn random_message(mut rng: impl RngCore) -> Vec<u8> {
+        let mut length = [0];
+        while length[0] == 0 {
+            rng.fill_bytes(&mut length);
+        }
+        let mut ret = vec![0; length[0] as usize];
+        rng.fill_bytes(&mut ret);
+        ret
+    }
+
+    #[test]
+    fn sign_and_verify<P: FAESTParameters>() {
+        let mut rng = rand::thread_rng();
+        for _i in 0..RUNS {
+            let sk = P::OWF::keygen_with_rng(&mut rng);
+            let msg = random_message(&mut rng);
+            let mut sigma = GenericArray::default_boxed();
+            faest_sign::<P>(&msg, &sk, &[], &mut sigma);
+            let pk = sk.as_public_key();
+            let res = faest_verify::<P>(&msg, &pk, &sigma);
+            assert!(res.is_ok());
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serialize<P: FAESTParameters>() {
+        let mut rng = rand::thread_rng();
+        let sk = P::OWF::keygen_with_rng(&mut rng);
+
+        let mut out = vec![];
+        let mut ser = serde_json::Serializer::new(&mut out);
+
+        sk.serialize(&mut ser).expect("serialize key pair");
+        let serialized = String::from_utf8(out).expect("serialize to string");
+
+        let mut de = serde_json::Deserializer::from_str(&serialized);
+        let sk2 = SecretKey::<P::OWF>::deserialize(&mut de).expect("deserialize secret key");
+        assert_eq!(sk, sk2);
+
+        let pk = sk.as_public_key();
+        let mut out = vec![];
+        let mut ser = serde_json::Serializer::new(&mut out);
+
+        pk.serialize(&mut ser).expect("serialize key pair");
+        let serialized = String::from_utf8(out).expect("serialize to string");
+
+        let mut de = serde_json::Deserializer::from_str(&serialized);
+        let pk2 = PublicKey::<P::OWF>::deserialize(&mut de).expect("deserialize public key");
+        assert_eq!(pk, pk2);
+    }
+
+    #[instantiate_tests(<FAEST128fParameters>)]
+    mod faest_128f {}
+
+    #[instantiate_tests(<FAEST128sParameters>)]
+    mod faest_128s {}
+
+    #[instantiate_tests(<FAEST192fParameters>)]
+    mod faest_192f {}
+
+    #[instantiate_tests(<FAEST192sParameters>)]
+    mod faest_192s {}
+
+    #[instantiate_tests(<FAEST256fParameters>)]
+    mod faest_256f {}
+
+    #[instantiate_tests(<FAEST256sParameters>)]
+    mod faest_256s {}
+
+    #[instantiate_tests(<FAESTEM128fParameters>)]
+    mod faest_em_128f {}
+
+    #[instantiate_tests(<FAESTEM128sParameters>)]
+    mod faest_em_128s {}
+
+    #[instantiate_tests(<FAESTEM192fParameters>)]
+    mod faest_em_192f {}
+
+    #[instantiate_tests(<FAESTEM192sParameters>)]
+    mod faest_em_192s {}
+
+    #[instantiate_tests(<FAESTEM256fParameters>)]
+    mod faest_em_256f {}
+
+    #[instantiate_tests(<FAESTEM256sParameters>)]
+    mod faest_em_256s {}
 }
 
 // #[cfg(test)]
@@ -775,111 +902,3 @@ where
 //         }
 //     }
 // }
-
-#[cfg(test)]
-#[generic_tests::define]
-mod test {
-    use super::*;
-
-    use generic_array::GenericArray;
-    use rand::RngCore;
-    #[cfg(feature = "serde")]
-    use serde::{Deserialize, Serialize};
-
-    use crate::parameter::{
-        FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
-        FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters, FAESTEM128sParameters,
-        FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters, FAESTEM256sParameters,
-        FAESTParameters,
-    };
-
-    const RUNS: usize = 3;
-
-    fn random_message(mut rng: impl RngCore) -> Vec<u8> {
-        let mut length = [0];
-        while length[0] == 0 {
-            rng.fill_bytes(&mut length);
-        }
-        let mut ret = vec![0; length[0] as usize];
-        rng.fill_bytes(&mut ret);
-        ret
-    }
-
-    #[test]
-    fn sign_and_verify<P: FAESTParameters>() {
-        let mut rng = rand::thread_rng();
-        for _i in 0..RUNS {
-            let sk = P::OWF::keygen_with_rng(&mut rng);
-            let msg = random_message(&mut rng);
-            let mut sigma = GenericArray::default_boxed();
-            faest_sign::<P>(&msg, &sk, &[], &mut sigma);
-            let pk = sk.as_public_key();
-            let res = faest_verify::<P>(&msg, &pk, &sigma);
-            assert!(res.is_ok());
-        }
-    }
-
-    #[cfg(feature = "serde")]
-    #[test]
-    fn serialize<P: FAESTParameters>() {
-        let mut rng = rand::thread_rng();
-        let sk = P::OWF::keygen_with_rng(&mut rng);
-
-        let mut out = vec![];
-        let mut ser = serde_json::Serializer::new(&mut out);
-
-        sk.serialize(&mut ser).expect("serialize key pair");
-        let serialized = String::from_utf8(out).expect("serialize to string");
-
-        let mut de = serde_json::Deserializer::from_str(&serialized);
-        let sk2 = SecretKey::<P::OWF>::deserialize(&mut de).expect("deserialize secret key");
-        assert_eq!(sk, sk2);
-
-        let pk = sk.as_public_key();
-        let mut out = vec![];
-        let mut ser = serde_json::Serializer::new(&mut out);
-
-        pk.serialize(&mut ser).expect("serialize key pair");
-        let serialized = String::from_utf8(out).expect("serialize to string");
-
-        let mut de = serde_json::Deserializer::from_str(&serialized);
-        let pk2 = PublicKey::<P::OWF>::deserialize(&mut de).expect("deserialize public key");
-        assert_eq!(pk, pk2);
-    }
-
-    #[instantiate_tests(<FAEST128fParameters>)]
-    mod faest_128f {}
-
-    #[instantiate_tests(<FAEST128sParameters>)]
-    mod faest_128s {}
-
-    #[instantiate_tests(<FAEST192fParameters>)]
-    mod faest_192f {}
-
-    #[instantiate_tests(<FAEST192sParameters>)]
-    mod faest_192s {}
-
-    #[instantiate_tests(<FAEST256fParameters>)]
-    mod faest_256f {}
-
-    #[instantiate_tests(<FAEST256sParameters>)]
-    mod faest_256s {}
-
-    #[instantiate_tests(<FAESTEM128fParameters>)]
-    mod faest_em_128f {}
-
-    #[instantiate_tests(<FAESTEM128sParameters>)]
-    mod faest_em_128s {}
-
-    #[instantiate_tests(<FAESTEM192fParameters>)]
-    mod faest_em_192f {}
-
-    #[instantiate_tests(<FAESTEM192sParameters>)]
-    mod faest_em_192s {}
-
-    #[instantiate_tests(<FAESTEM256fParameters>)]
-    mod faest_em_256f {}
-
-    #[instantiate_tests(<FAESTEM256sParameters>)]
-    mod faest_em_256s {}
-}
