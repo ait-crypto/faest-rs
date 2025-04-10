@@ -60,9 +60,9 @@ required-features = ["randomized-signer"]
 harness = false
 test = false
 
-#[[example]]
-#name = "simple"
-#required-features = ["randomized-signer"]
+[[example]]
+name = "simple"
+required-features = ["randomized-signer"]
 
 #[[test]]
 #name = "nist"
