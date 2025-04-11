@@ -15,97 +15,14 @@ use crate::{
 };
 
 use generic_array::{
-    typenum::{Prod, Quot, Unsigned, U2, U4, U8},
-    ArrayLength, GenericArray,
+    arr, typenum::{Diff, Prod, Quot, Unsigned, U2, U4, U8}, ArrayLength, GenericArray
 };
 use itertools::iproduct;
-use std::ops::{AddAssign, Deref, Index};
+use std::{default, ops::{AddAssign, Deref, Index}};
 use std::{convert::AsRef, process::Output};
 
-// TODO: (crate)
-pub fn key_exp_fwd<O>(
-    w: ByteCommitsRef<OWFField<O>, O::LKEBytes>,
-) -> ByteCommits<OWFField<O>, O::PRODRUN128Bytes>
-where
-    O: OWFParameters,
-{
-    // ::1
-    let mut y = GenericArray::default_boxed();
-    let mut y_tags = GenericArray::default_boxed();
-    y[..O::LAMBDABYTES::USIZE].copy_from_slice(&w.keys[..O::LAMBDABYTES::USIZE]);
-    y_tags[..O::LAMBDA::USIZE].copy_from_slice(&w.tags[..O::LAMBDA::USIZE]);
 
-    // ::2
-    let mut i_wd = O::LAMBDA::USIZE;
-
-    for j in O::NK::USIZE..(4 * (O::R::USIZE + 1)) {
-        // ::5
-        if (j % O::NK::USIZE == 0) || ((O::NK::USIZE > 6) && (j % O::NK::USIZE == 4)) {
-            // ::6
-            y[4 * j..4 * j + 4].copy_from_slice(&w.keys[i_wd / 8..i_wd / 8 + 4]);
-            y_tags[32 * j..32 * j + 32].copy_from_slice(&w.tags[i_wd..i_wd + 32]);
-
-            // ::7
-            i_wd += 32;
-        } else {
-            // ::9-10
-            for i in 0..4 {
-                y[4 * j + i] = y[4 * (j - O::NK::USIZE) + i] ^ y[4 * (j - 1) + i];
-
-                for i_0 in 8 * i..8 * i + 8 {
-                    y_tags[32 * j + i_0] =
-                        y_tags[32 * (j - O::NK::USIZE) + i_0] + y_tags[32 * (j - 1) + i_0];
-                }
-            }
-        }
-    }
-
-    ByteCommits::new(y, y_tags)
-}
-
-pub fn key_exp_bkwd<O>(
-    x: ByteCommitsRef<OWFField<O>, O::DIFFLKELAMBDABytes>,
-    xk: ByteCommitsRef<OWFField<O>, O::PRODRUN128Bytes>,
-) -> ByteCommits<OWFField<O>, O::SKE>
-where
-    O: OWFParameters,
-{
-    let mut y = GenericArray::default_boxed();
-    let mut y_tag = GenericArray::default_boxed();
-
-    let mut iwd = 0;
-
-    let rcon_evry = 4 * (O::LAMBDA::USIZE / 128);
-
-    for j in 0..O::SKE::USIZE {
-        // ::7
-        let mut x_tilde = x.keys[j] ^ xk.keys[iwd / 8 + (j % 4)];
-
-        let xt_0: GenericArray<OWFField<O>, U8> = (0..8)
-            .map(|i| x.tags[8 * j + i] + xk.tags[iwd + 8 * (j % 4) + i])
-            .collect();
-
-        // ::8
-        if j % rcon_evry == 0 {
-            x_tilde ^= RCON_TABLE[j / rcon_evry];
-        }
-
-        inverse_affine_byte::<O>(x_tilde, &xt_0, &mut y[j], &mut y_tag[8 * j..8 * j + 8]);
-
-        // ::12
-        if j % 4 == 3 {
-            if O::LAMBDA::USIZE != 256 {
-                iwd += O::LAMBDA::USIZE;
-            } else {
-                iwd += 128;
-            }
-        }
-    }
-
-    ByteCommits::new(y, y_tag)
-}
-
-pub fn key_exp_cstrnts<O>(
+pub(super) fn key_exp_cstrnts<O>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,
     w: ByteCommitsRef<OWFField<O>, O::LKEBytes>,
 ) -> ByteCommits<OWFField<O>, O::PRODRUN128Bytes>
@@ -116,7 +33,7 @@ where
 {
     // ::1
     let k = key_exp_fwd::<O>(w);
-
+    
     // ::2
     let w_flat = key_exp_bkwd::<O>(
         w.get_commits_ref::<O::DIFFLKELAMBDABytes>(O::LAMBDABYTES::USIZE),
@@ -159,6 +76,87 @@ where
     });
 
     k
+}
+
+fn key_exp_fwd<O>(
+    w: ByteCommitsRef<OWFField<O>, O::LKEBytes>,
+) -> ByteCommits<OWFField<O>, O::PRODRUN128Bytes>
+where
+    O: OWFParameters,
+{
+    let mut y = ByteCommits::default();
+
+    // ::1
+    y.keys[..O::LAMBDABYTES::USIZE].copy_from_slice(&w.keys[..O::LAMBDABYTES::USIZE]);
+    y.tags[..O::LAMBDA::USIZE].copy_from_slice(&w.tags[..O::LAMBDA::USIZE]);
+
+    // ::2
+    let mut i_wd = O::LAMBDA::USIZE;
+
+    for j in O::NK::USIZE..(4 * (O::R::USIZE + 1)) {
+        // ::5
+        if (j % O::NK::USIZE == 0) || ((O::NK::USIZE > 6) && (j % O::NK::USIZE == 4)) {
+            // ::6
+            y.keys[4 * j..4 * j + 4].copy_from_slice(&w.keys[i_wd / 8..i_wd / 8 + 4]);
+            y.tags[32 * j..32 * j + 32].copy_from_slice(&w.tags[i_wd..i_wd + 32]);
+
+            // ::7
+            i_wd += 32;
+        } else {
+            // ::9-10
+            for i in 0..4 {
+                y.keys[4 * j + i] = y.keys[4 * (j - O::NK::USIZE) + i] ^ y.keys[4 * (j - 1) + i];
+
+                for i_0 in 8 * i..8 * i + 8 {
+                    y.tags[32 * j + i_0] =
+                        y.tags[32 * (j - O::NK::USIZE) + i_0] + y.tags[32 * (j - 1) + i_0];
+                }
+            }
+        }
+    }
+
+    y
+}
+
+fn key_exp_bkwd<O>(
+    x: ByteCommitsRef<OWFField<O>, O::DIFFLKELAMBDABytes>,
+    xk: ByteCommitsRef<OWFField<O>, O::PRODRUN128Bytes>,
+) -> ByteCommits<OWFField<O>, O::SKE>
+where
+    O: OWFParameters,
+{
+    let mut y = ByteCommits::default();
+
+    let mut iwd = 0;
+
+    let rcon_evry = 4 * (O::LAMBDA::USIZE / 128);
+
+    for j in 0..O::SKE::USIZE {
+        // ::7
+        let mut x_tilde = x.keys[j] ^ xk.keys[iwd / 8 + (j % 4)];
+
+        let xt_0: GenericArray<OWFField<O>, U8> = (0..8)
+            .map(|i| x.tags[8 * j + i] + xk.tags[iwd + 8 * (j % 4) + i])
+            .collect();
+
+        // ::8
+        if j % rcon_evry == 0 {
+            x_tilde ^= RCON_TABLE[j / rcon_evry];
+        }
+
+        inverse_affine_byte::<O>(x_tilde, &xt_0, &mut y.keys[j], &mut y.tags[8 * j..8 * j + 8]);
+
+        // ::12
+        if j % 4 == 3 {
+            if O::LAMBDA::USIZE != 256 {
+                iwd += O::LAMBDA::USIZE;
+            } else {
+                iwd += 128;
+            }
+        }
+    }
+
+    y
 }
 
 fn inverse_affine_byte<O>(
