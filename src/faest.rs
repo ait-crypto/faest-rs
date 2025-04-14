@@ -293,7 +293,6 @@ fn mask_witness<'a>(d: &'a mut [u8], w: &[u8], u: &[u8]) {
     }
 }
 
-
 #[allow(unused)]
 fn sign<P, O>(
     msg: &[u8],
