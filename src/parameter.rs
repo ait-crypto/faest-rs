@@ -39,15 +39,6 @@ use crate::{
     zk_constraints::{aes_prove, CstrntsVal},
 };
 
-pub type GetBytes<BitLen> = Quot<BitLen, U8>;
-
-pub type L<LBytes> = Prod<LBytes, U8>;
-
-pub type Lambda<LambdaBytes> = Prod<LambdaBytes, U8>;
-pub type LambdaBytesTimes2<LambdaBytes> = Prod<LambdaBytes, U2>;
-pub type LambdaBytesTimes3<LambdaBytes> = Prod<LambdaBytes, U3>;
-pub type LambdaBytesTimes4<LambdaBytes> = Prod<LambdaBytes, U4>;
-
 // l_hat = l + 3*lambda + B
 type LHatBytes<LBytes, LambdaBytes, B> = Sum<LBytes, Sum<Prod<U3, LambdaBytes>, Quot<B, U8>>>;
 
@@ -196,8 +187,10 @@ pub(crate) trait OWFParameters: Sized {
     type NLeafCommit: ArrayLength;
     type LAMBDALBYTES: ArrayLength + Mul<U8, Output: ArrayLength>;
 
-    type PRODRUN128Bytes: ArrayLength + Mul<U8, Output = Self::PRODRUN128>;
-    type PRODRUN128: ArrayLength;
+    type PRODRUN128Bytes: ArrayLength
+        + Mul<U8, Output = Self::PRODRUN128>
+        + Sub<Self::LKEBytes, Output: ArrayLength>;
+    type PRODRUN128: ArrayLength + Sub<Self::LKE, Output: ArrayLength>;
 
     type DIFFLKELAMBDA: ArrayLength;
     type DIFFLKELAMBDABytes: ArrayLength + Mul<U8, Output: ArrayLength>;
@@ -206,12 +199,6 @@ pub(crate) trait OWFParameters: Sized {
     type PK: ArrayLength;
 
     fn is_em() -> bool;
-
-    // type QUOTLENC8: ArrayLength;
-    // type LAMBDAL: ArrayLength;
-    // type KBLENGTH: ArrayLength;
-    // type LAMBDALBYTESLAMBDA: ArrayLength;
-    // type LAMBDAR1BYTE: ArrayLength;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]);
 
@@ -282,7 +269,7 @@ impl OWFParameters for OWF128 {
     type LAMBDABYTES = U16;
     type LAMBDABYTESTWO = Prod<Self::LAMBDABYTES, U2>;
     type LBYTES = U160;
-    type L = L<Self::LBYTES>;
+    type L = Prod<Self::LBYTES, U8>;
     type LHATBYTES = LHatBytes<Self::LBYTES, Self::LAMBDABYTES, Self::B>;
 
     type NK = U4;
@@ -374,7 +361,7 @@ impl OWFParameters for OWF192 {
     type LAMBDABYTES = U24;
     type LAMBDABYTESTWO = Prod<Self::LAMBDABYTES, U2>;
     type LBYTES = U312;
-    type L = L<Self::LBYTES>;
+    type L = Prod<Self::LBYTES, U8>;
     type LHATBYTES = LHatBytes<Self::LBYTES, Self::LAMBDABYTES, Self::B>;
     type LAMBDALBYTES = Sum<Self::LAMBDABYTESTWO, Self::LBYTES>;
 
@@ -486,7 +473,7 @@ impl OWFParameters for OWF256 {
     type LAMBDABYTES = U32;
     type LAMBDABYTESTWO = Prod<Self::LAMBDABYTES, U2>;
     type LBYTES = U388;
-    type L = L<Self::LBYTES>;
+    type L = Prod<Self::LBYTES, U8>;
     type LHATBYTES = LHatBytes<Self::LBYTES, Self::LAMBDABYTES, Self::B>;
     type LAMBDALBYTES = Sum<Self::LAMBDABYTESTWO, Self::LBYTES>;
 
@@ -578,7 +565,7 @@ impl OWFParameters for OWF128EM {
     type LAMBDABYTES = U16;
     type LAMBDABYTESTWO = Prod<Self::LAMBDABYTES, U2>;
     type LBYTES = U120;
-    type L = L<Self::LBYTES>;
+    type L = Prod<Self::LBYTES, U8>;
     type LHATBYTES = LHatBytes<Self::LBYTES, Self::LAMBDABYTES, Self::B>;
     type LAMBDALBYTES = Sum<Self::LAMBDABYTESTWO, Self::LBYTES>;
 
@@ -667,7 +654,7 @@ impl OWFParameters for OWF192EM {
     type LAMBDABYTES = U24;
     type LAMBDABYTESTWO = Prod<Self::LAMBDABYTES, U2>;
     type LBYTES = U216;
-    type L = L<Self::LBYTES>;
+    type L = Prod<Self::LBYTES, U8>;
     type LHATBYTES = LHatBytes<Self::LBYTES, Self::LAMBDABYTES, Self::B>;
     type LAMBDALBYTES = Sum<Self::LAMBDABYTESTWO, Self::LBYTES>;
 
@@ -756,7 +743,7 @@ impl OWFParameters for OWF256EM {
     type LAMBDABYTES = U32;
     type LAMBDABYTESTWO = Prod<Self::LAMBDABYTES, U2>;
     type LBYTES = U336;
-    type L = L<Self::LBYTES>;
+    type L = Prod<Self::LBYTES, U8>;
     type LHATBYTES = LHatBytes<Self::LBYTES, Self::LAMBDABYTES, Self::B>;
     type LAMBDALBYTES = Sum<Self::LAMBDABYTESTWO, Self::LBYTES>;
 
@@ -1260,144 +1247,146 @@ type U12380 = Sum<Prod<U1000, U12>, U380>;
 type U17984 = Sum<Prod<U1000, U17>, U984>;
 type U23476 = Sum<Prod<U1000, U23>, U476>;
 
-// #[cfg(test)]
-// mod test {
-//     use super::*;
+#[cfg(test)]
+mod test {
+    use super::*;
 
-//     use serde::Deserialize;
+    use serde::Deserialize;
 
-//     use crate::utils::test::read_test_data;
+    use crate::utils::test::read_test_data;
 
-//     #[derive(Debug, Deserialize)]
-//     #[serde(rename_all = "camelCase")]
-//     struct DataChalDec {
-//         chal: Vec<u8>,
-//         i: [usize; 1],
-//         k0: [usize; 1],
-//         res: Vec<u8>,
-//     }
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct DataChalDec {
+        chal: Vec<u8>,
+        i: [usize; 1],
+        k0: [usize; 1],
+        res: Vec<u8>,
+    }
 
-//     #[test]
-//     fn chaldec() {
-//         let database: Vec<DataChalDec> = read_test_data("decode_challenge.json");
-//         for data in database {
-//             if data.chal.len() == 16 {
-//                 if data.k0[0] == 12 {
-//                     let res = Tau128Small::decode_challenge(&data.chal, data.i[0]);
-//                     assert_eq!(res, data.res);
-//                 } else {
-//                     let res = Tau128Fast::decode_challenge(&data.chal, data.i[0]);
-//                     assert_eq!(res, data.res);
-//                 }
-//             } else if data.chal.len() == 24 {
-//                 if data.k0[0] == 12 {
-//                     let res = Tau192Small::decode_challenge(&data.chal, data.i[0]);
-//                     assert_eq!(res, data.res);
-//                 } else {
-//                     let res = Tau192Fast::decode_challenge(&data.chal, data.i[0]);
-//                     assert_eq!(res, data.res);
-//                 }
-//             } else if data.k0[0] == 12 {
-//                 let res = Tau256Small::decode_challenge(&data.chal, data.i[0]);
-//                 assert_eq!(res, data.res);
-//             } else {
-//                 let res = Tau256Fast::decode_challenge(&data.chal, data.i[0]);
-//                 assert_eq!(res, data.res);
-//             }
-//         }
-//     }
+    // #[test]
+    // fn chaldec() {
+    //     let database: Vec<DataChalDec> = read_test_data("decode_challenge.json");
+    //     for data in database {
+    //         if data.chal.len() == 16 {
+    //             if data.k0[0] == 12 {
+    //                 let res = Tau128Small::decode_challenge(&data.chal, data.i[0]);
+    //                 assert_eq!(res, data.res);
+    //             } else {
+    //                 let res = Tau128Fast::decode_challenge(&data.chal, data.i[0]);
+    //                 assert_eq!(res, data.res);
+    //             }
+    //         } else if data.chal.len() == 24 {
+    //             if data.k0[0] == 12 {
+    //                 let res = Tau192Small::decode_challenge(&data.chal, data.i[0]);
+    //                 assert_eq!(res, data.res);
+    //             } else {
+    //                 let res = Tau192Fast::decode_challenge(&data.chal, data.i[0]);
+    //                 assert_eq!(res, data.res);
+    //             }
+    //         } else if data.k0[0] == 12 {
+    //             let res = Tau256Small::decode_challenge(&data.chal, data.i[0]);
+    //             assert_eq!(res, data.res);
+    //         } else {
+    //             let res = Tau256Fast::decode_challenge(&data.chal, data.i[0]);
+    //             assert_eq!(res, data.res);
+    //         }
+    //     }
+    // }
 
-//     #[generic_tests::define]
-//     mod owf_parameters {
-//         use super::*;
+    #[generic_tests::define]
+    mod owf_parameters {
+        use super::*;
 
-//         #[test]
-//         fn lambda<O: OWFParameters>() {
-//             assert!(O::LAMBDA::USIZE == 128 || O::LAMBDA::USIZE == 192 || O::LAMBDA::USIZE == 256);
-//             assert_eq!(O::LAMBDABYTES::USIZE * 8, O::LAMBDA::USIZE);
-//         }
+        #[test]
+        fn lambda<O: OWFParameters>() {
+            assert!(O::LAMBDA::USIZE == 128 || O::LAMBDA::USIZE == 192 || O::LAMBDA::USIZE == 256);
+            assert_eq!(O::LAMBDABYTES::USIZE * 8, O::LAMBDA::USIZE);
+        }
 
-//         #[test]
-//         fn pk_sk_size<O: OWFParameters>() {
-//             assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LAMBDABYTES::USIZE);
-//             assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::InputSize::USIZE);
-//         }
+        #[test]
+        fn pk_sk_size<O: OWFParameters>() {
+            assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LAMBDABYTES::USIZE);
+            assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::OutputSize::USIZE);
+        }
 
-//         #[test]
-//         fn owf_parameters<O: OWFParameters>() {
-//             assert_eq!(O::LKE::USIZE % 8, 0);
-//             assert_eq!(O::LKEBytes::USIZE * 8, O::LKE::USIZE);
-//             assert_eq!(O::LENC::USIZE % 8, 0);
-//             assert_eq!(O::L::USIZE % 8, 0);
-//             assert_eq!(O::LBYTES::USIZE * 8, O::L::USIZE);
-//         }
+        #[test]
+        fn owf_parameters<O: OWFParameters>() {
+            assert_eq!(O::LKE::USIZE % 8, 0);
+            assert_eq!(O::LKEBytes::USIZE * 8, O::LKE::USIZE);
+            assert_eq!(O::LENC::USIZE % 8, 0);
+            assert_eq!(O::L::USIZE % 8, 0);
+            assert_eq!(O::LBYTES::USIZE * 8, O::L::USIZE);
+        }
 
-//         #[instantiate_tests(<OWF128>)]
-//         mod owf_128 {}
+        #[instantiate_tests(<OWF128>)]
+        mod owf_128 {}
 
-//         #[instantiate_tests(<OWF192>)]
-//         mod owf_192 {}
+        #[instantiate_tests(<OWF192>)]
+        mod owf_192 {}
 
-//         #[instantiate_tests(<OWF256>)]
-//         mod owf_256 {}
+        #[instantiate_tests(<OWF256>)]
+        mod owf_256 {}
 
-//         #[instantiate_tests(<OWF128EM>)]
-//         mod owf_em_128 {}
+        #[instantiate_tests(<OWF128EM>)]
+        mod owf_em_128 {}
 
-//         #[instantiate_tests(<OWF192EM>)]
-//         mod owf_em_192 {}
+        #[instantiate_tests(<OWF192EM>)]
+        mod owf_em_192 {}
 
-//         #[instantiate_tests(<OWF256EM>)]
-//         mod owf_em_256 {}
-//     }
+        #[instantiate_tests(<OWF256EM>)]
+        mod owf_em_256 {}
+    }
 
-//     #[generic_tests::define]
-//     mod faest_parameters {
-//         use super::*;
+    #[generic_tests::define]
+    mod faest_parameters {
+        use super::*;
 
-//         #[test]
-//         fn tau_config<P: FAESTParameters>() {
-//             assert_eq!(
-//                 <P::OWF as OWFParameters>::LAMBDA::USIZE,
-//                 <P::Tau as TauParameters>::K0::USIZE * <P::Tau as TauParameters>::Tau0::USIZE
-//                     + <P::Tau as TauParameters>::K1::USIZE * <P::Tau as TauParameters>::Tau1::USIZE
-//             );
-//         }
+        #[test]
+        fn tau_config<P: FAESTParameters>() {
+            assert_eq!(
+                <P::OWF as OWFParameters>::LAMBDA::USIZE,
+                <P::Tau as TauParameters>::Tau1::USIZE * <P::Tau as TauParameters>::K::USIZE
+                    + <P::Tau as TauParameters>::Tau0::USIZE
+                        * (<P::Tau as TauParameters>::K::USIZE - 1)
+                    + P::WGRIND::USIZE
+            );
+        }
 
-//         #[instantiate_tests(<FAEST128fParameters>)]
-//         mod faest_128f {}
+        #[instantiate_tests(<FAEST128fParameters>)]
+        mod faest_128f {}
 
-//         #[instantiate_tests(<FAEST128sParameters>)]
-//         mod faest_128s {}
+        #[instantiate_tests(<FAEST128sParameters>)]
+        mod faest_128s {}
 
-//         #[instantiate_tests(<FAEST192fParameters>)]
-//         mod faest_192f {}
+        #[instantiate_tests(<FAEST192fParameters>)]
+        mod faest_192f {}
 
-//         #[instantiate_tests(<FAEST192sParameters>)]
-//         mod faest_192s {}
+        #[instantiate_tests(<FAEST192sParameters>)]
+        mod faest_192s {}
 
-//         #[instantiate_tests(<FAEST256fParameters>)]
-//         mod faest_256f {}
+        #[instantiate_tests(<FAEST256fParameters>)]
+        mod faest_256f {}
 
-//         #[instantiate_tests(<FAEST256sParameters>)]
-//         mod faest_256s {}
+        #[instantiate_tests(<FAEST256sParameters>)]
+        mod faest_256s {}
 
-//         #[instantiate_tests(<FAESTEM128fParameters>)]
-//         mod faest_em_128f {}
+        #[instantiate_tests(<FAESTEM128fParameters>)]
+        mod faest_em_128f {}
 
-//         #[instantiate_tests(<FAESTEM128sParameters>)]
-//         mod faest_em_128s {}
+        #[instantiate_tests(<FAESTEM128sParameters>)]
+        mod faest_em_128s {}
 
-//         #[instantiate_tests(<FAESTEM192fParameters>)]
-//         mod faest_em_192f {}
+        #[instantiate_tests(<FAESTEM192fParameters>)]
+        mod faest_em_192f {}
 
-//         #[instantiate_tests(<FAESTEM192sParameters>)]
-//         mod faest_em_192s {}
+        #[instantiate_tests(<FAESTEM192sParameters>)]
+        mod faest_em_192s {}
 
-//         #[instantiate_tests(<FAESTEM256fParameters>)]
-//         mod faest_em_256f {}
+        #[instantiate_tests(<FAESTEM256fParameters>)]
+        mod faest_em_256f {}
 
-//         #[instantiate_tests(<FAESTEM256sParameters>)]
-//         mod faest_em_256s {}
-//     }
-// }
+        #[instantiate_tests(<FAESTEM256sParameters>)]
+        mod faest_em_256s {}
+    }
+}
