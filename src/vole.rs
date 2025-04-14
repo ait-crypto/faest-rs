@@ -26,84 +26,6 @@ use crate::{
 
 const TWEAK_OFFSET: u32 = 1 << 31;
 
-#[allow(clippy::type_complexity)]
-fn convert_to_vole<'a, BAVC, LHatBytes>(
-    v: &mut GenericArray<GenericArray<u8, BAVC::Lambda>, LHatBytes>, // We directly work with the lambda*l_hat matrix instead of transposing it later
-    sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, BAVC::LambdaBytes>>,
-    iv: &IV,
-    round: u32,
-) -> GenericArray<u8, LHatBytes>
-// Should it be boxed?
-where
-    BAVC: BatchVectorCommitment,
-    LHatBytes: ArrayLength,
-{
-    let twk = round + TWEAK_OFFSET;
-
-    // Step 1
-    let d = BAVC::TAU::bavc_max_node_depth(round as usize);
-    let ni = BAVC::TAU::bavc_max_node_index(round as usize);
-
-    // Step 2
-    // As in steps 8,9 we only work with two rows at a time, we just allocate 2 r-vectors
-    let mut rj: Vec<GenericArray<u8, LHatBytes>> = vec![GenericArray::default(); ni];
-    let mut rj1: Vec<GenericArray<u8, LHatBytes>> = vec![GenericArray::default(); ni];
-
-    debug_assert!(sd.len() == ni || sd.len() + 1 == ni);
-    let offset = (sd.len() != ni) as usize;
-
-    // Step 3,4
-    for (i, sdi) in sd.enumerate() {
-        BAVC::PRG::new_prg(sdi, iv, twk).read(&mut rj[i + offset]);
-    }
-
-    let vcol_offset = BAVC::TAU::bavc_depth_offset(round as usize);
-
-    // Step 6..9
-    for j in 0..d {
-        for i in 0..(ni >> (j + 1)) {
-            // Join steps 8 and 9
-            for (vrow, (r_dst, r_src, r_src1)) in
-                izip!(&mut rj1[i], &rj[2 * i], &rj[2 * i + 1]).enumerate()
-            {
-                // Step 8
-                v[vrow][vcol_offset + j] ^= r_src1;
-
-                // Step 9
-                *r_dst = r_src ^ r_src1;
-            }
-        }
-
-        swap(&mut rj, &mut rj1); // At next iteration we want to have last row in rj
-    }
-
-    // Step 10
-    rj.into_iter().next().unwrap() // Move rj[0] (after last swap, rj[0] will contain r_d,0)
-}
-
-/// Mutable eference to storage area in signature for all `c`s.
-#[derive(Debug, PartialEq)]
-pub(crate) struct VoleCommitmentCRefMut<'a, LHatBytes>(&'a mut [u8], PhantomData<LHatBytes>);
-impl<LHatBytes> Index<usize> for VoleCommitmentCRefMut<'_, LHatBytes>
-where
-    LHatBytes: ArrayLength,
-{
-    type Output = [u8];
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index * LHatBytes::USIZE..(index + 1) * LHatBytes::USIZE]
-    }
-}
-
-impl<LHatBytes> IndexMut<usize> for VoleCommitmentCRefMut<'_, LHatBytes>
-where
-    LHatBytes: ArrayLength,
-{
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.0[index * LHatBytes::USIZE..(index + 1) * LHatBytes::USIZE]
-    }
-}
-
 impl<'a, LHatBytes> VoleCommitmentCRefMut<'a, LHatBytes>
 where
     LHatBytes: ArrayLength,
@@ -112,6 +34,35 @@ where
         Self(buffer, PhantomData)
     }
 }
+
+/// Result of VOLE commitment
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub struct VoleCommitResult<LambdaBytes, NLeafCommit, LHatBytes>
+where
+    LambdaBytes: ArrayLength
+        + Mul<U2, Output: ArrayLength>
+        + Mul<U8, Output: ArrayLength>
+        + Mul<NLeafCommit, Output: ArrayLength>,
+    NLeafCommit: ArrayLength,
+    LHatBytes: ArrayLength,
+{
+    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
+    pub decom: BavcDecommitment<LambdaBytes, NLeafCommit>,
+    pub u: Box<GenericArray<u8, LHatBytes>>,
+    pub v: Box<GenericArray<GenericArray<u8, Prod<LambdaBytes, U8>>, LHatBytes>>,
+}
+
+/// Result of VOLE reconstruction
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub struct VoleReconstructResult<LambdaBytes, LHatBytes>
+where
+    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<U8, Output: ArrayLength>,
+    LHatBytes: ArrayLength,
+{
+    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
+    pub q: Box<GenericArray<GenericArray<u8, Prod<LambdaBytes, U8>>, LHatBytes>>,
+}
+
 
 /// Immutable reference to storage area in signature for all `c`s.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -141,31 +92,88 @@ where
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
-pub struct VoleCommitResult<LambdaBytes, NLeafCommit, LHatBytes>
+
+/// Mutable eference to storage area in signature for all `c`s.
+#[derive(Debug, PartialEq)]
+pub(crate) struct VoleCommitmentCRefMut<'a, LHatBytes>(&'a mut [u8], PhantomData<LHatBytes>);
+impl<LHatBytes> Index<usize> for VoleCommitmentCRefMut<'_, LHatBytes>
 where
-    LambdaBytes: ArrayLength
-        + Mul<U2, Output: ArrayLength>
-        + Mul<U8, Output: ArrayLength>
-        + Mul<NLeafCommit, Output: ArrayLength>,
-    NLeafCommit: ArrayLength,
     LHatBytes: ArrayLength,
 {
-    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
-    pub decom: BavcDecommitment<LambdaBytes, NLeafCommit>,
-    pub u: GenericArray<u8, LHatBytes>,
-    pub v: Box<GenericArray<GenericArray<u8, Prod<LambdaBytes, U8>>, LHatBytes>>,
+    type Output = [u8];
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index * LHatBytes::USIZE..(index + 1) * LHatBytes::USIZE]
+    }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
-pub struct VoleReconstructResult<LambdaBytes, LHatBytes>
+impl<LHatBytes> IndexMut<usize> for VoleCommitmentCRefMut<'_, LHatBytes>
 where
-    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<U8, Output: ArrayLength>,
     LHatBytes: ArrayLength,
 {
-    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
-    pub q: Box<GenericArray<GenericArray<u8, Prod<LambdaBytes, U8>>, LHatBytes>>,
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index * LHatBytes::USIZE..(index + 1) * LHatBytes::USIZE]
+    }
 }
+
+
+#[allow(clippy::type_complexity)]
+fn convert_to_vole<'a, BAVC, LHatBytes>(
+    v: &mut GenericArray<GenericArray<u8, BAVC::Lambda>, LHatBytes>, 
+    sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, BAVC::LambdaBytes>>,
+    iv: &IV,
+    round: u32,
+) -> Box<GenericArray<u8, LHatBytes>>
+where
+    BAVC: BatchVectorCommitment,
+    LHatBytes: ArrayLength,
+{
+    let twk = round + TWEAK_OFFSET;
+
+    // Step 1
+    let d = BAVC::TAU::bavc_max_node_depth(round as usize);
+    let ni = BAVC::TAU::bavc_max_node_index(round as usize);
+
+    // Step 2
+    // As in steps 8,9 we only work with two rows at a time, we just allocate 2 r-vectors
+    let mut rj: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
+    let mut rj1: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
+
+    debug_assert!(sd.len() == ni || sd.len() + 1 == ni);
+    let offset = (sd.len() != ni) as usize;
+
+    // Step 3,4
+    for (i, sdi) in sd.enumerate() {
+        BAVC::PRG::new_prg(sdi, iv, twk).read(&mut rj[i + offset]);
+    }
+
+    let vcol_offset = BAVC::TAU::bavc_depth_offset(round as usize);
+
+    // Step 6..9
+    for j in 0..d {
+        for i in 0..(ni >> (j + 1)) {
+            // Join steps 8 and 9
+            for (vrow, (r_dst, r_src, r_src1)) in
+                izip!(rj1[i].iter_mut(), rj[2 * i].iter(), rj[2 * i + 1].iter()).enumerate()
+            {
+                // Step 8
+                v[vrow][vcol_offset + j] ^= r_src1;
+
+                // Step 9
+                *r_dst = r_src ^ r_src1;
+            }
+        }
+
+        swap(&mut rj, &mut rj1); // At next iteration we want to have last row in rj
+    }
+
+    // Step 10
+    // Move rj[0] (after last swap, rj[0] will contain r_d,0)
+    // SAFETY: rj is guaranteed to be non-empty as FAEST parameters ensure ni > 0
+    rj.into_iter().next().unwrap() 
+}
+
+
 
 #[allow(clippy::type_complexity)]
 pub fn volecommit<BAVC, LHatBytes>(
@@ -203,7 +211,7 @@ where
             convert_to_vole::<BAVC, LHatBytes>(&mut v, seeds[sdi_start..sdi_end].iter(), iv, i);
 
         // Step 8
-        for (u_i, u, c) in izip!(&u_i, &u, &mut c[i as usize - 1]) {
+        for (u_i, u, c) in izip!(u_i.iter(), u.iter(), &mut c[i as usize - 1]) {
             *c = u_i ^ u;
         }
     }
@@ -425,10 +433,12 @@ mod test {
                 * (<<BAVC as BatchVectorCommitment>::TAU as TauParameters>::Tau::USIZE
                     - 1)
         ];
-
+        
+        let t = std::time::Instant::now();
         let res_commit =
             volecommit::<BAVC, OWF::LHATBYTES>(VoleCommitmentCRefMut::new(&mut c), r, &iv);
-
+        println!("Time for commit: {:?}", t.elapsed());    
+            
         let i_delta = decode_all_chall_3::<BAVC::TAU>(&chall);
         let decom_i = BAVC::open(&res_commit.decom, &i_delta).unwrap();
 
