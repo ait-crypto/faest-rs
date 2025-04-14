@@ -17,7 +17,7 @@ use crate::{
         BatchVectorCommitment, BavcCommitResult, BavcDecommitment, BavcOpenResult,
         BavcReconstructResult,
     },
-    parameter::{Lambda, LambdaBytesTimes2, LambdaBytesTimes3, LambdaBytesTimes4, TauParameters},
+    parameter::TauParameters,
     prg::{PseudoRandomGenerator, IV, TWK},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{LeafHasher, B},
@@ -151,10 +151,10 @@ where
     NLeafCommit: ArrayLength,
     LHatBytes: ArrayLength,
 {
-    pub com: GenericArray<u8, LambdaBytesTimes2<LambdaBytes>>,
+    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
     pub decom: BavcDecommitment<LambdaBytes, NLeafCommit>,
     pub u: GenericArray<u8, LHatBytes>,
-    pub v: Box<GenericArray<GenericArray<u8, Lambda<LambdaBytes>>, LHatBytes>>,
+    pub v: Box<GenericArray<GenericArray<u8, Prod<LambdaBytes, U8>>, LHatBytes>>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
@@ -163,8 +163,8 @@ where
     LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<U8, Output: ArrayLength>,
     LHatBytes: ArrayLength,
 {
-    pub com: GenericArray<u8, LambdaBytesTimes2<LambdaBytes>>,
-    pub q: Box<GenericArray<GenericArray<u8, Lambda<LambdaBytes>>, LHatBytes>>,
+    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
+    pub q: Box<GenericArray<GenericArray<u8, Prod<LambdaBytes, U8>>, LHatBytes>>,
 }
 
 #[allow(clippy::type_complexity)]

@@ -27,7 +27,7 @@ use crate::{
         BigGaloisField, ByteCombine, ByteCombineConstants, Field, Square, SumPoly,
     },
     internal_keys::PublicKey,
-    parameter::{BaseParameters, Lambda, OWFField, OWFParameters, QSProof, TauParameters},
+    parameter::{BaseParameters, OWFField, OWFParameters, QSProof, TauParameters},
     rijndael_32::{
         bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
         rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes, sub_bytes,

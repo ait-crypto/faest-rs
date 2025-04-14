@@ -1,5 +1,5 @@
 use crate::{
-    aes::{AddRoundKey, AddRoundKeyAssign, StateToBytes},
+    aes::{AddRoundKey, AddRoundKeyAssign, AddRoundKeyBytes, StateToBytes},
     fields::{
         large_fields::{Betas, ByteCombineSquared, ByteCombineSquaredConstants, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
@@ -45,29 +45,28 @@ where
     fn state_to_bytes(&self) -> Self::Output
 where {
         (0..O::NSTBytes::USIZE)
-            .map(|i| FieldCommitDegOne {
-                key: OWFField::<O>::byte_combine_bits(self.keys[i]),
-                tag: OWFField::<O>::byte_combine_slice(&self.tags[i * 8..i * 8 + 8]),
+            .map(|i| {
+                FieldCommitDegOne::new(
+                    OWFField::<O>::byte_combine_bits(self.keys[i]),
+                    OWFField::<O>::byte_combine_slice(&self.tags[i * 8..i * 8 + 8]),
+                )
             })
             .collect()
     }
 }
 
-// Scalr commitments to known state
+// Scalar commitments to known state
 // TODO: Only return the keys (efficiency)
 impl<O, L> StateToBytes<O> for GenericArray<u8, L>
 where
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
     O: OWFParameters,
 {
-    type Output = StateBytesCommits<O>;
+    type Output = Box<GenericArray<OWFField<O>, O::NSTBytes>>;
 
     fn state_to_bytes(&self) -> Self::Output {
         self.iter()
-            .map(|k| FieldCommitDegOne {
-                key: OWFField::<O>::byte_combine_bits(*k),
-                tag: OWFField::<O>::ZERO,
-            })
+            .map(|k| OWFField::<O>::byte_combine_bits(*k))
             .collect()
     }
 }
@@ -214,6 +213,19 @@ pub(crate) fn add_round_key_bytes<O, T>(
 {
     for (st, k) in izip!(state.iter_mut(), key_bytes) {
         (*st) += k;
+    }
+}
+
+impl<F, L, T> AddRoundKeyBytes<&GenericArray<T, L>> for Box<GenericArray<FieldCommitDegTwo<F>, L>>
+where
+    F: BigGaloisField,
+    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    for<'a> FieldCommitDegTwo<F>: AddAssign<&'a T>,
+{
+    fn add_round_key_bytes(&mut self, key: &GenericArray<T, L>, _sq: bool) {
+        for (st, k) in izip!(self.iter_mut(), key) {
+            (*st) += k;
+        }
     }
 }
 

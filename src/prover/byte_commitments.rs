@@ -25,10 +25,10 @@ where
     }
 
     pub fn combine(&self) -> FieldCommitDegOne<F> {
-        FieldCommitDegOne {
-            key: F::byte_combine_bits(self.key),
-            tag: F::byte_combine_slice(self.tags.as_slice()),
-        }
+        FieldCommitDegOne::new(
+            F::byte_combine_bits(self.key),
+            F::byte_combine_slice(self.tags.as_slice()),
+        )
     }
 }
 
@@ -54,16 +54,30 @@ where
     }
 
     pub(crate) fn get_field_commit(&self, index: usize) -> FieldCommitDegOne<F> {
-        FieldCommitDegOne {
-            key: F::byte_combine_bits(self.keys[index]),
-            tag: F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
-        }
+        FieldCommitDegOne::new(
+            F::byte_combine_bits(self.keys[index]),
+            F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
+        )
     }
 
     pub(crate) fn get_field_commit_sq(&self, index: usize) -> FieldCommitDegOne<F> {
-        FieldCommitDegOne {
-            key: F::byte_combine_bits_sq(self.keys[index]),
-            tag: F::byte_combine_sq_slice(&self.tags[index * 8..index * 8 + 8]),
+        FieldCommitDegOne::new(
+            F::byte_combine_bits_sq(self.keys[index]),
+            F::byte_combine_sq_slice(&self.tags[index * 8..index * 8 + 8]),
+        )
+    }
+
+    pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<F, L2>
+    where
+        L2: ArrayLength + Mul<U8, Output: ArrayLength>,
+    {
+        debug_assert!(start_byte + L2::USIZE <= L::USIZE);
+
+        ByteCommitsRef {
+            keys: GenericArray::from_slice(&self.keys[start_byte..start_byte + L2::USIZE]),
+            tags: GenericArray::from_slice(
+                &self.tags[start_byte * 8..(start_byte + L2::USIZE) * 8],
+            ),
         }
     }
 
@@ -96,25 +110,28 @@ where
     F: BigGaloisField,
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
 {
-    pub(crate) fn new(
-        keys: &'a GenericArray<u8, L>,
-        tags: &'a GenericArray<F, Prod<L, U8>>,
-    ) -> Self {
-        Self { keys, tags }
+    /// Create a new instance of ByteCommitsRef from slices to commitment keys and tags.
+    ///
+    /// Panics if the lengths of the keys is not equal to the length of the tags divided by 8.
+    pub(crate) fn from_slices(keys: &'a [u8], tags: &'a [F]) -> Self {
+        Self {
+            keys: GenericArray::from_slice(keys),
+            tags: GenericArray::from_slice(tags),
+        }
     }
 
     pub(crate) fn get_field_commit(&self, index: usize) -> FieldCommitDegOne<F> {
-        FieldCommitDegOne {
-            key: F::byte_combine_bits(self.keys[index]),
-            tag: F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
-        }
+        FieldCommitDegOne::new(
+            F::byte_combine_bits(self.keys[index]),
+            F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
+        )
     }
 
     pub(crate) fn get_field_commit_sq(&self, index: usize) -> FieldCommitDegOne<F> {
-        FieldCommitDegOne {
-            key: F::byte_combine_bits_sq(self.keys[index]),
-            tag: F::byte_combine_sq_slice(&self.tags[index * 8..index * 8 + 8]),
-        }
+        FieldCommitDegOne::new(
+            F::byte_combine_bits_sq(self.keys[index]),
+            F::byte_combine_sq_slice(&self.tags[index * 8..index * 8 + 8]),
+        )
     }
 
     pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<F, L2>

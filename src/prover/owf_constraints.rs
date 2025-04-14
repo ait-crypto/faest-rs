@@ -60,19 +60,16 @@ pub(crate) fn owf_constraints<O>(
         let owf_input = w.get_commits_ref::<O::NSTBytes>(0);
 
         // ::11
-        // TODO: find a better way to do this
         let owf_output_keys: GenericArray<u8, O::NSTBytes> =
             xor_arrays(owf_input.keys.as_slice(), y.as_slice()).collect();
-        let owf_output = ByteCommitsRef {
-            keys: GenericArray::from_slice(&owf_output_keys),
-            tags: GenericArray::from_slice(owf_input.tags),
-        };
+
+        let owf_output = ByteCommitsRef::from_slices(&owf_output_keys, owf_input.tags);
 
         // ::19 - EM = true
         let w_tilde = w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE);
 
         // ::21 - EM = true
-        enc_cstrnts::<O, _>(
+        enc_cstrnts::<O, _, _>(
             zk_hasher,
             owf_input,
             owf_output,
@@ -85,9 +82,9 @@ pub(crate) fn owf_constraints<O>(
 
         // ::16
         let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKEBytes>(0));
-        let extended_key = k.get_ref();
+        // Get references to the R+1 key commitments
         let extended_key: Vec<_> = (0..O::R::USIZE + 1)
-            .map(|i| extended_key.get_commits_ref::<O::NSTBytes>(i * O::NSTBytes::USIZE))
+            .map(|i| k.get_commits_ref::<O::NSTBytes>(i * O::NSTBytes::USIZE))
             .collect();
 
         // ::18-22
@@ -101,7 +98,7 @@ pub(crate) fn owf_constraints<O>(
             );
 
             // ::21 - EM = false
-            enc_cstrnts::<O, _>(
+            enc_cstrnts::<O, _, _>(
                 zk_hasher,
                 &owf_input,
                 owf_output,

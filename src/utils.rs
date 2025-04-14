@@ -9,7 +9,6 @@ use crate::fields::Field;
 use crate::{
     fields::ByteCombine,
     parameter::TauParameters,
-    // parameter::{BaseParameters, OWFParameters, TauParameters},
 };
 
 /// Reader interface for PRGs and random oracles
@@ -106,54 +105,6 @@ pub(crate) fn get_bits(byte: u8) -> [u8; 8] {
     ]
 }
 
-// pub(crate) type Field<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
-
-// pub(crate) fn transpose_and_into_field<O>(
-//     gv: &GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>,
-// ) -> Box<GenericArray<Field<O>, O::LAMBDAL>>
-// where
-//     O: OWFParameters,
-// {
-//     Box::<GenericArray<_, O::LAMBDAL>>::from_iter(
-//         iproduct!(0..O::LBYTES::USIZE + O::LAMBDABYTES::USIZE, 0..8,).map(|(i, k)| {
-//             Field::<O>::from(&GenericArray::<_, O::LAMBDABYTES>::from_iter(
-//                 (0..O::LAMBDABYTES::USIZE)
-//                     .map(|j| (0..8).fold(0, |a, l| a ^ (((gv[j * 8 + l][i] >> k) & 1) << l))),
-//             ))
-//         }),
-//     )
-// }0x48, 0xb0, 0xcd, 0x3a, 0x03, 0x76, 0x84, 0x7b,
-
-// #[allow(clippy::boxed_local)]
-// pub(crate) fn convert_gq<O, Tau>(
-//     d: &GenericArray<u8, O::LBYTES>,
-//     mut gq: Box<GenericArray<GenericArray<u8, O::LAMBDALBYTES>, O::LAMBDA>>,
-//     chall3: &GenericArray<u8, O::LAMBDABYTES>,
-// ) -> Box<GenericArray<Field<O>, O::LAMBDAL>>
-// where
-//     O: OWFParameters,
-//     Tau: TauParameters,
-// {
-//     for index in (0..Tau::Tau::USIZE).flat_map(|i| {
-//         let converted_index = Tau::convert_index(i);
-//         Tau::decode_challenge_as_iter(chall3, i)
-//             .enumerate()
-//             .filter_map(move |(j, delta_j)| {
-//                 if delta_j != 0 {
-//                     Some(converted_index + j)
-//                 } else {
-//                     None
-//                 }
-//             })
-//     }) {
-//         for (gq_k, d_k) in zip(gq[index].iter_mut(), d) {
-//             *gq_k ^= d_k;
-//         }
-//     }
-
-//     transpose_and_into_field::<O>(&gq)
-// }
-
 // pub(crate) fn bit_combine_with_delta<O>(x: u8, delta: &Field<O>) -> Field<O>
 // where
 //     O: OWFParameters,
@@ -194,25 +145,6 @@ pub(crate) fn get_bit(input: &[u8], index: usize) -> u8 {
     let bit_offset = index % 8;
     (input[byte_index] >> bit_offset) & 1
 }
-
-// struct BitCommitment<F>
-// where
-//     F: Field,
-//     for <'a> &'a F: Add<&'a F>,
-// {
-//     tags: Vec<F>,
-//     comm: bool
-// }
-
-// impl<F> Add for BitCommitment<F> where F:Field{
-//     type Output = BitCommitment<F>;
-//     fn add(&self, rhs: Self) -> Self::Output {
-//         let tag_len: Vec<_> = std::cmp::max(self.tags.len(), rhs.tags.len());
-//         let new_tags = rhs.tags.iter().rev().zip(self.tags.iter().rev()).map(
-//             |(tag_l, tag_r)| tag_l + tag_r
-//         ).collect();
-//     }
-// }
 
 #[cfg(test)]
 pub(crate) mod test {

@@ -181,7 +181,7 @@ mod test {
 
     use crate::{
         fields::{GF128, GF192, GF256},
-        parameter::{Lambda, OWFParameters, OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM},
+        parameter::{OWFParameters, OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM},
         utils::test::read_test_data,
     };
 

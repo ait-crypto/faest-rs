@@ -15,12 +15,16 @@ use crate::{
 };
 
 use generic_array::{
-    arr, typenum::{Diff, Prod, Quot, Unsigned, U2, U4, U8}, ArrayLength, GenericArray
+    arr,
+    typenum::{Diff, Prod, Quot, Unsigned, U2, U4, U8},
+    ArrayLength, GenericArray,
 };
 use itertools::iproduct;
-use std::{default, ops::{AddAssign, Deref, Index}};
 use std::{convert::AsRef, process::Output};
-
+use std::{
+    default,
+    ops::{AddAssign, Deref, Index},
+};
 
 pub(super) fn key_exp_cstrnts<O>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,
@@ -33,7 +37,7 @@ where
 {
     // ::1
     let k = key_exp_fwd::<O>(w);
-    
+
     // ::2
     let w_flat = key_exp_bkwd::<O>(
         w.get_commits_ref::<O::DIFFLKELAMBDABytes>(O::LAMBDABYTES::USIZE),
@@ -144,7 +148,12 @@ where
             x_tilde ^= RCON_TABLE[j / rcon_evry];
         }
 
-        inverse_affine_byte::<O>(x_tilde, &xt_0, &mut y.keys[j], &mut y.tags[8 * j..8 * j + 8]);
+        inverse_affine_byte::<O>(
+            x_tilde,
+            &xt_0,
+            &mut y.keys[j],
+            &mut y.tags[8 * j..8 * j + 8],
+        );
 
         // ::12
         if j % 4 == 3 {

@@ -123,3 +123,15 @@ where
         &self.scalars[index]
     }
 }
+
+impl<F, L> Index<Range<usize>> for VoleCommitsRef<'_, F, L>
+where
+    F: BigGaloisField,
+    L: ArrayLength,
+{
+    type Output = [F];
+
+    fn index(&self, index: Range<usize>) -> &Self::Output {
+        &self.scalars[index]
+    }
+}

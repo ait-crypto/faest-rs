@@ -1,6 +1,6 @@
 use super::{ByteCommitment, ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use crate::{
-    aes::{AddRoundKey, AddRoundKeyAssign, StateToBytes},
+    aes::{AddRoundKey, AddRoundKeyAssign, AddRoundKeyBytes, StateToBytes},
     fields::{Betas, BigGaloisField, FromBit, Square},
     parameter::{OWFField, OWFParameters},
     prover::aes::{
@@ -15,10 +15,11 @@ use generic_array::{
     typenum::{Prod, Quot, Unsigned, U2, U4, U8},
     ArrayLength, GenericArray,
 };
+use itertools::izip;
 use std::convert::AsRef;
-use std::ops::{AddAssign, Deref, Index};
+use std::ops::{AddAssign, Deref, Index, Mul};
 
-pub(crate) fn enc_cstrnts<O, K>(
+pub(crate) fn enc_cstrnts<O, K, S>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,
     input: impl for<'a> AddRoundKey<&'a K, Output = ByteCommits<OWFField<O>, O::NSTBytes>>,
     output: impl for<'a> AddRoundKey<&'a K, Output = ByteCommits<OWFField<O>, O::NSTBytes>>,
@@ -26,7 +27,10 @@ pub(crate) fn enc_cstrnts<O, K>(
     extended_key: &[K],
 ) where
     O: OWFParameters,
-    K: StateToBytes<O, Output = StateBytesCommits<O>>,
+    K: StateToBytes<O, Output = Box<GenericArray<S, O::NSTBytes>>>,
+    S: Square + Clone,
+    for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a S>,
+    for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a <S as Square>::Output>,
     ByteCommits<OWFField<O>, O::NSTBytes>: for<'a> AddRoundKeyAssign<&'a K>,
 {
     // ::1
@@ -42,14 +46,12 @@ pub(crate) fn enc_cstrnts<O, K>(
         );
 
         // ::16-17
-        let round_key = StateToBytes::<O>::state_to_bytes(&extended_key[2 * r + 1]);
-
-        let round_key_sq = square_key::<O>(&round_key);
+        let round_key = extended_key[2 * r + 1].state_to_bytes();
+        let round_key_sq = square_key(&round_key);
 
         // ::18-22
-        let st_0 = aes_round::<O, FieldCommitDegOne<OWFField<O>>>(&state_prime, &round_key, false);
-        let st_1 =
-            aes_round::<O, FieldCommitDegTwo<OWFField<O>>>(&state_prime, &round_key_sq, true);
+        let st_0 = aes_round::<O, _>(&state_prime, &round_key, false);
+        let st_1 = aes_round::<O, _>(&state_prime, &round_key_sq, true);
 
         let round_key = &extended_key[2 * r + 2];
 
@@ -70,13 +72,6 @@ pub(crate) fn enc_cstrnts<O, K>(
             odd_round_cnstrnts::<O>(zk_hasher, s_tilde.get_ref(), &st_0, &st_1);
         }
     }
-}
-
-fn square_key<O>(key: &StateBytesCommits<O>) -> StateBytesSquaredCommits<O>
-where
-    O: OWFParameters,
-{
-    key.iter().map(|ki| ki.clone().square()).collect()
 }
 
 fn enc_cstrnts_even<O>(
@@ -140,23 +135,31 @@ fn odd_round_cnstrnts<O>(
     inverse_affine::<O>(&mut s);
 
     // ::31-37
-    for byte_i in 0..O::NSTBytes::USIZE {
-        let si = s.get_field_commit(byte_i);
-        let si_sq = s.get_field_commit_sq(byte_i);
-
-        zk_hasher.update(&(si_sq * &st_0[byte_i] + &si));
-        zk_hasher.update(&(si * &st_1[byte_i] + &st_0[byte_i]));
+    for (si, si_sq, st0, st1) in
+        izip!(st_0.iter(), st_1.iter())
+            .enumerate()
+            .map(|(byte_i, (st0, st1))| {
+                (
+                    s.get_field_commit(byte_i),
+                    s.get_field_commit_sq(byte_i),
+                    st0,
+                    st1,
+                )
+            })
+    {
+        zk_hasher.update(&(si_sq * st0 + &si));
+        zk_hasher.update(&(si * st1 + st0));
     }
 }
 
-fn aes_round<O, T>(
+fn aes_round<'a, O, S>(
     state: &StateBitsSquaredCommits<O>,
-    key_bytes: &GenericArray<T, O::NSTBytes>,
+    key_bytes: &'a GenericArray<S, O::NSTBytes>,
     sq: bool,
 ) -> StateBytesSquaredCommits<O>
 where
     O: OWFParameters,
-    for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a T>,
+    StateBytesSquaredCommits<O>: AddRoundKeyBytes<&'a GenericArray<S, O::NSTBytes>>,
 {
     // ::19-22
 
@@ -166,7 +169,7 @@ where
 
     mix_columns::<O>(&mut st, sq);
 
-    add_round_key_bytes::<O, T>(&mut st, key_bytes);
+    st.add_round_key_bytes(key_bytes, sq);
 
     st
 }
@@ -208,7 +211,7 @@ where
                 + OWFField::<O>::BETA_SQUARES[j + 1] * x_tag[2]
                 + OWFField::<O>::BETA_CUBES[j] * x_tag[3];
 
-            FieldCommitDegOne { key, tag }
+            FieldCommitDegOne::new(key, tag)
         })
         .collect()
 }
@@ -235,4 +238,12 @@ where
             y
         })
         .collect()
+}
+
+fn square_key<S, L>(key_bytes: &GenericArray<S, L>) -> GenericArray<<S as Square>::Output, L>
+where
+    S: Clone + Square,
+    L: ArrayLength,
+{
+    key_bytes.iter().map(|x| x.clone().square()).collect()
 }

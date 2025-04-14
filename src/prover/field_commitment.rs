@@ -3,7 +3,10 @@ use generic_array::{
     typenum::{Prod, U8},
     ArrayLength, GenericArray,
 };
-use std::ops::{Add, AddAssign, Index, Mul, MulAssign, Neg};
+use std::{
+    ops::{Add, AddAssign, Index, Mul, MulAssign, Neg},
+    sync::Arc,
+};
 
 /// Represents a polynomial commitment in GF of degree one
 #[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
@@ -85,22 +88,6 @@ where
     }
 }
 
-impl<F> Mul for FieldCommitDegOne<F>
-where
-    F: BigGaloisField,
-{
-    type Output = FieldCommitDegTwo<F>;
-
-    #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
-    fn mul(self, rhs: Self) -> Self::Output {
-        FieldCommitDegTwo {
-            key: self.key * rhs.key,
-            tag: [self.tag * rhs.tag, self.key * rhs.tag + self.tag * rhs.key],
-        }
-    }
-}
-
 impl<F> Mul<&Self> for FieldCommitDegOne<F>
 where
     F: BigGaloisField,
@@ -110,7 +97,23 @@ where
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: &Self) -> Self::Output {
-        self * rhs.clone()
+        FieldCommitDegTwo {
+            key: self.key * rhs.key,
+            tag: [self.tag * rhs.tag, self.key * rhs.tag + self.tag * rhs.key],
+        }
+    }
+}
+
+impl<F> Mul for FieldCommitDegOne<F>
+where
+    F: BigGaloisField,
+{
+    type Output = FieldCommitDegTwo<F>;
+
+    #[inline]
+    #[allow(clippy::suspicious_arithmetic_impl)]
+    fn mul(self, rhs: Self) -> Self::Output {
+        self * &rhs
     }
 }
 
@@ -162,10 +165,22 @@ where
 
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
-    fn mul(self, rhs: &F) -> Self::Output {
-        FieldCommitDegOne {
-            key: self.key * rhs,
-            tag: self.tag,
+    fn mul(mut self, rhs: &F) -> Self::Output {
+        self.key *= rhs;
+        self
+    }
+}
+
+impl<F> Square for &FieldCommitDegOne<F>
+where
+    F: BigGaloisField,
+{
+    type Output = FieldCommitDegTwo<F>;
+
+    fn square(self) -> Self::Output {
+        FieldCommitDegTwo {
+            key: self.key.square(),
+            tag: [self.tag.square(), F::ZERO],
         }
     }
 }
@@ -177,10 +192,7 @@ where
     type Output = FieldCommitDegTwo<F>;
 
     fn square(self) -> Self::Output {
-        FieldCommitDegTwo {
-            key: self.key.square(),
-            tag: [self.tag.square(), F::ZERO],
-        }
+        (&self).square()
     }
 }
 
@@ -323,7 +335,7 @@ where
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: FieldCommitDegOne<F>) -> Self::Output {
-        rhs * self
+        self * &rhs
     }
 }
 
@@ -336,7 +348,14 @@ where
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: &FieldCommitDegOne<F>) -> Self::Output {
-        rhs.clone() * self
+        FieldCommitDegThree {
+            key: self.key * rhs.key,
+            tag: [
+                rhs.tag * self.tag[0],
+                rhs.key * self.tag[0] + rhs.tag * self.tag[1],
+                rhs.key * self.tag[1] + rhs.tag * self.key,
+            ],
+        }
     }
 }
 
@@ -452,10 +471,7 @@ mod test {
             tag: [GF128::ONE, GF128::ONE],
         };
 
-        let rhs = FieldCommitDegOne {
-            key: GF128::ONE,
-            tag: GF128::ONE,
-        };
+        let rhs = FieldCommitDegOne::new(GF128::ONE, GF128::ONE);
 
         let exp_res = FieldCommitDegThree {
             key: GF128::ONE,
@@ -467,15 +483,9 @@ mod test {
         assert!(lhs.clone() * rhs.clone() == exp_res);
         assert!(rhs * lhs == exp_res);
 
-        let lhs = FieldCommitDegOne {
-            key: GF128::ONE,
-            tag: GF128::ONE,
-        };
+        let lhs = FieldCommitDegOne::new(GF128::ONE, GF128::ONE);
 
-        let rhs = FieldCommitDegOne {
-            key: GF128::ONE * 2,
-            tag: GF128::ZERO,
-        };
+        let rhs = FieldCommitDegOne::new(GF128::ONE * 2, GF128::ZERO);
 
         let exp_res = FieldCommitDegTwo {
             key: GF128::ONE * 2,
@@ -490,20 +500,11 @@ mod test {
 
     #[test]
     fn field_commit_sum() {
-        let lhs = FieldCommitDegOne {
-            key: GF128::ONE,
-            tag: GF128::ONE * 3,
-        };
+        let lhs = FieldCommitDegOne::new(GF128::ONE, GF128::ONE * 3);
 
-        let rhs = FieldCommitDegOne {
-            key: GF128::ONE * 4,
-            tag: GF128::ONE * 2,
-        };
+        let rhs = FieldCommitDegOne::new(GF128::ONE * 4, GF128::ONE * 2);
 
-        let exp_res = FieldCommitDegOne {
-            key: GF128::ONE * 5,
-            tag: GF128::ONE * 5,
-        };
+        let exp_res = FieldCommitDegOne::new(GF128::ONE * 5, GF128::ONE * 5);
 
         assert!(lhs.clone() + &rhs == exp_res);
         assert!(rhs.clone() + &lhs == exp_res);

@@ -15,6 +15,7 @@ use generic_array::{
     typenum::{Quot, Unsigned, U2, U4, U8},
     ArrayLength, GenericArray,
 };
+use itertools::izip;
 use std::ops::{AddAssign, Deref, Index};
 use std::{convert::AsRef, process::Output};
 
@@ -38,14 +39,11 @@ pub(crate) fn enc_cstrnts<'a, O, K>(
         let state_prime = enc_cstrnts_even::<O>(
             zk_hasher,
             &state,
-            GenericArray::from_slice(
-                &w.scalars[3 * O::NSTBits::USIZE * r / 2
-                    ..3 * O::NSTBits::USIZE * r / 2 + O::NSTBits::USIZE / 2],
-            ),
+            w.get_commits_ref::<Quot<O::NSTBits, U2>>(3 * O::NSTBits::USIZE * r / 2),
         );
 
         // ::16-17
-        let round_key = <K as StateToBytes<O>>::state_to_bytes(&extended_key[2 * r + 1]);
+        let round_key = extended_key[2 * r + 1].state_to_bytes();
         let round_key_sq = square_key::<O>(&round_key);
 
         // ::18-22
@@ -74,17 +72,6 @@ pub(crate) fn enc_cstrnts<'a, O, K>(
     }
 }
 
-fn state_to_bytes<O>(
-    state: &GenericArray<OWFField<O>, O::NSTBits>,
-) -> GenericArray<OWFField<O>, O::NSTBytes>
-where
-    O: OWFParameters,
-{
-    (0..O::NSTBytes::USIZE)
-        .map(|i| OWFField::<O>::byte_combine_slice(&state[8 * i..8 * i + 8]))
-        .collect()
-}
-
 fn aes_round<'a, O>(
     state: &VoleCommits<'a, OWFField<O>, O::NSTBits>,
     key_bytes: &GenericArray<OWFField<O>, O::NSTBytes>,
@@ -92,13 +79,16 @@ fn aes_round<'a, O>(
 ) -> VoleCommits<'a, OWFField<O>, O::NSTBytes>
 where
     O: OWFParameters,
+    VoleCommits<'a, OWFField<O>, O::NSTBits>:
+        SBoxAffine<O, Output = VoleCommits<'a, OWFField<O>, O::NSTBytes>>,
+    VoleCommits<'a, OWFField<O>, O::NSTBytes>: MixColumns<O>,
 {
     // ::19-22
-    let mut st = <VoleCommits<_, _> as SBoxAffine<O>>::s_box_affine(state, sq);
+    let mut st = state.s_box_affine(sq);
 
     st.shift_rows::<O>();
 
-    <VoleCommits<_, _> as MixColumns<O>>::mix_columns(&mut st, sq);
+    st.mix_columns(sq);
 
     st.add_round_key_bytes(key_bytes, sq);
 
@@ -117,7 +107,7 @@ where
 fn enc_cstrnts_even<'a, O>(
     zk_hasher: &mut ZKVerifyHasher<OWFField<O>>,
     state: &VoleCommits<'a, OWFField<O>, O::NSTBits>,
-    w: &GenericArray<OWFField<O>, Quot<O::NSTBits, U2>>,
+    w: VoleCommitsRef<'_, OWFField<O>, Quot<O::NSTBits, U2>>,
 ) -> VoleCommits<'a, OWFField<O>, O::NSTBits>
 where
     O: OWFParameters,
@@ -154,9 +144,11 @@ fn next_round_state<'a, O, K>(
 ) where
     O: OWFParameters,
     K: StateToBytes<O, Output = GenericArray<OWFField<O>, O::NSTBytes>>,
+    VoleCommitsRef<'a, OWFField<O>, O::NSTBits>:
+        BytewiseMixColumns<O, Output = VoleCommits<'a, OWFField<O>, O::NSTBits>>,
     VoleCommits<'a, OWFField<O>, O::NSTBits>: AddRoundKeyAssign<&'a K>,
 {
-    *state = <VoleCommitsRef<_, _> as BytewiseMixColumns<O>>::bytewise_mix_columns(&s_tilde);
+    *state = s_tilde.bytewise_mix_columns();
 
     state.add_round_key_assign(round_key);
 }
@@ -177,12 +169,12 @@ fn odd_round_cnstrnts<'a, O>(
     s.inverse_affine::<O>();
 
     // ::31-37
-    for byte_i in 0..O::NSTBytes::USIZE {
+    for (byte_i, (st0, st1)) in izip!(st_0.scalars.iter(), st_1.scalars.iter()).enumerate() {
         let s_i = OWFField::<O>::byte_combine_slice(&s.scalars[8 * byte_i..8 * byte_i + 8]);
         let s_i_sq = OWFField::<O>::byte_combine_sq_slice(&s.scalars[8 * byte_i..8 * byte_i + 8]);
 
-        zk_hasher.update(&(s_i_sq * &st_0.scalars[byte_i] + delta_sq * &s_i));
-        zk_hasher.update(&(s_i * &st_1.scalars[byte_i] + delta * &st_0.scalars[byte_i]));
+        zk_hasher.update(&(s_i_sq * st0 + delta_sq * &s_i));
+        zk_hasher.update(&(s_i * st1 + delta * st0));
     }
 }
 

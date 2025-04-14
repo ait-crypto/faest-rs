@@ -19,7 +19,7 @@ use crate::{
         BigGaloisField, ByteCombine, ByteCombineConstants, Field, Square, SumPoly,
     },
     internal_keys::PublicKey,
-    parameter::{BaseParameters, Lambda, OWFField, OWFParameters, QSProof, TauParameters},
+    parameter::{BaseParameters, OWFField, OWFParameters, QSProof, TauParameters},
     prover,
     prover::byte_commitments::ByteCommitsRef,
     rijndael_32::{
@@ -93,7 +93,7 @@ where
     // ::12
     prover::owf_constraints::<O>(
         &mut zk_hasher,
-        ByteCommitsRef::new(w, GenericArray::from_slice(&v[..O::L::USIZE])),
+        ByteCommitsRef::from_slices(w, &v[..O::L::USIZE]),
         pk,
     );
 
