@@ -230,29 +230,38 @@ pub(crate) trait OWFParameters: Sized {
     ) -> OWFField<Self>;
 
     fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<Self> {
-        loop {
-            // This is a quirk of the NIST PRG to generate the test vectors. The array has to be sampled at once.
-            let mut sk: GenericArray<u8, Self::SK> = GenericArray::default();
-            rng.fill_bytes(&mut sk);
 
-            let owf_input = GenericArray::from_slice(&sk[..Self::InputSize::USIZE]);
-            let owf_key = GenericArray::from_slice(&sk[Self::InputSize::USIZE..]);
+        let mut owf_input = GenericArray::default();
+        let mut owf_key = GenericArray::default();
+        
+        let mut done = false;
+        while !done {
 
-            if get_bit(&owf_key, 0) & get_bit(&owf_key, 1) != 0 {
-                continue;
+            // TODO: Fix RNG and remove this line
+            owf_key.fill(0);
+
+            rng.fill_bytes(&mut owf_key);
+
+            if (get_bit(&owf_key, 0) & get_bit(&owf_key, 1)) == 0 {
+                done = true;
             }
 
-            let mut owf_output = GenericArray::default();
-            Self::evaluate_owf(owf_key, owf_input, &mut owf_output);
-
-            return SecretKey {
-                owf_key: owf_key.clone(),
-                pk: PublicKey {
-                    owf_input: owf_input.clone(),
-                    owf_output,
-                },
-            };
         }
+
+
+        rng.fill_bytes(&mut owf_input);
+
+
+        let mut owf_output = GenericArray::default();
+        Self::evaluate_owf(&owf_key, &owf_input, &mut owf_output);
+
+        return SecretKey {
+            owf_key,
+            pk: PublicKey {
+                owf_input,
+                owf_output,
+            },
+        };
     }
 }
 
