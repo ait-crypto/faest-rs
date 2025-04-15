@@ -832,6 +832,12 @@ impl Field for BigGF<u128, 1, 128> {
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         GenericArray::from(self.0[0].to_le_bytes())
     }
+
+    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
+        let mut arr = GenericArray::default_boxed();
+        arr.copy_from_slice(&self.0[0].to_le_bytes());
+        arr
+    }
 }
 
 impl Alphas for BigGF<u128, 1, 128> {
@@ -963,6 +969,13 @@ impl Field for BigGF<u128, 2, 192> {
         ret[..16].copy_from_slice(&self.0[0].to_le_bytes());
         ret[16..].copy_from_slice(&self.0[1].to_le_bytes()[..8]);
         ret
+    }
+
+    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
+        let mut arr = GenericArray::default_boxed();
+        arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
+        arr[16..].copy_from_slice(&self.0[1].to_le_bytes()[..8]);
+        arr
     }
 }
 
@@ -1210,6 +1223,14 @@ impl Field for BigGF<u128, 2, 256> {
         ret[16..].copy_from_slice(&self.0[1].to_le_bytes());
         ret
     }
+
+    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
+        let mut arr = GenericArray::default_boxed();
+        arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
+        arr[16..].copy_from_slice(&self.0[1].to_le_bytes());
+        arr
+    }
+    
 }
 
 impl Alphas for BigGF<u128, 2, 256> {
@@ -1457,6 +1478,16 @@ impl Field for GF384 {
         ret[32..].copy_from_slice(&self.0[2].to_le_bytes());
         ret
     }
+
+    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
+        let mut arr = GenericArray::default_boxed();
+        arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
+        arr[16..32].copy_from_slice(&self.0[1].to_le_bytes());
+        arr[32..].copy_from_slice(&self.0[2].to_le_bytes());
+
+        arr
+    }
+
 }
 
 impl From<&[u8]> for GF384 {
@@ -1536,6 +1567,18 @@ impl Field for GF576 {
         ret[64..].copy_from_slice(&self.0[4].to_le_bytes()[..8]);
         ret
     }
+
+    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
+        let mut arr = GenericArray::default_boxed();
+        arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
+        arr[16..32].copy_from_slice(&self.0[1].to_le_bytes());
+        arr[32..48].copy_from_slice(&self.0[2].to_le_bytes());
+        arr[48..64].copy_from_slice(&self.0[3].to_le_bytes());
+        arr[64..].copy_from_slice(&self.0[4].to_le_bytes()[..8]);
+
+        arr
+    }
+    
 }
 
 impl Mul<GF192> for GF576 {
@@ -1622,6 +1665,21 @@ impl Field for GF768 {
         });
         ret
     }
+
+    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
+        let mut arr = GenericArray::default_boxed();
+        
+        arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
+        arr[16..32].copy_from_slice(&self.0[1].to_le_bytes());
+        arr[32..48].copy_from_slice(&self.0[2].to_le_bytes());
+        arr[48..64].copy_from_slice(&self.0[3].to_le_bytes());
+        arr[64..80].copy_from_slice(&self.0[4].to_le_bytes());
+        arr[80..].copy_from_slice(&self.0[5].to_le_bytes());
+
+
+        arr
+    }
+    
 }
 
 impl From<&[u8]> for GF768 {
