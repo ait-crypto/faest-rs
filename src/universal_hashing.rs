@@ -395,7 +395,7 @@ where
     fn hash(
         uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
         x: &GenericArray<u8, Self::LambdaBytesTimes4>,
-    ) -> GenericArray<u8, Self::LambdaBytesTimes3> {
+    ) -> Box<GenericArray<u8, Self::LambdaBytesTimes3>> {
         let u = <Self as LeafHasher>::ExtensionField::from(uhash.as_slice());
         let x0 =
             <Self as LeafHasher>::F::from(&x[..<<Self as LeafHasher>::F as Field>::Length::USIZE]);
@@ -405,7 +405,7 @@ where
 
         let h = (u * &x0) + &x1;
 
-        h.as_bytes()
+        h.as_boxed_bytes()
     }
 }
 
@@ -575,7 +575,7 @@ mod test {
             let expected_h = GenericArray::from_slice(&data.expected_h);
 
             let h = LeafHasher128::hash(&uhash, &x);
-            assert_eq!(h, *expected_h)
+            assert_eq!(*h, *expected_h)
         }
     }
 
@@ -589,7 +589,7 @@ mod test {
             let expected_h = GenericArray::from_slice(&data.expected_h);
 
             let h = LeafHasher192::hash(&uhash, &x);
-            assert_eq!(h, *expected_h)
+            assert_eq!(*h, *expected_h)
         }
     }
 
@@ -602,10 +602,9 @@ mod test {
             let uhash = GenericArray::from_slice(&data.uhash);
             let expected_h = GenericArray::from_slice(&data.expected_h);
 
-            let t = std::time::Instant::now();
             let h = LeafHasher256::hash(&uhash, &x);
-            println!("Time taken: {:?}", t.elapsed());
-            assert_eq!(h, *expected_h)
+
+            assert_eq!(*h, *expected_h)
         }
     }
 }

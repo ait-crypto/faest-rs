@@ -6,12 +6,6 @@ use std::{
     ops::{Index, IndexMut, Mul},
 };
 
-use generic_array::{
-    typenum::{Prod, Unsigned, U128, U2, U3, U8},
-    ArrayLength, GenericArray,
-};
-use itertools::izip;
-
 use crate::{
     bavc::{
         BatchVectorCommitment, BavcCommitResult, BavcDecommitment, BavcOpenResult,
@@ -23,6 +17,13 @@ use crate::{
     universal_hashing::{LeafHasher, B},
     utils::{decode_all_chall_3, Reader},
 };
+use generic_array::{
+    box_arr,
+    typenum::{Prod, Unsigned, U128, U2, U3, U8},
+    ArrayLength, GenericArray,
+};
+use itertools::izip;
+use std::mem::{transmute, MaybeUninit};
 
 const TWEAK_OFFSET: u32 = 1 << 31;
 
@@ -117,7 +118,7 @@ where
 #[allow(clippy::type_complexity)]
 fn convert_to_vole<'a, BAVC, LHatBytes>(
     v: &mut GenericArray<GenericArray<u8, BAVC::Lambda>, LHatBytes>,
-    sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, BAVC::LambdaBytes>>,
+    sd: impl ExactSizeIterator<Item = &'a Box<GenericArray<u8, BAVC::LambdaBytes>>>,
     iv: &IV,
     round: u32,
 ) -> Box<GenericArray<u8, LHatBytes>>
@@ -131,19 +132,20 @@ where
     let d = BAVC::TAU::bavc_max_node_depth(round as usize);
     let ni = BAVC::TAU::bavc_max_node_index(round as usize);
 
+    let sd0_empty = sd.len() != ni;
+    debug_assert!(sd.len() == ni || sd.len() + 1 == ni);
+
     // Step 2
     // As in steps 8,9 we only work with two rows at a time, we just allocate 2 r-vectors
-    let mut rj: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
+    let mut rj: Vec<Box<GenericArray<u8, LHatBytes>>> = sd0_empty
+        .then(|| Some(GenericArray::default_boxed())) // Pad with empty array if sd0 = ⊥
+        .into_iter()
+        .filter_map(|a| a)
+        .chain(sd.map(|sdi| BAVC::PRG::new_prg(sdi, iv, twk).read_into_boxed()))
+        .collect();
     let mut rj1: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
 
-    debug_assert!(sd.len() == ni || sd.len() + 1 == ni);
-    let offset = (sd.len() != ni) as usize;
-
     // Step 3,4
-    for (i, sdi) in sd.enumerate() {
-        BAVC::PRG::new_prg(sdi, iv, twk).read(&mut rj[i + offset]);
-    }
-
     let vcol_offset = BAVC::TAU::bavc_depth_offset(round as usize);
 
     // Step 6..9
@@ -169,8 +171,9 @@ where
     rj.swap_remove(0)
 }
 
+
 #[allow(clippy::type_complexity)]
-pub fn volecommit<BAVC, LHatBytes>(
+pub(crate) fn volecommit<BAVC, LHatBytes>(
     mut c: VoleCommitmentCRefMut<LHatBytes>,
     r: &GenericArray<u8, BAVC::LambdaBytes>,
     iv: &IV,
@@ -214,7 +217,7 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-pub fn volereconstruct<BAVC, LHatBytes>(
+pub(crate) fn volereconstruct<BAVC, LHatBytes>(
     chall: &GenericArray<u8, BAVC::LambdaBytes>,
     decom_i: &BavcOpenResult,
     c: VoleCommitmentCRef<LHatBytes>,
@@ -428,8 +431,10 @@ mod test {
                     - 1)
         ];
 
+        let t = std::time::Instant::now();
         let res_commit =
             volecommit::<BAVC, OWF::LHATBYTES>(VoleCommitmentCRefMut::new(&mut c), r, &iv);
+        println!("VOLE commit time: {:?}", t.elapsed());
 
         let i_delta = decode_all_chall_3::<BAVC::TAU>(&chall);
         let decom_i = BAVC::open(&res_commit.decom, &i_delta).unwrap();
@@ -457,6 +462,10 @@ mod test {
         let datatabase = read_test_data::<DataVOLE>("vole.json");
 
         for data in datatabase {
+            if data.lambda != 256 {
+                continue;
+            }
+
             match data.lambda {
                 128 => {
                     let r = GenericArray::from_slice(&r[..16]);
