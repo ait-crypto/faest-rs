@@ -121,74 +121,76 @@ where
         let mut rng = NistPqcAes256CtrRng::from_seed(seed.as_slice().try_into().unwrap());
 
         let kp = KP::generate(&mut rng);
+
         let vk = kp.verifying_key();
         assert_eq!(KP::VerifyingKey::try_from(&pk).unwrap(), vk);
         assert_eq!(KP::try_from(&sk).unwrap(), kp);
 
         let signature = kp.sign_with_rng(&mut rng, &message);
         assert!(vk.verify(&message, &signature).is_ok());
+
         assert_eq!(sm.len(), message.len() + signature.encoded_len());
         assert_eq!(sm[..sm.len() - signature.encoded_len()], message);
         assert_eq!(sm[sm.len() - signature.encoded_len()..], signature.to_vec());
     }
 }
 
-// #[test]
-// fn faest_128s() {
-//     test_nist::<FAEST128sSigningKey, FAEST128sSignature>("PQCsignKAT_faest_128s.rsp");
-// }
+#[test]
+fn faest_128s() {
+    test_nist::<FAEST128sSigningKey, FAEST128sSignature>("PQCsignKAT_faest_128s.rsp");
+}
 
-// #[test]
-// fn faest_128f() {
-//     test_nist::<FAEST128fSigningKey, FAEST128fSignature>("PQCsignKAT_faest_128f.rsp");
-// }
+#[test]
+fn faest_128f() {
+    test_nist::<FAEST128fSigningKey, FAEST128fSignature>("PQCsignKAT_faest_128f.rsp");
+}
 
-// #[test]
-// fn faest_192s() {
-//     test_nist::<FAEST192sSigningKey, FAEST192sSignature>("PQCsignKAT_faest_192s.rsp");
-// }
+#[test]
+fn faest_192s() {
+    test_nist::<FAEST192sSigningKey, FAEST192sSignature>("PQCsignKAT_faest_192s.rsp");
+}
 
-// #[test]
-// fn faest_192f() {
-//     test_nist::<FAEST192fSigningKey, FAEST192fSignature>("PQCsignKAT_faest_192f.rsp");
-// }
+#[test]
+fn faest_192f() {
+    test_nist::<FAEST192fSigningKey, FAEST192fSignature>("PQCsignKAT_faest_192f.rsp");
+}
 
-// #[test]
-// fn faest_256s() {
-//     test_nist::<FAEST256sSigningKey, FAEST256sSignature>("PQCsignKAT_faest_256s.rsp");
-// }
+#[test]
+fn faest_256s() {
+    test_nist::<FAEST256sSigningKey, FAEST256sSignature>("PQCsignKAT_faest_256s.rsp");
+}
 
-// #[test]
-// fn faest_256f() {
-//     test_nist::<FAEST256fSigningKey, FAEST256fSignature>("PQCsignKAT_faest_256f.rsp");
-// }
+#[test]
+fn faest_256f() {
+    test_nist::<FAEST256fSigningKey, FAEST256fSignature>("PQCsignKAT_faest_256f.rsp");
+}
 
-// #[test]
-// fn faest_em_128s() {
-//     test_nist::<FAESTEM128sSigningKey, FAESTEM128sSignature>("PQCsignKAT_faest_em_128s.rsp");
-// }
+#[test]
+fn faest_em_128s() {
+    test_nist::<FAESTEM128sSigningKey, FAESTEM128sSignature>("PQCsignKAT_faest_em_128s.rsp");
+}
 
-// #[test]
-// fn faest_em_128f() {
-//     test_nist::<FAESTEM128fSigningKey, FAESTEM128fSignature>("PQCsignKAT_faest_em_128f.rsp");
-// }
+#[test]
+fn faest_em_128f() {
+    test_nist::<FAESTEM128fSigningKey, FAESTEM128fSignature>("PQCsignKAT_faest_em_128f.rsp");
+}
 
-// #[test]
-// fn faest_em_192s() {
-//     test_nist::<FAESTEM192sSigningKey, FAESTEM192sSignature>("PQCsignKAT_faest_em_192s.rsp");
-// }
+#[test]
+fn faest_em_192s() {
+    test_nist::<FAESTEM192sSigningKey, FAESTEM192sSignature>("PQCsignKAT_faest_em_192s.rsp");
+}
 
-// #[test]
-// fn faest_em_192f() {
-//     test_nist::<FAESTEM192fSigningKey, FAESTEM192fSignature>("PQCsignKAT_faest_em_192f.rsp");
-// }
+#[test]
+fn faest_em_192f() {
+    test_nist::<FAESTEM192fSigningKey, FAESTEM192fSignature>("PQCsignKAT_faest_em_192f.rsp");
+}
 
-// #[test]
-// fn faest_em_256s() {
-//     test_nist::<FAESTEM256sSigningKey, FAESTEM256sSignature>("PQCsignKAT_faest_em_256s.rsp");
-// }
+#[test]
+fn faest_em_256s() {
+    test_nist::<FAESTEM256sSigningKey, FAESTEM256sSignature>("PQCsignKAT_faest_em_256s.rsp");
+}
 
-// #[test]
-// fn faest_em_256f() {
-//     test_nist::<FAESTEM256fSigningKey, FAESTEM256fSignature>("PQCsignKAT_faest_em_256f.rsp");
-// }
+#[test]
+fn faest_em_256f() {
+    test_nist::<FAESTEM256fSigningKey, FAESTEM256fSignature>("PQCsignKAT_faest_em_256f.rsp");
+}
