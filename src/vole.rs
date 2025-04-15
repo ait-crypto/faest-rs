@@ -63,7 +63,6 @@ where
     pub q: Box<GenericArray<GenericArray<u8, Prod<LambdaBytes, U8>>, LHatBytes>>,
 }
 
-
 /// Immutable reference to storage area in signature for all `c`s.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct VoleCommitmentCRef<'a, LHatBytes>(&'a [u8], PhantomData<LHatBytes>);
@@ -92,7 +91,6 @@ where
     }
 }
 
-
 /// Mutable eference to storage area in signature for all `c`s.
 #[derive(Debug, PartialEq)]
 pub(crate) struct VoleCommitmentCRefMut<'a, LHatBytes>(&'a mut [u8], PhantomData<LHatBytes>);
@@ -116,10 +114,9 @@ where
     }
 }
 
-
 #[allow(clippy::type_complexity)]
 fn convert_to_vole<'a, BAVC, LHatBytes>(
-    v: &mut GenericArray<GenericArray<u8, BAVC::Lambda>, LHatBytes>, 
+    v: &mut GenericArray<GenericArray<u8, BAVC::Lambda>, LHatBytes>,
     sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, BAVC::LambdaBytes>>,
     iv: &IV,
     round: u32,
@@ -169,11 +166,8 @@ where
 
     // Step 10
     // Move rj[0] (after last swap, rj[0] will contain r_d,0)
-    // SAFETY: rj is guaranteed to be non-empty as FAEST parameters ensure ni > 0
-    rj.into_iter().next().unwrap() 
+    rj.swap_remove(0)
 }
-
-
 
 #[allow(clippy::type_complexity)]
 pub fn volecommit<BAVC, LHatBytes>(
@@ -433,12 +427,10 @@ mod test {
                 * (<<BAVC as BatchVectorCommitment>::TAU as TauParameters>::Tau::USIZE
                     - 1)
         ];
-        
-        let t = std::time::Instant::now();
+
         let res_commit =
             volecommit::<BAVC, OWF::LHATBYTES>(VoleCommitmentCRefMut::new(&mut c), r, &iv);
-        println!("Time for commit: {:?}", t.elapsed());    
-            
+
         let i_delta = decode_all_chall_3::<BAVC::TAU>(&chall);
         let decom_i = BAVC::open(&res_commit.decom, &i_delta).unwrap();
 
