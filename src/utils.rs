@@ -6,10 +6,7 @@ use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 use itertools::iproduct;
 
 use crate::fields::Field;
-use crate::{
-    fields::ByteCombine,
-    parameter::TauParameters,
-};
+use crate::{fields::ByteCombine, parameter::TauParameters};
 
 /// Reader interface for PRGs and random oracles
 pub(crate) trait Reader {

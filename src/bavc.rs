@@ -31,6 +31,45 @@ use crate::{
     utils::Reader,
 };
 
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub(crate) struct BavcCommitResult<LambdaBytes, NLeafCommit>
+where
+    LambdaBytes: ArrayLength
+        + Mul<U2, Output: ArrayLength>
+        + Mul<NLeafCommit, Output: ArrayLength>
+        + PartialEq,
+    NLeafCommit: ArrayLength,
+{
+    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
+    pub decom: BavcDecommitment<LambdaBytes, NLeafCommit>,
+    pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub(crate) struct BavcOpenResult<'a> {
+    pub coms: Vec<&'a [u8]>,
+    pub nodes: Vec<&'a [u8]>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub(crate) struct BavcReconstructResult<LambdaBytes>
+where
+    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + PartialEq,
+{
+    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
+    pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub(crate) struct BavcDecommitment<LambdaBytes, NLeafCommit>
+where
+    LambdaBytes: ArrayLength + Mul<NLeafCommit, Output: ArrayLength>,
+    NLeafCommit: ArrayLength,
+{
+    keys: Vec<GenericArray<u8, LambdaBytes>>,
+    coms: Vec<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>>>,
+}
+
 pub trait LeafCommit {
     type LambdaBytes: ArrayLength;
     type LambdaBytesTimes2: ArrayLength;
@@ -118,7 +157,7 @@ mod bavc_common {
     use generic_array::typenum::Diff;
 
     use super::*;
-    // Need to find an alternative way to define helper functions (maybe in a private struct)
+
     pub(super) fn construct_keys<PRG, L>(
         r: &GenericArray<u8, PRG::KeySize>,
         iv: &IV,
@@ -336,8 +375,8 @@ where
 
         // Setps 8..13
         let mut com_hasher = RO::h1_init();
-        let mut seeds = Vec::with_capacity(TAU::L::USIZE);
-        let mut coms = Vec::with_capacity(TAU::L::USIZE);
+        let mut seeds = vec![GenericArray::default(); TAU::L::USIZE];
+        let mut coms = vec![GenericArray::default(); TAU::L::USIZE];
 
         for i in 0..TAU::Tau::U32 {
             // Step 2
@@ -349,13 +388,11 @@ where
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
                 let tweak = i + TAU::L::U32 - 1;
+                let idx = TAU::bavc_index_offset(i as usize) + j;
 
-                let (sd, com) = Self::LC::commit(&keys[alpha], &iv, tweak, &uhash_i);
+                (seeds[idx], coms[idx]) = Self::LC::commit(&keys[alpha], &iv, tweak, &uhash_i);
 
-                hi_hasher.update(&com);
-
-                seeds.push(sd);
-                coms.push(com);
+                hi_hasher.update(&coms[idx]);
             }
 
             // Step 14
@@ -388,7 +425,7 @@ where
 
         // Step 3
         let coms = (0..TAU::Tau::USIZE)
-            .map(|i| decom.coms[TAU::bavc_index_offset(i) + i_delta[i] as usize].as_ref())
+            .map(|i| decom.coms[TAU::bavc_index_offset(i) + i_delta[i] as usize].as_slice())
             .collect();
 
         Some(BavcOpenResult { coms, nodes })
@@ -551,7 +588,7 @@ where
 
         // Step 3
         let coms = (0..TAU::Tau::USIZE)
-            .map(|i| decom.coms[TAU::bavc_index_offset(i) + i_delta[i] as usize].as_ref())
+            .map(|i| decom.coms[TAU::bavc_index_offset(i) + i_delta[i] as usize].as_slice())
             .collect();
 
         Some(BavcOpenResult { coms, nodes })
@@ -614,45 +651,6 @@ where
             seeds,
         })
     }
-}
-
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
-pub(crate) struct BavcCommitResult<LambdaBytes, NLeafCommit>
-where
-    LambdaBytes: ArrayLength
-        + Mul<U2, Output: ArrayLength>
-        + Mul<NLeafCommit, Output: ArrayLength>
-        + PartialEq,
-    NLeafCommit: ArrayLength,
-{
-    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
-    pub decom: BavcDecommitment<LambdaBytes, NLeafCommit>,
-    pub seeds: Vec<GenericArray<u8, LambdaBytes>>, // GenericArray<GenericArray<u8, LambdaBytes>, L>?
-}
-
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
-pub(crate) struct BavcOpenResult<'a> {
-    pub coms: Vec<&'a [u8]>,  // GenericArray<&'a [u8], L>?
-    pub nodes: Vec<&'a [u8]>, // GenericArray<&'a [u8], 2*L-1>?
-}
-
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
-pub(crate) struct BavcReconstructResult<LambdaBytes>
-where
-    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + PartialEq,
-{
-    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
-    pub seeds: Vec<GenericArray<u8, LambdaBytes>>, //GenericArray<<GenericArray<u8, LambdaBytes>, L-Tau> ?
-}
-
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
-pub(crate) struct BavcDecommitment<LambdaBytes, NLeafCommit>
-where
-    LambdaBytes: ArrayLength + Mul<NLeafCommit, Output: ArrayLength>,
-    NLeafCommit: ArrayLength,
-{
-    keys: Vec<GenericArray<u8, LambdaBytes>>, // GenericArray<GenericArray<u8, LambdaBytes>, 2*L-1>?
-    coms: Vec<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>>>, // GenericArray<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>, L>?
 }
 
 pub(crate) type BAVC128Small = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small>;

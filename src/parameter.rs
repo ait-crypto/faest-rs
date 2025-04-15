@@ -235,7 +235,6 @@ pub(crate) trait OWFParameters: Sized {
 
         let mut done = false;
         while !done {
-
             rng.fill_bytes(&mut owf_key);
 
             if (get_bit(&owf_key, 0) & get_bit(&owf_key, 1)) == 0 {
