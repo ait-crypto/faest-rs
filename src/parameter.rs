@@ -230,27 +230,20 @@ pub(crate) trait OWFParameters: Sized {
     ) -> OWFField<Self>;
 
     fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<Self> {
-
         let mut owf_input = GenericArray::default();
         let mut owf_key = GenericArray::default();
-        
+
         let mut done = false;
         while !done {
-
-            // TODO: Fix RNG and remove this line
-            owf_key.fill(0);
 
             rng.fill_bytes(&mut owf_key);
 
             if (get_bit(&owf_key, 0) & get_bit(&owf_key, 1)) == 0 {
                 done = true;
             }
-
         }
 
-
         rng.fill_bytes(&mut owf_input);
-
 
         let mut owf_output = GenericArray::default();
         Self::evaluate_owf(&owf_key, &owf_input, &mut owf_output);
