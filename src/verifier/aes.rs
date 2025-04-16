@@ -361,11 +361,7 @@ where
 
         for r in 0..4 {
             for c in 0..nst {
-                let off = if (nst != 8) || (r <= 1) {
-                    0
-                } else {
-                    1
-                };
+                let off = if (nst != 8) || (r <= 1) { 0 } else { 1 };
                 std::mem::swap(
                     &mut self.scalars[4 * c + r],
                     &mut tmp[4 * ((c + r + off) % nst) + r],
@@ -381,10 +377,9 @@ where
     L: ArrayLength,
 {
     fn inverse_affine(&mut self) {
+        let nst_bytes = L::USIZE / 8;
 
-        let nst_bytes = L::USIZE/8;
-
-        for i in 0 .. nst_bytes {
+        for i in 0..nst_bytes {
             let xi_tags: GenericArray<_, U8> =
                 GenericArray::from_slice(&self.scalars[8 * i..8 * i + 8]).to_owned();
             for bit_i in 0..8 {

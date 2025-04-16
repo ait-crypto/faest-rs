@@ -303,7 +303,6 @@ fn sign<P, O>(
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
-
     // ::1
     let (signature, ctr_s) = signature.split_at_mut(P::SignatureSize::USIZE - size_of::<u32>());
 
@@ -324,12 +323,8 @@ fn sign<P, O>(
     // ::7
     let (volecommit_cs, signature) =
         signature.split_at_mut(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
-    let VoleCommitResult {
-        com,
-        decom,
-        u,
-        v,
-    } = volecommit::<P::BAVC, O::LHATBYTES>(VoleCommitmentCRefMut::new(volecommit_cs), &r, &iv);
+    let VoleCommitResult { com, decom, u, v } =
+        volecommit::<P::BAVC, O::LHATBYTES>(VoleCommitmentCRefMut::new(volecommit_cs), &r, &iv);
 
     // ::8
     //Contrarly to specification, faest-ref uses iv instead of iv_pre

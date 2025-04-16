@@ -3,10 +3,7 @@ use crate::{
     aes::*,
     fields::{Betas, BigGaloisField, FromBit, Square},
     parameter::{OWFField, OWFParameters},
-    prover::aes::{
-        StateBitsSquaredCommits, StateBytesCommits,
-        StateBytesSquaredCommits,
-    },
+    prover::aes::{StateBitsSquaredCommits, StateBytesCommits, StateBytesSquaredCommits},
     universal_hashing::ZKProofHasher,
     utils::get_bit,
 };
@@ -115,7 +112,8 @@ fn next_round_state<O, K>(
 ) where
     O: OWFParameters,
     ByteCommits<OWFField<O>, O::NSTBytes>: AddRoundKeyAssign<K>,
-    for <'a> ByteCommitsRef<'a, OWFField<O>, O::NSTBytes>: BytewiseMixColumns<O, Output = ByteCommits<OWFField<O>, O::NSTBytes>>,
+    for<'a> ByteCommitsRef<'a, OWFField<O>, O::NSTBytes>:
+        BytewiseMixColumns<O, Output = ByteCommits<OWFField<O>, O::NSTBytes>>,
 {
     *state = s_tilde.bytewise_mix_columns();
 
@@ -130,7 +128,8 @@ fn odd_round_cnstrnts<O>(
 ) where
     O: OWFParameters,
     ByteCommits<OWFField<O>, O::NSTBytes>: InverseAffine,
-    for<'a> ByteCommitsRef<'a, OWFField<O>, O::NSTBytes>: InverseShiftRows<O, Output = ByteCommits<OWFField<O>, O::NSTBytes>>
+    for<'a> ByteCommitsRef<'a, OWFField<O>, O::NSTBytes>:
+        InverseShiftRows<O, Output = ByteCommits<OWFField<O>, O::NSTBytes>>,
 {
     // ::29-30
     let mut s = s_tilde.inverse_shift_rows();

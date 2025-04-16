@@ -247,7 +247,6 @@ where
     }
 }
 
-
 impl<O> MixColumns<O> for StateBytesSquaredCommits<O>
 where
     O: OWFParameters,
