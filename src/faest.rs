@@ -20,6 +20,7 @@ use generic_array::{typenum::Unsigned, GenericArray};
 use itertools::izip;
 use rand_core::CryptoRngCore;
 use signature::SignerMut;
+use std::iter::repeat_n;
 
 type RO<P> =
     <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle;
@@ -293,7 +294,6 @@ fn mask_witness<'a>(d: &'a mut [u8], w: &[u8], u: &[u8]) {
     }
 }
 
-#[allow(unused)]
 fn sign<P, O>(
     msg: &[u8],
     sk: &SecretKey<O>,
@@ -303,7 +303,6 @@ fn sign<P, O>(
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
-    // let t = Instant::now();
 
     // ::1
     let (signature, ctr_s) = signature.split_at_mut(P::SignatureSize::USIZE - size_of::<u32>());
@@ -315,7 +314,7 @@ fn sign<P, O>(
     // ::4
     let mut r = GenericArray::<u8, O::LAMBDABYTES>::default();
     let (signature, iv) = signature.split_at_mut(signature.len() - IVSize::USIZE);
-    let mut iv_pre = GenericArray::from_mut_slice(iv);
+    let iv_pre = GenericArray::from_mut_slice(iv);
     RO::<P>::hash_r_iv(&mut r, iv_pre, &sk.owf_key, &mu, rho);
 
     // ::5
@@ -329,7 +328,7 @@ fn sign<P, O>(
         com,
         decom,
         u,
-        mut v,
+        v,
     } = volecommit::<P::BAVC, O::LHATBYTES>(VoleCommitmentCRefMut::new(volecommit_cs), &r, &iv);
 
     // ::8
@@ -338,8 +337,8 @@ fn sign<P, O>(
     RO::<P>::hash_challenge_1(&mut chall1, &mu, &com, volecommit_cs, iv.as_slice());
 
     // ::10
-    let mut vole_hasher_u = VoleHasher::<P>::new_vole_hasher(&chall1);
-    let mut vole_haher_v = vole_hasher_u.clone();
+    let vole_hasher_u = VoleHasher::<P>::new_vole_hasher(&chall1);
+    let vole_haher_v = vole_hasher_u.clone();
     // write u_t to signature
     let (u_t, signature) = signature.split_at_mut(
         <<O as OWFParameters>::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE,
@@ -349,7 +348,6 @@ fn sign<P, O>(
     // ::11
     let mut h2_hasher = RO::<P>::hash_challenge_2_init(&chall1.as_slice(), u_t);
     {
-        let row_len = O::LHATBYTES::USIZE;
         for i in 0..O::LAMBDA::USIZE {
             // Hash column-wise
             let v_col = get_column::<O>(&v, i);
@@ -372,9 +370,6 @@ fn sign<P, O>(
     // ::14
     let mut chall2 = GenericArray::default();
     RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, d);
-
-    // Free space
-    (d);
 
     // ::18
     let (a0_tilde, a1_tilde, a2_tilde) = P::OWF::prove(
@@ -478,12 +473,9 @@ where
     }
     let VoleReconstructResult { com, q } = res.unwrap();
 
-    // TODO: consider to modify volereconstruct so that it directly takes a slice
-    let c = c.as_slice();
-
     // ::10
     let mut chall1 = GenericArray::default();
-    RO::<P>::hash_challenge_1(&mut chall1, &mu, com.as_slice(), c, &iv);
+    RO::<P>::hash_challenge_1(&mut chall1, &mu, com.as_slice(), c.as_slice(), &iv);
 
     let (u_tilde, sigma) = sigma.split_at(
         <<O as OWFParameters>::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE,
@@ -498,7 +490,7 @@ where
             //TODO: make this more readable
             (0..<P::Tau as TauParameters>::Tau::USIZE)
                 .flat_map(|i| P::Tau::decode_challenge_as_iter(chall3, i))
-                .chain((0..P::WGRIND::USIZE).map(|_| 0)),
+                .chain(repeat_n(0, P::WGRIND::USIZE)),
         ) {
             // ::12
             let mut q_tilde = vole_hasher.process(&get_column::<O>(&q, i));
