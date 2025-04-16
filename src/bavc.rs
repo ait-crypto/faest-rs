@@ -70,7 +70,7 @@ where
     coms: Vec<Box<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>>>>,
 }
 
-pub trait LeafCommit {
+pub(crate) trait LeafCommit {
     type LambdaBytes: ArrayLength;
     type LambdaBytesTimes2: ArrayLength;
     type LambdaByesTimes3: ArrayLength;
@@ -898,13 +898,11 @@ mod test {
             match data.lambda {
                 128 => {
                     println!("lambda = 128 - testing leaf_commitment_em..");
-                    let t = std::time::Instant::now();  
                     let (sd, com) = LeafCommitment::<PRG128, LeafHasher128>::commit_em(
                         &GenericArray::from_slice(&data.key),
                         iv,
                         data.tweak,
                     );
-                    println!("Elapsed time: {:?}", t.elapsed());
 
                     assert_eq!(sd.as_slice(), data.expected_sd.as_slice());
                     assert_eq!(com.as_slice(), data.expected_com.as_slice());
@@ -953,8 +951,6 @@ mod test {
 
         let database: Vec<DataBAVAC> = read_test_data("bavc.json");
         for data in database {
-
-            if data.lambda != 256{continue;}
 
             match data.lambda {
                 128 => {
