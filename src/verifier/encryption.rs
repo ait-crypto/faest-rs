@@ -86,7 +86,7 @@ where
     // ::19-22
     let mut st = state.s_box_affine(sq);
 
-    st.shift_rows::<O>();
+    st.shift_rows();
 
     st.mix_columns(sq);
 
@@ -166,7 +166,7 @@ fn odd_round_cnstrnts<'a, O>(
 
     // ::29-30
     let mut s = s_tilde.inverse_shift_rows();
-    s.inverse_affine::<O>();
+    s.inverse_affine();
 
     // ::31-37
     for (byte_i, (st0, st1)) in izip!(st_0.scalars.iter(), st_1.scalars.iter()).enumerate() {

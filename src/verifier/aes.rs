@@ -7,7 +7,7 @@ use crate::{
         BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquared,
         ByteCombineSquaredConstants, Sigmas, Square,
     },
-    parameter::{BaseParameters, OWFField, OWFParameters},
+    parameter::{BaseParameters, OWFField, OWFParameters, SecurityParameter},
     utils::get_bit,
     verifier::{VoleCommits, VoleCommitsRef},
 };
@@ -353,20 +353,22 @@ where
     F: BigGaloisField,
     L: ArrayLength,
 {
-    fn shift_rows<O: OWFParameters>(&mut self) {
+    fn shift_rows(&mut self) {
         // TODO: Copy row by row instead of entire state
         let mut tmp = self.scalars.clone();
 
+        let nst = L::USIZE / 4;
+
         for r in 0..4 {
-            for c in 0..O::NST::USIZE {
-                let off = if (O::NST::USIZE != 8) || (r <= 1) {
+            for c in 0..nst {
+                let off = if (nst != 8) || (r <= 1) {
                     0
                 } else {
                     1
                 };
                 std::mem::swap(
                     &mut self.scalars[4 * c + r],
-                    &mut tmp[4 * ((c + r + off) % O::NST::USIZE) + r],
+                    &mut tmp[4 * ((c + r + off) % nst) + r],
                 );
             }
         }
@@ -378,8 +380,11 @@ where
     F: BigGaloisField,
     L: ArrayLength,
 {
-    fn inverse_affine<O: OWFParameters>(&mut self) {
-        for i in 0..O::NSTBytes::USIZE {
+    fn inverse_affine(&mut self) {
+
+        let nst_bytes = L::USIZE/8;
+
+        for i in 0 .. nst_bytes {
             let xi_tags: GenericArray<_, U8> =
                 GenericArray::from_slice(&self.scalars[8 * i..8 * i + 8]).to_owned();
             for bit_i in 0..8 {
