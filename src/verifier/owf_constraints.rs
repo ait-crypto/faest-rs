@@ -59,7 +59,7 @@ pub(crate) fn owf_constraints<O>(
     // ::7
     if O::is_em() {
         // ::8-9
-        let ext_key = key_schedule_bytes::<O>(&x, delta);
+        let ext_key = key_schedule_bytes::<O>(x, delta);
 
         // ::10
         let owf_input = w.get_commits_ref::<O::NSTBits>(0);
@@ -139,21 +139,18 @@ fn key_schedule_bytes<'a, O>(
 where
     O: OWFParameters,
 {
-    rijndael_key_schedule::<O::NST, O::NK, O::R>(&key, O::SKE::USIZE)
+    rijndael_key_schedule::<O::NST, O::NK, O::R>(key, O::SKE::USIZE)
         .0
         .chunks_exact(8)
         .take(O::R::USIZE + 1)
         .map(|chunk| {
             let scalars = <Box<GenericArray<OWFField<O>, O::NSTBits>>>::from_iter(
-                convert_from_batchblocks(inv_bitslice(&chunk))
+                convert_from_batchblocks(inv_bitslice(chunk))
                     .take(O::NST::USIZE)
                     .flat_map(|word| word.into_iter().flat_map(|byte| byte_to_vole(byte, delta))),
             );
 
-            VoleCommits {
-                scalars: scalars,
-                delta: delta,
-            }
+            VoleCommits { scalars, delta }
         })
         .collect()
 }

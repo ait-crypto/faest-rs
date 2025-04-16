@@ -226,7 +226,7 @@ impl GF8 {
         x = x.square(); // x^64
         y = x * y;
         x = x.square(); // x^128
-        return (x * y).0 .0;
+        (x * y).0 .0
     }
 
     pub(crate) fn square_bits_inplace(x: &mut u8) {

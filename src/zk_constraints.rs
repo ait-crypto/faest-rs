@@ -53,8 +53,8 @@ pub(crate) fn reshape_and_to_field<O: OWFParameters>(m: CstrntsVal<O>) -> Vec<OW
             let mut ret = vec![GenericArray::<u8, O::LAMBDABYTES>::default(); 8];
 
             (0..O::LAMBDA::USIZE).for_each(|col| {
-                for i in 0..8 {
-                    ret[i][col / 8] |= get_bit(&[m[row][col]], i) << (col % 8);
+                for (i, ret_i) in ret.iter_mut().enumerate().take(8) {
+                    ret_i[col / 8] |= get_bit(&[m[row][col]], i) << (col % 8);
                 }
             });
 
@@ -98,7 +98,7 @@ where
     );
 
     // ::13-18
-    zk_hasher.finalize(&v0_star, &(u0_star + &v1_star), &u1_star)
+    zk_hasher.finalize(&v0_star, &(u0_star + v1_star), &u1_star)
 }
 
 pub(crate) fn aes_verify<O>(
@@ -120,9 +120,9 @@ where
     let mut q = reshape_and_to_field::<O>(q);
 
     // Convert first L elements to VOLE
-    for i in 0..O::L::USIZE {
+    for (i, q_i) in q.iter_mut().take(O::L::USIZE).enumerate() {
         if get_bit(d, i) != 0 {
-            q[i] += delta;
+            *q_i += delta;
         }
     }
     let w = VoleCommitsRef {
@@ -137,11 +137,11 @@ where
     );
 
     // ::10
-    let q_star = delta * &q1_star + &q0_star;
+    let q_star = delta * q1_star + q0_star;
 
     let mut zk_hasher =
         <<O as OWFParameters>::BaseParams as BaseParameters>::ZKHasher::new_zk_verify_hasher(
-            &chall_2, delta,
+            chall_2, delta,
         );
 
     // ::12

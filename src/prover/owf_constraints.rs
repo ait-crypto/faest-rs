@@ -54,7 +54,7 @@ pub(crate) fn owf_constraints<O>(
     // ::7
     if O::is_em() {
         // ::8-9
-        let ext_key = key_schedule_bytes::<O>(&x);
+        let ext_key = key_schedule_bytes::<O>(x);
 
         // ::10
         let owf_input = w.get_commits_ref::<O::NSTBytes>(0);
@@ -78,7 +78,7 @@ pub(crate) fn owf_constraints<O>(
         );
     } else {
         // ::13
-        let mut owf_input = GenericArray::from_slice(&x).to_owned();
+        let mut owf_input = GenericArray::from_slice(x).to_owned();
 
         // ::16
         let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKEBytes>(0));
@@ -117,12 +117,12 @@ fn key_schedule_bytes<O>(key: &GenericArray<u8, O::InputSize>) -> Vec<GenericArr
 where
     O: OWFParameters,
 {
-    rijndael_key_schedule::<O::NST, O::NK, O::R>(&key, O::SKE::USIZE)
+    rijndael_key_schedule::<O::NST, O::NK, O::R>(key, O::SKE::USIZE)
         .0
         .chunks_exact(8)
         .map(|chunk| {
             GenericArray::from_iter(
-                convert_from_batchblocks(inv_bitslice(&chunk))
+                convert_from_batchblocks(inv_bitslice(chunk))
                     .take(O::NST::USIZE)
                     .flatten(),
             )

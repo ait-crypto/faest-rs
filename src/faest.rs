@@ -1,7 +1,7 @@
 use std::{io::Write, iter::zip, slice::RChunks};
 
 use crate::{
-    bavc::{BatchVectorCommitment, BavcDecommitment, BavcOpenResult, BAVC},
+    bavc::{BatchVectorCommitment, Bavc, BavcDecommitment, BavcOpenResult},
     fields::Field,
     internal_keys::{PublicKey, SecretKey},
     parameter::{BaseParameters, FAESTParameters, OWFField, OWFParameters, TauParameters},
@@ -96,7 +96,7 @@ where
     fn hash_iv(iv_pre: &mut IV) {
         // Step 5
         let mut h4_hasher = Self::h4_init();
-        h4_hasher.update(&iv_pre);
+        h4_hasher.update(iv_pre);
 
         let h4_reader = h4_hasher.finish();
         *iv_pre = h4_reader.read_into();
@@ -218,8 +218,8 @@ where
     }
 
     // Check that all the following bytes are 0s
-    for i in start_byte + 1..chall3.len() {
-        if chall3[i] != 0 {
+    for byte in chall3.iter().skip(start_byte + 1) {
+        if *byte != 0 {
             return false;
         }
     }
@@ -237,7 +237,7 @@ fn save_decom_and_ctr(
 
     // Save decom_i
     let mut offset = 0;
-    for slice in coms.into_iter().chain(nodes.into_iter()) {
+    for slice in coms.iter().chain(nodes.iter()) {
         decom_sig[offset..offset + slice.len()].copy_from_slice(slice);
         offset += slice.len();
     }
@@ -288,7 +288,7 @@ fn save_zk_constraints<'a>(
     signature
 }
 
-fn mask_witness<'a>(d: &'a mut [u8], w: &[u8], u: &[u8]) {
+fn mask_witness(d: &mut [u8], w: &[u8], u: &[u8]) {
     for (dj, wj, uj) in izip!(d, w, u) {
         *dj = wj ^ *uj;
     }
@@ -341,7 +341,7 @@ fn sign<P, O>(
     u_t.copy_from_slice(vole_hasher_u.process(&u).as_slice());
 
     // ::11
-    let mut h2_hasher = RO::<P>::hash_challenge_2_init(&chall1.as_slice(), u_t);
+    let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), u_t);
     {
         for i in 0..O::LAMBDA::USIZE {
             // Hash column-wise
@@ -395,7 +395,7 @@ fn sign<P, O>(
         // ::21
         if check_challenge_3::<P, O>(chall3) {
             // ::24
-            let i_delta = decode_all_chall_3::<P::Tau>(&chall3);
+            let i_delta = decode_all_chall_3::<P::Tau>(chall3);
 
             // ::26
             if let Some(decom_i) = <P as FAESTParameters>::BAVC::open(&decom, &i_delta) {
@@ -476,7 +476,7 @@ where
         <<O as OWFParameters>::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE,
     );
 
-    let mut h2_hasher = RO::<P>::hash_challenge_2_init(&chall1.as_slice(), u_tilde);
+    let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), u_tilde);
 
     {
         let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
@@ -492,7 +492,7 @@ where
 
             // ::14
             if d_i == 1 {
-                crate::utils::xor_arrays_inplace(&mut q_tilde, &u_tilde);
+                crate::utils::xor_arrays_inplace(&mut q_tilde, u_tilde);
             }
 
             // ::15
@@ -514,7 +514,7 @@ where
         GenericArray::from_slice(d),
         pk,
         &chall2,
-        &chall3,
+        chall3,
         &OWFField::<O>::from(a1_tilde),
         &OWFField::<O>::from(a2_tilde),
     );
@@ -524,8 +524,8 @@ where
         &mut chall3_prime,
         &chall2,
         a0_tilde.as_bytes().as_slice(),
-        &a1_tilde,
-        &a2_tilde,
+        a1_tilde,
+        a2_tilde,
         ctr,
     );
 

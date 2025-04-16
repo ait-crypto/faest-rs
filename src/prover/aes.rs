@@ -273,13 +273,13 @@ where
             let i3 = 4 * c + 3;
 
             // ::7
-            self[i0] = tmp[0].clone() * &v2 + tmp[1].clone() * &v3 + &tmp[2] + &tmp[3];
+            self[i0] = tmp[0].clone() * v2 + tmp[1].clone() * v3 + &tmp[2] + &tmp[3];
 
             // ::8
-            self[i1] = tmp[1].clone() * &v2 + tmp[2].clone() * &v3 + &tmp[0] + &tmp[3];
+            self[i1] = tmp[1].clone() * v2 + tmp[2].clone() * v3 + &tmp[0] + &tmp[3];
 
             // ::9
-            self[i2] = tmp[2].clone() * &v2 + tmp[3].clone() * &v3 + &tmp[0] + &tmp[1];
+            self[i2] = tmp[2].clone() * v2 + tmp[3].clone() * v3 + &tmp[0] + &tmp[1];
 
             // ::10
             // SAFETY: tmp has length 4, hence unwrapping the first 4 elements is safe
@@ -289,7 +289,7 @@ where
             let tmp2 = tmp.next().unwrap();
             let tmp3 = tmp.next().unwrap();
 
-            self[i3] = tmp0 * &v3 + tmp3 * &v2 + &tmp1 + &tmp2;
+            self[i3] = tmp0 * v3 + tmp3 * v2 + &tmp1 + &tmp2;
         }
     }
 }
@@ -319,13 +319,13 @@ where
         let i3 = 4 * c + 3;
 
         // ::7
-        state[i0] = tmp[0].clone() * &v2 + tmp[1].clone() * &v3 + &tmp[2] + &tmp[3];
+        state[i0] = tmp[0].clone() * v2 + tmp[1].clone() * v3 + &tmp[2] + &tmp[3];
 
         // ::8
-        state[i1] = tmp[1].clone() * &v2 + tmp[2].clone() * &v3 + &tmp[0] + &tmp[3];
+        state[i1] = tmp[1].clone() * v2 + tmp[2].clone() * v3 + &tmp[0] + &tmp[3];
 
         // ::9
-        state[i2] = tmp[2].clone() * &v2 + tmp[3].clone() * &v3 + &tmp[0] + &tmp[1];
+        state[i2] = tmp[2].clone() * v2 + tmp[3].clone() * v3 + &tmp[0] + &tmp[1];
 
         // ::10
         // SAFETY: tmp has length 4, hence unwrapping the first 4 elements is safe
@@ -335,7 +335,7 @@ where
         let tmp2 = tmp.next().unwrap();
         let tmp3 = tmp.next().unwrap();
 
-        state[i3] = tmp0 * &v3 + tmp3 * &v2 + &tmp1 + &tmp2;
+        state[i3] = tmp0 * v3 + tmp3 * v2 + tmp1 + tmp2;
     }
 }
 
@@ -428,13 +428,13 @@ where
             .map(|i| {
                 // :: 9
 
-                let mut y_i = self[i * 8 + t % 8].clone() * &sigmas[0];
+                let mut y_i = self[i * 8 + t % 8].clone() * sigmas[0];
 
                 for sigma_idx in 1..8 {
-                    y_i += self[i * 8 + (sigma_idx + t) % 8].clone() * &sigmas[sigma_idx];
+                    y_i += self[i * 8 + (sigma_idx + t) % 8].clone() * sigmas[sigma_idx];
                 }
 
-                y_i += &sigmas[8];
+                y_i += sigmas[8];
 
                 y_i
             })
@@ -461,8 +461,8 @@ where
             for bit_i in 0..8 {
                 // ::6
                 self.tags[8 * i + bit_i] = xi_tags[(bit_i + 8 - 1) % 8]
-                    + &xi_tags[(bit_i + 8 - 3) % 8]
-                    + &xi_tags[(bit_i + 8 - 6) % 8];
+                    + xi_tags[(bit_i + 8 - 3) % 8]
+                    + xi_tags[(bit_i + 8 - 6) % 8];
             }
         }
     }

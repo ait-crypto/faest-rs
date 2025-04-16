@@ -333,8 +333,8 @@ where
                 // :: 9
                 let mut y_i = sigmas[8] * self.delta.square();
 
-                for sigma_idx in 0..8 {
-                    y_i += self.scalars[i * 8 + (sigma_idx + t) % 8].clone() * &sigmas[sigma_idx];
+                for (sigma_idx, sigma) in sigmas.iter().enumerate().take(8) {
+                    y_i += self.scalars[i * 8 + (sigma_idx + t) % 8] * sigma;
                 }
 
                 y_i
@@ -385,8 +385,8 @@ where
             for bit_i in 0..8 {
                 // ::6
                 self.scalars[8 * i + bit_i] = xi_tags[(bit_i + 8 - 1) % 8]
-                    + &xi_tags[(bit_i + 8 - 3) % 8]
-                    + &xi_tags[(bit_i + 8 - 6) % 8];
+                    + xi_tags[(bit_i + 8 - 3) % 8]
+                    + xi_tags[(bit_i + 8 - 6) % 8];
 
                 if bit_i == 0 || bit_i == 2 {
                     self.scalars[8 * i + bit_i] += self.delta;
@@ -420,13 +420,13 @@ where
             let i3 = 4 * c + 3;
 
             // ::7
-            self.scalars[i0] = tmp[0] * &v2 + tmp[1] * &v3 + &tmp[2] + &tmp[3];
+            self.scalars[i0] = tmp[0] * v2 + tmp[1] * v3 + tmp[2] + tmp[3];
 
             // ::8
-            self.scalars[i1] = tmp[1] * &v2 + tmp[2] * &v3 + &tmp[0] + &tmp[3];
+            self.scalars[i1] = tmp[1] * v2 + tmp[2] * v3 + tmp[0] + tmp[3];
 
             // ::9
-            self.scalars[i2] = tmp[2] * &v2 + tmp[3] * &v3 + &tmp[0] + &tmp[1];
+            self.scalars[i2] = tmp[2] * v2 + tmp[3] * v3 + tmp[0] + tmp[1];
 
             // ::10
             // SAFETY: tmp has length 4, hence unwrapping the first 4 elements is safe
@@ -436,7 +436,7 @@ where
             let tmp2 = tmp.next().unwrap();
             let tmp3 = tmp.next().unwrap();
 
-            self.scalars[i3] = tmp0 * &v3 + tmp3 * &v2 + &tmp1 + &tmp2;
+            self.scalars[i3] = tmp0 * v3 + tmp3 * v2 + tmp1 + tmp2;
         }
     }
 }

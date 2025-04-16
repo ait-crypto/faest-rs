@@ -25,7 +25,7 @@ use crate::{
         Tau192Small, Tau192SmallEM, Tau256Fast, Tau256FastEM, Tau256Small, Tau256SmallEM,
         TauParameters,
     },
-    prg::{PseudoRandomGenerator, IV, PRG128, PRG192, PRG256, TWK},
+    prg::{PseudoRandomGenerator, Twk, IV, PRG128, PRG192, PRG256},
     random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256},
     universal_hashing::{LeafHasher, LeafHasher128, LeafHasher192, LeafHasher256},
     utils::Reader,
@@ -42,13 +42,13 @@ where
 {
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
     pub decom: BavcDecommitment<LambdaBytes, NLeafCommit>,
-    pub seeds: Vec<GenericArray<u8, LambdaBytes>>, 
+    pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub(crate) struct BavcOpenResult<'a> {
-    pub coms: Vec<&'a [u8]>,  
-    pub nodes: Vec<&'a [u8]>, 
+    pub coms: Vec<&'a [u8]>,
+    pub nodes: Vec<&'a [u8]>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
@@ -57,7 +57,7 @@ where
     LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + PartialEq,
 {
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
-    pub seeds: Vec<GenericArray<u8, LambdaBytes>>, 
+    pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
@@ -80,7 +80,7 @@ pub(crate) trait LeafCommit {
     fn commit(
         r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
-        tweak: TWK,
+        tweak: Twk,
         uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
     ) -> (
         GenericArray<u8, Self::LambdaBytes>,
@@ -90,7 +90,7 @@ pub(crate) trait LeafCommit {
     fn commit_em(
         r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
-        tewak: TWK,
+        tewak: Twk,
     ) -> (
         GenericArray<u8, Self::LambdaBytes>,
         Box<GenericArray<u8, Self::LambdaBytesTimes2>>,
@@ -116,16 +116,16 @@ where
     fn commit(
         r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
-        tweak: TWK,
+        tweak: Twk,
         uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
     ) -> (
         GenericArray<u8, Self::LambdaBytes>,
         Box<GenericArray<u8, Self::LambdaBytesTimes3>>,
     ) {
         // Step 2
-        let hash = PRG::new_prg(&r, iv, tweak).read_into();
+        let hash = PRG::new_prg(r, iv, tweak).read_into();
 
-        let com = LH::hash(&uhash, &hash);
+        let com = LH::hash(uhash, &hash);
 
         let sd = hash.into_iter().take(Self::LambdaBytes::USIZE).collect();
 
@@ -135,7 +135,7 @@ where
     fn commit_em(
         r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
-        tweak: TWK,
+        tweak: Twk,
     ) -> (
         GenericArray<u8, Self::LambdaBytes>,
         Box<GenericArray<u8, Self::LambdaBytesTimes2>>,
@@ -169,7 +169,7 @@ mod bavc_common {
         keys[0].copy_from_slice(r);
 
         for alpha in 0..L::USIZE - 1 {
-            let mut prg = PRG::new_prg(&keys[alpha], &iv, alpha as TWK);
+            let mut prg = PRG::new_prg(&keys[alpha], iv, alpha as Twk);
             prg.read(&mut keys[2 * alpha + 1]);
             prg.read(&mut keys[2 * alpha + 2]);
         }
@@ -214,7 +214,7 @@ mod bavc_common {
         }
 
         // Step 22
-        while let Some(&pad) = decom_iter.next() {
+        for &pad in decom_iter {
             if pad.iter().any(|&x| x != 0) {
                 return None;
             }
@@ -223,7 +223,7 @@ mod bavc_common {
         // Steps 25..27
         for i in 0..TAU::L::USIZE - 1 {
             if !s.contains(i) {
-                let mut rng = PRG::new_prg(&keys[i], iv, i as TWK);
+                let mut rng = PRG::new_prg(&keys[i], iv, i as Twk);
                 rng.read(&mut keys[2 * i + 1]);
                 rng.read(&mut keys[2 * i + 2]);
             }
@@ -327,7 +327,7 @@ where
 }
 
 // It would be nice to avoid all this code duplication between BAVC and BAVCEM
-pub(crate) struct BAVC<RO, PRG, LH, TAU>(
+pub(crate) struct Bavc<RO, PRG, LH, TAU>(
     PhantomData<RO>,
     PhantomData<PRG>,
     PhantomData<LH>,
@@ -339,7 +339,7 @@ where
     TAU: TauParameters,
     LH: LeafHasher;
 
-impl<RO, PRG, LH, TAU> BatchVectorCommitment for BAVC<RO, PRG, LH, TAU>
+impl<RO, PRG, LH, TAU> BatchVectorCommitment for Bavc<RO, PRG, LH, TAU>
 where
     RO: RandomOracle,
     PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
@@ -366,7 +366,7 @@ where
     ) -> BavcCommitResult<Self::LambdaBytes, Self::NLeafCommit> {
         // Step 3
         let mut h0_hasher = RO::h0_init();
-        h0_hasher.update(&iv);
+        h0_hasher.update(iv);
         let mut h0_hasher = h0_hasher.finish();
 
         // Steps 5..7
@@ -388,7 +388,7 @@ where
                 let alpha = TAU::pos_in_tree(i as usize, j);
                 let tweak = i + TAU::L::U32 - 1;
 
-                let (sd, com) = Self::LC::commit(&keys[alpha], &iv, tweak, &uhash_i);
+                let (sd, com) = Self::LC::commit(&keys[alpha], iv, tweak, &uhash_i);
 
                 hi_hasher.update(&com);
 
@@ -415,9 +415,7 @@ where
         let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
 
         // Steps 6..17
-        if mark_nodes::<TAU>(&mut s, i_delta).is_none() {
-            return None;
-        }
+        mark_nodes::<TAU>(&mut s, i_delta)?;
 
         // Steps 19..23
         let nodes = construct_nodes::<Self::LambdaBytes, Self::L>(&decom.keys, &s);
@@ -449,7 +447,7 @@ where
 
         // Step 4
         let mut h0_hasher = RO::h0_init();
-        h0_hasher.update(&iv);
+        h0_hasher.update(iv);
         let mut h0_hasher = h0_hasher.finish();
 
         // Steps 28..34
@@ -475,12 +473,10 @@ where
                     h1_hasher.update(&h);
                 }
                 // Step 31
-                else {
-                    if let Some(com_ij) = com_it.next() {
-                        h1_hasher.update(com_ij);
-                    } else {
-                        return None;
-                    }
+                else if let Some(com_ij) = com_it.next() {
+                    h1_hasher.update(com_ij);
+                } else {
+                    return None;
                 }
             }
 
@@ -550,7 +546,7 @@ where
                 let alpha = TAU::pos_in_tree(i as usize, j);
                 let tweak = i + TAU::L::U32 - 1;
 
-                let (seed, com) = Self::LC::commit_em(&keys[alpha], &iv, tweak);
+                let (seed, com) = Self::LC::commit_em(&keys[alpha], iv, tweak);
 
                 // Step 13
                 hi_hasher.update(&com);
@@ -578,9 +574,7 @@ where
         let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
 
         // Steps 6..17
-        if mark_nodes::<TAU>(&mut s, i_delta).is_none() {
-            return None;
-        }
+        mark_nodes::<TAU>(&mut s, i_delta)?;
 
         // Steps 19..23
         let nodes = construct_nodes::<Self::LambdaBytes, Self::L>(&decom.keys, &s);
@@ -654,12 +648,12 @@ where
     }
 }
 
-pub(crate) type BAVC128Small = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small>;
-pub(crate) type BAVC128Fast = BAVC<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>;
-pub(crate) type BAVC192Small = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Small>;
-pub(crate) type BAVC192Fast = BAVC<RandomOracleShake256, PRG192, LeafHasher192, Tau192Fast>;
-pub(crate) type BAVC256Small = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Small>;
-pub(crate) type BAVC256Fast = BAVC<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>;
+pub(crate) type BAVC128Small = Bavc<RandomOracleShake128, PRG128, LeafHasher128, Tau128Small>;
+pub(crate) type BAVC128Fast = Bavc<RandomOracleShake128, PRG128, LeafHasher128, Tau128Fast>;
+pub(crate) type BAVC192Small = Bavc<RandomOracleShake256, PRG192, LeafHasher192, Tau192Small>;
+pub(crate) type BAVC192Fast = Bavc<RandomOracleShake256, PRG192, LeafHasher192, Tau192Fast>;
+pub(crate) type BAVC256Small = Bavc<RandomOracleShake256, PRG256, LeafHasher256, Tau256Small>;
+pub(crate) type BAVC256Fast = Bavc<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>;
 
 pub(crate) type BAVC128SmallEM =
     BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128SmallEM>;

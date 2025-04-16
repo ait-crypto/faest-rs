@@ -12,7 +12,7 @@ use crate::{
         BavcReconstructResult,
     },
     parameter::TauParameters,
-    prg::{PseudoRandomGenerator, IV, TWK},
+    prg::{PseudoRandomGenerator, Twk, IV},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{LeafHasher, B},
     utils::{decode_all_chall_3, Reader},

@@ -49,7 +49,7 @@ where
             let mut owf_output = GenericArray::default();
             O::evaluate_owf(owf_key, owf_input, &mut owf_output);
 
-            if get_bit(&owf_key, 0) & get_bit(&owf_key, 1) != 0 {
+            if get_bit(owf_key, 0) & get_bit(owf_key, 1) != 0 {
                 return Err(Error::new());
             }
 

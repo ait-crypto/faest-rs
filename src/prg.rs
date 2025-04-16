@@ -19,7 +19,7 @@ pub(crate) type IVSize = U16;
 /// IV of the PRG
 pub(crate) type IV = GenericArray<u8, IVSize>;
 /// TWEAK of the PRG
-pub(crate) type TWK = u32;
+pub(crate) type Twk = u32;
 
 /// Interface for the PRG
 pub(crate) trait PseudoRandomGenerator: Sized + Reader {
@@ -27,10 +27,10 @@ pub(crate) trait PseudoRandomGenerator: Sized + Reader {
     type KeySize: ArrayLength;
 
     /// Instantiate new PRG instance
-    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: TWK) -> Self;
+    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self;
 
     // Add tweak to the IV
-    fn add_tweak(iv: &IV, tweak: TWK) -> IV {
+    fn add_tweak(iv: &IV, tweak: Twk) -> IV {
         let mut iv = iv.to_owned();
         let tweaked_word = u32::from_le_bytes([iv[12], iv[13], iv[14], iv[15]]).wrapping_add(tweak);
         iv[12..].copy_from_slice(&tweaked_word.to_le_bytes());
@@ -44,7 +44,7 @@ pub(crate) struct PRG128(Aes128Ctr32LE);
 impl PseudoRandomGenerator for PRG128 {
     type KeySize = U16;
 
-    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: TWK) -> Self {
+    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
         Self(Aes128Ctr32LE::new(
             GenericArray_0_14::from_slice(k.as_slice()),
             GenericArray_0_14::from_slice(Self::add_tweak(iv, tweak).as_slice()),
@@ -64,7 +64,7 @@ pub(crate) struct PRG192(Aes192Ctr32LE);
 impl PseudoRandomGenerator for PRG192 {
     type KeySize = U24;
 
-    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: TWK) -> Self {
+    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
         Self(Aes192Ctr32LE::new(
             GenericArray_0_14::from_slice(k.as_slice()),
             GenericArray_0_14::from_slice(Self::add_tweak(iv, tweak).as_slice()),
@@ -84,7 +84,7 @@ pub(crate) struct PRG256(Aes256Ctr32LE);
 impl PseudoRandomGenerator for PRG256 {
     type KeySize = U32;
 
-    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: TWK) -> Self {
+    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
         Self(Aes256Ctr32LE::new(
             GenericArray_0_14::from_slice(k.as_slice()),
             GenericArray_0_14::from_slice(Self::add_tweak(iv, tweak).as_slice()),

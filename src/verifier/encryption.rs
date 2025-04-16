@@ -61,7 +61,7 @@ pub(crate) fn enc_cstrnts<'a, O, K>(
             odd_round_cnstrnts::<O>(zk_hasher, s_tilde, &st_0, &st_1);
 
             // ::39-40
-            next_round_state::<O, _>(&mut state, s_tilde, &round_key);
+            next_round_state::<O, _>(&mut state, s_tilde, round_key);
         } else {
             let s_tilde = output.add_round_key(round_key);
 
@@ -127,7 +127,7 @@ where
 
         // ::12
         for j in 0..8 {
-            state_prime[i * 8 + j] = state_conj[8 * i + (j + 4) % 8] * &ys[j % 4];
+            state_prime[i * 8 + j] = state_conj[8 * i + (j + 4) % 8] * ys[j % 4];
         }
     }
 
@@ -173,7 +173,7 @@ fn odd_round_cnstrnts<'a, O>(
         let s_i = OWFField::<O>::byte_combine_slice(&s.scalars[8 * byte_i..8 * byte_i + 8]);
         let s_i_sq = OWFField::<O>::byte_combine_sq_slice(&s.scalars[8 * byte_i..8 * byte_i + 8]);
 
-        zk_hasher.update(&(s_i_sq * st0 + delta_sq * &s_i));
+        zk_hasher.update(&(s_i_sq * st0 + delta_sq * s_i));
         zk_hasher.update(&(s_i * st1 + delta * st0));
     }
 }
@@ -184,11 +184,9 @@ where
 {
     (0..4)
         .map(|j| {
-            let tag = x[0]
-                + OWFField::<O>::BETA_SQUARES[j] * x[1]
+            x[0] + OWFField::<O>::BETA_SQUARES[j] * x[1]
                 + OWFField::<O>::BETA_SQUARES[j + 1] * x[2]
-                + OWFField::<O>::BETA_CUBES[j] * x[3];
-            tag
+                + OWFField::<O>::BETA_CUBES[j] * x[3]
         })
         .collect()
 }

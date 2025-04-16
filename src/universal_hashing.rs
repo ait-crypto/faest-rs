@@ -286,14 +286,14 @@ where
         // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
 
         // Degree 1
-        self.a1_hasher.update(&(a_sq.tag * &b.tag));
-        self.a1_hasher.update(&(b_sq.tag * &a.tag));
+        self.a1_hasher.update(&(a_sq.tag * b.tag));
+        self.a1_hasher.update(&(b_sq.tag * a.tag));
 
         // Degree 2
         self.a2_hasher
-            .update(&(a_sq.key * &b.tag + a_sq.tag * &b.key - &a.tag));
+            .update(&(a_sq.key * b.tag + a_sq.tag * b.key - a.tag));
         self.a2_hasher
-            .update(&(b_sq.key * &a.tag + b_sq.tag * &a.key - &b.tag));
+            .update(&(b_sq.key * a.tag + b_sq.tag * a.key - b.tag));
 
         // Degree 3 (i.e., commitments) should be zero
         debug_assert_eq!(a_sq.key * b.key - a.key, F::ZERO);
@@ -339,7 +339,7 @@ where
     }
 
     pub(crate) fn inv_norm_constraints(&mut self, conjugates: &[F], y: &F) {
-        let cnstr = *y * &conjugates[1] * &conjugates[4] + self.delta_squared * &conjugates[0];
+        let cnstr = *y * conjugates[1] * conjugates[4] + self.delta_squared * conjugates[0];
         self.b_hasher.update(&cnstr);
     }
 

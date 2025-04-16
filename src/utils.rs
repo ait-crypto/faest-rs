@@ -81,7 +81,7 @@ fn chall_to_u16(chall: &[u8], start_bit: usize, k: usize) -> u16 {
     res |= extract_k_bits_next_bytes(chall, byte_idx + 1, 8) << nbits_first_byte;
     // Take remaining bits from third byte
     res | extract_k_bits_next_bytes(chall, byte_idx + 2, k - nbits_first_byte - 8)
-        << nbits_first_byte + 8
+        << (nbits_first_byte + 8)
 }
 
 pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> GenericArray<u16, TAU::Tau> {
@@ -137,7 +137,7 @@ pub(crate) fn xor_arrays<'a>(lhs: &'a [u8], rhs: &'a [u8]) -> impl Iterator<Item
 }
 
 /// Xors the input slices overwriting the first slice with the resulting elements.
-pub(crate) fn xor_arrays_inplace<'a>(lhs: &mut [u8], rhs: &[u8]) {
+pub(crate) fn xor_arrays_inplace(lhs: &mut [u8], rhs: &[u8]) {
     lhs.iter_mut()
         .zip(rhs.iter())
         .for_each(|(lhs, rhs)| *lhs ^= rhs);

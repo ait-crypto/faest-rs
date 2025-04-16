@@ -77,10 +77,8 @@ where
                 let mut x_tilde_i = x.scalars[8 * j + i] + xk.scalars[iwd + 8 * (j % 4) + i];
 
                 // ::8
-                if j % rcon_evry == 0 {
-                    if get_bit(&[RCON_TABLE[j / rcon_evry]], i) != 0 {
-                        x_tilde_i += x.delta;
-                    }
+                if j % rcon_evry == 0 && get_bit(&[RCON_TABLE[j / rcon_evry]], i) != 0 {
+                    x_tilde_i += x.delta;
                 }
 
                 x_tilde_i

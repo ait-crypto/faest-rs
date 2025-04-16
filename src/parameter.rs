@@ -25,7 +25,7 @@ use crate::{
     bavc::{
         BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast, BAVC192FastEM,
         BAVC192Small, BAVC192SmallEM, BAVC256Fast, BAVC256FastEM, BAVC256Small, BAVC256SmallEM,
-        BatchVectorCommitment, BAVC,
+        BatchVectorCommitment, Bavc,
     },
     fields::{BigGaloisField, GF128, GF192, GF256},
     internal_keys::{PublicKey, SecretKey},
@@ -247,13 +247,13 @@ pub(crate) trait OWFParameters: Sized {
         let mut owf_output = GenericArray::default();
         Self::evaluate_owf(&owf_key, &owf_input, &mut owf_output);
 
-        return SecretKey {
+        SecretKey {
             owf_key,
             pk: PublicKey {
                 owf_input,
                 owf_output,
             },
-        };
+        }
     }
 }
 
@@ -877,7 +877,7 @@ pub(crate) trait TauParameters {
 
     fn bavc_max_node_depth(i: usize) -> usize {
         if i < Self::Tau1::USIZE {
-            return Self::K::USIZE;
+            Self::K::USIZE
         } else {
             Self::K::USIZE - 1
         }
@@ -896,7 +896,7 @@ pub(crate) trait TauParameters {
 
         // mod 2^(k-1) is the same as & 2^(k-1)-1
         let mask = tmp - 1;
-        return Self::L::USIZE - 1 + Self::Tau::USIZE * tmp + Self::Tau1::USIZE * (j & mask) + i;
+        Self::L::USIZE - 1 + Self::Tau::USIZE * tmp + Self::Tau1::USIZE * (j & mask) + i
     }
 
     // fn convert_index_and_size(i: usize) -> (usize, usize) {

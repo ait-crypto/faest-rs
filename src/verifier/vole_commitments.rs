@@ -35,7 +35,7 @@ where
     {
         VoleCommitsRef {
             scalars: GenericArray::from_slice(&self.scalars[start_idx..start_idx + L2::USIZE]),
-            delta: &self.delta,
+            delta: self.delta,
         }
     }
 
@@ -83,7 +83,7 @@ where
     {
         VoleCommitsRef {
             scalars: GenericArray::from_slice(&self.scalars[start_idx..start_idx + L2::USIZE]),
-            delta: &self.delta,
+            delta: self.delta,
         }
     }
 }

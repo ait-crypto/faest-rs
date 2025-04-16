@@ -79,7 +79,7 @@ where
     O: OWFParameters,
 {
     // ::4
-    let state_conj = f256_f2_conjugates::<O>(&state);
+    let state_conj = f256_f2_conjugates::<O>(state);
 
     let mut state_prime = StateBitsSquaredCommits::<O>::default();
 
