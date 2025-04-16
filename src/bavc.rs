@@ -123,7 +123,8 @@ where
         Box<GenericArray<u8, Self::LambdaByesTimes3>>,
     ) {
         // Step 2
-        let hash: Box<GenericArray<u8, Self::LambdaByesTimes4>> = PRG::new_prg(&r, iv, tweak).read_into_boxed();
+        let mut hash: Box<GenericArray<u8, Self::LambdaByesTimes4>> = GenericArray::default_boxed();
+        PRG::new_prg(&r, iv, tweak).read(&mut hash);
 
         let com = LH::hash(&uhash, &hash);
 
@@ -141,7 +142,8 @@ where
         Box<GenericArray<u8, Self::LambdaBytesTimes2>>,
     ) {
         // Step 1
-        let com = PRG::new_prg(r, iv, tweak).read_into_boxed();
+        let mut com = GenericArray::default_boxed();
+        PRG::new_prg(r, iv, tweak).read(&mut com);
 
         // Step 2
         let mut sd = GenericArray::default_boxed();
