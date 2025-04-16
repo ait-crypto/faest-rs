@@ -1,11 +1,10 @@
 use super::{ByteCommitment, ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use crate::{
-    aes::{AddRoundKey, AddRoundKeyAssign, AddRoundKeyBytes, StateToBytes},
+    aes::*,
     fields::{Betas, BigGaloisField, FromBit, Square},
     parameter::{OWFField, OWFParameters},
     prover::aes::{
-        add_round_key_bytes, bytewise_mix_columns, inverse_affine, inverse_shift_rows, mix_columns,
-        s_box_affine, shift_rows, StateBitsSquaredCommits, StateBytesCommits,
+        StateBitsSquaredCommits, StateBytesCommits,
         StateBytesSquaredCommits,
     },
     universal_hashing::ZKProofHasher,
@@ -116,8 +115,9 @@ fn next_round_state<O, K>(
 ) where
     O: OWFParameters,
     ByteCommits<OWFField<O>, O::NSTBytes>: AddRoundKeyAssign<K>,
+    for <'a> ByteCommitsRef<'a, OWFField<O>, O::NSTBytes>: BytewiseMixColumns<O, Output = ByteCommits<OWFField<O>, O::NSTBytes>>,
 {
-    *state = bytewise_mix_columns::<O>(s_tilde);
+    *state = s_tilde.bytewise_mix_columns();
 
     state.add_round_key_assign(round_key);
 }
@@ -129,10 +129,12 @@ fn odd_round_cnstrnts<O>(
     st_1: &StateBytesSquaredCommits<O>,
 ) where
     O: OWFParameters,
+    ByteCommits<OWFField<O>, O::NSTBytes>: InverseAffine,
+    for<'a> ByteCommitsRef<'a, OWFField<O>, O::NSTBytes>: InverseShiftRows<O, Output = ByteCommits<OWFField<O>, O::NSTBytes>>
 {
     // ::29-30
-    let mut s = inverse_shift_rows::<O>(s_tilde);
-    inverse_affine::<O>(&mut s);
+    let mut s = s_tilde.inverse_shift_rows();
+    s.inverse_affine();
 
     // ::31-37
     for (si, si_sq, st0, st1) in
@@ -159,15 +161,16 @@ fn aes_round<'a, O, S>(
 ) -> StateBytesSquaredCommits<O>
 where
     O: OWFParameters,
+    StateBitsSquaredCommits<O>: SBoxAffine<O, Output = StateBytesSquaredCommits<O>>,
     StateBytesSquaredCommits<O>: AddRoundKeyBytes<&'a GenericArray<S, O::NSTBytes>>,
+    StateBytesSquaredCommits<O>: MixColumns<O>,
 {
     // ::19-22
+    let mut st = state.s_box_affine(sq);
 
-    let mut st = s_box_affine::<O>(state, sq);
+    st.shift_rows();
 
-    shift_rows::<O>(&mut st);
-
-    mix_columns::<O>(&mut st, sq);
+    st.mix_columns(sq);
 
     st.add_round_key_bytes(key_bytes, sq);
 

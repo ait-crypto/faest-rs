@@ -1,11 +1,11 @@
 use crate::{
-    aes::{AddRoundKey, AddRoundKeyAssign, AddRoundKeyBytes, StateToBytes},
+    aes::*,
     fields::{
         large_fields::{Betas, ByteCombineSquared, ByteCombineSquaredConstants, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
         BigGaloisField, ByteCombine, ByteCombineConstants, Field, Sigmas, SumPoly,
     },
-    parameter::{BaseParameters, OWFField, OWFParameters},
+    parameter::{BaseParameters, OWFField, OWFParameters, SecurityParameter},
     universal_hashing::ZKProofHasher,
     utils::get_bits,
 };
@@ -182,37 +182,26 @@ where
     }
 }
 
-pub(crate) fn shift_rows<O>(state: &mut StateBytesSquaredCommits<O>)
+impl<T, L> ShiftRows for GenericArray<T, L>
 where
-    O: OWFParameters,
+    T: Clone,
+    L: ArrayLength,
 {
-    // TODO: Copy row by row instead of entire state
-    let mut tmp = state.clone();
+    fn shift_rows(&mut self) {
+        // TODO: Copy row by row instead of entire state
+        let mut tmp = self.clone();
 
-    for r in 0..4 {
-        for c in 0..O::NST::USIZE {
-            let off = if (O::NST::USIZE != 8) || (r <= 1) {
-                0
-            } else {
-                1
-            };
-            std::mem::swap(
-                &mut state[4 * c + r],
-                &mut tmp[4 * ((c + r + off) % O::NST::USIZE) + r],
-            );
+        let nst = L::USIZE / 4;
+
+        for r in 0..4 {
+            for c in 0..nst {
+                let off = if (nst != 8) || (r <= 1) { 0 } else { 1 };
+                std::mem::swap(
+                    &mut self[4 * c + r],
+                    &mut tmp[4 * ((c + r + off) % nst) + r],
+                );
+            }
         }
-    }
-}
-
-pub(crate) fn add_round_key_bytes<O, T>(
-    state: &mut StateBytesSquaredCommits<O>,
-    key_bytes: &GenericArray<T, O::NSTBytes>,
-) where
-    O: OWFParameters,
-    for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a T>,
-{
-    for (st, k) in izip!(state.iter_mut(), key_bytes) {
-        (*st) += k;
     }
 }
 
@@ -229,31 +218,81 @@ where
     }
 }
 
-pub(crate) fn inverse_shift_rows<O>(
-    state: ByteCommitsRef<OWFField<O>, O::NSTBytes>,
-) -> ByteCommits<OWFField<O>, O::NSTBytes>
+impl<O> InverseShiftRows<O> for ByteCommitsRef<'_, OWFField<O>, O::NSTBytes>
 where
     O: OWFParameters,
 {
-    let mut state_prime = ByteCommits::<OWFField<O>, O::NSTBytes>::default();
+    type Output = ByteCommits<OWFField<O>, O::NSTBytes>;
 
-    for r in 0..4 {
+    fn inverse_shift_rows(&self) -> Self::Output {
+        let mut state_prime = ByteCommits::<OWFField<O>, O::NSTBytes>::default();
+
+        for r in 0..4 {
+            for c in 0..O::NST::USIZE {
+                // :: 3-6
+                let i = if (O::NST::USIZE != 8) || (r <= 1) {
+                    4 * ((O::NST::USIZE + c - r) % O::NST::USIZE) + r
+                } else {
+                    4 * ((O::NST::USIZE + c - r - 1) % O::NST::USIZE) + r
+                };
+
+                // :: 7
+                state_prime.keys[4 * c + r] = self.keys[i];
+                state_prime.tags[8 * (4 * c + r)..8 * (4 * c + r) + 8]
+                    .copy_from_slice(&self.tags[8 * i..8 * i + 8]);
+            }
+        }
+
+        state_prime
+    }
+}
+
+
+impl<O> MixColumns<O> for StateBytesSquaredCommits<O>
+where
+    O: OWFParameters,
+{
+    fn mix_columns(&mut self, sq: bool) {
+        let v2 = if sq {
+            OWFField::<O>::BYTE_COMBINE_SQ_2
+        } else {
+            OWFField::<O>::BYTE_COMBINE_2
+        };
+        let v3: <<O as OWFParameters>::BaseParams as BaseParameters>::Field = if sq {
+            OWFField::<O>::BYTE_COMBINE_SQ_3
+        } else {
+            OWFField::<O>::BYTE_COMBINE_3
+        };
+
         for c in 0..O::NST::USIZE {
-            // :: 3-6
-            let i = if (O::NST::USIZE != 8) || (r <= 1) {
-                4 * ((O::NST::USIZE + c - r) % O::NST::USIZE) + r
-            } else {
-                4 * ((O::NST::USIZE + c - r - 1) % O::NST::USIZE) + r
-            };
+            // Save the 4 state's columns that will be modified in this round
+            let tmp = GenericArray::<_, U4>::from_slice(&self[4 * c..4 * c + 4]).to_owned();
 
-            // :: 7
-            state_prime.keys[4 * c + r] = state.keys[i];
-            state_prime.tags[8 * (4 * c + r)..8 * (4 * c + r) + 8]
-                .copy_from_slice(&state.tags[8 * i..8 * i + 8]);
+            let i0 = 4 * c;
+            let i1 = 4 * c + 1;
+            let i2 = 4 * c + 2;
+            let i3 = 4 * c + 3;
+
+            // ::7
+            self[i0] = tmp[0].clone() * &v2 + tmp[1].clone() * &v3 + &tmp[2] + &tmp[3];
+
+            // ::8
+            self[i1] = tmp[1].clone() * &v2 + tmp[2].clone() * &v3 + &tmp[0] + &tmp[3];
+
+            // ::9
+            self[i2] = tmp[2].clone() * &v2 + tmp[3].clone() * &v3 + &tmp[0] + &tmp[1];
+
+            // ::10
+            // SAFETY: tmp has length 4, hence unwrapping the first 4 elements is safe
+            let mut tmp = tmp.into_iter();
+            let tmp0 = tmp.next().unwrap();
+            let tmp1 = tmp.next().unwrap();
+            let tmp2 = tmp.next().unwrap();
+            let tmp3 = tmp.next().unwrap();
+
+            self[i3] = tmp0 * &v3 + tmp3 * &v2 + &tmp1 + &tmp2;
         }
     }
-
-    state_prime
 }
 
 pub(crate) fn mix_columns<O>(state: &mut StateBytesSquaredCommits<O>, sq: bool)
@@ -301,121 +340,131 @@ where
     }
 }
 
-pub(crate) fn bytewise_mix_columns<O>(
-    state: ByteCommitsRef<OWFField<O>, O::NSTBytes>,
-) -> ByteCommits<OWFField<O>, O::NSTBytes>
+impl<O> BytewiseMixColumns<O> for ByteCommitsRef<'_, OWFField<O>, O::NSTBytes>
 where
     O: OWFParameters,
 {
-    let mut o = ByteCommits::<_, O::NSTBytes>::default();
+    type Output = ByteCommits<OWFField<O>, O::NSTBytes>;
 
-    for c in 0..O::NST::USIZE {
-        for r in 0..4 {
-            // ::4
-            let a_key = state.keys[4 * c + r];
-            let a_tags = &state.tags[32 * c + 8 * r..32 * c + 8 * r + 8];
-            let a_key_bits = get_bits(a_key);
+    fn bytewise_mix_columns(&self) -> Self::Output {
+        let mut o = ByteCommits::<_, O::NSTBytes>::default();
 
-            // ::5
-            let b_key = a_key_bits[7]
-                | ((a_key_bits[0] ^ a_key_bits[7]) << 1)
-                | (a_key_bits[1] << 2)
-                | ((a_key_bits[2] ^ a_key_bits[7]) << 3)
-                | ((a_key_bits[3] ^ a_key_bits[7]) << 4)
-                | (a_key_bits[4] << 5)
-                | (a_key_bits[5] << 6)
-                | (a_key_bits[6] << 7);
-            let b_tags = [
-                a_tags[7],
-                a_tags[0] + a_tags[7],
-                a_tags[1],
-                a_tags[2] + a_tags[7],
-                a_tags[3] + a_tags[7],
-                a_tags[4],
-                a_tags[5],
-                a_tags[6],
-            ];
+        for c in 0..O::NST::USIZE {
+            for r in 0..4 {
+                // ::4
+                let a_key = self.keys[4 * c + r];
+                let a_tags = &self.tags[32 * c + 8 * r..32 * c + 8 * r + 8];
+                let a_key_bits = get_bits(a_key);
 
-            // ::6..10
-            // Add b(r) to o_{4*c+r} and o_{4* c + (r - 1 mod 4)}
-            for j in 0..2 {
-                let off = (4 + r - j) % 4;
-                o.keys[4 * c + off] ^= b_key;
-                o.tags[32 * c + 8 * off..32 * c + 8 * off + 8]
-                    .iter_mut()
-                    .zip(b_tags.iter())
-                    .for_each(|(o, b)| {
-                        *o += b;
-                    });
-            }
+                // ::5
+                let b_key = a_key_bits[7]
+                    | ((a_key_bits[0] ^ a_key_bits[7]) << 1)
+                    | (a_key_bits[1] << 2)
+                    | ((a_key_bits[2] ^ a_key_bits[7]) << 3)
+                    | ((a_key_bits[3] ^ a_key_bits[7]) << 4)
+                    | (a_key_bits[4] << 5)
+                    | (a_key_bits[5] << 6)
+                    | (a_key_bits[6] << 7);
+                let b_tags = [
+                    a_tags[7],
+                    a_tags[0] + a_tags[7],
+                    a_tags[1],
+                    a_tags[2] + a_tags[7],
+                    a_tags[3] + a_tags[7],
+                    a_tags[4],
+                    a_tags[5],
+                    a_tags[6],
+                ];
 
-            // Add a(r) to o_{4*c + (r+1 mod 4)}, o_{4*c + (r+2 mod 4)}, o_{4*c + (r+3 mod 4)}
-            for j in 1..4 {
-                let off = (r + j) % 4;
+                // ::6..10
+                // Add b(r) to o_{4*c+r} and o_{4* c + (r - 1 mod 4)}
+                for j in 0..2 {
+                    let off = (4 + r - j) % 4;
+                    o.keys[4 * c + off] ^= b_key;
+                    o.tags[32 * c + 8 * off..32 * c + 8 * off + 8]
+                        .iter_mut()
+                        .zip(b_tags.iter())
+                        .for_each(|(o, b)| {
+                            *o += b;
+                        });
+                }
 
-                o.keys[4 * c + off] ^= a_key;
+                // Add a(r) to o_{4*c + (r+1 mod 4)}, o_{4*c + (r+2 mod 4)}, o_{4*c + (r+3 mod 4)}
+                for j in 1..4 {
+                    let off = (r + j) % 4;
 
-                o.tags[32 * c + 8 * off..32 * c + 8 * off + 8]
-                    .iter_mut()
-                    .zip(a_tags.iter())
-                    .for_each(|(o, a)| {
-                        *o += a;
-                    });
+                    o.keys[4 * c + off] ^= a_key;
+
+                    o.tags[32 * c + 8 * off..32 * c + 8 * off + 8]
+                        .iter_mut()
+                        .zip(a_tags.iter())
+                        .for_each(|(o, a)| {
+                            *o += a;
+                        });
+                }
             }
         }
+
+        o
     }
-
-    o
 }
 
-pub(crate) fn s_box_affine<O>(
-    state: &StateBitsSquaredCommits<O>,
-    sq: bool,
-) -> StateBytesSquaredCommits<O>
+impl<O> SBoxAffine<O> for StateBitsSquaredCommits<O>
 where
     O: OWFParameters,
 {
-    let sigmas = if sq {
-        &OWFField::<O>::SIGMA_SQUARES
-    } else {
-        &OWFField::<O>::SIGMA
-    };
+    type Output = StateBytesSquaredCommits<O>;
 
-    let t = sq as usize;
+    fn s_box_affine(&self, sq: bool) -> Self::Output {
+        let sigmas = if sq {
+            &OWFField::<O>::SIGMA_SQUARES
+        } else {
+            &OWFField::<O>::SIGMA
+        };
 
-    // :: 8-10
-    (0..O::NSTBytes::USIZE)
-        .map(|i| {
-            // :: 9
-            let mut y_i = FieldCommitDegTwo::from_field(&sigmas[8]);
+        let t = sq as usize;
 
-            for sigma_idx in 0..8 {
-                y_i += state[i * 8 + (sigma_idx + t) % 8].clone() * &sigmas[sigma_idx];
+        // :: 8-10
+        (0..O::NSTBytes::USIZE)
+            .map(|i| {
+                // :: 9
+
+                let mut y_i = self[i * 8 + t % 8].clone() * &sigmas[0];
+
+                for sigma_idx in 1..8 {
+                    y_i += self[i * 8 + (sigma_idx + t) % 8].clone() * &sigmas[sigma_idx];
+                }
+
+                y_i += &sigmas[8];
+
+                y_i
+            })
+            .collect()
+    }
+}
+
+impl<F, L> InverseAffine for ByteCommits<F, L>
+where
+    F: BigGaloisField,
+    L: SecurityParameter,
+{
+    fn inverse_affine(&mut self) {
+        for i in 0..L::USIZE {
+            // ::5
+            self.keys[i] = self.keys[i].rotate_right(7)
+                ^ self.keys[i].rotate_right(5)
+                ^ self.keys[i].rotate_right(2)
+                ^ 0x5;
+
+            let xi_tags: GenericArray<_, U8> =
+                GenericArray::from_slice(&self.tags[8 * i..8 * i + 8]).to_owned();
+
+            for bit_i in 0..8 {
+                // ::6
+                self.tags[8 * i + bit_i] = xi_tags[(bit_i + 8 - 1) % 8]
+                    + &xi_tags[(bit_i + 8 - 3) % 8]
+                    + &xi_tags[(bit_i + 8 - 6) % 8];
             }
-
-            y_i
-        })
-        .collect()
-}
-
-pub(crate) fn inverse_affine<O>(state: &mut ByteCommits<OWFField<O>, O::NSTBytes>)
-where
-    O: OWFParameters,
-{
-    for i in 0..O::NSTBytes::USIZE {
-        // ::5
-        state.keys[i] = state.keys[i].rotate_right(7)
-            ^ state.keys[i].rotate_right(5)
-            ^ state.keys[i].rotate_right(2)
-            ^ 0x5;
-
-        let xi_tags: GenericArray<_, U8> =
-            GenericArray::from_slice(&state.tags[8 * i..8 * i + 8]).to_owned();
-        for bit_i in 0..8 {
-            // ::6
-            state.tags[8 * i + bit_i] = xi_tags[(bit_i + 8 - 1) % 8]
-                + &xi_tags[(bit_i + 8 - 3) % 8]
-                + &xi_tags[(bit_i + 8 - 6) % 8];
         }
     }
 }
