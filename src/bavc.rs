@@ -42,13 +42,13 @@ where
 {
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
     pub decom: BavcDecommitment<LambdaBytes, NLeafCommit>,
-    pub seeds: Vec<Box<GenericArray<u8, LambdaBytes>>>,
+    pub seeds: Vec<GenericArray<u8, LambdaBytes>>, 
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub(crate) struct BavcOpenResult<'a> {
-    pub coms: Vec<&'a [u8]>,
-    pub nodes: Vec<&'a [u8]>,
+    pub coms: Vec<&'a [u8]>,  
+    pub nodes: Vec<&'a [u8]>, 
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
@@ -57,7 +57,7 @@ where
     LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + PartialEq,
 {
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
-    pub seeds: Vec<Box<GenericArray<u8, LambdaBytes>>>,
+    pub seeds: Vec<GenericArray<u8, LambdaBytes>>, 
 }
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
@@ -73,18 +73,18 @@ where
 pub(crate) trait LeafCommit {
     type LambdaBytes: ArrayLength;
     type LambdaBytesTimes2: ArrayLength;
-    type LambdaByesTimes3: ArrayLength;
-    type LambdaByesTimes4: ArrayLength;
+    type LambdaBytesTimes3: ArrayLength;
+    type LambdaBytesTimes4: ArrayLength;
     type PRG: PseudoRandomGenerator;
 
     fn commit(
         r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
         tweak: TWK,
-        uhash: &GenericArray<u8, Self::LambdaByesTimes3>,
+        uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
     ) -> (
-        Box<GenericArray<u8, Self::LambdaBytes>>,
-        Box<GenericArray<u8, Self::LambdaByesTimes3>>,
+        GenericArray<u8, Self::LambdaBytes>,
+        Box<GenericArray<u8, Self::LambdaBytesTimes3>>,
     );
 
     fn commit_em(
@@ -92,7 +92,7 @@ pub(crate) trait LeafCommit {
         iv: &IV,
         tewak: TWK,
     ) -> (
-        Box<GenericArray<u8, Self::LambdaBytes>>,
+        GenericArray<u8, Self::LambdaBytes>,
         Box<GenericArray<u8, Self::LambdaBytesTimes2>>,
     );
 }
@@ -109,22 +109,21 @@ where
 {
     type LambdaBytes = LH::LambdaBytes;
     type LambdaBytesTimes2 = LH::LambdaBytesTimes2;
-    type LambdaByesTimes3 = LH::LambdaBytesTimes3;
-    type LambdaByesTimes4 = LH::LambdaBytesTimes4;
+    type LambdaBytesTimes3 = LH::LambdaBytesTimes3;
+    type LambdaBytesTimes4 = LH::LambdaBytesTimes4;
     type PRG = PRG;
 
     fn commit(
         r: &GenericArray<u8, Self::LambdaBytes>,
         iv: &IV,
         tweak: TWK,
-        uhash: &GenericArray<u8, Self::LambdaByesTimes3>,
+        uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
     ) -> (
-        Box<GenericArray<u8, Self::LambdaBytes>>,
-        Box<GenericArray<u8, Self::LambdaByesTimes3>>,
+        GenericArray<u8, Self::LambdaBytes>,
+        Box<GenericArray<u8, Self::LambdaBytesTimes3>>,
     ) {
         // Step 2
-        let mut hash: Box<GenericArray<u8, Self::LambdaByesTimes4>> = GenericArray::default_boxed();
-        PRG::new_prg(&r, iv, tweak).read(&mut hash);
+        let hash = PRG::new_prg(&r, iv, tweak).read_into();
 
         let com = LH::hash(&uhash, &hash);
 
@@ -138,16 +137,14 @@ where
         iv: &IV,
         tweak: TWK,
     ) -> (
-        Box<GenericArray<u8, Self::LambdaBytes>>,
+        GenericArray<u8, Self::LambdaBytes>,
         Box<GenericArray<u8, Self::LambdaBytesTimes2>>,
     ) {
         // Step 1
-        let mut com = GenericArray::default_boxed();
-        PRG::new_prg(r, iv, tweak).read(&mut com);
+        let com = PRG::new_prg(r, iv, tweak).read_into_boxed();
 
         // Step 2
-        let mut sd = GenericArray::default_boxed();
-        sd.copy_from_slice(r);
+        let sd = r.to_owned();
 
         (sd, com)
     }
@@ -159,7 +156,7 @@ mod bavc_common {
     use generic_array::typenum::Diff;
 
     use super::*;
-
+    // Need to find an alternative way to define helper functions (maybe in a private struct)
     pub(super) fn construct_keys<PRG, L>(
         r: &GenericArray<u8, PRG::KeySize>,
         iv: &IV,
@@ -377,8 +374,8 @@ where
 
         // Setps 8..13
         let mut com_hasher = RO::h1_init();
-        let mut seeds = vec![GenericArray::default_boxed(); TAU::L::USIZE];
-        let mut coms = vec![GenericArray::default_boxed(); TAU::L::USIZE];
+        let mut seeds = Vec::with_capacity(TAU::L::USIZE);
+        let mut coms = Vec::with_capacity(TAU::L::USIZE);
 
         for i in 0..TAU::Tau::U32 {
             // Step 2
@@ -390,11 +387,13 @@ where
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
                 let tweak = i + TAU::L::U32 - 1;
-                let idx = TAU::bavc_index_offset(i as usize) + j;
 
-                (seeds[idx], coms[idx]) = Self::LC::commit(&keys[alpha], &iv, tweak, &uhash_i);
+                let (sd, com) = Self::LC::commit(&keys[alpha], &iv, tweak, &uhash_i);
 
-                hi_hasher.update(&coms[idx]);
+                hi_hasher.update(&com);
+
+                seeds.push(sd);
+                coms.push(com);
             }
 
             // Step 14
@@ -905,7 +904,6 @@ mod test {
                         iv,
                         data.tweak,
                     );
-
                     assert_eq!(sd.as_slice(), data.expected_sd.as_slice());
                     assert_eq!(com.as_slice(), data.expected_com.as_slice());
                 }
@@ -953,7 +951,6 @@ mod test {
 
         let database: Vec<DataBAVAC> = read_test_data("bavc.json");
         for data in database {
-
             match data.lambda {
                 128 => {
                     let r = GenericArray::from_slice(&r[..16]);
@@ -964,7 +961,7 @@ mod test {
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
                         let res_commit = BAVC128Small::commit(r, &iv);
-                        
+
                         let res_open = BAVC128Small::open(&res_commit.decom, &i_delta).unwrap();
 
                         let res_reconstruct =
@@ -1035,9 +1032,7 @@ mod test {
 
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
-                        let t = std::time::Instant::now();
                         let res_commit = BAVC256Small::commit(&r, &iv);
-                        println!("Commit took {:?}", t.elapsed());
 
                         let res_open = BAVC256Small::open(&res_commit.decom, &i_delta).unwrap();
 

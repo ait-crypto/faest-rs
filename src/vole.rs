@@ -24,7 +24,6 @@ use generic_array::{
 };
 use itertools::izip;
 
-
 /// Initial tweak value as by FEAST specification
 const TWEAK_OFFSET: u32 = 1 << 31;
 
@@ -88,7 +87,6 @@ where
 #[derive(Debug, PartialEq)]
 pub(crate) struct VoleCommitmentCRefMut<'a, LHatBytes>(&'a mut [u8], PhantomData<LHatBytes>);
 
-
 impl<'a, LHatBytes> VoleCommitmentCRefMut<'a, LHatBytes>
 where
     LHatBytes: ArrayLength,
@@ -118,12 +116,10 @@ where
     }
 }
 
-
-
 #[allow(clippy::type_complexity)]
 fn convert_to_vole<'a, BAVC, LHatBytes>(
     v: &mut GenericArray<GenericArray<u8, BAVC::Lambda>, LHatBytes>,
-    sd: impl ExactSizeIterator<Item: AsRef<GenericArray<u8, BAVC::LambdaBytes>>>,
+    sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, BAVC::LambdaBytes>>,
     iv: &IV,
     round: u32,
 ) -> Box<GenericArray<u8, LHatBytes>>
@@ -137,23 +133,21 @@ where
     let d = BAVC::TAU::bavc_max_node_depth(round as usize);
     let ni = BAVC::TAU::bavc_max_node_index(round as usize);
 
-    let sd0_empty = sd.len() != ni;
-    debug_assert!(sd.len() == ni || sd.len() + 1 == ni);
-
-    // let t = std::time::Instant::now();
-    // Step 2: as in steps 8,9 we only work with two rows at a time, we just allocate 2 r-vectors
+    // Step 2
+    // As in steps 8,9 we only work with two rows at a time, we just allocate 2 r-vectors
     let mut rj: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
     let mut rj1: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
 
-    // Step 3
-    for (i, sdi) in sd.enumerate()  {
-        BAVC::PRG::new_prg(sdi.as_ref(), iv, twk).read(&mut rj[i + sd0_empty as usize]);
-    }
-    // println!("Init took: {:?}", t.elapsed());
+    debug_assert!(sd.len() == ni || sd.len() + 1 == ni);
+    let offset = (sd.len() != ni) as usize;
 
-    
+    // Step 3,4
+    for (i, sdi) in sd.enumerate() {
+        BAVC::PRG::new_prg(sdi, iv, twk).read(&mut rj[i + offset]);
+    }
+
     let vcol_offset = BAVC::TAU::bavc_depth_offset(round as usize);
-    
+
     // Step 6..9
     for j in 0..d {
         for i in 0..(ni >> (j + 1)) {
@@ -173,12 +167,11 @@ where
     }
 
     // Step 10: after last swap, rj[0] will contain r_d,0)
-    //rj.swap_remove(0)
     rj.into_iter().next().unwrap()
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn volecommit<BAVC, LHatBytes>(
+pub fn volecommit<BAVC, LHatBytes>(
     mut c: VoleCommitmentCRefMut<LHatBytes>,
     r: &GenericArray<u8, BAVC::LambdaBytes>,
     iv: &IV,
@@ -191,7 +184,6 @@ where
     BAVC: BatchVectorCommitment,
     LHatBytes: ArrayLength,
 {
-    // Step 1
     let BavcCommitResult { com, decom, seeds } = BAVC::commit(r, iv);
 
     let mut v = GenericArray::default_boxed();
@@ -223,7 +215,7 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn volereconstruct<BAVC, LHatBytes>(
+pub fn volereconstruct<BAVC, LHatBytes>(
     chall: &GenericArray<u8, BAVC::LambdaBytes>,
     decom_i: &BavcOpenResult,
     c: VoleCommitmentCRef<LHatBytes>,
@@ -236,14 +228,13 @@ where
     // Step 1
     let i_delta = decode_all_chall_3::<BAVC::TAU>(chall);
 
-    // Skip step 2: decode_all_chall_3 can't fail (parameter constraints ensure that we only provide valid challenges/indexes)
+    // Skip step 2 as decode_all_chall_3 can't fail (parameter constraints ensure that we only provide valid challenges/indexes)
 
     // Step 4
-    let rec = BAVC::reconstruct(decom_i, &i_delta, iv);
-    if rec.is_none() {
+    let rec = BAVC::reconstruct(decom_i, &i_delta, iv).unwrap_or_default();
+    if rec == BavcReconstructResult::default() {
         return None;
     }
-    let rec = rec.unwrap();
 
     let mut q = GenericArray::default_boxed();
 
@@ -437,7 +428,7 @@ mod test {
                 * (<<BAVC as BatchVectorCommitment>::TAU as TauParameters>::Tau::USIZE
                     - 1)
         ];
-                    
+
         let res_commit =
             volecommit::<BAVC, OWF::LHATBYTES>(VoleCommitmentCRefMut::new(&mut c), r, &iv);
 
@@ -467,7 +458,6 @@ mod test {
         let datatabase = read_test_data::<DataVOLE>("vole.json");
 
         for data in datatabase {
-
             match data.lambda {
                 128 => {
                     let r = GenericArray::from_slice(&r[..16]);

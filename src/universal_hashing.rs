@@ -572,10 +572,9 @@ mod test {
         for data in database {
             let x = GenericArray::from_slice(&data.x);
             let uhash = GenericArray::from_slice(&data.uhash);
-            let expected_h = GenericArray::from_slice(&data.expected_h);
 
             let h = LeafHasher128::hash(&uhash, &x);
-            assert_eq!(*h, *expected_h)
+            assert_eq!(h.as_ref(), data.expected_h)
         }
     }
 
@@ -586,10 +585,9 @@ mod test {
         for data in database {
             let x = GenericArray::from_slice(&data.x);
             let uhash = GenericArray::from_slice(&data.uhash);
-            let expected_h = GenericArray::from_slice(&data.expected_h);
 
             let h = LeafHasher192::hash(&uhash, &x);
-            assert_eq!(*h, *expected_h)
+            assert_eq!(h.as_ref(), data.expected_h)
         }
     }
 
@@ -600,11 +598,10 @@ mod test {
         for data in database {
             let x = GenericArray::from_slice(&data.x);
             let uhash = GenericArray::from_slice(&data.uhash);
-            let expected_h = GenericArray::from_slice(&data.expected_h);
 
             let h = LeafHasher256::hash(&uhash, &x);
 
-            assert_eq!(*h, *expected_h)
+            assert_eq!(h.as_ref(), data.expected_h)
         }
     }
 }
