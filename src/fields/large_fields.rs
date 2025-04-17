@@ -189,9 +189,9 @@ where
 }
 
 // generic implementation of FromBit
-impl<T, const N: usize, const LENGTH: usize> FromBit for BigGF<T, N, LENGTH>
+impl<F> FromBit for F
 where
-    Self: Field,
+    F: Field,
 {
     fn from_bit(x: u8) -> Self {
         if (x & 1) == 0 {
@@ -1449,7 +1449,6 @@ impl Distribution<GF256> for Standard {
     }
 }
 
-// I haven't implemented BigGaloisField as we only need a restricted set of operations
 /// Type representing binary Galois field of size `2^384`
 pub type GF384 = BigGF<u128, 3, 384>;
 
