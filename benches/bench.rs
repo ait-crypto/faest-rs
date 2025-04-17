@@ -1,3 +1,4 @@
+#![allow(unused_imports, dead_code)]
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use faest::*;
 use rand::{RngCore, SeedableRng};

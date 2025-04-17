@@ -1,5 +1,6 @@
 pub(crate) mod large_fields;
 pub(crate) mod small_fields;
+
 #[cfg(all(
     feature = "opt-simd",
     target_arch = "x86_64",
@@ -12,14 +13,18 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use generic_array::{ArrayLength, GenericArray};
 
-pub(crate) use large_fields::{BigGaloisField, ByteCombine, ByteCombineConstants, SumPoly};
+pub(crate) use large_fields::{
+    Betas, BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquared,
+    ByteCombineSquaredConstants, FromBit, Sigmas, SumPoly,
+};
 #[cfg(not(all(
     feature = "opt-simd",
     target_feature = "avx2",
     target_feature = "pclmulqdq"
 )))]
-pub(crate) use large_fields::{GF128, GF192, GF256};
-pub(crate) use small_fields::GF64;
+pub(crate) use large_fields::{GF128, GF192, GF256, GF384, GF576, GF768};
+pub(crate) use small_fields::{GF64, GF8};
+
 #[cfg(all(
     feature = "opt-simd",
     target_feature = "avx2",
@@ -53,6 +58,9 @@ pub(crate) trait Field:
 
     /// Obtain byte representation of the field element
     fn as_bytes(&self) -> GenericArray<u8, Self::Length>;
+
+    /// Obtain a boxed byte representation of the field element
+    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>>;
 }
 
 /// Double a field element
@@ -71,7 +79,6 @@ pub(crate) trait Double {
 pub(crate) trait Square {
     /// Output type
     type Output;
-
     /// Square an element
     fn square(self) -> Self::Output;
 }

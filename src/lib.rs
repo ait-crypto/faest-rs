@@ -9,7 +9,7 @@
 //!
 //! Key generation, signing and verification can be implemented as follows:
 //! ```
-//! use faest::{FAEST128fSigningKey, FAEST128fSignature}
+//! use faest::{FAEST128fSigningKey, FAEST128fSignature};
 //! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
 //!
 //! let sk = FAEST128fSigningKey::generate(rand::thread_rng());
@@ -22,7 +22,7 @@
 //!
 //! Due to the size of the signatures, all variants support signing into boxed signatures:
 //! ```
-//! use faest::{FAEST128fSigningKey, FAEST128fSignature}
+//! use faest::{FAEST128fSigningKey, FAEST128fSignature};
 //! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
 //!
 //! let sk = FAEST128fSigningKey::generate(rand::thread_rng());
@@ -56,7 +56,7 @@
 #![warn(missing_docs)]
 // TODO: fix those
 #![allow(clippy::type_complexity)]
-
+#![allow(unused_imports, dead_code)]
 use generic_array::{typenum::Unsigned, GenericArray};
 use paste::paste;
 use rand_core::CryptoRngCore;
@@ -70,18 +70,21 @@ pub use signature::{self, Error, Keypair, Signer, Verifier};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 mod aes;
-mod em;
+mod bavc;
 mod faest;
 mod fields;
 mod internal_keys;
 mod parameter;
 mod prg;
+mod prover;
 mod random_oracles;
 mod rijndael_32;
 mod universal_hashing;
 mod utils;
-mod vc;
+mod verifier;
 mod vole;
+mod witness;
+mod zk_constraints;
 
 use crate::{
     faest::{faest_keygen, faest_sign, faest_verify},
@@ -543,7 +546,6 @@ mod tests {
         assert!(!bool::from(sk1.ct_eq(&sk2)));
     }
     */
-
     #[cfg(feature = "serde")]
     #[test]
     fn serde_serialization<KP, S>()

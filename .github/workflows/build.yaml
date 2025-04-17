@@ -12,7 +12,7 @@ jobs:
       matrix:
         toolchain:
           - stable
-          - "1.78"
+          - "1.85"
     name: Test with Rust ${{matrix.toolchain}} toolchain
     steps:
       - uses: actions/checkout@v4

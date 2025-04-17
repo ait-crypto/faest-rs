@@ -1,13 +1,17 @@
 use std::{
+    default,
     num::Wrapping,
     ops::{
         Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
     },
 };
 
-use generic_array::{typenum::U8, GenericArray};
+use generic_array::{
+    typenum::{U1, U3, U8},
+    GenericArray,
+};
 
-use super::Field;
+use super::{Field, Square};
 
 trait GaloisFieldHelper<T>
 where
@@ -137,6 +141,12 @@ impl GaloisFieldHelper<u64> for SmallGF<u64> {
     const ONE: Wrapping<u64> = Wrapping(1u64);
 }
 
+impl GaloisFieldHelper<u8> for SmallGF<u8> {
+    const BITS: usize = u8::BITS as usize;
+    const MODULUS: Wrapping<u8> = Wrapping(0b00011011);
+    const ONE: Wrapping<u8> = Wrapping(1u8);
+}
+
 impl<T> Mul for SmallGF<T>
 where
     Self: GaloisFieldHelper<T>,
@@ -173,6 +183,94 @@ where
     }
 }
 
+/// Binary field `2^3`
+pub(crate) type GF8 = SmallGF<u8>;
+impl Square for GF8 {
+    type Output = GF8;
+
+    fn square(mut self) -> Self::Output {
+        let mut result_value = -(self.0 & GF8::ONE) & self.0;
+        let right = self.0;
+
+        for i in 1..GF8::BITS {
+            let mask = -((self.0 >> (GF8::BITS - 1)) & GF8::ONE);
+            self.0 = (self.0 << 1) ^ (mask & GF8::MODULUS);
+            result_value ^= -((right >> i) & GF8::ONE) & self.0;
+        }
+
+        SmallGF(result_value)
+    }
+}
+
+impl GF8 {
+    pub(crate) fn invnorm(x: u8) -> u8 {
+        let inv = GF8::exp_238(GF8::from(x));
+
+        let mut res = inv & 1; // Take bit 0 in pos 0
+
+        res |= (inv & 0b11000000u8) >> 5; // Take bit 6,7 in pos 1,2
+
+        res | ((inv & 0b100) << 1) // Take bit 2 in pos 3
+    }
+
+    fn exp_238(mut x: GF8) -> u8 {
+        // 238 == 0b11101110
+        let mut y = x.square(); // x^2
+        x = y.square(); // x^4
+        y = x * y;
+        x = x.square(); // x^8
+        y = x * y;
+        x = x.square(); // x^16
+        x = x.square(); // x^32
+        y = x * y;
+        x = x.square(); // x^64
+        y = x * y;
+        x = x.square(); // x^128
+        (x * y).0 .0
+    }
+
+    pub(crate) fn square_bits_inplace(x: &mut u8) {
+        let bits = [
+            *x & 0b1,
+            (*x & 0b10) >> 1,
+            (*x & 0b100) >> 2,
+            (*x & 0b1000) >> 3,
+            (*x & 0b10000) >> 4,
+            (*x & 0b100000) >> 5,
+            (*x & 0b1000000) >> 6,
+            (*x & 0b10000000) >> 7,
+        ];
+
+        *x = bits[0] ^ bits[4] ^ bits[6];
+        *x |= (bits[4] ^ bits[6] ^ bits[7]) << 1;
+        *x |= (bits[1] ^ bits[5]) << 2;
+        *x |= (bits[4] ^ bits[5] ^ bits[6] ^ bits[7]) << 3;
+        *x |= (bits[2] ^ bits[4] ^ bits[7]) << 4;
+        *x |= (bits[5] ^ bits[6]) << 5;
+        *x |= (bits[3] ^ bits[5]) << 6;
+        *x |= (bits[6] ^ bits[7]) << 7;
+    }
+
+    pub(crate) fn square_bits(x: u8) -> u8 {
+        let mut x = x;
+        Self::square_bits_inplace(&mut x);
+        x
+    }
+}
+
+pub const GF8_INV_NORM: [u8; 256] = [
+    0, 1, 13, 9, 12, 3, 6, 4, 1, 5, 8, 7, 15, 10, 10, 4, 13, 5, 7, 7, 11, 15, 2, 7, 9, 14, 14, 12,
+    14, 1, 10, 10, 12, 7, 7, 9, 2, 12, 2, 9, 3, 4, 9, 2, 5, 15, 2, 1, 6, 3, 4, 12, 4, 1, 1, 15, 4,
+    1, 13, 2, 14, 8, 14, 11, 1, 14, 2, 2, 2, 10, 6, 10, 5, 3, 1, 9, 5, 13, 6, 6, 8, 6, 10, 4, 6,
+    15, 5, 14, 7, 11, 9, 3, 5, 9, 13, 9, 15, 12, 8, 1, 10, 3, 1, 15, 10, 3, 13, 2, 13, 10, 9, 15,
+    10, 9, 13, 15, 12, 2, 5, 11, 4, 3, 11, 5, 4, 13, 3, 8, 13, 10, 4, 12, 5, 2, 5, 6, 5, 2, 14, 4,
+    15, 12, 14, 11, 7, 12, 8, 3, 13, 11, 6, 12, 7, 14, 12, 6, 15, 5, 15, 13, 11, 8, 15, 15, 14, 9,
+    10, 6, 15, 11, 9, 1, 7, 10, 4, 4, 2, 11, 3, 1, 6, 15, 8, 7, 7, 11, 6, 4, 12, 13, 6, 11, 9, 10,
+    1, 2, 11, 13, 13, 8, 14, 7, 8, 13, 13, 4, 9, 7, 14, 8, 8, 1, 12, 8, 5, 6, 12, 8, 14, 4, 6, 3,
+    9, 15, 14, 3, 6, 11, 12, 3, 9, 3, 1, 5, 5, 14, 7, 4, 3, 1, 10, 7, 8, 8, 3, 5, 7, 2, 10, 2, 12,
+    14, 8, 11, 11, 11,
+];
+
 /// Binary field `2^64`
 pub type GF64 = SmallGF<u64>;
 
@@ -184,6 +282,12 @@ impl Field for GF64 {
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         GenericArray::from(self.0 .0.to_le_bytes())
+    }
+
+    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
+        let mut arr = GenericArray::default_boxed();
+        arr.copy_from_slice(&self.0 .0.to_le_bytes());
+        arr
     }
 }
 
@@ -252,5 +356,14 @@ mod test {
             //to test commutativity
             assert_eq!(res, res_rev);
         }
+    }
+
+    #[test]
+    fn gf8_test_invnorm() {
+        assert_eq!(GF8::invnorm(0), 0);
+        assert_eq!(GF8::invnorm(1), 1);
+        assert_eq!(GF8::invnorm(2), 1 << 3 | 1 << 2 | 1);
+        assert_eq!(GF8::invnorm(0x80), 1 << 3 | 1 << 2 | 1);
+        assert_eq!(GF8::invnorm(0x88), 1 << 2 | 1);
     }
 }

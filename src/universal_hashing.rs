@@ -1,12 +1,21 @@
-use std::{array, iter::zip};
+use std::{
+    array,
+    iter::zip,
+    marker::PhantomData,
+    ops::{Add, Mul},
+};
 
 use generic_array::{
-    typenum::{Prod, Quot, Sum, Unsigned, U16, U3, U5, U8},
+    typenum::{
+        IsEqual, Le, Length, Prod, Quot, Sum, Unsigned, U128, U16, U2, U3, U4, U5, U64, U8, U96,
+    },
     ArrayLength, GenericArray,
 };
 use itertools::{chain, izip};
 
-use crate::fields::{BigGaloisField, Field, GF128, GF192, GF256, GF64};
+use crate::fields::{BigGaloisField, Field, GF128, GF192, GF256, GF384, GF576, GF64, GF768};
+
+use crate::prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree};
 
 type BBits = U16;
 // Additional bytes returned by VOLE hash
@@ -145,7 +154,7 @@ where
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Init part
 pub(crate) trait ZKHasherInit<F>
 where
-    F: BigGaloisField,
+    F: BigGaloisField + PartialEq + std::fmt::Debug,
 {
     type SDLength: ArrayLength;
 
@@ -169,7 +178,7 @@ where
 
     fn new_zk_proof_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKProofHasher<F> {
         let hasher = Self::new_zk_hasher(sd);
-        ZKProofHasher::new(hasher.clone(), hasher)
+        ZKProofHasher::new(hasher.clone(), hasher.clone(), hasher)
     }
 
     fn new_zk_verify_hasher(sd: &GenericArray<u8, Self::SDLength>, delta: F) -> ZKVerifyHasher<F> {
@@ -227,41 +236,76 @@ where
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct ZKProofHasher<F>
 where
     F: BigGaloisField,
 {
-    a_hasher: ZKHasher<F>,
-    b_hasher: ZKHasher<F>,
+    a0_hasher: ZKHasher<F>,
+    a1_hasher: ZKHasher<F>,
+    a2_hasher: ZKHasher<F>,
 }
 
 impl<F> ZKProofHasher<F>
 where
-    F: BigGaloisField,
+    F: BigGaloisField + PartialEq + std::fmt::Debug,
 {
-    const fn new(a_hasher: ZKHasher<F>, b_hasher: ZKHasher<F>) -> Self {
-        Self { a_hasher, b_hasher }
-    }
-
-    pub(crate) fn process<I1, I2, I3, I4>(&mut self, s: I1, vs: I2, s_b: I3, v_s_b: I4)
-    where
-        I1: Iterator<Item = F>,
-        I2: Iterator<Item = F>,
-        I3: Iterator<Item = F>,
-        I4: Iterator<Item = F>,
-    {
-        for (s_j, vs_j, s_b_j, v_s_b_j) in izip!(s, vs, s_b, v_s_b) {
-            let a0 = v_s_b_j * vs_j;
-            let a1 = (s_j + vs_j) * (s_b_j + v_s_b_j) + F::ONE + a0;
-            self.a_hasher.update(&a1);
-            self.b_hasher.update(&a0);
+    pub(crate) const fn new(
+        a0_hasher: ZKHasher<F>,
+        a1_hasher: ZKHasher<F>,
+        a2_hasher: ZKHasher<F>,
+    ) -> Self {
+        Self {
+            a0_hasher,
+            a1_hasher,
+            a2_hasher,
         }
     }
 
-    pub(crate) fn finalize(self, u: &F, v: &F) -> (F, F) {
-        let a = self.a_hasher.finalize(u);
-        let b = self.b_hasher.finalize(v);
-        (a, b)
+    pub(crate) fn update(&mut self, val: &FieldCommitDegThree<F>) {
+        // Degree 0
+        self.a0_hasher.update(&val.tag[0]);
+        // Degree 1
+        self.a1_hasher.update(&val.tag[1]);
+        // Degree 2
+        self.a2_hasher.update(&val.tag[2]);
+
+        // Should be a commitment to 0
+        debug_assert_eq!(val.key, F::ZERO);
+    }
+
+    pub(crate) fn lift_and_process(
+        &mut self,
+        a: &FieldCommitDegOne<F>,
+        a_sq: &FieldCommitDegOne<F>,
+        b: &FieldCommitDegOne<F>,
+        b_sq: &FieldCommitDegOne<F>,
+    ) where
+        F: BigGaloisField,
+    {
+        // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
+
+        // Degree 1
+        self.a1_hasher.update(&(a_sq.tag * b.tag));
+        self.a1_hasher.update(&(b_sq.tag * a.tag));
+
+        // Degree 2
+        self.a2_hasher
+            .update(&(a_sq.key * b.tag + a_sq.tag * b.key - a.tag));
+        self.a2_hasher
+            .update(&(b_sq.key * a.tag + b_sq.tag * a.key - b.tag));
+
+        // Degree 3 (i.e., commitments) should be zero
+        debug_assert_eq!(a_sq.key * b.key - a.key, F::ZERO);
+        debug_assert_eq!(b_sq.key * a.key - b.key, F::ZERO);
+    }
+
+    pub(crate) fn finalize(self, u: &F, u_plus_v: &F, v: &F) -> (F, F, F) {
+        let a0 = self.a0_hasher.finalize(u);
+        let a1 = self.a1_hasher.finalize(u_plus_v);
+        let a2 = self.a2_hasher.finalize(v);
+
+        (a0, a1, a2)
     }
 }
 
@@ -269,19 +313,45 @@ pub(crate) struct ZKVerifyHasher<F>
 where
     F: BigGaloisField,
 {
-    b_hasher: ZKHasher<F>,
-    delta_squared: F,
+    pub(crate) b_hasher: ZKHasher<F>,
+    pub(crate) delta: F,
+    pub(crate) delta_squared: F,
 }
 
 impl<F> ZKVerifyHasher<F>
 where
     F: BigGaloisField,
 {
-    fn new(b_hasher: ZKHasher<F>, delta: F) -> Self {
+    pub(crate) fn new(b_hasher: ZKHasher<F>, delta: F) -> Self {
         Self {
             b_hasher,
+            delta,
             delta_squared: delta.square(),
         }
+    }
+
+    pub(crate) fn update(&mut self, val: &F) {
+        self.b_hasher.update(val);
+    }
+
+    pub(crate) fn mul_and_update(&mut self, a: &F, b: &F) {
+        self.b_hasher.update(&(self.delta * a * b));
+    }
+
+    pub(crate) fn inv_norm_constraints(&mut self, conjugates: &[F], y: &F) {
+        let cnstr = *y * conjugates[1] * conjugates[4] + self.delta_squared * conjugates[0];
+        self.b_hasher.update(&cnstr);
+    }
+
+    pub(crate) fn lift_and_process(&mut self, a: &F, a_sq: &F, b: &F, b_sq: &F)
+    where
+        F: BigGaloisField,
+    {
+        // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
+
+        // Raise to degree 3 and update
+        self.update(&(self.delta * (*a_sq * b - self.delta * a)));
+        self.update(&(self.delta * (*a * b_sq - self.delta * b)));
     }
 
     pub(crate) fn process<I1, I2>(&mut self, qs: I1, qs_b: I2)
@@ -298,6 +368,78 @@ where
     pub(crate) fn finalize(self, v: &F) -> F {
         self.b_hasher.finalize(v)
     }
+}
+
+pub(crate) trait LeafHasher
+where
+    Self::LambdaBytes: Add<Self::LambdaBytes, Output = Self::LambdaBytesTimes2>
+        + Mul<U2, Output = Self::LambdaBytesTimes2>
+        + Mul<U3, Output = Self::LambdaBytesTimes3>
+        + Mul<U4, Output = Self::LambdaBytesTimes4>
+        + Mul<U8, Output = Self::Lambda>
+        + PartialEq,
+
+    Self::ExtensionField: for<'a> From<&'a [u8]>
+        + for<'a> Mul<&'a Self::F, Output = Self::ExtensionField>
+        + for<'a> Add<&'a Self::ExtensionField, Output = Self::ExtensionField>
+        + Mul<Self::F, Output = Self::ExtensionField>,
+{
+    type F: Field + for<'a> From<&'a [u8]>;
+    type ExtensionField: Field<Length = Self::LambdaBytesTimes3>;
+    type Lambda: ArrayLength;
+    type LambdaBytes: ArrayLength;
+    type LambdaBytesTimes2: ArrayLength;
+    type LambdaBytesTimes3: ArrayLength;
+    type LambdaBytesTimes4: ArrayLength;
+
+    fn hash(
+        uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
+        x: &GenericArray<u8, Self::LambdaBytesTimes4>,
+    ) -> Box<GenericArray<u8, Self::LambdaBytesTimes3>> {
+        let u = <Self as LeafHasher>::ExtensionField::from(uhash.as_slice());
+        let x0 =
+            <Self as LeafHasher>::F::from(&x[..<<Self as LeafHasher>::F as Field>::Length::USIZE]);
+        let x1 = <Self as LeafHasher>::ExtensionField::from(
+            &x[<<Self as LeafHasher>::F as Field>::Length::USIZE..],
+        );
+
+        let h = (u * &x0) + &x1;
+
+        h.as_boxed_bytes()
+    }
+}
+
+pub(crate) struct LeafHasher128;
+impl LeafHasher for LeafHasher128 {
+    type F = GF128;
+    type ExtensionField = GF384;
+    type LambdaBytes = <GF128 as Field>::Length;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LambdaBytesTimes3 = Prod<Self::LambdaBytes, U3>;
+    type LambdaBytesTimes4 = Prod<Self::LambdaBytes, U4>;
+    type Lambda = Prod<Self::LambdaBytes, U8>;
+}
+
+pub(crate) struct LeafHasher192;
+impl LeafHasher for LeafHasher192 {
+    type F = GF192;
+    type ExtensionField = GF576;
+    type LambdaBytes = <GF192 as Field>::Length;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LambdaBytesTimes3 = Prod<Self::LambdaBytes, U3>;
+    type LambdaBytesTimes4 = Prod<Self::LambdaBytes, U4>;
+    type Lambda = Prod<Self::LambdaBytes, U8>;
+}
+
+pub(crate) struct LeafHasher256;
+impl LeafHasher for LeafHasher256 {
+    type F = GF256;
+    type ExtensionField = GF768;
+    type LambdaBytes = <GF256 as Field>::Length;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LambdaBytesTimes3 = Prod<Self::LambdaBytes, U3>;
+    type LambdaBytesTimes4 = Prod<Self::LambdaBytes, U4>;
+    type Lambda = Prod<Self::LambdaBytes, U8>;
 }
 
 #[cfg(test)]
@@ -326,6 +468,13 @@ mod test {
         sd: Vec<u8>,
         xs: Vec<u8>,
         h: Vec<u8>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct LeafHashDatabaseEntry {
+        uhash: Vec<u8>,
+        x: Vec<u8>,
+        expected_h: Vec<u8>,
     }
 
     #[test]
@@ -413,6 +562,46 @@ mod test {
             }
             let res = hasher.finalize(&data.x1);
             assert_eq!(GF256::from(data.h.as_slice()), res);
+        }
+    }
+
+    #[test]
+    fn test_leaf_hash_128() {
+        let database: Vec<LeafHashDatabaseEntry> = read_test_data("leafhash_128.json");
+
+        for data in database {
+            let x = GenericArray::from_slice(&data.x);
+            let uhash = GenericArray::from_slice(&data.uhash);
+
+            let h = LeafHasher128::hash(&uhash, &x);
+            assert_eq!(h.as_slice(), &data.expected_h)
+        }
+    }
+
+    #[test]
+    fn test_leaf_hash_192() {
+        let database: Vec<LeafHashDatabaseEntry> = read_test_data("leafhash_192.json");
+
+        for data in database {
+            let x = GenericArray::from_slice(&data.x);
+            let uhash = GenericArray::from_slice(&data.uhash);
+
+            let h = LeafHasher192::hash(&uhash, &x);
+            assert_eq!(h.as_slice(), &data.expected_h)
+        }
+    }
+
+    #[test]
+    fn test_leaf_hash_256() {
+        let database: Vec<LeafHashDatabaseEntry> = read_test_data("leafhash_256.json");
+
+        for data in database {
+            let x = GenericArray::from_slice(&data.x);
+            let uhash = GenericArray::from_slice(&data.uhash);
+
+            let h = LeafHasher256::hash(&uhash, &x);
+
+            assert_eq!(h.as_slice(), &data.expected_h)
         }
     }
 }

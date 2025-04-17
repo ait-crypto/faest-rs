@@ -4,7 +4,7 @@
 
 use std::fmt::{self, Debug};
 
-use crate::{parameter::OWFParameters, ByteEncoding, Error};
+use crate::{parameter::OWFParameters, utils::get_bit, ByteEncoding, Error};
 
 use generic_array::{typenum::Unsigned, GenericArray};
 #[cfg(feature = "serde")]
@@ -46,19 +46,20 @@ where
             let owf_input = GenericArray::from_slice(&bytes[..O::InputSize::USIZE]);
             let owf_key = GenericArray::from_slice(&bytes[O::InputSize::USIZE..]);
 
-            O::extendwitness(owf_key, owf_input)
-                .map(|_| {
-                    let mut owf_output = GenericArray::default();
-                    O::evaluate_owf(owf_key, owf_input, &mut owf_output);
-                    Self {
-                        owf_key: owf_key.clone(),
-                        pk: PublicKey {
-                            owf_input: owf_input.clone(),
-                            owf_output,
-                        },
-                    }
-                })
-                .ok_or_else(Error::new)
+            let mut owf_output = GenericArray::default();
+            O::evaluate_owf(owf_key, owf_input, &mut owf_output);
+
+            if get_bit(owf_key, 0) & get_bit(owf_key, 1) != 0 {
+                return Err(Error::new());
+            }
+
+            Ok(Self {
+                owf_key: owf_key.clone(),
+                pk: PublicKey {
+                    owf_input: owf_input.clone(),
+                    owf_output,
+                },
+            })
         } else {
             Err(Error::new())
         }
@@ -167,7 +168,7 @@ where
     O: OWFParameters,
 {
     pub(crate) owf_input: GenericArray<u8, O::InputSize>,
-    pub(crate) owf_output: GenericArray<u8, O::InputSize>,
+    pub(crate) owf_output: GenericArray<u8, O::OutputSize>,
 }
 
 impl<O> Clone for PublicKey<O>

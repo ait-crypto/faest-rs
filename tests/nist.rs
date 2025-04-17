@@ -1,3 +1,4 @@
+#![allow(unused_imports, dead_code)]
 use std::{
     fmt::Debug,
     fs::File,
@@ -120,12 +121,14 @@ where
         let mut rng = NistPqcAes256CtrRng::from_seed(seed.as_slice().try_into().unwrap());
 
         let kp = KP::generate(&mut rng);
+
         let vk = kp.verifying_key();
         assert_eq!(KP::VerifyingKey::try_from(&pk).unwrap(), vk);
         assert_eq!(KP::try_from(&sk).unwrap(), kp);
 
         let signature = kp.sign_with_rng(&mut rng, &message);
         assert!(vk.verify(&message, &signature).is_ok());
+
         assert_eq!(sm.len(), message.len() + signature.encoded_len());
         assert_eq!(sm[..sm.len() - signature.encoded_len()], message);
         assert_eq!(sm[sm.len() - signature.encoded_len()..], signature.to_vec());

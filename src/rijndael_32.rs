@@ -387,6 +387,11 @@ pub(crate) fn sub_bytes_nots(state: &mut [u32]) {
     state[6] ^= 0xffffffff;
 }
 
+pub(crate) fn rijndael_sub_bytes(state: &mut [u32]) {
+    sub_bytes(state);
+    sub_bytes_nots(state);
+}
+
 /// Computation of the MixColumns transformation in the fixsliced representation, with different
 /// rotations used according to the round number mod 4.
 ///
