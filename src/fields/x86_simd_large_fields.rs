@@ -4,7 +4,7 @@
 use std::arch::x86 as x86_64;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64;
-use std::{ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign}};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use x86_64::{
     __m128i, __m256i, _mm256_and_si256, _mm256_blend_epi32, _mm256_blendv_epi8, _mm256_cmpeq_epi32,
     _mm256_extracti128_si256, _mm256_loadu_si256, _mm256_maskload_epi64, _mm256_maskstore_epi64,
@@ -26,8 +26,12 @@ use generic_array::{
 
 use super::{
     large_fields::{
-        Alphas, Betas, Modulus, SquareBytes, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192, GF256 as UnoptimizedGF256, GF384 as UnoptimizedGF384,  GF576 as UnoptimizedGF576,  GF768 as UnoptimizedGF768,  
-    }, BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquared, ByteCombineSquaredConstants, Double, Field, FromBit, Sigmas, Square, GF64, GF8
+        Alphas, Betas, Modulus, SquareBytes, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192,
+        GF256 as UnoptimizedGF256, GF384 as UnoptimizedGF384, GF576 as UnoptimizedGF576,
+        GF768 as UnoptimizedGF768,
+    },
+    BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquared,
+    ByteCombineSquaredConstants, Double, ExtensionField, Field, FromBit, Sigmas, Square, GF64, GF8,
 };
 
 #[allow(non_snake_case)]
@@ -641,8 +645,8 @@ impl From<&[u8]> for GF128 {
 // Implementation of SquareBytes
 
 impl SquareBytes for GF128 {
-// TODO: Should we define a generic implementation for F: Field in large fields instead?
-    
+    // TODO: Should we define a generic implementation for F: Field in large fields instead?
+
     fn square_byte(x: &[Self]) -> [Self; 8] {
         let mut sq = [<Self as Field>::ZERO; 8];
         sq[0] = x[0] + x[4] + x[6];
@@ -726,25 +730,22 @@ impl ByteCombine for GF128 {
     }
 }
 
-
 // Implementation of ByteCombineSquared
 
-impl ByteCombineSquaredConstants for GF128{
+impl ByteCombineSquaredConstants for GF128 {
     const BYTE_COMBINE_SQ_2: Self = Self(gfu128_as_m128(UnoptimizedGF128::BYTE_COMBINE_SQ_2));
     const BYTE_COMBINE_SQ_3: Self = Self(gfu128_as_m128(UnoptimizedGF128::BYTE_COMBINE_SQ_3));
 }
 
-
 impl ByteCombineSquared for GF128 {
-
     fn byte_combine_sq(x: &[Self; 8]) -> Self {
         let sq = Self::square_byte(x);
-        Self::byte_combine(&sq) 
+        Self::byte_combine(&sq)
     }
 
     fn byte_combine_sq_slice(x: &[Self]) -> Self {
         let sq = Self::square_byte(x);
-        Self::byte_combine(&sq) 
+        Self::byte_combine(&sq)
     }
 
     fn byte_combine_bits_sq(x: u8) -> Self {
@@ -753,7 +754,6 @@ impl ByteCombineSquared for GF128 {
         Self::byte_combine_bits(sq_bits)
     }
 }
-
 
 impl Betas for GF128 {
     const BETA_SQUARES: [Self; 5] = [
@@ -770,7 +770,6 @@ impl Betas for GF128 {
         Self(gfu128_as_m128(UnoptimizedGF128::BETA_CUBES[2])),
         Self(gfu128_as_m128(UnoptimizedGF128::BETA_CUBES[3])),
     ];
-
 }
 
 impl Sigmas for GF128 {
@@ -798,7 +797,6 @@ impl Sigmas for GF128 {
         Self(gfu128_as_m128(UnoptimizedGF128::SIGMA_SQUARES[8])),
     ];
 }
-
 
 impl BigGaloisField for GF128 {}
 
@@ -1187,50 +1185,48 @@ impl Field for GF192 {
     }
 }
 
-
 // Implementation of SquareBytes
 
 impl SquareBytes for GF192 {
     // TODO: Should we define a generic implementation for F: Field in large fields instead?
-        
-        fn square_byte(x: &[Self]) -> [Self; 8] {
-            let mut sq = [<Self as Field>::ZERO; 8];
-            sq[0] = x[0] + x[4] + x[6];
-            sq[2] = x[1] + x[5];
-            sq[4] = x[2] + x[4] + x[7];
-            sq[5] = x[5] + x[6];
-            sq[6] = x[3] + x[5];
-            sq[7] = x[6] + x[7];
-    
-            sq[1] = x[4] + sq[7];
-            sq[3] = x[5] + sq[1];
-    
-            sq
-        }
-    
-        fn square_byte_inplace(x: &mut [Self]) {
-            let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
-    
-            // x0 = x0 + x4 + x6
-            x[0] += x[4] + x[6];
-            // x2 = x1 + x5
-            x[2] = x[1] + x[5];
-            // x4 = x4 + x2 + x7
-            x[4] += i2 + x[7];
-            // x5 = x5 + x6
-            x[5] += x[6];
-            // x6 = x3 + x5
-            x[6] = x[3] + i5;
-            // x7 = x6 + x7
-            x[7] += i6;
-    
-            // x1 = x4 + (x6 + x7)
-            x[1] = i4 + x[7];
-            // x3 = x5 + (x4 + x6 + x7)
-            x[3] = i5 + x[1];
-        }
+
+    fn square_byte(x: &[Self]) -> [Self; 8] {
+        let mut sq = [<Self as Field>::ZERO; 8];
+        sq[0] = x[0] + x[4] + x[6];
+        sq[2] = x[1] + x[5];
+        sq[4] = x[2] + x[4] + x[7];
+        sq[5] = x[5] + x[6];
+        sq[6] = x[3] + x[5];
+        sq[7] = x[6] + x[7];
+
+        sq[1] = x[4] + sq[7];
+        sq[3] = x[5] + sq[1];
+
+        sq
     }
-    
+
+    fn square_byte_inplace(x: &mut [Self]) {
+        let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
+
+        // x0 = x0 + x4 + x6
+        x[0] += x[4] + x[6];
+        // x2 = x1 + x5
+        x[2] = x[1] + x[5];
+        // x4 = x4 + x2 + x7
+        x[4] += i2 + x[7];
+        // x5 = x5 + x6
+        x[5] += x[6];
+        // x6 = x3 + x5
+        x[6] = x[3] + i5;
+        // x7 = x6 + x7
+        x[7] += i6;
+
+        // x1 = x4 + (x6 + x7)
+        x[1] = i4 + x[7];
+        // x3 = x5 + (x4 + x6 + x7)
+        x[3] = i5 + x[1];
+    }
+}
 
 impl From<&[u8]> for GF192 {
     fn from(value: &[u8]) -> Self {
@@ -1291,22 +1287,20 @@ impl ByteCombine for GF192 {
 
 // Implementation of ByteCombineSquared
 
-impl ByteCombineSquaredConstants for GF192{
+impl ByteCombineSquaredConstants for GF192 {
     const BYTE_COMBINE_SQ_2: Self = Self(gfu192_as_m256(UnoptimizedGF192::BYTE_COMBINE_SQ_2));
     const BYTE_COMBINE_SQ_3: Self = Self(gfu192_as_m256(UnoptimizedGF192::BYTE_COMBINE_SQ_3));
 }
 
-
 impl ByteCombineSquared for GF192 {
-
     fn byte_combine_sq(x: &[Self; 8]) -> Self {
         let sq = Self::square_byte(x);
-        Self::byte_combine(&sq) 
+        Self::byte_combine(&sq)
     }
 
     fn byte_combine_sq_slice(x: &[Self]) -> Self {
         let sq = Self::square_byte(x);
-        Self::byte_combine(&sq) 
+        Self::byte_combine(&sq)
     }
 
     fn byte_combine_bits_sq(x: u8) -> Self {
@@ -1315,7 +1309,6 @@ impl ByteCombineSquared for GF192 {
         Self::byte_combine_bits(sq_bits)
     }
 }
-
 
 impl Betas for GF192 {
     const BETA_SQUARES: [Self; 5] = [
@@ -1332,7 +1325,6 @@ impl Betas for GF192 {
         Self(gfu192_as_m256(UnoptimizedGF192::BETA_CUBES[2])),
         Self(gfu192_as_m256(UnoptimizedGF192::BETA_CUBES[3])),
     ];
-
 }
 
 impl Sigmas for GF192 {
@@ -1711,50 +1703,48 @@ impl Field for GF256 {
     }
 }
 
-
 // Implementation of SquareBytes
 
 impl SquareBytes for GF256 {
     // TODO: Should we define a generic implementation for F: Field in large fields instead?
-        
-        fn square_byte(x: &[Self]) -> [Self; 8] {
-            let mut sq = [<Self as Field>::ZERO; 8];
-            sq[0] = x[0] + x[4] + x[6];
-            sq[2] = x[1] + x[5];
-            sq[4] = x[2] + x[4] + x[7];
-            sq[5] = x[5] + x[6];
-            sq[6] = x[3] + x[5];
-            sq[7] = x[6] + x[7];
-    
-            sq[1] = x[4] + sq[7];
-            sq[3] = x[5] + sq[1];
-    
-            sq
-        }
-    
-        fn square_byte_inplace(x: &mut [Self]) {
-            let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
-    
-            // x0 = x0 + x4 + x6
-            x[0] += x[4] + x[6];
-            // x2 = x1 + x5
-            x[2] = x[1] + x[5];
-            // x4 = x4 + x2 + x7
-            x[4] += i2 + x[7];
-            // x5 = x5 + x6
-            x[5] += x[6];
-            // x6 = x3 + x5
-            x[6] = x[3] + i5;
-            // x7 = x6 + x7
-            x[7] += i6;
-    
-            // x1 = x4 + (x6 + x7)
-            x[1] = i4 + x[7];
-            // x3 = x5 + (x4 + x6 + x7)
-            x[3] = i5 + x[1];
-        }
+
+    fn square_byte(x: &[Self]) -> [Self; 8] {
+        let mut sq = [<Self as Field>::ZERO; 8];
+        sq[0] = x[0] + x[4] + x[6];
+        sq[2] = x[1] + x[5];
+        sq[4] = x[2] + x[4] + x[7];
+        sq[5] = x[5] + x[6];
+        sq[6] = x[3] + x[5];
+        sq[7] = x[6] + x[7];
+
+        sq[1] = x[4] + sq[7];
+        sq[3] = x[5] + sq[1];
+
+        sq
     }
-    
+
+    fn square_byte_inplace(x: &mut [Self]) {
+        let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
+
+        // x0 = x0 + x4 + x6
+        x[0] += x[4] + x[6];
+        // x2 = x1 + x5
+        x[2] = x[1] + x[5];
+        // x4 = x4 + x2 + x7
+        x[4] += i2 + x[7];
+        // x5 = x5 + x6
+        x[5] += x[6];
+        // x6 = x3 + x5
+        x[6] = x[3] + i5;
+        // x7 = x6 + x7
+        x[7] += i6;
+
+        // x1 = x4 + (x6 + x7)
+        x[1] = i4 + x[7];
+        // x3 = x5 + (x4 + x6 + x7)
+        x[3] = i5 + x[1];
+    }
+}
 
 impl From<&[u8]> for GF256 {
     fn from(value: &[u8]) -> Self {
@@ -1810,22 +1800,20 @@ impl ByteCombine for GF256 {
 
 // Implementation of ByteCombineSquared
 
-impl ByteCombineSquaredConstants for GF256{
+impl ByteCombineSquaredConstants for GF256 {
     const BYTE_COMBINE_SQ_2: Self = Self(gfu256_as_m256(UnoptimizedGF256::BYTE_COMBINE_SQ_2));
     const BYTE_COMBINE_SQ_3: Self = Self(gfu256_as_m256(UnoptimizedGF256::BYTE_COMBINE_SQ_3));
 }
 
-
 impl ByteCombineSquared for GF256 {
-
     fn byte_combine_sq(x: &[Self; 8]) -> Self {
         let sq = Self::square_byte(x);
-        Self::byte_combine(&sq) 
+        Self::byte_combine(&sq)
     }
 
     fn byte_combine_sq_slice(x: &[Self]) -> Self {
         let sq = Self::square_byte(x);
-        Self::byte_combine(&sq) 
+        Self::byte_combine(&sq)
     }
 
     fn byte_combine_bits_sq(x: u8) -> Self {
@@ -1834,7 +1822,6 @@ impl ByteCombineSquared for GF256 {
         Self::byte_combine_bits(sq_bits)
     }
 }
-
 
 impl Betas for GF256 {
     const BETA_SQUARES: [Self; 5] = [
@@ -1851,7 +1838,6 @@ impl Betas for GF256 {
         Self(gfu256_as_m256(UnoptimizedGF256::BETA_CUBES[2])),
         Self(gfu256_as_m256(UnoptimizedGF256::BETA_CUBES[3])),
     ];
-
 }
 
 impl Sigmas for GF256 {
@@ -1882,7 +1868,6 @@ impl Sigmas for GF256 {
 
 impl BigGaloisField for GF256 {}
 
-
 #[cfg(test)]
 impl serde::Serialize for GF256 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -1904,7 +1889,6 @@ impl<'de> serde::Deserialize<'de> for GF256 {
     }
 }
 
-
 /// Optimized implementation of the 384 bit Galois field
 #[derive(Debug, Clone, Copy)]
 // #[repr(transparent)]
@@ -1913,23 +1897,24 @@ pub(crate) struct GF384(__m256i, __m256i);
 impl Default for GF384 {
     #[inline(always)]
     fn default() -> Self {
-        Self(unsafe{_mm256_setzero_si256()}, unsafe { _mm256_setzero_si256()})
+        Self(unsafe { _mm256_setzero_si256() }, unsafe {
+            _mm256_setzero_si256()
+        })
     }
 }
 
 impl PartialEq for GF384 {
     fn eq(&self, other: &Self) -> bool {
         unsafe {
-            
             let tmp = _mm256_xor_si256(self.0, other.0);
 
             if _mm256_testz_si256(tmp, tmp) != 0 {
                 return false;
             }
-            
+
             let tmp = _mm256_xor_si256(self.1, other.1);
-            
-            _mm256_testz_si256(tmp, tmp) == 1   
+
+            _mm256_testz_si256(tmp, tmp) == 1
         }
     }
 }
@@ -1943,7 +1928,9 @@ impl Add for GF384 {
 
     #[inline(always)]
     fn add(self, rhs: Self) -> Self::Output {
-        Self(unsafe{_mm256_xor_si256(self.0, rhs.0)}, unsafe { _mm256_xor_si256(self.1, rhs.1)})
+        Self(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
+            _mm256_xor_si256(self.1, rhs.1)
+        })
     }
 }
 
@@ -1952,7 +1939,9 @@ impl Add<&Self> for GF384 {
 
     #[inline(always)]
     fn add(self, rhs: &Self) -> Self::Output {
-        Self( unsafe{_mm256_xor_si256(self.0, rhs.0)}, unsafe { _mm256_xor_si256(self.1, rhs.1)})
+        Self(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
+            _mm256_xor_si256(self.1, rhs.1)
+        })
     }
 }
 
@@ -1961,7 +1950,9 @@ impl Add<GF384> for &GF384 {
 
     #[inline(always)]
     fn add(self, rhs: GF384) -> Self::Output {
-        GF384( unsafe{_mm256_xor_si256(self.0, rhs.0)}, unsafe { _mm256_xor_si256(self.1, rhs.1)})
+        GF384(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
+            _mm256_xor_si256(self.1, rhs.1)
+        })
     }
 }
 
@@ -1971,7 +1962,7 @@ impl AddAssign for GF384 {
         self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
         self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
     }
-    }
+}
 
 impl AddAssign<&Self> for GF384 {
     #[inline(always)]
@@ -1988,7 +1979,9 @@ impl Sub for GF384 {
 
     #[inline(always)]
     fn sub(self, rhs: Self) -> Self::Output {
-        Self(unsafe{_mm256_xor_si256(self.0, rhs.0)}, unsafe { _mm256_xor_si256(self.1, rhs.1)})
+        Self(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
+            _mm256_xor_si256(self.1, rhs.1)
+        })
     }
 }
 
@@ -1997,7 +1990,9 @@ impl Sub<&Self> for GF384 {
 
     #[inline(always)]
     fn sub(self, rhs: &Self) -> Self::Output {
-        Self( unsafe{_mm256_xor_si256(self.0, rhs.0)}, unsafe { _mm256_xor_si256(self.1, rhs.1)})
+        Self(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
+            _mm256_xor_si256(self.1, rhs.1)
+        })
     }
 }
 
@@ -2006,7 +2001,9 @@ impl Sub<GF384> for &GF384 {
 
     #[inline(always)]
     fn sub(self, rhs: GF384) -> Self::Output {
-        GF384( unsafe{_mm256_xor_si256(self.0, rhs.0)}, unsafe { _mm256_xor_si256(self.1, rhs.1)})
+        GF384(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
+            _mm256_xor_si256(self.1, rhs.1)
+        })
     }
 }
 
@@ -2016,7 +2013,7 @@ impl SubAssign for GF384 {
         self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
         self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
     }
-    }
+}
 
 impl SubAssign<&Self> for GF384 {
     #[inline(always)]
@@ -2026,11 +2023,9 @@ impl SubAssign<&Self> for GF384 {
     }
 }
 
-
 // implementations of Neg
 
 impl Neg for GF384 {
-    
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -2038,91 +2033,116 @@ impl Neg for GF384 {
     }
 }
 
-
 impl From<&[u8]> for GF384 {
     fn from(value: &[u8]) -> Self {
         debug_assert_eq!(value.len(), 48);
-        Self(unsafe{ _mm256_loadu_si256(value.as_ptr().cast()) }, unsafe { _mm256_maskload_epi64(value[32..].as_ptr().cast(), _mm256_setr_epi64x(i64::MIN, i64::MIN, 0, 0),) })
+        Self(
+            unsafe { _mm256_loadu_si256(value.as_ptr().cast()) },
+            unsafe {
+                _mm256_maskload_epi64(
+                    value[32..].as_ptr().cast(),
+                    _mm256_setr_epi64x(i64::MIN, i64::MIN, 0, 0),
+                )
+            },
+        )
     }
 }
 
-
-impl Mul for GF384 {
-    type Output = Self;
-
-    #[inline(always)]
-    fn mul(self, rhs: Self) -> Self::Output {
-        todo!("implement multiplication")
+impl From<(__m256i, __m256i)> for GF384 {
+    fn from(value: (__m256i, __m256i)) -> Self {
+        Self(value.0, value.1)
     }
 }
 
-impl Mul<&Self> for GF384 {
-    type Output = Self;
-
-    #[inline(always)]
-    fn mul(self, rhs: &Self) -> Self::Output {
-        todo!("implement multiplication")
+impl Into<(__m256i, __m256i)> for GF384 {
+    fn into(self) -> (__m256i, __m256i) {
+        (self.0, self.1)
     }
 }
 
-impl Mul<GF256> for &GF384 {
+const GF384_MOD_M128: __m128i = u128_as_m128(UnoptimizedGF384::MODULUS);
+
+unsafe fn poly512_reduce384(mut x: [__m128i; 4]) -> (__m256i, __m256i) {
+    let xmod = [
+        m128_clmul_ll(GF384_MOD_M128, x[3]),
+        m128_clmul_lh(GF384_MOD_M128, x[3]),
+    ];
+
+    let xmod_combined = [
+        _mm_xor_si128(xmod[0], _mm_slli_si128(xmod[1], 8)),
+        _mm_srli_si128(xmod[1], 8),
+    ];
+
+    x[0] = _mm_xor_si128(x[0], xmod_combined[0]);
+    x[1] = _mm_xor_si128(x[1], xmod_combined[1]);
+
+    (
+        _mm256_setr_m128i(x[0], x[1]),
+        _mm256_setr_m128i(x[2], _mm_setzero_si128()),
+    )
+}
+
+fn mul_gf384_gf128(lhs: (__m256i, __m256i), y0: __m128i) -> (__m256i, __m256i) {
+    unsafe {
+        let x0 = _mm256_extracti128_si256(lhs.0, 0);
+        let x1 = _mm256_extracti128_si256(lhs.0, 1);
+        let x2 = _mm256_extracti128_si256(lhs.1, 0);
+
+        let x0y0 = karatsuba_mul_128_uncombined(x0, y0);
+        let x1y0 = karatsuba_mul_128_uncombined(x1, y0);
+        let x2y0 = karatsuba_mul_128_uncombined(x2, y0);
+
+        let tmp1 = _mm_xor_si128(x0y0[2], _mm_alignr_epi8(x1y0[1], x0y0[1], 8));
+        let tmp2 = _mm_xor_si128(x1y0[2], _mm_alignr_epi8(x2y0[1], x1y0[1], 8));
+
+        let combined = [
+            _mm_xor_si128(x0y0[0], _mm_slli_si128(x0y0[1], 8)),
+            _mm_xor_si128(x1y0[0], tmp1),
+            _mm_xor_si128(x2y0[0], tmp2),
+            _mm_xor_si128(x2y0[2], _mm_srli_si128(x2y0[1], 8)),
+        ];
+
+        poly512_reduce384(combined)
+    }
+}
+
+impl Mul<GF128> for GF384 {
     type Output = GF384;
 
     #[inline(always)]
-    fn mul(self, rhs: GF256) -> Self::Output {
-        todo!("implement multiplication")
+    fn mul(self, rhs: GF128) -> Self::Output {
+        Self::from(mul_gf384_gf128(self.into(), rhs.0))
     }
 }
 
-impl Mul<GF64> for GF384 {
+impl Mul<&GF128> for GF384 {
     type Output = Self;
 
     #[inline(always)]
-    fn mul(self, rhs: GF64) -> Self::Output {
-        todo!("implement multiplication")
+    fn mul(self, rhs: &GF128) -> Self::Output {
+        Self::from(mul_gf384_gf128(self.into(), rhs.0))
     }
 }
 
-impl Mul<u8> for GF384 {
-    type Output = Self;
-
-    #[inline(always)]
-    fn mul(self, rhs: u8) -> Self::Output {
-        todo!("implement multiplication")
-    }
-}
-
-impl MulAssign for GF384 {
-    #[inline(always)]
-    fn mul_assign(&mut self, rhs: Self) {
-        todo!("implement multiplication")
-    }
-}
-
-impl MulAssign<&Self> for GF384 {
-    #[inline(always)]
-    fn mul_assign(&mut self, rhs: &Self) {
-        todo!("implement multiplication")
-    }
-}
-
-impl Field for GF384 {
+impl ExtensionField for GF384 {
     const ZERO: Self = Self(u64_as_m256(0), u64_as_m256(0));
     const ONE: Self = Self(u64_as_m256(1), u64_as_m256(0));
 
     type Length = U48;
 
+    type BaseField = GF128;
+
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::<u8, Self::Length>::default();
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0)}; 
-        unsafe{ _mm256_storeu_si256(ret[32..].as_mut_ptr().cast(), self.1)};
+        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
+        unsafe { _mm256_storeu_si256(ret[32..].as_mut_ptr().cast(), self.1) };
         ret
     }
 
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0)}; 
-        unsafe{ _mm256_storeu_si256(ret[32..].as_mut_ptr().cast(), self.1)};
+        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
+        unsafe { _mm256_storeu_si256(ret[32..].as_mut_ptr().cast(), self.1) };
         ret
     }
 }
@@ -2132,6 +2152,12 @@ mod test {
     use super::*;
 
     const RUNS: usize = 100;
+
+    use rand::{
+        distributions::{Distribution, Standard},
+        rngs::SmallRng,
+        Rng, RngCore, SeedableRng,
+    };
 
     #[generic_tests::define]
     mod field_ops {
@@ -2283,7 +2309,6 @@ mod test {
         mod gf256 {}
     }
 
-
     #[generic_tests::define]
     mod big_gf_ops {
         use super::*;
@@ -2316,14 +2341,19 @@ mod test {
                 let v2 = F::byte_combine_slice(byte2.as_slice());
                 assert_eq!(v1.as_bytes(), v2.as_bytes());
 
-
                 let v1 = Fu::byte_combine_bits_sq(byte3);
                 let v2 = Fu::byte_combine_bits_sq(byte3);
                 assert_eq!(v1.as_bytes(), v2.as_bytes());
             }
 
-            assert_eq!(F::BYTE_COMBINE_SQ_2.as_bytes(), Fu::BYTE_COMBINE_SQ_2.as_bytes());
-            assert_eq!(F::BYTE_COMBINE_SQ_3.as_bytes(), Fu::BYTE_COMBINE_SQ_3.as_bytes());
+            assert_eq!(
+                F::BYTE_COMBINE_SQ_2.as_bytes(),
+                Fu::BYTE_COMBINE_SQ_2.as_bytes()
+            );
+            assert_eq!(
+                F::BYTE_COMBINE_SQ_3.as_bytes(),
+                Fu::BYTE_COMBINE_SQ_3.as_bytes()
+            );
         }
 
         #[test]
@@ -2332,23 +2362,22 @@ mod test {
             Standard: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length> + Alphas + Debug + Eq,
         {
-            for (x, y) in itertools::izip!(F::ALPHA, Fu::ALPHA){
+            for (x, y) in itertools::izip!(F::ALPHA, Fu::ALPHA) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
             }
-            for (x, y) in itertools::izip!(F::BETA_CUBES, Fu::BETA_CUBES){
+            for (x, y) in itertools::izip!(F::BETA_CUBES, Fu::BETA_CUBES) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
             }
-            for (x, y) in itertools::izip!(F::BETA_SQUARES, Fu::BETA_SQUARES){
+            for (x, y) in itertools::izip!(F::BETA_SQUARES, Fu::BETA_SQUARES) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
             }
-            for (x, y) in itertools::izip!(F::SIGMA, Fu::SIGMA){
+            for (x, y) in itertools::izip!(F::SIGMA, Fu::SIGMA) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
             }
-            for (x, y) in itertools::izip!(F::SIGMA_SQUARES, Fu::SIGMA_SQUARES){
+            for (x, y) in itertools::izip!(F::SIGMA_SQUARES, Fu::SIGMA_SQUARES) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
             }
         }
-
 
         #[instantiate_tests(<UnoptimizedGF128, GF128>)]
         mod gf128 {}
@@ -2361,9 +2390,9 @@ mod test {
     }
 
     #[generic_tests::define]
-    mod extended_fields{
+    mod extended_fields {
         use super::*;
-        
+
         use std::fmt::Debug;
         use std::{ops::AddAssign, process::Output};
 
@@ -2378,8 +2407,8 @@ mod test {
         fn add<Fu, F>()
         where
             Standard: Distribution<Fu>,
-            Fu: Field + Debug + Eq + Copy,
-            for<'a> F: Field<Length = Fu::Length> + Debug + Eq + From<&'a [u8]> + Copy,
+            Fu: ExtensionField + Debug + Eq + Copy,
+            for<'a> F: ExtensionField<Length = Fu::Length> + Debug + Eq + From<&'a [u8]> + Copy,
         {
             let mut rng = SmallRng::from_entropy();
 
@@ -2390,11 +2419,9 @@ mod test {
                 let mut lhs2 = F::from(lhs1.as_bytes().as_slice());
                 let rhs2 = F::from(rhs1.as_bytes().as_slice());
 
-                
                 let r1 = lhs1 + rhs1;
                 let r2 = lhs2 + rhs2;
                 assert_eq!(r1.as_bytes(), r2.as_bytes());
-
 
                 lhs1 += rhs1;
                 lhs2 += rhs2;
@@ -2402,8 +2429,27 @@ mod test {
             }
         }
 
+        #[test]
+        fn mul<Fu, F>()
+        where
+            Standard: Distribution<Fu> + Distribution<Fu::BaseField>,
+            Fu: ExtensionField + Debug + Eq + Copy,
+            for<'a> F: ExtensionField<Length = Fu::Length, BaseField: From<&'a [u8]>> + Debug + Eq + From<&'a [u8]> + Copy,
+        {
+            let mut rng = SmallRng::from_entropy();
 
-        
+            for _ in 0..RUNS {
+                let lhs1: Fu = rng.gen();
+                let rhs1: Fu::BaseField = rng.gen::<Fu::BaseField>();
+
+                let lhs2 = F::from(lhs1.as_bytes().as_slice());
+                let rhs2 = F::BaseField::from(rhs1.as_bytes().as_slice());
+
+                let r1 = lhs1 * rhs1;
+                let r2 = lhs2 * rhs2;
+                assert_eq!(r1.as_bytes(), r2.as_bytes());
+            }
+        }
 
         #[instantiate_tests(<UnoptimizedGF384, GF384>)]
         mod gf384 {}
