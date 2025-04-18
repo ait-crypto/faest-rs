@@ -13,7 +13,7 @@ use generic_array::{
 };
 use itertools::{chain, izip};
 
-use crate::fields::{BigGaloisField, Field, GF128, GF192, GF256, GF384, GF576, GF64, GF768};
+use crate::fields::{BigGaloisField, ExtensionField, Field, GF128, GF192, GF256, GF384, GF576, GF64, GF768};
 
 use crate::prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree};
 
@@ -385,7 +385,7 @@ where
         + Mul<Self::F, Output = Self::ExtensionField>,
 {
     type F: Field + for<'a> From<&'a [u8]>;
-    type ExtensionField: Field<Length = Self::LambdaBytesTimes3>;
+    type ExtensionField: ExtensionField<Length = Self::LambdaBytesTimes3, BaseField = Self::F>;
     type Lambda: ArrayLength;
     type LambdaBytes: ArrayLength;
     type LambdaBytesTimes2: ArrayLength;

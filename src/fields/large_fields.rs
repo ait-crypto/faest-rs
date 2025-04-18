@@ -9,7 +9,7 @@ use std::{
     },
 };
 
-use super::{Double, Field, Square, GF64, GF8};
+use super::{Double, Field, ExtensionField, Square, GF64, GF8};
 
 use generic_array::{
     typenum::{U16, U24, U32, U48, U72, U96},
@@ -1463,11 +1463,13 @@ impl ClearHighBits for GF384 {
     }
 }
 
-impl Field for GF384 {
+impl ExtensionField for GF384 {
     const ZERO: Self = Self([0, 0, 0]);
     const ONE: Self = Self([1, 0, 0]);
 
     type Length = U48;
+
+    type BaseField = GF128;
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::default();
@@ -1549,11 +1551,13 @@ impl ClearHighBits for GF576 {
     }
 }
 
-impl Field for GF576 {
+impl ExtensionField for GF576 {
     const ZERO: Self = Self([0, 0, 0, 0, 0]);
     const ONE: Self = Self([1, 0, 0, 0, 0]);
 
     type Length = U72;
+
+    type BaseField = GF192;
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::default();
@@ -1648,11 +1652,13 @@ impl ClearHighBits for GF768 {
     }
 }
 
-impl Field for GF768 {
+impl ExtensionField for GF768 {
     const ZERO: Self = Self([0, 0, 0, 0, 0, 0]);
     const ONE: Self = Self([1, 0, 0, 0, 0, 0]);
 
     type Length = U96;
+
+    type BaseField = GF256;
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::default();

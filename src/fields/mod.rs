@@ -82,3 +82,39 @@ pub(crate) trait Square {
     /// Square an element
     fn square(self) -> Self::Output;
 }
+
+
+/// Trait covering the basic functionality of an extension field
+///
+/// The implementation in general does not require field elements to be
+/// inverted. As such, no function to invert elements is provided.
+/// Furthermore, we only require extension field elements to support multiplication for base field elements.
+pub(crate) trait ExtensionField:
+    Sized
+    + Default
+    + Add<Self, Output = Self>
+    + AddAssign
+    + Sub<Self, Output = Self>
+    + SubAssign
+    + Neg<Output = Self>
+    + Mul<Self::BaseField, Output = Self>
+    + for<'a> Mul<&'a Self::BaseField, Output = Self>
+{
+    /// Representation of `0`
+    const ZERO: Self;
+
+    /// Representation of `1`
+    const ONE: Self;
+
+    /// Length of the byte representation of the field
+    type Length: ArrayLength;
+
+    /// Base field of the extension field
+    type BaseField: Field;
+
+    /// Obtain byte representation of the field element
+    fn as_bytes(&self) -> GenericArray<u8, Self::Length>;
+
+    /// Obtain a boxed byte representation of the field element
+    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>>;
+} 
