@@ -135,15 +135,18 @@ where
 
     // Step 2
     // As in steps 8,9 we only work with two rows at a time, we just allocate 2 r-vectors
-    let mut rj: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
+    let mut rj: Vec<Box<GenericArray<u8, LHatBytes>>> = Vec::with_capacity(ni);
     let mut rj1: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
 
     debug_assert!(sd.len() == ni || sd.len() + 1 == ni);
     let offset = (sd.len() != ni) as usize;
 
     // Step 3,4
-    for (i, sdi) in sd.enumerate() {
-        BAVC::PRG::new_prg(sdi, iv, twk).read(&mut rj[i + offset]);
+    if offset != 0 {
+        rj.push(GenericArray::default_boxed());
+    }
+    for sdi in sd {
+        rj.push(BAVC::PRG::new_prg(sdi, iv, twk).read_into_boxed());
     }
 
     let vcol_offset = BAVC::TAU::bavc_depth_offset(round as usize);
