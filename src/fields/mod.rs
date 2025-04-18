@@ -83,7 +83,6 @@ pub(crate) trait Square {
     fn square(self) -> Self::Output;
 }
 
-
 /// Trait covering the basic functionality of an extension field
 ///
 /// The implementation in general does not require field elements to be
@@ -117,4 +116,4 @@ pub(crate) trait ExtensionField:
 
     /// Obtain a boxed byte representation of the field element
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>>;
-} 
+}

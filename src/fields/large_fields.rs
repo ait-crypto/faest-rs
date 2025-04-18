@@ -9,7 +9,7 @@ use std::{
     },
 };
 
-use super::{Double, Field, ExtensionField, Square, GF64, GF8};
+use super::{Double, ExtensionField, Field, Square, GF64, GF8};
 
 use generic_array::{
     typenum::{U16, U24, U32, U48, U72, U96},
