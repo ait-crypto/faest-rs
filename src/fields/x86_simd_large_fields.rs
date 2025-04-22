@@ -4,7 +4,10 @@
 use std::arch::x86 as x86_64;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::{
+    arch::x86_64::{_mm256_set_m128i, _mm_xor_pd},
+    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+};
 use x86_64::{
     __m128i, __m256i, _mm256_and_si256, _mm256_blend_epi32, _mm256_blendv_epi8, _mm256_cmpeq_epi32,
     _mm256_extracti128_si256, _mm256_loadu_si256, _mm256_maskload_epi64, _mm256_maskstore_epi64,
@@ -2148,31 +2151,33 @@ impl ExtensionField for GF384 {
 
 /// Optimized implementation of the 576 bit Galois field
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct GF576(u64, __m256i, __m256i);
+pub(crate) struct GF576(__m256i, __m256i, u64);
 
 impl Default for GF576 {
     #[inline(always)]
     fn default() -> Self {
-        Self(0, unsafe { _mm256_setzero_si256() }, unsafe {
-            _mm256_setzero_si256()
-        })
+        Self(
+            unsafe { _mm256_setzero_si256() },
+            unsafe { _mm256_setzero_si256() },
+            0,
+        )
     }
 }
 
 impl PartialEq for GF576 {
     fn eq(&self, other: &Self) -> bool {
         unsafe {
-            let tmp = _mm256_xor_si256(self.1, other.1);
+            let tmp = _mm256_xor_si256(self.0, other.0);
 
             let mut eq = true;
 
             eq &= _mm256_testz_si256(tmp, tmp) == 1;
 
-            let tmp = _mm256_xor_si256(self.2, other.2);
+            let tmp = _mm256_xor_si256(self.1, other.1);
 
             eq &= _mm256_testz_si256(tmp, tmp) == 1;
 
-            eq & (self.0 == other.0)
+            eq & (self.2 == other.2)
         }
     }
 }
@@ -2187,9 +2192,9 @@ impl Add for GF576 {
     #[inline(always)]
     fn add(self, rhs: Self) -> Self::Output {
         Self(
-            self.0 ^ rhs.0,
+            unsafe { _mm256_xor_si256(self.0, rhs.0) },
             unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            unsafe { _mm256_xor_si256(self.2, rhs.2) },
+            self.2 ^ rhs.2,
         )
     }
 }
@@ -2200,9 +2205,9 @@ impl Add<&Self> for GF576 {
     #[inline(always)]
     fn add(self, rhs: &Self) -> Self::Output {
         Self(
-            self.0 ^ rhs.0,
+            unsafe { _mm256_xor_si256(self.0, rhs.0) },
             unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            unsafe { _mm256_xor_si256(self.2, rhs.2) },
+            self.2 ^ rhs.2,
         )
     }
 }
@@ -2213,9 +2218,9 @@ impl Add<GF576> for &GF576 {
     #[inline(always)]
     fn add(self, rhs: GF576) -> Self::Output {
         GF576(
-            self.0 ^ rhs.0,
+            unsafe { _mm256_xor_si256(self.0, rhs.0) },
             unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            unsafe { _mm256_xor_si256(self.2, rhs.2) },
+            self.2 ^ rhs.2,
         )
     }
 }
@@ -2223,18 +2228,18 @@ impl Add<GF576> for &GF576 {
 impl AddAssign for GF576 {
     #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
-        self.0 ^= rhs.0;
+        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
         self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
-        self.2 = unsafe { _mm256_xor_si256(self.2, rhs.2) };
+        self.2 ^= rhs.2;
     }
 }
 
 impl AddAssign<&Self> for GF576 {
     #[inline(always)]
     fn add_assign(&mut self, rhs: &Self) {
-        self.0 ^= rhs.0;
+        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
         self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
-        self.2 = unsafe { _mm256_xor_si256(self.2, rhs.2) };
+        self.2 ^= rhs.2;
     }
 }
 
@@ -2295,62 +2300,97 @@ impl From<&[u8]> for GF576 {
     fn from(value: &[u8]) -> Self {
         debug_assert_eq!(value.len(), <Self as ExtensionField>::Length::USIZE);
         Self(
-            u64::from_le_bytes(value[..8].try_into().unwrap()),
-            unsafe { _mm256_loadu_si256(value.as_ptr().add(8).cast()) },
-            unsafe { _mm256_loadu_si256(value.as_ptr().add(40).cast()) },
+            unsafe { _mm256_loadu_si256(value.as_ptr().cast()) },
+            unsafe { _mm256_loadu_si256(value.as_ptr().add(32).cast()) },
+            u64::from_le_bytes(value[64..].try_into().unwrap()),
         )
     }
 }
 
 const GF576_MOD_M128: __m128i = u128_as_m128(UnoptimizedGF576::MODULUS);
 
-fn mul_gf576_gf192(lhs: (u64, __m256i, __m256i), rhs: __m256i) -> (__m256i, __m256i) {
+unsafe fn poly896_reduce576(x: [__m128i; 6]) -> (__m256i, __m256i, u64) {
+    let xmod = [
+        m128_clmul_lh(GF576_MOD_M128, x[4]),
+        m128_clmul_ll(GF576_MOD_M128, x[5]), //2^64
+        m128_clmul_lh(GF576_MOD_M128, x[5]), //2^128
+    ];
+
+    let xmod_combined = [
+        _mm_xor_si128(xmod[0], _mm_slli_si128(xmod[1], 8)),
+        _mm_xor_si128(xmod[2], _mm_srli_si128(xmod[1], 8)),
+    ];
+
+    (
+        _mm256_set_m128i(
+            _mm_xor_si128(x[1], xmod_combined[1]),
+            _mm_xor_si128(x[0], xmod_combined[0]),
+        ),
+        _mm256_set_m128i(x[3], x[2]),
+        GF128ConstHelper { a: x[4] }.c[0],
+    )
+}
+
+fn mul_gf576_gf192(lhs: (__m256i, __m256i, u64), rhs: __m256i) -> (__m256i, __m256i, u64) {
     unsafe {
-        let x0 = _mm_set_epi64x(0, lhs.0 as i64);
-        let x1 = _mm256_extracti128_si256(lhs.1, 0);
-        let x2 = _mm256_extracti128_si256(lhs.1, 1);
-        let x3 = _mm256_extracti128_si256(lhs.2, 0);
-        let x4 = _mm256_extracti128_si256(lhs.2, 1);
+        let x0 = _mm256_extracti128_si256(lhs.0, 0);
+        let x1 = _mm256_extracti128_si256(lhs.0, 1);
+        let x2 = _mm256_extracti128_si256(lhs.1, 0);
+        let x3 = _mm256_extracti128_si256(lhs.1, 1);
+        let x4 = _mm_set_epi64x(0, lhs.2 as i64);
 
         let y0 = _mm256_extracti128_si256(rhs, 0);
         let y1 = _mm256_extracti128_si256(rhs, 1);
+        let ysum = _mm_xor_si128(y0, y1);
 
-        let tmp = m128_clmul_lh(x0, y0);
-        let x0y0 = [
-            _mm_xor_si128(m128_clmul_ll(x0, y0), _mm_slli_si128(tmp, 8)),
+        let x0y0 = karatsuba_mul_128_uncombined(x0, y0);
+        let xsum_low_ysum = karatsuba_mul_128_uncombined(_mm_xor_si128(x0, x1), ysum);
+        let x1y1 = [m128_clmul_ll(y1, x1), m128_clmul_lh(y1, x1)];
+        let x0y0_2_plus_x1y1_0 = _mm_xor_si128(x0y0[2], x1y1[0]);
+
+        let x2y0 = karatsuba_mul_128_uncombined(x2, y0);
+        let xsum_high_ysum = karatsuba_mul_128_uncombined(_mm_xor_si128(x2, x3), ysum);
+        let x3y1 = [m128_clmul_ll(y1, x3), m128_clmul_lh(y1, x3)];
+        let x2y0_2_plus_x3y1_0 = _mm_xor_si128(x2y0[2], x3y1[0]);
+
+        let tmp = m128_clmul_lh(x4, y0);
+        let x4y0 = [
+            _mm_xor_si128(m128_clmul_ll(x4, y0), _mm_slli_si128(tmp, 8)),
             _mm_srli_si128(tmp, 8),
         ];
 
-        let tmp = m128_clmul_lh(x0, y1);
-        let x0y1 = [
-            _mm_xor_si128(m128_clmul_ll(x0, y1), _mm_slli_si128(tmp, 8)),
-            _mm_srli_si128(tmp, 8),
+        let x4y1 = m128_clmul_ll(x4, y1);
+
+        let tmp = [
+            //128
+            _mm_xor_si128(xsum_low_ysum[0], _mm_xor_si128(x0y0[0], x0y0_2_plus_x1y1_0)),
+            _mm_xor_si128(xsum_low_ysum[1], _mm_xor_si128(x0y0[1], x1y1[1])),
+            //256
+            _mm_xor_si128(_mm_xor_si128(xsum_low_ysum[2], x2y0[0]), x0y0_2_plus_x1y1_0),
+            _mm_xor_si128(x1y1[1], x2y0[1]),
+            //384
+            _mm_xor_si128(
+                xsum_high_ysum[0],
+                _mm_xor_si128(x2y0[0], x2y0_2_plus_x3y1_0),
+            ),
+            _mm_xor_si128(xsum_high_ysum[1], _mm_xor_si128(x2y0[1], x3y1[1])),
+            //512
+            _mm_xor_si128(xsum_high_ysum[2], x2y0_2_plus_x3y1_0),
         ];
 
-        let x1y0 = karatsuba_mul_128_uncombined(x1, y0);
+        let combined = [
+            _mm_xor_si128(x0y0[0], _mm_slli_si128(x0y0[1], 8)),
+            _mm_xor_si128(tmp[0], _mm_alignr_epi8(tmp[1], x0y0[1], 8)),
+            _mm_xor_si128(tmp[2], _mm_alignr_epi8(tmp[3], tmp[1], 8)),
+            _mm_xor_si128(tmp[4], _mm_alignr_epi8(tmp[5], tmp[3], 8)),
+            _mm_xor_si128(
+                _mm_xor_si128(tmp[6], x4y0[0]),
+                _mm_alignr_epi8(x3y1[1], tmp[5], 8),
+            ),
+            _mm_xor_si128(x4y0[1], _mm_xor_si128(_mm_srli_si128(x3y1[1], 8), x4y1)),
+        ];
 
-        let x2y1 = karatsuba_mul_128_uncombined(x2, y1);
-
-        let x3y0 = karatsuba_mul_128_uncombined(x3, y0);
-        let x4y1 = karatsuba_mul_128_uncombined(x3, y1);
-
-        // let x0y0 = karatsuba_mul_128_uncombined(x0, y0);
-        // let x1y0 = karatsuba_mul_128_uncombined(x1, y0);
-        // let x2y0 = karatsuba_mul_128_uncombined(x2, y0);
-
-        // let tmp1 = _mm_xor_si128(x0y0[2], _mm_alignr_epi8(x1y0[1], x0y0[1], 8));
-        // let tmp2 = _mm_xor_si128(x1y0[2], _mm_alignr_epi8(x2y0[1], x1y0[1], 8));
-
-        // let combined = [
-        //     _mm_xor_si128(x0y0[0], _mm_slli_si128(x0y0[1], 8)),
-        //     _mm_xor_si128(x1y0[0], tmp1),
-        //     _mm_xor_si128(x2y0[0], tmp2),
-        //     _mm_xor_si128(x2y0[2], _mm_srli_si128(x2y0[1], 8)),
-        // ];
-
-        // poly512_reduce384(combined)
-
-        todo!("implement")
+        poly896_reduce576(combined)
     }
 }
 
@@ -2359,7 +2399,8 @@ impl Mul<GF192> for GF576 {
 
     #[inline(always)]
     fn mul(self, rhs: GF192) -> Self::Output {
-        todo!("Implement")
+        let res = mul_gf576_gf192((self.0, self.1, self.2), rhs.0);
+        Self(res.0, res.1, res.2)
     }
 }
 
@@ -2368,13 +2409,14 @@ impl Mul<&GF192> for GF576 {
 
     #[inline(always)]
     fn mul(self, rhs: &GF192) -> Self::Output {
-        todo!("Implement")
+        let res = mul_gf576_gf192((self.0, self.1, self.2), rhs.0);
+        Self(res.0, res.1, res.2)
     }
 }
 
 impl ExtensionField for GF576 {
-    const ZERO: Self = Self(0, u64_as_m256(0), u64_as_m256(0));
-    const ONE: Self = Self(1, u64_as_m256(0), u64_as_m256(0));
+    const ZERO: Self = Self(u64_as_m256(0), u64_as_m256(0), 0);
+    const ONE: Self = Self(u64_as_m256(1), u64_as_m256(0), 0);
 
     type Length = U72;
 
@@ -2382,17 +2424,17 @@ impl ExtensionField for GF576 {
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::<u8, Self::Length>::default();
-        ret[..8].copy_from_slice(&self.0.to_le_bytes());
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(8).cast(), self.1) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(40).cast(), self.2) };
+        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
+        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1) };
+        ret[64..].copy_from_slice(&self.2.to_le_bytes());
         ret
     }
 
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
-        ret[..8].copy_from_slice(&self.0.to_le_bytes());
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(8).cast(), self.1) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(40).cast(), self.2) };
+        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
+        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1) };
+        ret[64..].copy_from_slice(&self.2.to_le_bytes());
         ret
     }
 }
@@ -2708,7 +2750,7 @@ mod test {
         #[instantiate_tests(<UnoptimizedGF384, GF384>)]
         mod gf384 {}
 
-        // #[instantiate_tests(<UnoptimizedGF576, GF576>)]
-        // mod gf576 {}
+        #[instantiate_tests(<UnoptimizedGF576, GF576>)]
+        mod gf576 {}
     }
 }
