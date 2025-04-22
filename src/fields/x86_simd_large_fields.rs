@@ -2137,14 +2137,22 @@ impl ExtensionField for GF384 {
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::<u8, Self::Length>::default();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe { _mm256_storeu_si256(ret[32..].as_mut_ptr().cast(), self.1) };
+        unsafe {_mm256_maskstore_epi64(
+            ret[32..].as_mut_ptr().cast(),
+            _mm256_setr_epi64x(i64::MIN, i64::MIN, 0, 0),
+            self.1,
+        )};
         ret
     }
 
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe { _mm256_storeu_si256(ret[32..].as_mut_ptr().cast(), self.1) };
+        unsafe {_mm256_maskstore_epi64(
+            ret[32..].as_mut_ptr().cast(),
+            _mm256_setr_epi64x(i64::MIN, i64::MIN, 0, 0),
+            self.1,
+        )};
         ret
     }
 }
@@ -2296,7 +2304,7 @@ impl From<&[u8]> for GF576 {
         debug_assert_eq!(value.len(), <Self as ExtensionField>::Length::USIZE);
         Self(
             unsafe { _mm256_loadu_si256(value.as_ptr().cast()) },
-            unsafe { _mm256_loadu_si256(value.as_ptr().add(32).cast()) },
+            unsafe { _mm256_loadu_si256(value[32..].as_ptr().cast()) },
             u64::from_le_bytes(value[64..].try_into().unwrap()),
         )
     }
@@ -2420,7 +2428,7 @@ impl ExtensionField for GF576 {
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::<u8, Self::Length>::default();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1) };
+        unsafe { _mm256_storeu_si256(ret[32..].as_mut_ptr().cast(), self.1) };
         ret[64..].copy_from_slice(&self.2.to_le_bytes());
         ret
     }
@@ -2428,7 +2436,7 @@ impl ExtensionField for GF576 {
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1) };
+        unsafe { _mm256_storeu_si256(ret[32..].as_mut_ptr().cast(), self.1) };
         ret[64..].copy_from_slice(&self.2.to_le_bytes());
         ret
     }
@@ -2582,8 +2590,8 @@ impl From<&[u8]> for GF768 {
         debug_assert_eq!(value.len(), <Self as ExtensionField>::Length::USIZE);
         Self(
             unsafe { _mm256_loadu_si256(value.as_ptr().cast()) },
-            unsafe { _mm256_loadu_si256(value.as_ptr().add(32).cast()) },
-            unsafe { _mm256_loadu_si256(value.as_ptr().add(64).cast()) },
+            unsafe { _mm256_loadu_si256(value[32..].as_ptr().cast()) },
+            unsafe { _mm256_loadu_si256(value[64..].as_ptr().cast()) },
         )
     }
 }
@@ -2727,16 +2735,16 @@ impl ExtensionField for GF768 {
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::<u8, Self::Length>::default();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(64).cast(), self.2) };
+        unsafe { _mm256_storeu_si256(ret[32..].as_mut_ptr().cast(), self.1) };
+        unsafe { _mm256_storeu_si256(ret[64..].as_mut_ptr().cast(), self.2) };
         ret
     }
 
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(64).cast(), self.2) };
+        unsafe { _mm256_storeu_si256(ret[32..].as_mut_ptr().cast(), self.1) };
+        unsafe { _mm256_storeu_si256(ret[64..].as_mut_ptr().cast(), self.2) };
         ret
     }
 }
@@ -3047,6 +3055,36 @@ mod test {
                 let r2 = lhs2 * rhs2;
                 assert_eq!(r1.as_bytes(), r2.as_bytes());
             }
+        }
+
+        #[test]
+        fn serialization<Fu, F>()
+        where
+        Standard: Distribution<Fu> + Distribution<Fu::BaseField>,
+        Fu: ExtensionField + Debug + Eq + Copy,
+        for<'a> F: ExtensionField<Length = Fu::Length, BaseField: From<&'a [u8]>>
+            + Debug
+            + Eq
+            + From<&'a [u8]>
+            + Copy
+        {
+            let mut rng = SmallRng::from_entropy();
+            for _ in 0..RUNS {
+                let bytes: Fu = rng.gen();
+
+                let elem = F::from(bytes.as_bytes().as_slice());
+                assert_eq!(elem.as_bytes(), bytes.as_bytes());
+                
+                let elem_bytes_1 = elem.as_bytes();
+                let elem_bytes_2 = elem.as_boxed_bytes();
+
+                let elem1 = F::from(elem_bytes_1.as_slice());
+                let elem2 = F::from(elem_bytes_2.as_slice());
+
+                assert_eq!(elem, elem1);
+                assert_eq!(elem, elem2);
+            }
+
         }
 
         #[instantiate_tests(<UnoptimizedGF384, GF384>)]
