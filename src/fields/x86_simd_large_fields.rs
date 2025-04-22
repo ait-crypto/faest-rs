@@ -2056,9 +2056,9 @@ impl From<(__m256i, __m256i)> for GF384 {
     }
 }
 
-impl Into<(__m256i, __m256i)> for GF384 {
-    fn into(self) -> (__m256i, __m256i) {
-        (self.0, self.1)
+impl From<GF384> for (__m256i, __m256i) {
+    fn from(value: GF384) -> Self {
+        (value.0, value.1)
     }
 }
 
@@ -2137,22 +2137,26 @@ impl ExtensionField for GF384 {
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::<u8, Self::Length>::default();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe {_mm256_maskstore_epi64(
-            ret[32..].as_mut_ptr().cast(),
-            _mm256_setr_epi64x(i64::MIN, i64::MIN, 0, 0),
-            self.1,
-        )};
+        unsafe {
+            _mm256_maskstore_epi64(
+                ret[32..].as_mut_ptr().cast(),
+                _mm256_setr_epi64x(i64::MIN, i64::MIN, 0, 0),
+                self.1,
+            )
+        };
         ret
     }
 
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe {_mm256_maskstore_epi64(
-            ret[32..].as_mut_ptr().cast(),
-            _mm256_setr_epi64x(i64::MIN, i64::MIN, 0, 0),
-            self.1,
-        )};
+        unsafe {
+            _mm256_maskstore_epi64(
+                ret[32..].as_mut_ptr().cast(),
+                _mm256_setr_epi64x(i64::MIN, i64::MIN, 0, 0),
+                self.1,
+            )
+        };
         ret
     }
 }
@@ -2193,6 +2197,7 @@ impl Add for GF576 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: Self) -> Self::Output {
         Self(
             unsafe { _mm256_xor_si256(self.0, rhs.0) },
@@ -2206,6 +2211,7 @@ impl Add<&Self> for GF576 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: &Self) -> Self::Output {
         Self(
             unsafe { _mm256_xor_si256(self.0, rhs.0) },
@@ -2219,6 +2225,7 @@ impl Add<GF576> for &GF576 {
     type Output = GF576;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: GF576) -> Self::Output {
         GF576(
             unsafe { _mm256_xor_si256(self.0, rhs.0) },
@@ -2230,6 +2237,7 @@ impl Add<GF576> for &GF576 {
 
 impl AddAssign for GF576 {
     #[inline(always)]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: Self) {
         self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
         self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
@@ -2239,6 +2247,7 @@ impl AddAssign for GF576 {
 
 impl AddAssign<&Self> for GF576 {
     #[inline(always)]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: &Self) {
         self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
         self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
@@ -2277,6 +2286,7 @@ impl Sub<GF576> for &GF576 {
 
 impl SubAssign for GF576 {
     #[inline(always)]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: Self) {
         *self += rhs;
     }
@@ -2284,6 +2294,7 @@ impl SubAssign for GF576 {
 
 impl SubAssign<&Self> for GF576 {
     #[inline(always)]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: &Self) {
         *self += rhs;
     }
@@ -2563,6 +2574,7 @@ impl Sub<GF768> for &GF768 {
 
 impl SubAssign for GF768 {
     #[inline(always)]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: Self) {
         *self += rhs;
     }
@@ -2570,6 +2582,7 @@ impl SubAssign for GF768 {
 
 impl SubAssign<&Self> for GF768 {
     #[inline(always)]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: &Self) {
         *self += rhs;
     }
@@ -2596,15 +2609,15 @@ impl From<&[u8]> for GF768 {
     }
 }
 
-impl From<(__m256i, __m256i, __m256i)> for GF768 {
-    fn from(value: (__m256i, __m256i, __m256i)) -> Self {
-        Self(value.0, value.1, value.2)
+impl From<GF768> for (__m256i, __m256i, __m256i) {
+    fn from(value: GF768) -> Self {
+        (value.0, value.1, value.2)
     }
 }
 
-impl Into<(__m256i, __m256i, __m256i)> for GF768 {
-    fn into(self) -> (__m256i, __m256i, __m256i) {
-        (self.0, self.1, self.2)
+impl From<(__m256i, __m256i, __m256i)> for GF768 {
+    fn from(value: (__m256i, __m256i, __m256i)) -> Self {
+        Self(value.0, value.1, value.2)
     }
 }
 
@@ -3060,13 +3073,13 @@ mod test {
         #[test]
         fn serialization<Fu, F>()
         where
-        Standard: Distribution<Fu> + Distribution<Fu::BaseField>,
-        Fu: ExtensionField + Debug + Eq + Copy,
-        for<'a> F: ExtensionField<Length = Fu::Length, BaseField: From<&'a [u8]>>
-            + Debug
-            + Eq
-            + From<&'a [u8]>
-            + Copy
+            Standard: Distribution<Fu> + Distribution<Fu::BaseField>,
+            Fu: ExtensionField + Debug + Eq + Copy,
+            for<'a> F: ExtensionField<Length = Fu::Length, BaseField: From<&'a [u8]>>
+                + Debug
+                + Eq
+                + From<&'a [u8]>
+                + Copy,
         {
             let mut rng = SmallRng::from_entropy();
             for _ in 0..RUNS {
@@ -3074,7 +3087,7 @@ mod test {
 
                 let elem = F::from(bytes.as_bytes().as_slice());
                 assert_eq!(elem.as_bytes(), bytes.as_bytes());
-                
+
                 let elem_bytes_1 = elem.as_bytes();
                 let elem_bytes_2 = elem.as_boxed_bytes();
 
@@ -3084,7 +3097,6 @@ mod test {
                 assert_eq!(elem, elem1);
                 assert_eq!(elem, elem2);
             }
-
         }
 
         #[instantiate_tests(<UnoptimizedGF384, GF384>)]
