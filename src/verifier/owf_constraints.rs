@@ -1,17 +1,4 @@
-use generic_array::{
-    ArrayLength, GenericArray, LengthError,
-    functional::FunctionalSequence,
-    typenum::{Prod, Quot, U1, U2, U3, U4, U8, U10, U32, Unsigned},
-};
-use itertools::multiunzip;
-use itertools::{iproduct, izip};
-use std::{
-    array,
-    borrow::Borrow,
-    default,
-    mem::size_of,
-    ops::{Add, Deref, Mul, Sub},
-};
+use generic_array::{GenericArray, typenum::Unsigned};
 
 use super::{
     encryption,
@@ -21,21 +8,12 @@ use super::{
 
 use crate::{
     aes::AddRoundKey,
-    fields::{
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Square, SumPoly,
-        large_fields::{Betas, ByteCombineSquared, FromBit, SquareBytes},
-        small_fields::{GF8, GF8_INV_NORM},
-    },
+    fields::BigGaloisField,
     internal_keys::PublicKey,
-    parameter::{BaseParameters, OWFField, OWFParameters, QSProof, TauParameters},
-    rijndael_32::{
-        RCON_TABLE, State, bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0,
-        rijndael_add_round_key, rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes,
-        sub_bytes, sub_bytes_nots,
-    },
-    universal_hashing::{ZKHasher, ZKHasherInit, ZKHasherProcess, ZKProofHasher, ZKVerifyHasher},
-    utils::{get_bit, xor_arrays},
-    zk_constraints::reshape_and_to_field,
+    parameter::{BaseParameters, OWFField, OWFParameters},
+    rijndael_32::{convert_from_batchblocks, inv_bitslice, rijndael_key_schedule},
+    universal_hashing::ZKVerifyHasher,
+    utils::get_bit,
 };
 
 pub(crate) fn owf_constraints<O>(

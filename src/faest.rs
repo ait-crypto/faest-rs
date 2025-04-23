@@ -1,12 +1,12 @@
-use std::{io::Write, iter::zip, slice::RChunks};
+use std::iter::zip;
 
 use crate::{
     Error,
-    bavc::{BatchVectorCommitment, Bavc, BavcDecommitment, BavcOpenResult},
+    bavc::{BatchVectorCommitment, BavcOpenResult},
     fields::Field,
     internal_keys::{PublicKey, SecretKey},
     parameter::{BaseParameters, FAESTParameters, OWFField, OWFParameters, TauParameters},
-    prg::{IV, IVSize, PseudoRandomGenerator},
+    prg::{IV, IVSize},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
     utils::{Reader, decode_all_chall_3},
@@ -19,7 +19,6 @@ use crate::{
 use generic_array::{GenericArray, typenum::Unsigned};
 use itertools::izip;
 use rand_core::CryptoRngCore;
-use signature::SignerMut;
 use std::iter::repeat_n;
 
 type RO<P> =
@@ -656,7 +655,7 @@ mod test {
             },
             utils::test::{hash_array, read_test_data},
         };
-        use core::hash;
+
         use serde::Deserialize;
 
         const MSG: [u8; 76] = [

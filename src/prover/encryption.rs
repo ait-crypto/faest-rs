@@ -1,19 +1,17 @@
-use super::{ByteCommitment, ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
+use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use crate::{
     aes::*,
-    fields::{Betas, BigGaloisField, FromBit, Square},
+    fields::{Betas, FromBit, Square},
     parameter::{OWFField, OWFParameters},
-    prover::aes::{StateBitsSquaredCommits, StateBytesCommits, StateBytesSquaredCommits},
+    prover::aes::{StateBitsSquaredCommits, StateBytesSquaredCommits},
     universal_hashing::ZKProofHasher,
-    utils::get_bit,
 };
 use generic_array::{
     ArrayLength, GenericArray,
-    typenum::{Prod, Quot, U2, U4, U8, Unsigned},
+    typenum::{Quot, U2, U4, U8, Unsigned},
 };
 use itertools::izip;
-use std::convert::AsRef;
-use std::ops::{AddAssign, Deref, Index, Mul};
+use std::ops::AddAssign;
 
 pub(crate) fn enc_cstrnts<O, K, S>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,
@@ -65,7 +63,7 @@ pub(crate) fn enc_cstrnts<O, K, S>(
             let s_tilde = output.add_round_key(round_key);
 
             // ::29-38
-            odd_round_cnstrnts::<O>(zk_hasher, s_tilde.get_ref(), &st_0, &st_1);
+            odd_round_cnstrnts::<O>(zk_hasher, s_tilde.to_ref(), &st_0, &st_1);
         }
     }
 }

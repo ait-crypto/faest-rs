@@ -1,20 +1,5 @@
-use crate::{
-    aes::{
-        AddRoundKey, AddRoundKeyAssign, AddRoundKeyBytes, BytewiseMixColumns, InverseAffine,
-        InverseShiftRows, MixColumns, SBoxAffine, ShiftRows, StateToBytes,
-    },
-    fields::{
-        BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquared,
-        ByteCombineSquaredConstants, Sigmas, Square,
-    },
-    parameter::{BaseParameters, OWFField, OWFParameters},
-    utils::get_bit,
-};
-use generic_array::{
-    ArrayLength, GenericArray,
-    typenum::{U4, U8, marker_traits::Unsigned},
-};
-use itertools::izip;
+use crate::{fields::BigGaloisField, utils::get_bit};
+use generic_array::{ArrayLength, GenericArray, typenum::U8};
 use std::ops::Range;
 use std::ops::{Index, Mul};
 
@@ -29,16 +14,6 @@ where
     F: BigGaloisField,
     L: ArrayLength,
 {
-    pub(crate) fn get_commits_ref<L2>(&self, start_idx: usize) -> VoleCommitsRef<'_, F, L2>
-    where
-        L2: ArrayLength,
-    {
-        VoleCommitsRef {
-            scalars: GenericArray::from_slice(&self.scalars[start_idx..start_idx + L2::USIZE]),
-            delta: self.delta,
-        }
-    }
-
     /// Turns the input array into vole commitments using the challenge delta.
     pub(crate) fn from_constant<L2>(
         input: &GenericArray<u8, L>,

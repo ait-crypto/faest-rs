@@ -5,19 +5,17 @@ use crate::{
         InverseShiftRows, MixColumns, SBoxAffine, ShiftRows, StateToBytes,
     },
     fields::{
-        ByteCombine, Sigmas, Square,
+        ByteCombine, Square,
         large_fields::{Betas, ByteCombineSquared, SquareBytes},
     },
     parameter::{OWFField, OWFParameters},
     universal_hashing::ZKVerifyHasher,
 };
 use generic_array::{
-    ArrayLength, GenericArray,
+    GenericArray,
     typenum::{Quot, U2, U4, U8, Unsigned},
 };
 use itertools::izip;
-use std::ops::{AddAssign, Deref, Index};
-use std::{convert::AsRef, process::Output};
 
 pub(crate) fn enc_cstrnts<'a, O, K>(
     zk_hasher: &mut ZKVerifyHasher<OWFField<O>>,
@@ -189,21 +187,6 @@ where
                 + OWFField::<O>::BETA_CUBES[j] * x[3]
         })
         .collect()
-}
-
-fn inverse_affine_byte<O>(
-    x: u8,
-    x_0: &GenericArray<OWFField<O>, U8>,
-    y: &mut u8,
-    y_0: &mut [OWFField<O>],
-) where
-    O: OWFParameters,
-{
-    *y = x.rotate_right(7) ^ x.rotate_right(5) ^ x.rotate_right(2) ^ 0x5;
-
-    for i in 0..8 {
-        y_0[i] = x_0[(i + 8 - 1) % 8] + x_0[(i + 8 - 3) % 8] + x_0[(i + 8 - 6) % 8];
-    }
 }
 
 pub(crate) fn f256_f2_conjugates<O>(

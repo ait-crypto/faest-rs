@@ -111,6 +111,7 @@ pub trait SquareBytes: Field {
 }
 
 /// Trait providing methods for "squared byte combination"
+#[allow(dead_code)]
 pub trait ByteCombineSquared: Field {
     fn byte_combine_sq(x: &[Self; 8]) -> Self;
     fn byte_combine_sq_slice(x: &[Self]) -> Self;

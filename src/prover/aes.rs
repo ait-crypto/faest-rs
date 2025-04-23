@@ -1,27 +1,22 @@
 use crate::{
     aes::*,
     fields::{
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Sigmas, SumPoly,
-        large_fields::{Betas, ByteCombineSquared, ByteCombineSquaredConstants, SquareBytes},
-        small_fields::{GF8, GF8_INV_NORM},
+        BigGaloisField, ByteCombine, ByteCombineConstants, Sigmas,
+        large_fields::ByteCombineSquaredConstants,
     },
     parameter::{BaseParameters, OWFField, OWFParameters, SecurityParameter},
-    universal_hashing::ZKProofHasher,
     utils::get_bits,
 };
 
-use super::{ByteCommitment, ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
+use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use generic_array::{
     ArrayLength, GenericArray,
-    typenum::{Prod, Quot, U2, U4, U8, Unsigned},
+    typenum::{Prod, U4, U8, Unsigned},
 };
 use itertools::izip;
-use std::convert::AsRef;
-use std::ops::{AddAssign, Deref, Index, Mul};
+use std::ops::{AddAssign, Mul};
 
 // Helper type aliases
-pub(crate) type StateBitsCommits<O> =
-    Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
 
 pub(crate) type StateBitsSquaredCommits<O> =
     Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
@@ -82,10 +77,10 @@ where
     type Output = ByteCommits<F, L>;
 
     fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
-        ByteCommits {
-            keys: self.keys.iter().zip(rhs).map(|(a, b)| a ^ b).collect(),
-            tags: <Box<GenericArray<F, Prod<L, U8>>>>::from_iter(self.tags.to_owned()),
-        }
+        ByteCommits::new(
+            self.keys.iter().zip(rhs).map(|(a, b)| a ^ b).collect(),
+            self.tags.to_owned(),
+        )
     }
 }
 

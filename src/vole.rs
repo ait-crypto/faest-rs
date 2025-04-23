@@ -1,6 +1,4 @@
 use std::{
-    f32::consts::TAU,
-    iter::zip,
     marker::PhantomData,
     mem::swap,
     ops::{Index, IndexMut, Mul},
@@ -12,14 +10,12 @@ use crate::{
         BavcReconstructResult,
     },
     parameter::TauParameters,
-    prg::{IV, PseudoRandomGenerator, Twk},
-    random_oracles::{Hasher, RandomOracle},
-    universal_hashing::{B, LeafHasher},
+    prg::{IV, PseudoRandomGenerator},
     utils::{Reader, decode_all_chall_3},
 };
 use generic_array::{
-    ArrayLength, GenericArray, box_arr,
-    typenum::{Prod, U2, U3, U8, U128, Unsigned},
+    ArrayLength, GenericArray,
+    typenum::{Prod, U2, U8, Unsigned},
 };
 use itertools::izip;
 
@@ -285,31 +281,19 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::{f64::consts::TAU, str::FromStr};
 
     use super::*;
 
-    use generic_array::{
-        GenericArray,
-        sequence::GenericSequence,
-        typenum::{U210, U434, U486},
-    };
+    use generic_array::GenericArray;
     use serde::Deserialize;
 
     use crate::{
         bavc::{
-            self, BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast,
-            BAVC192FastEM, BAVC192Small, BAVC192SmallEM, BAVC256Fast, BAVC256FastEM, BAVC256Small,
-            BAVC256SmallEM, BatchVectorCommitment,
+            BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast, BAVC192FastEM,
+            BAVC192Small, BAVC192SmallEM, BAVC256Fast, BAVC256FastEM, BAVC256Small, BAVC256SmallEM,
+            BatchVectorCommitment,
         },
-        parameter::{
-            MAX_TAU, OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM, OWFParameters,
-            Tau128Fast, Tau128Small, Tau192Fast, Tau192Small, Tau256Fast, Tau256FastEM,
-            Tau256Small,
-        },
-        prg::PRG128,
-        random_oracles::RandomOracleShake128,
-        universal_hashing::LeafHasher128,
+        parameter::{OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM, OWFParameters},
         utils::test::{hash_array, read_test_data},
     };
 

@@ -1,12 +1,5 @@
-use crate::fields::{BigGaloisField, GF8, Square};
-use generic_array::{
-    ArrayLength, GenericArray,
-    typenum::{Prod, U8},
-};
-use std::{
-    ops::{Add, AddAssign, Index, Mul, MulAssign, Neg},
-    sync::Arc,
-};
+use crate::fields::{BigGaloisField, Square};
+use std::ops::{Add, AddAssign, Mul};
 
 /// Represents a polynomial commitment in GF of degree one
 #[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
@@ -204,19 +197,6 @@ where
 {
     pub(crate) key: F,
     pub(crate) tag: [F; 2],
-}
-
-impl<F> FieldCommitDegTwo<F>
-where
-    F: BigGaloisField,
-{
-    /// Lifts a field element to a degree 2 polynomial commitment
-    pub(crate) fn from_field(c: &F) -> Self {
-        FieldCommitDegTwo {
-            key: *c,
-            tag: [F::ZERO, F::ZERO],
-        }
-    }
 }
 
 impl<F> Mul<F> for FieldCommitDegTwo<F>
@@ -477,7 +457,6 @@ where
 mod test {
     use super::*;
     use crate::fields::{Field, GF128};
-    use rand::{Rng, RngCore, SeedableRng, rngs::SmallRng};
 
     #[test]
     fn field_commit_mul() {

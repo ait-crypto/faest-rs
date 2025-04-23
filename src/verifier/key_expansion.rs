@@ -1,25 +1,16 @@
 use super::vole_commitments::{VoleCommits, VoleCommitsRef};
 use crate::{
-    aes::{
-        AddRoundKey, AddRoundKeyAssign, AddRoundKeyBytes, BytewiseMixColumns, InverseAffine,
-        InverseShiftRows, MixColumns, SBoxAffine, ShiftRows, StateToBytes,
-    },
-    fields::{
-        ByteCombine, Sigmas, Square,
-        large_fields::{Betas, ByteCombineSquared, SquareBytes},
-    },
+    fields::{ByteCombine, large_fields::ByteCombineSquared},
     parameter::{OWFField, OWFParameters},
     rijndael_32::RCON_TABLE,
     universal_hashing::ZKVerifyHasher,
     utils::get_bit,
 };
 use generic_array::{
-    ArrayLength, GenericArray,
-    typenum::{Prod, Quot, U2, U4, U8, Unsigned},
+    GenericArray,
+    typenum::{Prod, U8, Unsigned},
 };
 use itertools::iproduct;
-use std::ops::{AddAssign, Deref, Index};
-use std::{convert::AsRef, process::Output};
 
 pub(crate) fn key_exp_fwd<O>(
     w: VoleCommitsRef<OWFField<O>, O::LKE>,

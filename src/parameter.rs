@@ -1,7 +1,4 @@
-use std::{
-    ops::{Add, Div, Mul, Sub},
-    process::Output,
-};
+use std::ops::{Add, Div, Mul, Sub};
 
 use aes::{
     Aes128Enc, Aes192Enc, Aes256Enc,
@@ -10,13 +7,11 @@ use aes::{
 use generic_array::{
     ArrayLength, GenericArray,
     typenum::{
-        self, Diff, Prod, Quot, Sum, U0, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13,
-        U14, U16, U17, U20, U22, U23, U24, U26, U32, U33, U40, U44, U48, U52, U56, U60, U64, U68,
-        U96, U102, U103, U110, U112, U120, U128, U142, U152, U160, U162, U163, U176, U192, U200,
-        U212, U216, U218, U234, U245, U246, U256, U260, U280, U288, U312, U320, U336, U340, U380,
-        U384, U388, U408, U410, U448, U460, U470, U476, U500, U506, U511, U512, U548, U576, U584,
-        U596, U600, U640, U672, U688, U696, U752, U756, U828, U832, U906, U924, U948, U960, U984,
-        U992, U1000, U1024, U2048, U4096, U8192, U16384, U32768, U65536, Unsigned,
+        Diff, Prod, Quot, Sum, U0, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U14, U16,
+        U17, U20, U22, U23, U24, U26, U32, U40, U48, U52, U60, U64, U102, U103, U110, U112, U120,
+        U128, U160, U162, U163, U176, U192, U216, U218, U234, U245, U246, U256, U260, U312, U336,
+        U340, U380, U384, U388, U448, U476, U506, U512, U548, U672, U696, U832, U906, U924, U948,
+        U984, U1000, U1024, U2048, U4096, Unsigned,
     },
 };
 use rand_core::RngCore;
@@ -25,7 +20,7 @@ use crate::{
     bavc::{
         BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast, BAVC192FastEM,
         BAVC192Small, BAVC192SmallEM, BAVC256Fast, BAVC256FastEM, BAVC256Small, BAVC256SmallEM,
-        BatchVectorCommitment, Bavc,
+        BatchVectorCommitment,
     },
     fields::{BigGaloisField, GF128, GF192, GF256},
     internal_keys::{PublicKey, SecretKey},
@@ -703,7 +698,6 @@ impl OWFParameters for OWF192EM {
 }
 
 type U2432 = Sum<U2048, U384>;
-type U2688 = Sum<Prod<U1000, U2>, U688>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct OWF256EM;
@@ -869,8 +863,6 @@ pub(crate) trait TauParameters {
         Self::L::USIZE - 1 + Self::Tau::USIZE * tmp + Self::Tau1::USIZE * (j & mask) + i
     }
 }
-
-pub const MAX_TAU: usize = 32;
 
 // FAEST
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1213,10 +1205,9 @@ mod test {
 
     use serde::Deserialize;
 
-    use crate::utils::test::read_test_data;
-
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
+    #[allow(dead_code)]
     struct DataChalDec {
         chal: Vec<u8>,
         i: [usize; 1],

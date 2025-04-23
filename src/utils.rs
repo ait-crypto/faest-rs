@@ -1,12 +1,6 @@
-use std::ops::Add;
-use std::{array, f32::consts::TAU, io::Read, iter::zip};
-
-use generic_array::typenum::bit;
 use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
-use itertools::iproduct;
 
-use crate::fields::Field;
-use crate::{fields::ByteCombine, parameter::TauParameters};
+use crate::parameter::TauParameters;
 
 /// Reader interface for PRGs and random oracles
 pub(crate) trait Reader {
@@ -176,10 +170,7 @@ pub(crate) mod test {
     }
 
     pub(crate) fn hash_array(data: &[u8]) -> Vec<u8> {
-        use sha3::{
-            Shake256,
-            digest::{ExtendableOutput, Update, XofReader},
-        };
+        use sha3::digest::{ExtendableOutput, Update, XofReader};
 
         let mut hasher = sha3::Shake256::default();
         hasher.update(data);

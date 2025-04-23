@@ -1,15 +1,11 @@
 use std::{
     array,
-    iter::zip,
-    marker::PhantomData,
     ops::{Add, Mul},
 };
 
 use generic_array::{
     ArrayLength, GenericArray,
-    typenum::{
-        IsEqual, Le, Length, Prod, Quot, Sum, U2, U3, U4, U5, U8, U16, U64, U96, U128, Unsigned,
-    },
+    typenum::{Prod, Quot, Sum, U2, U3, U4, U5, U8, U16, Unsigned},
 };
 use itertools::{chain, izip};
 
@@ -354,17 +350,6 @@ where
         // Raise to degree 3 and update
         self.update(&(self.delta * (*a_sq * b - self.delta * a)));
         self.update(&(self.delta * (*a * b_sq - self.delta * b)));
-    }
-
-    pub(crate) fn process<I1, I2>(&mut self, qs: I1, qs_b: I2)
-    where
-        I1: Iterator<Item = F>,
-        I2: Iterator<Item = F>,
-    {
-        for (q, qb) in zip(qs, qs_b) {
-            let b = q * qb + self.delta_squared;
-            self.b_hasher.update(&b);
-        }
     }
 
     pub(crate) fn finalize(self, v: &F) -> F {

@@ -1,15 +1,11 @@
 use std::{
-    default,
     num::Wrapping,
     ops::{
         Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
     },
 };
 
-use generic_array::{
-    GenericArray,
-    typenum::{U1, U3, U8},
-};
+use generic_array::{GenericArray, typenum::U8};
 
 use super::{Field, Square};
 
@@ -203,32 +199,6 @@ impl Square for GF8 {
 }
 
 impl GF8 {
-    pub(crate) fn invnorm(x: u8) -> u8 {
-        let inv = GF8::exp_238(GF8::from(x));
-
-        let mut res = inv & 1; // Take bit 0 in pos 0
-
-        res |= (inv & 0b11000000u8) >> 5; // Take bit 6,7 in pos 1,2
-
-        res | ((inv & 0b100) << 1) // Take bit 2 in pos 3
-    }
-
-    fn exp_238(mut x: GF8) -> u8 {
-        // 238 == 0b11101110
-        let mut y = x.square(); // x^2
-        x = y.square(); // x^4
-        y = x * y;
-        x = x.square(); // x^8
-        y = x * y;
-        x = x.square(); // x^16
-        x = x.square(); // x^32
-        y = x * y;
-        x = x.square(); // x^64
-        y = x * y;
-        x = x.square(); // x^128
-        (x * y).0.0
-    }
-
     pub(crate) fn square_bits_inplace(x: &mut u8) {
         let bits = [
             *x & 0b1,
@@ -356,14 +326,5 @@ mod test {
             //to test commutativity
             assert_eq!(res, res_rev);
         }
-    }
-
-    #[test]
-    fn gf8_test_invnorm() {
-        assert_eq!(GF8::invnorm(0), 0);
-        assert_eq!(GF8::invnorm(1), 1);
-        assert_eq!(GF8::invnorm(2), 1 << 3 | 1 << 2 | 1);
-        assert_eq!(GF8::invnorm(0x80), 1 << 3 | 1 << 2 | 1);
-        assert_eq!(GF8::invnorm(0x88), 1 << 2 | 1);
     }
 }

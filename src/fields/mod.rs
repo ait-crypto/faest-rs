@@ -14,8 +14,8 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use generic_array::{ArrayLength, GenericArray};
 
 pub(crate) use large_fields::{
-    Betas, BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquared,
-    ByteCombineSquaredConstants, FromBit, Sigmas, SumPoly,
+    Betas, BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquaredConstants, FromBit,
+    Sigmas, SumPoly,
 };
 #[cfg(not(all(
     feature = "opt-simd",
@@ -60,6 +60,7 @@ pub(crate) trait Field:
     fn as_bytes(&self) -> GenericArray<u8, Self::Length>;
 
     /// Obtain a boxed byte representation of the field element
+    #[allow(dead_code)]
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>>;
 }
 
@@ -112,6 +113,7 @@ pub(crate) trait ExtensionField:
     type BaseField: Field;
 
     /// Obtain byte representation of the field element
+    #[allow(dead_code)]
     fn as_bytes(&self) -> GenericArray<u8, Self::Length>;
 
     /// Obtain a boxed byte representation of the field element

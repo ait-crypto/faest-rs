@@ -1,36 +1,15 @@
-use aes::cipher::KeyInit;
-use generic_array::{
-    ArrayLength, GenericArray,
-    functional::FunctionalSequence,
-    typenum::{Prod, Quot, U1, U2, U3, U4, U8, U10, U32, Unsigned},
-};
-use itertools::multiunzip;
-use itertools::{iproduct, izip};
-use std::{
-    array, default,
-    mem::size_of,
-    ops::{Add, Mul, Sub},
-};
+use generic_array::{GenericArray, typenum::Unsigned};
 
 use crate::{
-    fields::{
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Square, SumPoly,
-        large_fields::{Betas, ByteCombineSquared, FromBit, SquareBytes},
-        small_fields::{GF8, GF8_INV_NORM},
-    },
+    fields::{Square, SumPoly},
     internal_keys::PublicKey,
-    parameter::{BaseParameters, OWFField, OWFParameters, QSProof, TauParameters},
+    parameter::{BaseParameters, OWFField, OWFParameters, QSProof},
     prover,
     prover::byte_commitments::ByteCommitsRef,
-    rijndael_32::{
-        RCON_TABLE, State, bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0,
-        rijndael_add_round_key, rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes,
-        sub_bytes, sub_bytes_nots,
-    },
-    universal_hashing::{ZKHasher, ZKHasherInit, ZKHasherProcess, ZKProofHasher, ZKVerifyHasher},
-    utils::{get_bit, xor_arrays},
+    universal_hashing::ZKHasherInit,
+    utils::get_bit,
     verifier,
-    verifier::{VoleCommits, VoleCommitsRef},
+    verifier::VoleCommitsRef,
 };
 
 pub(crate) type CstrntsVal<'a, O> = &'a GenericArray<

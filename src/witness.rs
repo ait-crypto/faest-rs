@@ -1,42 +1,17 @@
-use aes::cipher::KeyInit;
 use generic_array::{
-    ArrayLength, GenericArray,
-    functional::FunctionalSequence,
-    typenum::{B1, Prod, U1, U3, U4, U8, U10, U32, Unsigned},
+    GenericArray,
+    typenum::{U3, Unsigned},
 };
-use itertools::multiunzip;
-use itertools::{iproduct, izip};
-use std::{
-    array, default,
-    mem::size_of,
-    ops::{Add, Mul, Sub},
-};
+use std::mem::size_of;
 
 use crate::{
-    fields::{
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field, SumPoly,
-        large_fields::{Betas, ByteCombineSquared, SquareBytes},
-        small_fields::{GF8, GF8_INV_NORM},
-    },
-    internal_keys::PublicKey,
-    parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},
+    fields::small_fields::GF8_INV_NORM,
+    parameter::OWFParameters,
     rijndael_32::{
-        RCON_TABLE, State, bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0,
+        State, bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0,
         rijndael_add_round_key, rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes,
-        sub_bytes, sub_bytes_nots,
     },
-    universal_hashing::{ZKHasher, ZKHasherInit, ZKHasherProcess, ZKProofHasher, ZKVerifyHasher},
-    utils::contains_zeros,
 };
-
-const fn inverse_rotate_word(r: usize, rotate: bool) -> usize {
-    if rotate {
-        // equivalent to (r - 3) % 4
-        (r + 1) % 4
-    } else {
-        r
-    }
-}
 
 pub(crate) fn aes_extendedwitness<O>(
     owf_secret: &GenericArray<u8, O::LAMBDABYTES>,
@@ -177,15 +152,12 @@ fn round_with_save<O>(
 mod test {
     #![allow(clippy::needless_range_loop)]
 
-    use super::*;
-
     use crate::{
-        fields::{GF128, GF192, GF256},
         parameter::{OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM, OWFParameters},
         utils::test::read_test_data,
     };
 
-    use generic_array::{ArrayLength, GenericArray, sequence::GenericSequence};
+    use generic_array::GenericArray;
     use serde::Deserialize;
 
     #[derive(Debug, Deserialize)]
