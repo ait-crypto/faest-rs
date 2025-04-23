@@ -30,7 +30,7 @@ pub(crate) use small_fields::{GF8, GF64};
     target_feature = "avx2",
     target_feature = "pclmulqdq"
 ))]
-pub(crate) use x86_simd_large_fields::{GF128, GF192, GF256};
+pub(crate) use x86_simd_large_fields::{GF128, GF192, GF256, GF384, GF576, GF768};
 
 /// Trait covering the basic functionality of a field
 ///
