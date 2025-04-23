@@ -12,8 +12,8 @@ use crate::{
     verifier::{VoleCommits, VoleCommitsRef},
 };
 use generic_array::{
-    typenum::{marker_traits::Unsigned, U4, U8},
     ArrayLength, GenericArray,
+    typenum::{U4, U8, marker_traits::Unsigned},
 };
 use itertools::izip;
 use std::ops::Mul;

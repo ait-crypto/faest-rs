@@ -7,8 +7,8 @@ use std::{
 };
 
 use generic_array::{
-    typenum::{U1, U3, U8},
     GenericArray,
+    typenum::{U1, U3, U8},
 };
 
 use super::{Field, Square};
@@ -55,7 +55,7 @@ impl<T> From<T> for SmallGF<T> {
 impl From<SmallGF<Self>> for u64 {
     #[inline(always)]
     fn from(value: SmallGF<Self>) -> Self {
-        value.0 .0
+        value.0.0
     }
 }
 
@@ -74,7 +74,7 @@ where
     T: PartialEq<T>,
 {
     fn eq(&self, other: &T) -> bool {
-        self.0 .0 == *other
+        self.0.0 == *other
     }
 }
 
@@ -226,7 +226,7 @@ impl GF8 {
         x = x.square(); // x^64
         y = x * y;
         x = x.square(); // x^128
-        (x * y).0 .0
+        (x * y).0.0
     }
 
     pub(crate) fn square_bits_inplace(x: &mut u8) {
@@ -281,12 +281,12 @@ impl Field for GF64 {
     type Length = U8;
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        GenericArray::from(self.0 .0.to_le_bytes())
+        GenericArray::from(self.0.0.to_le_bytes())
     }
 
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut arr = GenericArray::default_boxed();
-        arr.copy_from_slice(&self.0 .0.to_le_bytes());
+        arr.copy_from_slice(&self.0.0.to_le_bytes());
         arr
     }
 }
@@ -302,7 +302,7 @@ impl From<&[u8]> for GF64 {
 
 #[cfg(test)]
 mod test {
-    use rand::{rngs::SmallRng, Rng, SeedableRng};
+    use rand::{Rng, SeedableRng, rngs::SmallRng};
 
     use super::*;
 
@@ -310,7 +310,7 @@ mod test {
     fn gf64_test_mul() {
         let mut rng = SmallRng::from_entropy();
 
-        let anything: u64 = rng.gen();
+        let anything: u64 = rng.r#gen();
         let pol_anything = GF64::from(anything);
         let pol_0 = GF64::from(0u64);
         let pol_1 = GF64::from(1u64);

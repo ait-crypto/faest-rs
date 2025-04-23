@@ -6,15 +6,15 @@ use std::{
 };
 
 use generic_array::{
-    typenum::{
-        IsEqual, Le, Length, Prod, Quot, Sum, Unsigned, U128, U16, U2, U3, U4, U5, U64, U8, U96,
-    },
     ArrayLength, GenericArray,
+    typenum::{
+        IsEqual, Le, Length, Prod, Quot, Sum, U2, U3, U4, U5, U8, U16, U64, U96, U128, Unsigned,
+    },
 };
 use itertools::{chain, izip};
 
 use crate::fields::{
-    BigGaloisField, ExtensionField, Field, GF128, GF192, GF256, GF384, GF576, GF64, GF768,
+    BigGaloisField, ExtensionField, Field, GF64, GF128, GF192, GF256, GF384, GF576, GF768,
 };
 
 use crate::prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree};
@@ -380,7 +380,6 @@ where
         + Mul<U4, Output = Self::LambdaBytesTimes4>
         + Mul<U8, Output = Self::Lambda>
         + PartialEq,
-
     Self::ExtensionField: for<'a> From<&'a [u8]>
         + for<'a> Mul<&'a Self::F, Output = Self::ExtensionField>
         + for<'a> Add<&'a Self::ExtensionField, Output = Self::ExtensionField>
@@ -449,7 +448,7 @@ mod test {
     use super::*;
 
     use generic_array::GenericArray;
-    use serde::{de::DeserializeOwned, Deserialize};
+    use serde::{Deserialize, de::DeserializeOwned};
 
     use crate::{
         fields::{GF128, GF192, GF256},

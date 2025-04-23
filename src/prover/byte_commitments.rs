@@ -1,8 +1,8 @@
-use crate::fields::{BigGaloisField, Square, GF8};
+use crate::fields::{BigGaloisField, GF8, Square};
 use crate::prover::field_commitment::FieldCommitDegOne;
 use generic_array::{
-    typenum::{Prod, U8},
     ArrayLength, GenericArray,
+    typenum::{Prod, U8},
 };
 use std::ops::{Add, Mul};
 

@@ -11,8 +11,8 @@ use crate::{
     utils::get_bit,
 };
 use generic_array::{
-    typenum::{marker_traits::Unsigned, U4, U8},
     ArrayLength, GenericArray,
+    typenum::{U4, U8, marker_traits::Unsigned},
 };
 use itertools::izip;
 use std::ops::Range;

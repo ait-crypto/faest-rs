@@ -4,20 +4,20 @@ use std::{
 };
 
 use aes::{
-    cipher::{generic_array::GenericArray as GenericArray_AES, BlockEncrypt, KeyInit},
     Aes128Enc, Aes192Enc, Aes256Enc,
+    cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray as GenericArray_AES},
 };
 use generic_array::{
-    typenum::{
-        self, Diff, Prod, Quot, Sum, Unsigned, U0, U1, U10, U1000, U102, U1024, U103, U11, U110,
-        U112, U12, U120, U128, U13, U14, U142, U152, U16, U160, U162, U163, U16384, U17, U176,
-        U192, U2, U20, U200, U2048, U212, U216, U218, U22, U23, U234, U24, U245, U246, U256, U26,
-        U260, U280, U288, U3, U312, U32, U320, U32768, U33, U336, U340, U380, U384, U388, U4, U40,
-        U408, U4096, U410, U44, U448, U460, U470, U476, U48, U5, U500, U506, U511, U512, U52, U548,
-        U56, U576, U584, U596, U6, U60, U600, U64, U640, U65536, U672, U68, U688, U696, U7, U752,
-        U756, U8, U8192, U828, U832, U9, U906, U924, U948, U96, U960, U984, U992,
-    },
     ArrayLength, GenericArray,
+    typenum::{
+        self, Diff, Prod, Quot, Sum, U0, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13,
+        U14, U16, U17, U20, U22, U23, U24, U26, U32, U33, U40, U44, U48, U52, U56, U60, U64, U68,
+        U96, U102, U103, U110, U112, U120, U128, U142, U152, U160, U162, U163, U176, U192, U200,
+        U212, U216, U218, U234, U245, U246, U256, U260, U280, U288, U312, U320, U336, U340, U380,
+        U384, U388, U408, U410, U448, U460, U470, U476, U500, U506, U511, U512, U548, U576, U584,
+        U596, U600, U640, U672, U688, U696, U752, U756, U828, U832, U906, U924, U948, U960, U984,
+        U992, U1000, U1024, U2048, U4096, U8192, U16384, U32768, U65536, Unsigned,
+    },
 };
 use rand_core::RngCore;
 
@@ -29,14 +29,14 @@ use crate::{
     },
     fields::{BigGaloisField, GF128, GF192, GF256},
     internal_keys::{PublicKey, SecretKey},
-    prg::{PseudoRandomGenerator, PRG128, PRG192, PRG256},
+    prg::{PRG128, PRG192, PRG256, PseudoRandomGenerator},
     random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake256},
     rijndael_32::{Rijndael192, Rijndael256},
-    universal_hashing::{VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit, B},
+    universal_hashing::{B, VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit},
     utils::get_bit,
     witness::aes_extendedwitness,
     zk_constraints::aes_verify,
-    zk_constraints::{aes_prove, CstrntsVal},
+    zk_constraints::{CstrntsVal, aes_prove},
 };
 
 // l_hat = l + 3*lambda + B
@@ -65,10 +65,10 @@ pub(crate) trait BaseParameters {
     type ZKHasher: ZKHasherInit<Self::Field, SDLength = Self::Chall>;
     /// Hasher implementation of `VOLEHash`
     type VoleHasher: VoleHasherInit<
-        Self::Field,
-        SDLength = Self::Chall1,
-        OutputLength = Self::VoleHasherOutputLength,
-    >;
+            Self::Field,
+            SDLength = Self::Chall1,
+            OutputLength = Self::VoleHasherOutputLength,
+        >;
     /// Associated random oracle
     type RandomOracle: RandomOracle;
     /// Associated PRG
@@ -299,14 +299,6 @@ impl OWFParameters for OWF128 {
     fn is_em() -> bool {
         false
     }
-    //type PK = U32;
-
-    // type SK = U32;
-    // type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
-    // type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
-    // type QUOTLENC8 = Quot<Self::LENC, U8>;
-    // type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-    // type LAMBDAR1BYTE = Quot<Prod<Self::LAMBDA, Sum<Self::R, U1>>, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes128Enc::new(GenericArray_AES::from_slice(key));
@@ -391,24 +383,6 @@ impl OWFParameters for OWF192 {
     fn is_em() -> bool {
         false
     }
-
-    // type LAMBDALBYTES = Sum<Self::LAMBDABYTES, Self::LBYTES>;
-    // type NK = U6;
-    // type R = U12;
-    // type SKE = U32;
-    // type LKE = U448;
-    // type LKEBytes = Quot<Self::LKE, U8>;
-    // type LENC = Sum<U1024, U384>;
-    // type NST = U0;
-    // type PK = U64;
-    // type SK = U56;
-    // type KBLENGTH = Prod<Sum<Self::R, U1>, U8>;
-    // type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
-    // type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
-    // type LAMBDALBYTESLAMBDA = Prod<Self::LAMBDA, Self::LAMBDALBYTES>;
-    // type QUOTLENC8 = Quot<Self::LENC, U8>;
-    // type LAMBDAL = Sum<Self::LAMBDA, Self::L>;
-    // type LAMBDAR1BYTE = Quot<Prod<Self::LAMBDA, Sum<Self::R, U1>>, U8>;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes192Enc::new(GenericArray_AES::from_slice(key));
@@ -826,10 +800,6 @@ pub(crate) trait TauParameters {
     type L: ArrayLength;
     type Topen: ArrayLength;
 
-    // fn decode_challenge(chal: &[u8], i: usize) -> Vec<u8> {
-    //     Self::decode_challenge_as_iter(chal, i).collect()
-    // }
-
     fn decode_challenge_as_iter(chal: &[u8], i: usize) -> impl Iterator<Item = u8> + '_ {
         let (lo, hi) = if i < Self::Tau1::USIZE {
             let lo = Self::tau1_offset_unchecked(i);
@@ -898,17 +868,6 @@ pub(crate) trait TauParameters {
         let mask = tmp - 1;
         Self::L::USIZE - 1 + Self::Tau::USIZE * tmp + Self::Tau1::USIZE * (j & mask) + i
     }
-
-    // fn convert_index_and_size(i: usize) -> (usize, usize) {
-    //     if i < Self::Tau0::USIZE {
-    //         (Self::K0::USIZE * i, Self::K0::USIZE)
-    //     } else {
-    //         (
-    //             Self::Tau0::USIZE * Self::K0::USIZE + Self::K1::USIZE * (i - Self::Tau0::USIZE),
-    //             Self::K1::USIZE,
-    //         )
-    //     }
-    // }
 }
 
 pub const MAX_TAU: usize = 32;
@@ -1064,12 +1023,12 @@ pub(crate) trait FAESTParameters {
 
     /// Associated BAVC
     type BAVC: BatchVectorCommitment<
-        RO = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle,
-        PRG = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::PRG,
-        TAU = Self::Tau,
-        LambdaBytes = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::LambdaBytes,
-        NLeafCommit = <Self::OWF as OWFParameters>::NLeafCommit,
-    >;
+            RO = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle,
+            PRG = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::PRG,
+            TAU = Self::Tau,
+            LambdaBytes = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::LambdaBytes,
+            NLeafCommit = <Self::OWF as OWFParameters>::NLeafCommit,
+        >;
 
     type WGRIND: ArrayLength;
     /// Size of the signature (in bytes)
@@ -1264,36 +1223,6 @@ mod test {
         k0: [usize; 1],
         res: Vec<u8>,
     }
-
-    // #[test]
-    // fn chaldec() {
-    //     let database: Vec<DataChalDec> = read_test_data("decode_challenge.json");
-    //     for data in database {
-    //         if data.chal.len() == 16 {
-    //             if data.k0[0] == 12 {
-    //                 let res = Tau128Small::decode_challenge(&data.chal, data.i[0]);
-    //                 assert_eq!(res, data.res);
-    //             } else {
-    //                 let res = Tau128Fast::decode_challenge(&data.chal, data.i[0]);
-    //                 assert_eq!(res, data.res);
-    //             }
-    //         } else if data.chal.len() == 24 {
-    //             if data.k0[0] == 12 {
-    //                 let res = Tau192Small::decode_challenge(&data.chal, data.i[0]);
-    //                 assert_eq!(res, data.res);
-    //             } else {
-    //                 let res = Tau192Fast::decode_challenge(&data.chal, data.i[0]);
-    //                 assert_eq!(res, data.res);
-    //             }
-    //         } else if data.k0[0] == 12 {
-    //             let res = Tau256Small::decode_challenge(&data.chal, data.i[0]);
-    //             assert_eq!(res, data.res);
-    //         } else {
-    //             let res = Tau256Fast::decode_challenge(&data.chal, data.i[0]);
-    //             assert_eq!(res, data.res);
-    //         }
-    //     }
-    // }
 
     #[generic_tests::define]
     mod owf_parameters {

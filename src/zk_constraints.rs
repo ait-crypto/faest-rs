@@ -1,8 +1,8 @@
 use aes::cipher::KeyInit;
 use generic_array::{
-    functional::FunctionalSequence,
-    typenum::{Prod, Quot, Unsigned, U1, U10, U2, U3, U32, U4, U8},
     ArrayLength, GenericArray,
+    functional::FunctionalSequence,
+    typenum::{Prod, Quot, U1, U2, U3, U4, U8, U10, U32, Unsigned},
 };
 use itertools::multiunzip;
 use itertools::{iproduct, izip};
@@ -14,31 +14,24 @@ use std::{
 
 use crate::{
     fields::{
+        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Square, SumPoly,
         large_fields::{Betas, ByteCombineSquared, FromBit, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Square, SumPoly,
     },
     internal_keys::PublicKey,
     parameter::{BaseParameters, OWFField, OWFParameters, QSProof, TauParameters},
     prover,
     prover::byte_commitments::ByteCommitsRef,
     rijndael_32::{
-        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
-        rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes, sub_bytes,
-        sub_bytes_nots, State, RCON_TABLE,
+        RCON_TABLE, State, bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0,
+        rijndael_add_round_key, rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes,
+        sub_bytes, sub_bytes_nots,
     },
     universal_hashing::{ZKHasher, ZKHasherInit, ZKHasherProcess, ZKProofHasher, ZKVerifyHasher},
     utils::{get_bit, xor_arrays},
     verifier,
     verifier::{VoleCommits, VoleCommitsRef},
 };
-
-// use key_expansion::{key_exp_bkwd, key_exp_cstrnts, key_exp_fwd};
-
-pub(crate) type KeyCstrnts<O> = (
-    Box<GenericArray<u8, <O as OWFParameters>::PRODRUN128Bytes>>,
-    Box<GenericArray<OWFField<O>, <O as OWFParameters>::PRODRUN128>>,
-);
 
 pub(crate) type CstrntsVal<'a, O> = &'a GenericArray<
     GenericArray<u8, <O as OWFParameters>::LAMBDA>,

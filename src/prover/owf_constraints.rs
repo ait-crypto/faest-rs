@@ -4,23 +4,23 @@ use crate::{
         InverseShiftRows, MixColumns, SBoxAffine, ShiftRows, StateToBytes,
     },
     fields::{
-        large_fields::{Betas, ByteCombineSquared, SquareBytes},
         BigGaloisField, ByteCombine, Field, FromBit, Sigmas, Square,
+        large_fields::{Betas, ByteCombineSquared, SquareBytes},
     },
     internal_keys::PublicKey,
     parameter::{BaseParameters, OWFField, OWFParameters},
-    rijndael_32::{convert_from_batchblocks, inv_bitslice, rijndael_key_schedule, RCON_TABLE},
+    rijndael_32::{RCON_TABLE, convert_from_batchblocks, inv_bitslice, rijndael_key_schedule},
     universal_hashing::ZKProofHasher,
     utils::{get_bit, xor_arrays},
 };
 use generic_array::{
-    typenum::{Prod, Quot, Unsigned, U2, U4, U8},
     ArrayLength, GenericArray,
+    typenum::{Prod, Quot, U2, U4, U8, Unsigned},
 };
 
 use super::{
-    encryption::enc_cstrnts, key_expansion::key_exp_cstrnts, ByteCommitment, ByteCommits,
-    ByteCommitsRef, FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo,
+    ByteCommitment, ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegThree,
+    FieldCommitDegTwo, encryption::enc_cstrnts, key_expansion::key_exp_cstrnts,
 };
 
 #[allow(unused)]

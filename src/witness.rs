@@ -1,8 +1,8 @@
 use aes::cipher::KeyInit;
 use generic_array::{
-    functional::FunctionalSequence,
-    typenum::{Prod, Unsigned, B1, U1, U10, U3, U32, U4, U8},
     ArrayLength, GenericArray,
+    functional::FunctionalSequence,
+    typenum::{B1, Prod, U1, U3, U4, U8, U10, U32, Unsigned},
 };
 use itertools::multiunzip;
 use itertools::{iproduct, izip};
@@ -14,16 +14,16 @@ use std::{
 
 use crate::{
     fields::{
+        BigGaloisField, ByteCombine, ByteCombineConstants, Field, SumPoly,
         large_fields::{Betas, ByteCombineSquared, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field, SumPoly,
     },
     internal_keys::PublicKey,
     parameter::{BaseParameters, OWFParameters, QSProof, TauParameters},
     rijndael_32::{
-        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
-        rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes, sub_bytes,
-        sub_bytes_nots, State, RCON_TABLE,
+        RCON_TABLE, State, bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0,
+        rijndael_add_round_key, rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes,
+        sub_bytes, sub_bytes_nots,
     },
     universal_hashing::{ZKHasher, ZKHasherInit, ZKHasherProcess, ZKProofHasher, ZKVerifyHasher},
     utils::contains_zeros,
@@ -181,11 +181,11 @@ mod test {
 
     use crate::{
         fields::{GF128, GF192, GF256},
-        parameter::{OWFParameters, OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM},
+        parameter::{OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM, OWFParameters},
         utils::test::read_test_data,
     };
 
-    use generic_array::{sequence::GenericSequence, ArrayLength, GenericArray};
+    use generic_array::{ArrayLength, GenericArray, sequence::GenericSequence};
     use serde::Deserialize;
 
     #[derive(Debug, Deserialize)]

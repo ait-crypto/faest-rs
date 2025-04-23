@@ -1,22 +1,22 @@
 use std::{io::Write, iter::zip, slice::RChunks};
 
 use crate::{
+    Error,
     bavc::{BatchVectorCommitment, Bavc, BavcDecommitment, BavcOpenResult},
     fields::Field,
     internal_keys::{PublicKey, SecretKey},
     parameter::{BaseParameters, FAESTParameters, OWFField, OWFParameters, TauParameters},
-    prg::{IVSize, PseudoRandomGenerator, IV},
+    prg::{IV, IVSize, PseudoRandomGenerator},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
-    utils::{decode_all_chall_3, Reader},
+    utils::{Reader, decode_all_chall_3},
     vole::{
-        volecommit, volereconstruct, VoleCommitResult, VoleCommitmentCRef, VoleCommitmentCRefMut,
-        VoleReconstructResult,
+        VoleCommitResult, VoleCommitmentCRef, VoleCommitmentCRefMut, VoleReconstructResult,
+        volecommit, volereconstruct,
     },
-    Error,
 };
 
-use generic_array::{typenum::Unsigned, GenericArray};
+use generic_array::{GenericArray, typenum::Unsigned};
 use itertools::izip;
 use rand_core::CryptoRngCore;
 use signature::SignerMut;

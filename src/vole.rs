@@ -12,15 +12,14 @@ use crate::{
         BavcReconstructResult,
     },
     parameter::TauParameters,
-    prg::{PseudoRandomGenerator, Twk, IV},
+    prg::{IV, PseudoRandomGenerator, Twk},
     random_oracles::{Hasher, RandomOracle},
-    universal_hashing::{LeafHasher, B},
-    utils::{decode_all_chall_3, Reader},
+    universal_hashing::{B, LeafHasher},
+    utils::{Reader, decode_all_chall_3},
 };
 use generic_array::{
-    box_arr,
-    typenum::{Prod, Unsigned, U128, U2, U3, U8},
-    ArrayLength, GenericArray,
+    ArrayLength, GenericArray, box_arr,
+    typenum::{Prod, U2, U3, U8, U128, Unsigned},
 };
 use itertools::izip;
 
@@ -242,7 +241,7 @@ where
     let mut q = GenericArray::default_boxed();
 
     let mut sdi_off = 0; // At round i, seeds_i has offset \sum_{j=0}^{i-1} N_j in the seeds vector
-                         // Step 7
+    // Step 7
     for i in 0..BAVC::Tau::U32 {
         // Step 8
         let delta_i = i_delta[i as usize];
@@ -291,9 +290,9 @@ mod test {
     use super::*;
 
     use generic_array::{
+        GenericArray,
         sequence::GenericSequence,
         typenum::{U210, U434, U486},
-        GenericArray,
     };
     use serde::Deserialize;
 
@@ -304,9 +303,9 @@ mod test {
             BAVC256SmallEM, BatchVectorCommitment,
         },
         parameter::{
-            OWFParameters, Tau128Fast, Tau128Small, Tau192Fast, Tau192Small, Tau256Fast,
-            Tau256FastEM, Tau256Small, MAX_TAU, OWF128, OWF128EM, OWF192, OWF192EM, OWF256,
-            OWF256EM,
+            MAX_TAU, OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM, OWFParameters,
+            Tau128Fast, Tau128Small, Tau192Fast, Tau192Small, Tau256Fast, Tau256FastEM,
+            Tau256Small,
         },
         prg::PRG128,
         random_oracles::RandomOracleShake128,

@@ -5,15 +5,15 @@ use crate::{
         InverseShiftRows, MixColumns, SBoxAffine, ShiftRows, StateToBytes,
     },
     fields::{
-        large_fields::{Betas, ByteCombineSquared, SquareBytes},
         ByteCombine, Sigmas, Square,
+        large_fields::{Betas, ByteCombineSquared, SquareBytes},
     },
     parameter::{OWFField, OWFParameters},
     universal_hashing::ZKVerifyHasher,
 };
 use generic_array::{
-    typenum::{Quot, Unsigned, U2, U4, U8},
     ArrayLength, GenericArray,
+    typenum::{Quot, U2, U4, U8, Unsigned},
 };
 use itertools::izip;
 use std::ops::{AddAssign, Deref, Index};

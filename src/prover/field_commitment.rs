@@ -1,7 +1,7 @@
-use crate::fields::{BigGaloisField, Square, GF8};
+use crate::fields::{BigGaloisField, GF8, Square};
 use generic_array::{
-    typenum::{Prod, U8},
     ArrayLength, GenericArray,
+    typenum::{Prod, U8},
 };
 use std::{
     ops::{Add, AddAssign, Index, Mul, MulAssign, Neg},
@@ -477,7 +477,7 @@ where
 mod test {
     use super::*;
     use crate::fields::{Field, GF128};
-    use rand::{rngs::SmallRng, Rng, RngCore, SeedableRng};
+    use rand::{Rng, RngCore, SeedableRng, rngs::SmallRng};
 
     #[test]
     fn field_commit_mul() {

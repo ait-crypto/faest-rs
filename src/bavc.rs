@@ -3,7 +3,7 @@ use std::{
     convert, default,
     marker::PhantomData,
     ops::{Add, Mul, Sub},
-    process::{id, Output},
+    process::{Output, id},
     vec,
 };
 
@@ -11,11 +11,11 @@ use aes::cipher::KeyInit;
 use bit_set::BitSet;
 
 use generic_array::{
-    typenum::{
-        Const, Diff, IsEqual, Negate, Prod, Sum, Unsigned, U1, U10, U128, U16, U2, U216, U3, U4,
-        U48, U64, U8,
-    },
     ArrayLength, GenericArray, IntoArrayLength,
+    typenum::{
+        Const, Diff, IsEqual, Negate, Prod, Sum, U1, U2, U3, U4, U8, U10, U16, U48, U64, U128,
+        U216, Unsigned,
+    },
 };
 
 use crate::{
@@ -25,7 +25,7 @@ use crate::{
         Tau192Small, Tau192SmallEM, Tau256Fast, Tau256FastEM, Tau256Small, Tau256SmallEM,
         TauParameters,
     },
-    prg::{PseudoRandomGenerator, Twk, IV, PRG128, PRG192, PRG256},
+    prg::{IV, PRG128, PRG192, PRG256, PseudoRandomGenerator, Twk},
     random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256},
     universal_hashing::{LeafHasher, LeafHasher128, LeafHasher192, LeafHasher256},
     utils::Reader,
@@ -672,10 +672,10 @@ mod test {
     use std::iter::zip;
 
     use generic_array::{
-        typenum::{U16, U31, U32, U4, U5, U63},
         GenericArray,
+        typenum::{U4, U5, U16, U31, U32, U63},
     };
-    use serde::{de::Expected, Deserialize};
+    use serde::{Deserialize, de::Expected};
     use serde_json::de;
 
     use crate::{
@@ -823,8 +823,8 @@ mod test {
 
     fn hash_array(data: &[u8]) -> Vec<u8> {
         use sha3::{
-            digest::{ExtendableOutput, Update, XofReader},
             Shake256,
+            digest::{ExtendableOutput, Update, XofReader},
         };
 
         let mut hasher = sha3::Shake256::default();

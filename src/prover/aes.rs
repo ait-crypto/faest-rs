@@ -1,9 +1,9 @@
 use crate::{
     aes::*,
     fields::{
+        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Sigmas, SumPoly,
         large_fields::{Betas, ByteCombineSquared, ByteCombineSquaredConstants, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Sigmas, SumPoly,
     },
     parameter::{BaseParameters, OWFField, OWFParameters, SecurityParameter},
     universal_hashing::ZKProofHasher,
@@ -12,8 +12,8 @@ use crate::{
 
 use super::{ByteCommitment, ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use generic_array::{
-    typenum::{Prod, Quot, Unsigned, U2, U4, U8},
     ArrayLength, GenericArray,
+    typenum::{Prod, Quot, U2, U4, U8, Unsigned},
 };
 use itertools::izip;
 use std::convert::AsRef;

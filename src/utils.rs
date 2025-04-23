@@ -2,7 +2,7 @@ use std::ops::Add;
 use std::{array, f32::consts::TAU, io::Read, iter::zip};
 
 use generic_array::typenum::bit;
-use generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
+use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
 use itertools::iproduct;
 
 use crate::fields::Field;
@@ -177,8 +177,8 @@ pub(crate) mod test {
 
     pub(crate) fn hash_array(data: &[u8]) -> Vec<u8> {
         use sha3::{
-            digest::{ExtendableOutput, Update, XofReader},
             Shake256,
+            digest::{ExtendableOutput, Update, XofReader},
         };
 
         let mut hasher = sha3::Shake256::default();

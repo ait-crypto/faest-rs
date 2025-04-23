@@ -4,8 +4,8 @@ use crate::{
         InverseShiftRows, MixColumns, SBoxAffine, ShiftRows, StateToBytes,
     },
     fields::{
-        large_fields::{Betas, ByteCombineSquared, SquareBytes},
         BigGaloisField, ByteCombine, Sigmas, Square,
+        large_fields::{Betas, ByteCombineSquared, SquareBytes},
     },
     parameter::{BaseParameters, OWFField, OWFParameters},
     prover::{ByteCommitment, ByteCommits, ByteCommitsRef},
@@ -15,9 +15,8 @@ use crate::{
 };
 
 use generic_array::{
-    arr,
-    typenum::{Diff, Prod, Quot, Unsigned, U2, U4, U8},
-    ArrayLength, GenericArray,
+    ArrayLength, GenericArray, arr,
+    typenum::{Diff, Prod, Quot, U2, U4, U8, Unsigned},
 };
 use itertools::iproduct;
 use std::{convert::AsRef, process::Output};

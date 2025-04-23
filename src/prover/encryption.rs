@@ -8,8 +8,8 @@ use crate::{
     utils::get_bit,
 };
 use generic_array::{
-    typenum::{Prod, Quot, Unsigned, U2, U4, U8},
     ArrayLength, GenericArray,
+    typenum::{Prod, Quot, U2, U4, U8, Unsigned},
 };
 use itertools::izip;
 use std::convert::AsRef;

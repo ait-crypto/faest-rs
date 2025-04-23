@@ -1,7 +1,7 @@
 use generic_array::{
-    functional::FunctionalSequence,
-    typenum::{Prod, Quot, Unsigned, U1, U10, U2, U3, U32, U4, U8},
     ArrayLength, GenericArray, LengthError,
+    functional::FunctionalSequence,
+    typenum::{Prod, Quot, U1, U2, U3, U4, U8, U10, U32, Unsigned},
 };
 use itertools::multiunzip;
 use itertools::{iproduct, izip};
@@ -22,16 +22,16 @@ use super::{
 use crate::{
     aes::AddRoundKey,
     fields::{
+        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Square, SumPoly,
         large_fields::{Betas, ByteCombineSquared, FromBit, SquareBytes},
         small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Square, SumPoly,
     },
     internal_keys::PublicKey,
     parameter::{BaseParameters, OWFField, OWFParameters, QSProof, TauParameters},
     rijndael_32::{
-        bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0, rijndael_add_round_key,
-        rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes, sub_bytes,
-        sub_bytes_nots, State, RCON_TABLE,
+        RCON_TABLE, State, bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0,
+        rijndael_add_round_key, rijndael_key_schedule, rijndael_shift_rows_1, rijndael_sub_bytes,
+        sub_bytes, sub_bytes_nots,
     },
     universal_hashing::{ZKHasher, ZKHasherInit, ZKHasherProcess, ZKProofHasher, ZKVerifyHasher},
     utils::{get_bit, xor_arrays},

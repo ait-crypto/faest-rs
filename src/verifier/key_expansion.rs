@@ -5,8 +5,8 @@ use crate::{
         InverseShiftRows, MixColumns, SBoxAffine, ShiftRows, StateToBytes,
     },
     fields::{
-        large_fields::{Betas, ByteCombineSquared, SquareBytes},
         ByteCombine, Sigmas, Square,
+        large_fields::{Betas, ByteCombineSquared, SquareBytes},
     },
     parameter::{OWFField, OWFParameters},
     rijndael_32::RCON_TABLE,
@@ -14,8 +14,8 @@ use crate::{
     utils::get_bit,
 };
 use generic_array::{
-    typenum::{Prod, Quot, Unsigned, U2, U4, U8},
     ArrayLength, GenericArray,
+    typenum::{Prod, Quot, U2, U4, U8, Unsigned},
 };
 use itertools::iproduct;
 use std::ops::{AddAssign, Deref, Index};

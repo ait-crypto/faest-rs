@@ -21,9 +21,11 @@ where
         MESSAGE, name
     );
     let verification_key = keypair.verifying_key();
-    assert!(verification_key
-        .verify(MESSAGE.as_bytes(), &signature)
-        .is_ok());
+    assert!(
+        verification_key
+            .verify(MESSAGE.as_bytes(), &signature)
+            .is_ok()
+    );
 
     println!(
         "Signing message '{}' with {} (randomized)...",
@@ -34,9 +36,11 @@ where
         "Verifying signature on message '{}' with {} ...",
         MESSAGE, name
     );
-    assert!(verification_key
-        .verify(MESSAGE.as_bytes(), &signature)
-        .is_ok());
+    assert!(
+        verification_key
+            .verify(MESSAGE.as_bytes(), &signature)
+            .is_ok()
+    );
 }
 
 fn main() {

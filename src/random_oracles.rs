@@ -1,6 +1,6 @@
 use sha3::{
-    digest::{ExtendableOutput, Update, XofReader},
     Shake128, Shake128Reader, Shake256, Shake256Reader,
+    digest::{ExtendableOutput, Update, XofReader},
 };
 
 use crate::utils::Reader;
