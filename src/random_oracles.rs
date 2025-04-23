@@ -57,30 +57,6 @@ pub(crate) trait Hasher {
     /// Hash additional bytes
     fn update(&mut self, data: &[u8]);
 
-    /*
-       /// Hash additional bytes obtained from an iterator
-       fn update_from_iterator<I>(&mut self, it: I)
-       where
-           I: Iterator<Item = u8>,
-       {
-           const BUFFER_LEN: usize = 64;
-
-           let mut idx = 0;
-           let mut buffer = [0u8; BUFFER_LEN];
-           for v in it {
-               buffer[idx % BUFFER_LEN] = v;
-               idx += 1;
-               if idx % BUFFER_LEN == 0 {
-                   self.update(&buffer);
-               }
-           }
-
-           if idx % BUFFER_LEN != 0 {
-               self.update(&buffer[..idx % BUFFER_LEN]);
-           }
-       }
-    */
-
     /// Finish hashing
     fn finish(self) -> Self::Reader;
 }
