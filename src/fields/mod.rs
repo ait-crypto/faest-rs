@@ -23,7 +23,7 @@ pub(crate) use large_fields::{
     target_feature = "pclmulqdq"
 )))]
 pub(crate) use large_fields::{GF128, GF192, GF256, GF384, GF576, GF768};
-pub(crate) use small_fields::{GF64, GF8};
+pub(crate) use small_fields::{GF8, GF64};
 
 #[cfg(all(
     feature = "opt-simd",
