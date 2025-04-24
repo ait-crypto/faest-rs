@@ -39,6 +39,16 @@ where
             delta: self.delta,
         }
     }
+
+    pub(crate) fn get_field_commit(&self, idx: usize) -> F {
+        debug_assert!(idx * 8 + 8 < L::USIZE);
+        F::byte_combine_slice(&self.scalars[8 * idx..8 * idx + 8])
+    }
+
+    pub(crate) fn get_field_commit_sq(&self, idx: usize) -> F {
+        debug_assert!(idx * 8 + 8 < L::USIZE);
+        F::byte_combine_sq_slice(&self.scalars[8 * idx..8 * idx + 8])
+    }
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
@@ -108,5 +118,15 @@ where
 
     fn index(&self, index: Range<usize>) -> &Self::Output {
         &self.scalars[index]
+    }
+}
+
+impl<F, L> AsRef<GenericArray<F, L>> for VoleCommits<'_, F, L>
+where
+    F: BigGaloisField,
+    L: ArrayLength,
+{
+    fn as_ref(&self) -> &GenericArray<F, L> {
+        &self.scalars
     }
 }

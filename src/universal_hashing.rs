@@ -13,7 +13,7 @@ use crate::fields::{
     BigGaloisField, ExtensionField, Field, GF64, GF128, GF192, GF256, GF384, GF576, GF768,
 };
 
-use crate::prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree};
+use crate::prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo};
 
 type BBits = U16;
 // Additional bytes returned by VOLE hash
@@ -298,6 +298,19 @@ where
         debug_assert_eq!(b_sq.key * a.key - b.key, F::ZERO);
     }
 
+    pub(crate) fn odd_round_cstrnts(
+        &mut self,
+        si: &FieldCommitDegOne<F>,
+        si_sq: &FieldCommitDegOne<F>,
+        st0_i: &FieldCommitDegTwo<F>,
+        st1_i: &FieldCommitDegTwo<F>,
+    ) where
+        F: BigGaloisField,
+    {
+        self.update(&(si_sq.to_owned() * st0_i + si));
+        self.update(&(si.to_owned() * st1_i + st0_i));
+    }
+
     pub(crate) fn finalize(self, u: &F, u_plus_v: &F, v: &F) -> (F, F, F) {
         let a0 = self.a0_hasher.finalize(u);
         let a1 = self.a1_hasher.finalize(u_plus_v);
@@ -339,6 +352,14 @@ where
     pub(crate) fn inv_norm_constraints(&mut self, conjugates: &[F], y: &F) {
         let cnstr = *y * conjugates[1] * conjugates[4] + self.delta_squared * conjugates[0];
         self.b_hasher.update(&cnstr);
+    }
+
+    pub(crate) fn odd_round_cstrnts(&mut self, si: &F, si_sq: &F, st0_i: &F, st1_i: &F)
+    where
+        F: BigGaloisField,
+    {
+        self.update(&(self.delta_squared * si + si_sq.clone() * st0_i));
+        self.update(&(self.delta * st0_i + si.clone() * st1_i));
     }
 
     pub(crate) fn lift_and_process(&mut self, a: &F, a_sq: &F, b: &F, b_sq: &F)
@@ -394,7 +415,6 @@ where
         h.as_boxed_bytes()
     }
 }
-
 pub(crate) struct LeafHasher128;
 impl LeafHasher for LeafHasher128 {
     type F = GF128;
