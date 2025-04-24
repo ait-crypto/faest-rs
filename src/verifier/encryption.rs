@@ -6,7 +6,7 @@ use crate::{
     },
     fields::{
         ByteCombine, Square,
-        large_fields::{Betas, ByteCombineSquared, SquareBytes},
+        large_fields::{Betas, SquareBytes},
     },
     parameter::{OWFField, OWFParameters},
     universal_hashing::ZKVerifyHasher,
@@ -28,7 +28,7 @@ pub(crate) fn enc_cstrnts<'a, O, K>(
     K: StateToBytes<O, Output = GenericArray<OWFField<O>, O::NSTBytes>>,
     VoleCommits<'a, OWFField<O>, O::NSTBits>: AddRoundKeyAssign<&'a K>,
 {
-    // // ::1
+    // ::1
     let mut state = input.add_round_key(&extended_key[0]);
 
     // ::2
@@ -56,7 +56,7 @@ pub(crate) fn enc_cstrnts<'a, O, K>(
             );
 
             // ::29-38
-            odd_round_cnstrnts::<O>(zk_hasher, s_tilde, &st_0, &st_1);
+            odd_round_cstrnts::<O>(zk_hasher, s_tilde, &st_0, &st_1);
 
             // ::39-40
             next_round_state::<O, _>(&mut state, s_tilde, round_key);
@@ -64,8 +64,7 @@ pub(crate) fn enc_cstrnts<'a, O, K>(
             let s_tilde = output.add_round_key(round_key);
 
             //::29-38
-
-            odd_round_cnstrnts::<O>(zk_hasher, &s_tilde, &st_0, &st_1);
+            odd_round_cstrnts::<O>(zk_hasher, &s_tilde, &st_0, &st_1);
         }
     }
 }
@@ -83,13 +82,9 @@ where
 {
     // ::19-22
     let mut st = state.s_box_affine(sq);
-
     st.shift_rows();
-
     st.mix_columns(sq);
-
     st.add_round_key_bytes(key_bytes, sq);
-
     st
 }
 
@@ -151,7 +146,7 @@ fn next_round_state<'a, O, K>(
     state.add_round_key_assign(round_key);
 }
 
-fn odd_round_cnstrnts<'a, O>(
+fn odd_round_cstrnts<'a, O>(
     zk_hasher: &mut ZKVerifyHasher<OWFField<O>>,
     s_tilde: impl InverseShiftRows<O, Output = VoleCommits<'a, OWFField<O>, O::NSTBits>>,
     st_0: &VoleCommits<'a, OWFField<O>, O::NSTBytes>,
@@ -159,20 +154,23 @@ fn odd_round_cnstrnts<'a, O>(
 ) where
     O: OWFParameters,
 {
-    let delta = zk_hasher.delta;
-    let delta_sq = zk_hasher.delta_squared;
-
     // ::29-30
     let mut s = s_tilde.inverse_shift_rows();
     s.inverse_affine();
 
     // ::31-37
-    for (byte_i, (st0, st1)) in izip!(st_0.scalars.iter(), st_1.scalars.iter()).enumerate() {
-        let s_i = OWFField::<O>::byte_combine_slice(&s.scalars[8 * byte_i..8 * byte_i + 8]);
-        let s_i_sq = OWFField::<O>::byte_combine_sq_slice(&s.scalars[8 * byte_i..8 * byte_i + 8]);
-
-        zk_hasher.update(&(s_i_sq * st0 + delta_sq * s_i));
-        zk_hasher.update(&(s_i * st1 + delta * st0));
+    for (si, si_sq, st0_i, st1_i) in izip!(st_0.as_ref().iter(), st_1.as_ref().iter())
+        .enumerate()
+        .map(|(byte_i, (st0, st1))| {
+            (
+                s.get_field_commit(byte_i),
+                s.get_field_commit_sq(byte_i),
+                st0,
+                st1,
+            )
+        })
+    {
+        zk_hasher.odd_round_cstrnts(&si, &si_sq, st0_i, st1_i);
     }
 }
 

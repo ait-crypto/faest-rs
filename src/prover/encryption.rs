@@ -134,7 +134,7 @@ fn odd_round_cnstrnts<O>(
     s.inverse_affine();
 
     // ::31-37
-    for (si, si_sq, st0, st1) in
+    for (si, si_sq, st0_i, st1_i) in
         izip!(st_0.iter(), st_1.iter())
             .enumerate()
             .map(|(byte_i, (st0, st1))| {
@@ -146,8 +146,7 @@ fn odd_round_cnstrnts<O>(
                 )
             })
     {
-        zk_hasher.update(&(si_sq * st0 + &si));
-        zk_hasher.update(&(si * st1 + st0));
+        zk_hasher.odd_round_cstrnts(&si, &si_sq, &st0_i, &st1_i);
     }
 }
 
@@ -164,13 +163,9 @@ where
 {
     // ::19-22
     let mut st = state.s_box_affine(sq);
-
     st.shift_rows();
-
     st.mix_columns(sq);
-
     st.add_round_key_bytes(key_bytes, sq);
-
     st
 }
 
