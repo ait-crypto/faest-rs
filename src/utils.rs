@@ -139,8 +139,8 @@ pub(crate) fn get_bit(input: &[u8], index: usize) -> u8 {
 }
 
 /// Squares every the element of the input array.
-/// 
-/// Returns a new array of squared elements. 
+///
+/// Returns a new array of squared elements.
 #[inline]
 pub(crate) fn square_array<T, L>(
     key_bytes: &GenericArray<T, L>,
