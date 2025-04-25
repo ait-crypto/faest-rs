@@ -131,7 +131,7 @@ fn enc_cstrnts_odd<O>(
                 )
             })
     {
-        zk_hasher.odd_round_cstrnts(&si, &si_sq, &st0_i, &st1_i);
+        zk_hasher.odd_round_cstrnts(&si, &si_sq, st0_i, st1_i);
     }
 }
 

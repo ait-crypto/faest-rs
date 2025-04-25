@@ -1,6 +1,5 @@
+use crate::{fields::Square, parameter::TauParameters};
 use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
-
-use crate::parameter::TauParameters;
 
 /// Reader interface for PRGs and random oracles
 pub(crate) trait Reader {
@@ -106,14 +105,6 @@ pub(crate) fn get_bits(byte: u8) -> [u8; 8] {
     ]
 }
 
-// pub(crate) fn bit_combine_with_delta<O>(x: u8, delta: &Field<O>) -> Field<O>
-// where
-//     O: OWFParameters,
-// {
-//     let tmp = array::from_fn(|index| *delta * ((x >> (index % 8)) & 1));
-//     Field::<O>::byte_combine(&tmp)
-// }
-
 /// Check for `0` in buffers for key validity.
 ///
 /// This function does not need to be constant time. It may only return early
@@ -145,6 +136,20 @@ pub(crate) fn get_bit(input: &[u8], index: usize) -> u8 {
     let byte_index = index / 8;
     let bit_offset = index % 8;
     (input[byte_index] >> bit_offset) & 1
+}
+
+/// Squares every the element of the input array.
+/// 
+/// Returns a new array of squared elements. 
+#[inline]
+pub(crate) fn square_array<T, L>(
+    key_bytes: &GenericArray<T, L>,
+) -> GenericArray<<T as Square>::Output, L>
+where
+    T: Clone + Square,
+    L: ArrayLength,
+{
+    key_bytes.iter().map(|x| x.to_owned().square()).collect()
 }
 
 #[cfg(test)]

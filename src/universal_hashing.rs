@@ -369,8 +369,8 @@ where
     where
         F: BigGaloisField,
     {
-        self.update(&(self.delta_squared * si + si_sq.clone() * st0_i));
-        self.update(&(self.delta * st0_i + si.clone() * st1_i));
+        self.update(&(self.delta_squared * si + *si_sq * st0_i));
+        self.update(&(self.delta * st0_i + *si * st1_i));
     }
 
     pub(crate) fn lift_and_process(&mut self, a: &F, a_sq: &F, b: &F, b_sq: &F)
