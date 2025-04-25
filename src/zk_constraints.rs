@@ -1,5 +1,3 @@
-use generic_array::{GenericArray, typenum::Unsigned};
-
 use crate::{
     fields::{Square, SumPoly},
     internal_keys::PublicKey,
@@ -11,22 +9,23 @@ use crate::{
     verifier,
     verifier::VoleCommitsRef,
 };
+use generic_array::{GenericArray, typenum::Unsigned};
 
 pub(crate) type CstrntsVal<'a, O> = &'a GenericArray<
-    GenericArray<u8, <O as OWFParameters>::LAMBDA>,
-    <O as OWFParameters>::LAMBDALBYTES,
+    GenericArray<u8, <O as OWFParameters>::LHATBYTES>,
+    <O as OWFParameters>::LAMBDA,
 >;
 
-// Reshapes a matrix of size (l_hat/8) x lambda into a matrix of size l_hat x (lambda/8).
-// Then, it converts all rows in the interval [row_start, rowstart + nrows) to field elements.
-pub(crate) fn reshape_and_to_field<O: OWFParameters>(m: CstrntsVal<O>) -> Vec<OWFField<O>> {
+// // Reshapes a matrix of size (l_hat/8) x lambda into a matrix of size l_hat x (lambda/8).
+// // Then, it converts all rows in the interval [row_start, rowstart + nrows) to field elements.
+fn reshape_and_to_field<O: OWFParameters>(m: CstrntsVal<O>) -> Vec<OWFField<O>> {
     (0..O::LBYTES::USIZE + O::LAMBDABYTESTWO::USIZE)
-        .flat_map(|row| {
+        .flat_map(|col| {
             let mut ret = vec![GenericArray::<u8, O::LAMBDABYTES>::default(); 8];
 
-            (0..O::LAMBDA::USIZE).for_each(|col| {
-                for (i, ret_i) in ret.iter_mut().enumerate().take(8) {
-                    ret_i[col / 8] |= get_bit(&[m[row][col]], i) << (col % 8);
+            (0..O::LAMBDA::USIZE).for_each(|row| {
+                for (i, ret_i) in ret.iter_mut().enumerate() {
+                    ret_i[row / 8] |= get_bit(&[m[row][col]], i) << (row % 8);
                 }
             });
 

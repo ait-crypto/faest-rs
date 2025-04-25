@@ -192,16 +192,6 @@ pub(crate) fn faest_sign<P>(
     sign::<P, P::OWF>(msg, sk, rho, signature);
 }
 
-fn get_column<O>(
-    m: &GenericArray<GenericArray<u8, O::LAMBDA>, O::LHATBYTES>,
-    column: usize,
-) -> Vec<u8>
-where
-    O: OWFParameters,
-{
-    (0..m.len()).map(|row| m[row][column]).collect()
-}
-
 fn check_challenge_3<P, O>(chall3: &[u8]) -> bool
 where
     P: FAESTParameters,
@@ -344,10 +334,9 @@ fn sign<P, O>(
     {
         for i in 0..O::LAMBDA::USIZE {
             // Hash column-wise
-            let v_col = get_column::<O>(&v, i);
             RO::<P>::hash_challenge_2_update(
                 &mut h2_hasher,
-                vole_haher_v.process(&v_col).as_slice(),
+                vole_haher_v.process(&v[i]).as_slice(),
             );
         }
     }
@@ -371,7 +360,7 @@ fn sign<P, O>(
         // ::16
         GenericArray::from_slice(&u[O::LBYTES::USIZE..O::LBYTES::USIZE + O::LAMBDABYTESTWO::USIZE]),
         // ::17
-        GenericArray::from_slice(&v[..O::LAMBDALBYTES::USIZE]),
+        GenericArray::from_slice(&v),
         &sk.pk,
         &chall2,
     );
@@ -487,7 +476,7 @@ where
                 .chain(repeat_n(0, P::WGRIND::USIZE)),
         ) {
             // ::12
-            let mut q_tilde = vole_hasher.process(&get_column::<O>(&q, i));
+            let mut q_tilde = vole_hasher.process(&q[i]);
 
             // ::14
             if d_i == 1 {
@@ -509,7 +498,7 @@ where
 
     // ::17
     let a0_tilde = P::OWF::verify(
-        GenericArray::from_slice(&q[..O::LBYTES::USIZE + O::LAMBDABYTESTWO::USIZE]),
+        GenericArray::from_slice(&q),
         GenericArray::from_slice(d),
         pk,
         &chall2,

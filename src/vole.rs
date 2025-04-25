@@ -36,7 +36,7 @@ where
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
     pub decom: BavcDecommitment<LambdaBytes, NLeafCommit>,
     pub u: Box<GenericArray<u8, LHatBytes>>,
-    pub v: Box<GenericArray<GenericArray<u8, Prod<LambdaBytes, U8>>, LHatBytes>>,
+    pub v: Box<GenericArray<GenericArray<u8, LHatBytes>, Prod<LambdaBytes, U8>>>,
 }
 
 /// Result of VOLE reconstruction
@@ -47,7 +47,7 @@ where
     LHatBytes: ArrayLength,
 {
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
-    pub q: Box<GenericArray<GenericArray<u8, Prod<LambdaBytes, U8>>, LHatBytes>>,
+    pub q: Box<GenericArray<GenericArray<u8, LHatBytes>, Prod<LambdaBytes, U8>>>,
 }
 
 /// Immutable reference to storage area in signature for all `c`s.
@@ -113,7 +113,7 @@ where
 
 #[allow(clippy::type_complexity)]
 fn convert_to_vole<'a, BAVC, LHatBytes>(
-    v: &mut GenericArray<GenericArray<u8, BAVC::Lambda>, LHatBytes>,
+    v: &mut GenericArray<GenericArray<u8, LHatBytes>, BAVC::Lambda>,
     sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, BAVC::LambdaBytes>>,
     iv: &IV,
     round: u32,
@@ -144,17 +144,17 @@ where
         rj.push(BAVC::PRG::new_prg(sdi, iv, twk).read_into_boxed());
     }
 
-    let vcol_offset = BAVC::TAU::bavc_depth_offset(round as usize);
+    let row_offset = BAVC::TAU::bavc_depth_offset(round as usize);
 
     // Step 6..9
     for j in 0..d {
         for i in 0..(ni >> (j + 1)) {
             // Join steps 8 and 9
-            for (vrow, (r_dst, r_src, r_src1)) in
+            for (col, (r_dst, r_src, r_src1)) in
                 izip!(rj1[i].iter_mut(), rj[2 * i].iter(), rj[2 * i + 1].iter()).enumerate()
             {
                 // Step 8
-                v[vrow][vcol_offset + j] ^= r_src1;
+                v[row_offset + j][col] ^= r_src1;
 
                 // Step 9
                 *r_dst = r_src ^ r_src1;
@@ -262,13 +262,13 @@ where
 
         // Step 14
         if i != 0 {
-            let q_col_offset = BAVC::TAU::bavc_depth_offset(i as usize);
+            let q_row_offset = BAVC::TAU::bavc_depth_offset(i as usize);
             let ki = BAVC::TAU::bavc_max_node_depth(i as usize);
             // Step 15
             for j in (0..ki).filter(|j| delta_i & (1 << j) != 0) {
                 // xor column q_{i,j} with c_i
-                for (row, c_ij) in c[i as usize - 1].iter().enumerate() {
-                    q[row][q_col_offset + j] ^= c_ij; // Column range q_col_offset,...,q_col_offset + k_i
+                for (col, c_ij) in c[i as usize - 1].iter().enumerate() {
+                    q[q_row_offset + j][col] ^= c_ij; // Column range q_col_offset,...,q_col_offset + k_i
                 }
             }
         }
@@ -319,13 +319,11 @@ mod test {
         }
 
         pub fn check_v(&self, expected_v: &[u8]) -> bool {
-            let v_trans = transpose_matrix(
-                &self
-                    .v
-                    .iter()
-                    .map(|row| row.as_slice())
-                    .collect::<Vec<&[u8]>>(),
-            );
+            let v_trans = self
+                .v
+                .iter()
+                .flat_map(|row| row.to_owned())
+                .collect::<Vec<u8>>();
             hash_array(&v_trans) == expected_v
         }
 
@@ -353,14 +351,12 @@ mod test {
         }
 
         pub fn check_q(&self, expected_q: &[u8]) -> bool {
-            let q_trans = transpose_matrix(
-                &self
-                    .q
-                    .iter()
-                    .map(|row| row.as_slice())
-                    .collect::<Vec<&[u8]>>(),
-            );
-            hash_array(&q_trans) == expected_q
+            let q = self
+                .q
+                .iter()
+                .flat_map(|row| row.to_owned())
+                .collect::<Vec<u8>>();
+            hash_array(q.as_slice()) == expected_q
         }
 
         pub fn verify(&self, expected_com: &[u8], expected_q: &[u8]) -> bool {
@@ -379,16 +375,6 @@ mod test {
         hashed_v: Vec<u8>,
         chall: Vec<u8>,
         hashed_q: Vec<u8>,
-    }
-
-    fn transpose_matrix(m: &[&[u8]]) -> Vec<u8> {
-        let mut m_trans = vec![vec![]; m[0].len()];
-        for i in 0..m[0].len() {
-            for j in 0..m.len() {
-                m_trans[i].push(m[j][i]);
-            }
-        }
-        m_trans.into_iter().flatten().collect()
     }
 
     fn vole_check<OWF: OWFParameters, BAVC: BatchVectorCommitment>(
