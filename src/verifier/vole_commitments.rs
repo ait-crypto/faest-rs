@@ -33,9 +33,19 @@ where
         VoleCommits { scalars, delta }
     }
 
-    pub(crate) fn get_ref(&self) -> VoleCommitsRef<'_, F, L> {
+    pub(crate) fn to_ref(&self) -> VoleCommitsRef<'_, F, L> {
         VoleCommitsRef {
             scalars: &self.scalars,
+            delta: self.delta,
+        }
+    }
+
+    pub(crate) fn get_commits_ref<L2>(&self, start_idx: usize) -> VoleCommitsRef<F, L2>
+    where
+        L2: ArrayLength,
+    {
+        VoleCommitsRef {
+            scalars: GenericArray::from_slice(&self.scalars[start_idx..start_idx + L2::USIZE]),
             delta: self.delta,
         }
     }

@@ -37,24 +37,20 @@ pub(crate) fn owf_constraints<O>(
     // ::7
     if O::is_em() {
         // ::8-9
-        let ext_key = key_schedule_bytes::<O>(x, delta);
-
+        let extended_key = key_schedule_bytes::<O>(x, delta);
         // ::10
         let owf_input = w.get_commits_ref::<O::NSTBits>(0);
-
         // ::11
         let owf_output = owf_input.add_round_key(GenericArray::<u8, O::NSTBytes>::from_slice(y));
-
         // ::19 - EM = true
         let w_tilde = w.get_commits_ref::<O::LENC>(O::LKE::USIZE);
-
         // ::21 - EM = true
         encryption::enc_cstrnts::<O, _>(
             zk_hasher,
             owf_input,
-            owf_output.get_ref(),
+            owf_output.to_ref(),
             w_tilde,
-            ext_key.as_slice(),
+            extended_key.as_slice(),
         );
     } else {
         // ::13
@@ -65,31 +61,26 @@ pub(crate) fn owf_constraints<O>(
 
         // ::16
         let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKE>(0));
-
-        let extended_key = k.get_ref();
         let extended_key: Vec<_> = (0..O::R::USIZE + 1)
-            .map(|i| extended_key.get_commits_ref::<O::NSTBits>(i * O::NSTBits::USIZE))
+            .map(|i| k.get_commits_ref::<O::NSTBits>(i * O::NSTBits::USIZE))
             .collect();
 
         // ::18-22
         for b in 0..O::BETA::USIZE {
             // ::19 - EM = false
             let w_tilde = w.get_commits_ref::<O::LENC>(O::LKE::USIZE + b * O::LENC::USIZE);
-
             let owf_output = GenericArray::<u8, O::NSTBytes>::from_slice(
                 &y[O::InputSize::USIZE * b..O::InputSize::USIZE * (b + 1)],
             );
             let owf_output = VoleCommits::from_constant(owf_output, delta);
-
             // ::21 - EM = false
             encryption::enc_cstrnts::<O, _>(
                 zk_hasher,
-                owf_input.get_ref(),
-                owf_output.get_ref(),
+                owf_input.to_ref(),
+                owf_output.to_ref(),
                 w_tilde,
                 extended_key.as_slice(),
             );
-
             // ::20
             owf_input.scalars[0] += delta;
         }

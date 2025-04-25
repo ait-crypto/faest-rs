@@ -12,7 +12,6 @@ use super::{
     ByteCommitsRef, FieldCommitDegThree, encryption::enc_cstrnts, key_expansion::key_exp_cstrnts,
 };
 
-#[allow(unused)]
 pub(crate) fn owf_constraints<O>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,
     w: ByteCommitsRef<OWFField<O>, O::LBYTES>,
@@ -44,19 +43,14 @@ pub(crate) fn owf_constraints<O>(
     if O::is_em() {
         // ::8-9
         let ext_key = key_schedule_bytes::<O>(x);
-
         // ::10
         let owf_input = w.get_commits_ref::<O::NSTBytes>(0);
-
         // ::11
         let owf_output_keys: GenericArray<u8, O::NSTBytes> =
             xor_arrays(owf_input.keys.as_slice(), y.as_slice()).collect();
-
         let owf_output = ByteCommitsRef::from_slices(&owf_output_keys, owf_input.tags);
-
         // ::19 - EM = true
         let w_tilde = w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE);
-
         // ::21 - EM = true
         enc_cstrnts::<O, _, _>(
             zk_hasher,

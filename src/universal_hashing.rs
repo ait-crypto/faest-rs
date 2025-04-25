@@ -311,6 +311,17 @@ where
         self.update(&(si.to_owned() * st1_i + st0_i));
     }
 
+    pub(crate) fn inv_norm_constraints(
+        &mut self,
+        conjugates: &[FieldCommitDegOne<F>],
+        y: &FieldCommitDegOne<F>,
+    ) where
+        F: Field,
+    {
+        let cnstr = y.to_owned() * &conjugates[1] * &conjugates[4] + &conjugates[0];
+        self.update(&cnstr);
+    }
+
     pub(crate) fn finalize(self, u: &F, u_plus_v: &F, v: &F) -> (F, F, F) {
         let a0 = self.a0_hasher.finalize(u);
         let a1 = self.a1_hasher.finalize(u_plus_v);

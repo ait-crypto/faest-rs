@@ -122,7 +122,7 @@ where
     // ::2
     let w_flat = key_exp_bkwd::<O>(
         w.get_commits_ref::<O::DIFFLKELAMBDA>(O::LAMBDA::USIZE),
-        k.get_ref(),
+        k.to_ref(),
     );
 
     let mut iwd = 32 * (O::NK::USIZE - 1);
