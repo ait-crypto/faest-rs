@@ -141,7 +141,7 @@ where
 mod bavc_common {
 
     use super::*;
-    // Need to find an alternative way to define helper functions (maybe in a private struct)
+
     pub(super) fn construct_keys<PRG, L>(
         r: &GenericArray<u8, PRG::KeySize>,
         iv: &IV,
@@ -311,7 +311,6 @@ where
     ) -> Option<BavcReconstructResult<Self::LambdaBytes>>;
 }
 
-// It would be nice to avoid all this code duplication between BAVC and BAVCEM
 pub(crate) struct Bavc<RO, PRG, LH, TAU>(
     PhantomData<RO>,
     PhantomData<PRG>,

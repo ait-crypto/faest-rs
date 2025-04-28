@@ -819,16 +819,6 @@ pub(crate) trait TauParameters {
         Self::Tau1::USIZE * (Self::K::USIZE) + (Self::K::USIZE - 1) * (i - Self::Tau1::USIZE)
     }
 
-    fn bavc_depth_offset(i: usize) -> usize {
-        debug_assert!(i < Self::Tau::USIZE);
-
-        if i < Self::Tau1::USIZE {
-            return Self::K::USIZE * i;
-        }
-
-        Self::Tau1::USIZE * (Self::K::USIZE) + (Self::K::USIZE - 1) * (i - Self::Tau1::USIZE)
-    }
-
     fn bavc_index_offset(i: usize) -> usize {
         debug_assert!(i < Self::Tau::USIZE);
 
