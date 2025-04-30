@@ -1,9 +1,9 @@
 //! Implementation of the PRGs for security levels 128, 192 and 256
 
-use aes::cipher::{generic_array::GenericArray as GenericArray_0_14, KeyIvInit, StreamCipher};
+use aes::cipher::{KeyIvInit, StreamCipher, generic_array::GenericArray as GenericArray_0_14};
 use generic_array::{
-    typenum::{U16, U24, U32},
     ArrayLength, GenericArray,
+    typenum::{U16, U24, U32},
 };
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;

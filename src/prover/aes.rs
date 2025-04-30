@@ -1,27 +1,22 @@
 use crate::{
     aes::*,
     fields::{
-        large_fields::{Betas, ByteCombineSquared, ByteCombineSquaredConstants, SquareBytes},
-        small_fields::{GF8, GF8_INV_NORM},
-        BigGaloisField, ByteCombine, ByteCombineConstants, Field, Sigmas, SumPoly,
+        BigGaloisField, ByteCombine, ByteCombineConstants, Sigmas,
+        large_fields::ByteCombineSquaredConstants,
     },
     parameter::{BaseParameters, OWFField, OWFParameters, SecurityParameter},
-    universal_hashing::ZKProofHasher,
     utils::get_bits,
 };
 
-use super::{ByteCommitment, ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
+use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use generic_array::{
-    typenum::{Prod, Quot, Unsigned, U2, U4, U8},
     ArrayLength, GenericArray,
+    typenum::{Prod, U4, U8, Unsigned},
 };
 use itertools::izip;
-use std::convert::AsRef;
-use std::ops::{AddAssign, Deref, Index, Mul};
+use std::ops::{AddAssign, Mul};
 
 // Helper type aliases
-pub(crate) type StateBitsCommits<O> =
-    Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
 
 pub(crate) type StateBitsSquaredCommits<O> =
     Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
@@ -82,10 +77,10 @@ where
     type Output = ByteCommits<F, L>;
 
     fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
-        ByteCommits {
-            keys: self.keys.iter().zip(rhs).map(|(a, b)| a ^ b).collect(),
-            tags: <Box<GenericArray<F, Prod<L, U8>>>>::from_iter(self.tags.to_owned()),
-        }
+        ByteCommits::new(
+            self.keys.iter().zip(rhs).map(|(a, b)| a ^ b).collect(),
+            self.tags.to_owned(),
+        )
     }
 }
 
@@ -291,51 +286,6 @@ where
 
             self[i3] = tmp0 * v3 + tmp3 * v2 + &tmp1 + &tmp2;
         }
-    }
-}
-
-pub(crate) fn mix_columns<O>(state: &mut StateBytesSquaredCommits<O>, sq: bool)
-where
-    O: OWFParameters,
-{
-    let v2 = if sq {
-        OWFField::<O>::BYTE_COMBINE_SQ_2
-    } else {
-        OWFField::<O>::BYTE_COMBINE_2
-    };
-    let v3: <<O as OWFParameters>::BaseParams as BaseParameters>::Field = if sq {
-        OWFField::<O>::BYTE_COMBINE_SQ_3
-    } else {
-        OWFField::<O>::BYTE_COMBINE_3
-    };
-
-    for c in 0..O::NST::USIZE {
-        // Save the 4 state's columns that will be modified in this round
-        let tmp = GenericArray::<_, U4>::from_slice(&state[4 * c..4 * c + 4]).to_owned();
-
-        let i0 = 4 * c;
-        let i1 = 4 * c + 1;
-        let i2 = 4 * c + 2;
-        let i3 = 4 * c + 3;
-
-        // ::7
-        state[i0] = tmp[0].clone() * v2 + tmp[1].clone() * v3 + &tmp[2] + &tmp[3];
-
-        // ::8
-        state[i1] = tmp[1].clone() * v2 + tmp[2].clone() * v3 + &tmp[0] + &tmp[3];
-
-        // ::9
-        state[i2] = tmp[2].clone() * v2 + tmp[3].clone() * v3 + &tmp[0] + &tmp[1];
-
-        // ::10
-        // SAFETY: tmp has length 4, hence unwrapping the first 4 elements is safe
-        let mut tmp = tmp.into_iter();
-        let tmp0 = tmp.next().unwrap();
-        let tmp1 = tmp.next().unwrap();
-        let tmp2 = tmp.next().unwrap();
-        let tmp3 = tmp.next().unwrap();
-
-        state[i3] = tmp0 * v3 + tmp3 * v2 + tmp1 + tmp2;
     }
 }
 

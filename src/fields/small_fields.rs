@@ -1,15 +1,11 @@
 use std::{
-    default,
     num::Wrapping,
     ops::{
         Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
     },
 };
 
-use generic_array::{
-    typenum::{U1, U3, U8},
-    GenericArray,
-};
+use generic_array::{GenericArray, typenum::U8};
 
 use super::{Field, Square};
 
@@ -55,7 +51,7 @@ impl<T> From<T> for SmallGF<T> {
 impl From<SmallGF<Self>> for u64 {
     #[inline(always)]
     fn from(value: SmallGF<Self>) -> Self {
-        value.0 .0
+        value.0.0
     }
 }
 
@@ -74,7 +70,7 @@ where
     T: PartialEq<T>,
 {
     fn eq(&self, other: &T) -> bool {
-        self.0 .0 == *other
+        self.0.0 == *other
     }
 }
 
@@ -203,32 +199,6 @@ impl Square for GF8 {
 }
 
 impl GF8 {
-    pub(crate) fn invnorm(x: u8) -> u8 {
-        let inv = GF8::exp_238(GF8::from(x));
-
-        let mut res = inv & 1; // Take bit 0 in pos 0
-
-        res |= (inv & 0b11000000u8) >> 5; // Take bit 6,7 in pos 1,2
-
-        res | ((inv & 0b100) << 1) // Take bit 2 in pos 3
-    }
-
-    fn exp_238(mut x: GF8) -> u8 {
-        // 238 == 0b11101110
-        let mut y = x.square(); // x^2
-        x = y.square(); // x^4
-        y = x * y;
-        x = x.square(); // x^8
-        y = x * y;
-        x = x.square(); // x^16
-        x = x.square(); // x^32
-        y = x * y;
-        x = x.square(); // x^64
-        y = x * y;
-        x = x.square(); // x^128
-        (x * y).0 .0
-    }
-
     pub(crate) fn square_bits_inplace(x: &mut u8) {
         let bits = [
             *x & 0b1,
@@ -281,12 +251,12 @@ impl Field for GF64 {
     type Length = U8;
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        GenericArray::from(self.0 .0.to_le_bytes())
+        GenericArray::from(self.0.0.to_le_bytes())
     }
 
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut arr = GenericArray::default_boxed();
-        arr.copy_from_slice(&self.0 .0.to_le_bytes());
+        arr.copy_from_slice(&self.0.0.to_le_bytes());
         arr
     }
 }
@@ -302,7 +272,7 @@ impl From<&[u8]> for GF64 {
 
 #[cfg(test)]
 mod test {
-    use rand::{rngs::SmallRng, Rng, SeedableRng};
+    use rand::{Rng, SeedableRng, rngs::SmallRng};
 
     use super::*;
 
@@ -310,7 +280,7 @@ mod test {
     fn gf64_test_mul() {
         let mut rng = SmallRng::from_entropy();
 
-        let anything: u64 = rng.gen();
+        let anything: u64 = rng.r#gen();
         let pol_anything = GF64::from(anything);
         let pol_0 = GF64::from(0u64);
         let pol_1 = GF64::from(1u64);
@@ -356,14 +326,5 @@ mod test {
             //to test commutativity
             assert_eq!(res, res_rev);
         }
-    }
-
-    #[test]
-    fn gf8_test_invnorm() {
-        assert_eq!(GF8::invnorm(0), 0);
-        assert_eq!(GF8::invnorm(1), 1);
-        assert_eq!(GF8::invnorm(2), 1 << 3 | 1 << 2 | 1);
-        assert_eq!(GF8::invnorm(0x80), 1 << 3 | 1 << 2 | 1);
-        assert_eq!(GF8::invnorm(0x88), 1 << 2 | 1);
     }
 }

@@ -1,10 +1,10 @@
-use crate::fields::{BigGaloisField, Square, GF8};
+use crate::fields::{BigGaloisField, GF8};
 use crate::prover::field_commitment::FieldCommitDegOne;
 use generic_array::{
-    typenum::{Prod, U8},
     ArrayLength, GenericArray,
+    typenum::{Prod, U8},
 };
-use std::ops::{Add, Mul};
+use std::ops::Mul;
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub(crate) struct ByteCommitment<F>
@@ -81,14 +81,14 @@ where
         }
     }
 
-    pub fn get_ref(&self) -> ByteCommitsRef<F, L> {
+    pub(crate) fn to_ref(&self) -> ByteCommitsRef<F, L> {
         ByteCommitsRef {
             keys: &self.keys,
             tags: &self.tags,
         }
     }
 
-    pub fn get(&self, idx: usize) -> ByteCommitment<F> {
+    pub(crate) fn get(&self, idx: usize) -> ByteCommitment<F> {
         ByteCommitment {
             key: self.keys[idx],
             tags: GenericArray::from_slice(&self.tags[idx * 8..idx * 8 + 8]).to_owned(),
@@ -118,20 +118,6 @@ where
             keys: GenericArray::from_slice(keys),
             tags: GenericArray::from_slice(tags),
         }
-    }
-
-    pub(crate) fn get_field_commit(&self, index: usize) -> FieldCommitDegOne<F> {
-        FieldCommitDegOne::new(
-            F::byte_combine_bits(self.keys[index]),
-            F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
-        )
-    }
-
-    pub(crate) fn get_field_commit_sq(&self, index: usize) -> FieldCommitDegOne<F> {
-        FieldCommitDegOne::new(
-            F::byte_combine_bits_sq(self.keys[index]),
-            F::byte_combine_sq_slice(&self.tags[index * 8..index * 8 + 8]),
-        )
     }
 
     pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<F, L2>

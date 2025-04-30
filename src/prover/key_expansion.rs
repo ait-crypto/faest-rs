@@ -1,30 +1,16 @@
 use crate::{
-    aes::{
-        AddRoundKey, AddRoundKeyAssign, AddRoundKeyBytes, BytewiseMixColumns, InverseAffine,
-        InverseShiftRows, MixColumns, SBoxAffine, ShiftRows, StateToBytes,
-    },
-    fields::{
-        large_fields::{Betas, ByteCombineSquared, SquareBytes},
-        BigGaloisField, ByteCombine, Sigmas, Square,
-    },
+    fields::{BigGaloisField, ByteCombine},
     parameter::{BaseParameters, OWFField, OWFParameters},
-    prover::{ByteCommitment, ByteCommits, ByteCommitsRef},
+    prover::{ByteCommits, ByteCommitsRef},
     rijndael_32::RCON_TABLE,
     universal_hashing::ZKProofHasher,
-    utils::get_bit,
 };
 
 use generic_array::{
-    arr,
-    typenum::{Diff, Prod, Quot, Unsigned, U2, U4, U8},
-    ArrayLength, GenericArray,
+    GenericArray,
+    typenum::{U8, Unsigned},
 };
 use itertools::iproduct;
-use std::{convert::AsRef, process::Output};
-use std::{
-    default,
-    ops::{AddAssign, Deref, Index},
-};
 
 pub(super) fn key_exp_cstrnts<O>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,
@@ -41,7 +27,7 @@ where
     // ::2
     let w_flat = key_exp_bkwd::<O>(
         w.get_commits_ref::<O::DIFFLKELAMBDABytes>(O::LAMBDABYTES::USIZE),
-        k.get_ref(),
+        k.to_ref(),
     );
 
     let mut iwd = 32 * (O::NK::USIZE - 1);

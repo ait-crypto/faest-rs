@@ -52,12 +52,10 @@
 //! # }
 //! ```
 
-// #![forbid(unsafe_code)]
 #![warn(missing_docs)]
-// TODO: fix those
+// TODO: fix this
 #![allow(clippy::type_complexity)]
-#![allow(unused_imports, dead_code)]
-use generic_array::{typenum::Unsigned, GenericArray};
+use generic_array::{GenericArray, typenum::Unsigned};
 use paste::paste;
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
@@ -449,7 +447,7 @@ mod tests {
     use std::fmt::Debug;
 
     #[cfg(feature = "serde")]
-    use serde::{de::DeserializeOwned, Serialize};
+    use serde::{Serialize, de::DeserializeOwned};
 
     const TEST_MESSAGE: &[u8] = "test message".as_bytes();
 

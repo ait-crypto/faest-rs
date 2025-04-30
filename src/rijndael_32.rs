@@ -12,15 +12,15 @@
 //! Originally licensed MIT. Relicensed as Apache 2.0+MIT with permission.
 
 use aes::{
-    cipher::{
-        generic_array::typenum::{U24, U32},
-        BlockEncrypt, BlockSizeUser, KeyInit, KeySizeUser,
-    },
     Block,
+    cipher::{
+        BlockEncrypt, BlockSizeUser, KeyInit, KeySizeUser,
+        generic_array::typenum::{U24, U32},
+    },
 };
 use generic_array::{
-    typenum::{Unsigned, U12, U14, U2, U6, U8},
     GenericArray,
+    typenum::{U2, U6, U8, U12, U14, Unsigned},
 };
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
@@ -766,7 +766,7 @@ mod test {
     use std::cmp::max;
 
     use aes::cipher::generic_array::GenericArray;
-    use generic_array::typenum::{U10, U12, U14, U4, U6, U8};
+    use generic_array::typenum::{U4, U6, U8, U10, U12, U14};
     use serde::Deserialize;
 
     use crate::utils::test::read_test_data;

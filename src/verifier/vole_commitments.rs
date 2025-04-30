@@ -1,20 +1,5 @@
-use crate::{
-    aes::{
-        AddRoundKey, AddRoundKeyAssign, AddRoundKeyBytes, BytewiseMixColumns, InverseAffine,
-        InverseShiftRows, MixColumns, SBoxAffine, ShiftRows, StateToBytes,
-    },
-    fields::{
-        BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquared,
-        ByteCombineSquaredConstants, Sigmas, Square,
-    },
-    parameter::{BaseParameters, OWFField, OWFParameters},
-    utils::get_bit,
-};
-use generic_array::{
-    typenum::{marker_traits::Unsigned, U4, U8},
-    ArrayLength, GenericArray,
-};
-use itertools::izip;
+use crate::{fields::BigGaloisField, utils::get_bit};
+use generic_array::{ArrayLength, GenericArray, typenum::U8};
 use std::ops::Range;
 use std::ops::{Index, Mul};
 
@@ -29,16 +14,6 @@ where
     F: BigGaloisField,
     L: ArrayLength,
 {
-    pub(crate) fn get_commits_ref<L2>(&self, start_idx: usize) -> VoleCommitsRef<'_, F, L2>
-    where
-        L2: ArrayLength,
-    {
-        VoleCommitsRef {
-            scalars: GenericArray::from_slice(&self.scalars[start_idx..start_idx + L2::USIZE]),
-            delta: self.delta,
-        }
-    }
-
     /// Turns the input array into vole commitments using the challenge delta.
     pub(crate) fn from_constant<L2>(
         input: &GenericArray<u8, L>,
@@ -58,11 +33,31 @@ where
         VoleCommits { scalars, delta }
     }
 
-    pub(crate) fn get_ref(&self) -> VoleCommitsRef<'_, F, L> {
+    pub(crate) fn to_ref(&self) -> VoleCommitsRef<'_, F, L> {
         VoleCommitsRef {
             scalars: &self.scalars,
             delta: self.delta,
         }
+    }
+
+    pub(crate) fn get_commits_ref<L2>(&self, start_idx: usize) -> VoleCommitsRef<F, L2>
+    where
+        L2: ArrayLength,
+    {
+        VoleCommitsRef {
+            scalars: GenericArray::from_slice(&self.scalars[start_idx..start_idx + L2::USIZE]),
+            delta: self.delta,
+        }
+    }
+
+    pub(crate) fn get_field_commit(&self, idx: usize) -> F {
+        debug_assert!(idx * 8 + 8 < L::USIZE);
+        F::byte_combine_slice(&self.scalars[8 * idx..8 * idx + 8])
+    }
+
+    pub(crate) fn get_field_commit_sq(&self, idx: usize) -> F {
+        debug_assert!(idx * 8 + 8 < L::USIZE);
+        F::byte_combine_sq_slice(&self.scalars[8 * idx..8 * idx + 8])
     }
 }
 
@@ -133,5 +128,15 @@ where
 
     fn index(&self, index: Range<usize>) -> &Self::Output {
         &self.scalars[index]
+    }
+}
+
+impl<F, L> AsRef<GenericArray<F, L>> for VoleCommits<'_, F, L>
+where
+    F: BigGaloisField,
+    L: ArrayLength,
+{
+    fn as_ref(&self) -> &GenericArray<F, L> {
+        &self.scalars
     }
 }

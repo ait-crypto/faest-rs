@@ -1,25 +1,24 @@
-use std::{io::Write, iter::zip, slice::RChunks};
+use std::iter::zip;
 
 use crate::{
-    bavc::{BatchVectorCommitment, Bavc, BavcDecommitment, BavcOpenResult},
+    Error,
+    bavc::{BatchVectorCommitment, BavcOpenResult},
     fields::Field,
     internal_keys::{PublicKey, SecretKey},
     parameter::{BaseParameters, FAESTParameters, OWFField, OWFParameters, TauParameters},
-    prg::{IVSize, PseudoRandomGenerator, IV},
+    prg::{IV, IVSize},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
-    utils::{decode_all_chall_3, Reader},
+    utils::{Reader, decode_all_chall_3},
     vole::{
-        volecommit, volereconstruct, VoleCommitResult, VoleCommitmentCRef, VoleCommitmentCRefMut,
-        VoleReconstructResult,
+        VoleCommitResult, VoleCommitmentCRef, VoleCommitmentCRefMut, VoleReconstructResult,
+        volecommit, volereconstruct,
     },
-    Error,
 };
 
-use generic_array::{typenum::Unsigned, GenericArray};
+use generic_array::{GenericArray, typenum::Unsigned};
 use itertools::izip;
 use rand_core::CryptoRngCore;
-use signature::SignerMut;
 use std::iter::repeat_n;
 
 type RO<P> =
@@ -193,16 +192,6 @@ pub(crate) fn faest_sign<P>(
     sign::<P, P::OWF>(msg, sk, rho, signature);
 }
 
-fn get_column<O>(
-    m: &GenericArray<GenericArray<u8, O::LAMBDA>, O::LHATBYTES>,
-    column: usize,
-) -> Vec<u8>
-where
-    O: OWFParameters,
-{
-    (0..m.len()).map(|row| m[row][column]).collect()
-}
-
 fn check_challenge_3<P, O>(chall3: &[u8]) -> bool
 where
     P: FAESTParameters,
@@ -345,10 +334,9 @@ fn sign<P, O>(
     {
         for i in 0..O::LAMBDA::USIZE {
             // Hash column-wise
-            let v_col = get_column::<O>(&v, i);
             RO::<P>::hash_challenge_2_update(
                 &mut h2_hasher,
-                vole_haher_v.process(&v_col).as_slice(),
+                vole_haher_v.process(&v[i]).as_slice(),
             );
         }
     }
@@ -372,7 +360,7 @@ fn sign<P, O>(
         // ::16
         GenericArray::from_slice(&u[O::LBYTES::USIZE..O::LBYTES::USIZE + O::LAMBDABYTESTWO::USIZE]),
         // ::17
-        GenericArray::from_slice(&v[..O::LAMBDALBYTES::USIZE]),
+        GenericArray::from_slice(&v),
         &sk.pk,
         &chall2,
     );
@@ -488,7 +476,7 @@ where
                 .chain(repeat_n(0, P::WGRIND::USIZE)),
         ) {
             // ::12
-            let mut q_tilde = vole_hasher.process(&get_column::<O>(&q, i));
+            let mut q_tilde = vole_hasher.process(&q[i]);
 
             // ::14
             if d_i == 1 {
@@ -510,7 +498,7 @@ where
 
     // ::17
     let a0_tilde = P::OWF::verify(
-        GenericArray::from_slice(&q[..O::LBYTES::USIZE + O::LAMBDABYTESTWO::USIZE]),
+        GenericArray::from_slice(&q),
         GenericArray::from_slice(d),
         pk,
         &chall2,
@@ -642,205 +630,227 @@ mod test {
 
     #[instantiate_tests(<FAESTEM256sParameters>)]
     mod faest_em_256s {}
+
+    // Test signature against TVs and verify
+    mod faest_tvs {
+        use super::*;
+        use crate::{
+            parameter::{
+                FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
+                FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters,
+                FAESTEM128sParameters, FAESTEM192fParameters, FAESTEM192sParameters,
+                FAESTEM256fParameters, FAESTEM256sParameters, FAESTParameters, OWF128, OWF128EM,
+                OWF192, OWF192EM, OWF256, OWF256EM,
+            },
+            utils::test::{hash_array, read_test_data},
+        };
+
+        use serde::Deserialize;
+
+        const MSG: [u8; 76] = [
+            0x54, 0x68, 0x69, 0x73, 0x20, 0x64, 0x6f, 0x63, 0x75, 0x6d, 0x65, 0x6e, 0x74, 0x20,
+            0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x73, 0x20, 0x61, 0x6e, 0x64, 0x20,
+            0x73, 0x70, 0x65, 0x63, 0x69, 0x66, 0x69, 0x65, 0x73, 0x20, 0x74, 0x68, 0x65, 0x20,
+            0x46, 0x41, 0x45, 0x53, 0x54, 0x20, 0x64, 0x69, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x20,
+            0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x20, 0x61, 0x6c, 0x67, 0x6f,
+            0x72, 0x69, 0x74, 0x68, 0x6d, 0x2e,
+        ];
+
+        const RHO: [u8; 16] = [
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+            0x0e, 0x0f,
+        ];
+
+        #[derive(Debug, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct FaestProveData {
+            lambda: u16,
+            em: bool,
+            sk: Vec<u8>,
+            hashed_sig_s: Vec<u8>,
+            hashed_sig_f: Vec<u8>,
+        }
+        impl FaestProveData {
+            fn try_signing<P: FAESTParameters<OWF = O>, O: OWFParameters>(
+                sk: &SecretKey<O>,
+                hashed_sig: &[u8],
+            ) -> Box<GenericArray<u8, P::SignatureSize>> {
+                let mut signature = GenericArray::default_boxed();
+                sign::<P, O>(&MSG, &sk, &RHO, &mut signature);
+                assert_eq!(hashed_sig, hash_array(signature.as_slice()).as_slice());
+                signature
+            }
+
+            fn test_signature_em(&self) {
+                match self.lambda {
+                    128 => {
+                        let sk = SecretKey::<OWF128EM>::try_from(self.sk.as_slice()).unwrap();
+                        let pk = sk.as_public_key();
+
+                        println!("FAEST-EM-128s - testing FAEST.sign ..");
+                        let signature = Self::try_signing::<FAESTEM128sParameters, OWF128EM>(
+                            &sk,
+                            &self.hashed_sig_s,
+                        );
+                        println!("FAEST-EM-128s - testing FAEST.verify ..");
+                        assert!(
+                            verify::<FAESTEM128sParameters, OWF128EM>(&MSG, &pk, &signature)
+                                .is_ok()
+                        );
+
+                        println!("FAEST-EM-128f - testing FAEST.sign..");
+                        let signature = Self::try_signing::<FAESTEM128fParameters, OWF128EM>(
+                            &sk,
+                            &self.hashed_sig_f,
+                        );
+                        println!("FAEST-EM-128f - testing FAEST.verify ..");
+                        assert!(
+                            verify::<FAESTEM128fParameters, OWF128EM>(&MSG, &pk, &signature)
+                                .is_ok()
+                        );
+                    }
+
+                    192 => {
+                        let sk = SecretKey::<OWF192EM>::try_from(self.sk.as_slice()).unwrap();
+                        let pk = sk.as_public_key();
+
+                        println!("FAEST-EM-192s - testing FAEST.sign..");
+                        let signature = Self::try_signing::<FAESTEM192sParameters, OWF192EM>(
+                            &sk,
+                            &self.hashed_sig_s,
+                        );
+                        println!("FAEST-EM-192s - testing FAEST.verify..");
+                        assert!(
+                            verify::<FAESTEM192sParameters, OWF192EM>(&MSG, &pk, &signature)
+                                .is_ok()
+                        );
+
+                        println!("FAEST-EM-192f - testing FAEST.sign..");
+                        let signature = Self::try_signing::<FAESTEM192fParameters, OWF192EM>(
+                            &sk,
+                            &self.hashed_sig_f,
+                        );
+                        println!("FAEST-EM-192f - testing FAEST.verify..");
+                        assert!(
+                            verify::<FAESTEM192fParameters, OWF192EM>(&MSG, &pk, &signature)
+                                .is_ok()
+                        );
+                    }
+
+                    _ => {
+                        let sk = SecretKey::<OWF256EM>::try_from(self.sk.as_slice()).unwrap();
+                        let pk = sk.as_public_key();
+
+                        println!("FAEST-EM-256s - testing FAEST.sign..");
+                        let signature = Self::try_signing::<FAESTEM256sParameters, OWF256EM>(
+                            &sk,
+                            &self.hashed_sig_s,
+                        );
+                        assert!(
+                            verify::<FAESTEM256sParameters, OWF256EM>(&MSG, &pk, &signature)
+                                .is_ok()
+                        );
+
+                        println!("FAEST-EM-256f - testing FAEST.verify..");
+                        let signature = Self::try_signing::<FAESTEM256fParameters, OWF256EM>(
+                            &sk,
+                            &self.hashed_sig_f,
+                        );
+                        assert!(
+                            verify::<FAESTEM256fParameters, OWF256EM>(&MSG, &pk, &signature)
+                                .is_ok()
+                        );
+                    }
+                }
+            }
+
+            fn test_signature_aes(&self) {
+                match self.lambda {
+                    128 => {
+                        let sk = SecretKey::<OWF128>::try_from(self.sk.as_slice()).unwrap();
+                        let pk = sk.as_public_key();
+                        println!("FAEST-128s - testing FAEST.sign..");
+                        let signature = Self::try_signing::<FAEST128sParameters, OWF128>(
+                            &sk,
+                            &self.hashed_sig_s,
+                        );
+                        assert!(
+                            verify::<FAEST128sParameters, OWF128>(&MSG, &pk, &signature).is_ok()
+                        );
+
+                        println!("FAEST-128f - testing FAEST.sign..");
+                        let signature = Self::try_signing::<FAEST128fParameters, OWF128>(
+                            &sk,
+                            &self.hashed_sig_f,
+                        );
+                        assert!(
+                            verify::<FAEST128fParameters, OWF128>(&MSG, &pk, &signature).is_ok()
+                        );
+                    }
+
+                    192 => {
+                        let sk = SecretKey::<OWF192>::try_from(self.sk.as_slice()).unwrap();
+                        let pk = sk.as_public_key();
+
+                        println!("FAEST-192s - testing FAEST.sign..");
+                        let signature = Self::try_signing::<FAEST192sParameters, OWF192>(
+                            &sk,
+                            &self.hashed_sig_s,
+                        );
+                        assert!(
+                            verify::<FAEST192sParameters, OWF192>(&MSG, &pk, &signature).is_ok()
+                        );
+
+                        println!("FAEST-192f - testing FAEST.sign..");
+                        let signature = Self::try_signing::<FAEST192fParameters, OWF192>(
+                            &sk,
+                            &self.hashed_sig_f,
+                        );
+                        assert!(
+                            verify::<FAEST192fParameters, OWF192>(&MSG, &pk, &signature).is_ok()
+                        );
+                    }
+
+                    _ => {
+                        let sk = SecretKey::<OWF256>::try_from(self.sk.as_slice()).unwrap();
+                        let pk = sk.as_public_key();
+
+                        println!("FAEST-256s - testing FAEST.sign..");
+                        let signature = Self::try_signing::<FAEST256sParameters, OWF256>(
+                            &sk,
+                            &self.hashed_sig_s,
+                        );
+                        assert!(
+                            verify::<FAEST256sParameters, OWF256>(&MSG, &pk, &signature).is_ok()
+                        );
+
+                        println!("FAEST-256f - testing FAEST.sign..");
+                        let signature = Self::try_signing::<FAEST256fParameters, OWF256>(
+                            &sk,
+                            &self.hashed_sig_f,
+                        );
+                        assert!(
+                            verify::<FAEST256fParameters, OWF256>(&MSG, &pk, &signature).is_ok()
+                        );
+                    }
+                }
+            }
+
+            pub fn test_signature(&self) {
+                if self.em {
+                    self.test_signature_em();
+                } else {
+                    self.test_signature_aes();
+                }
+            }
+        }
+
+        #[test]
+        fn faest_sign_verify_tvs_test() {
+            let database: Vec<FaestProveData> = read_test_data("FaestProve.json");
+            for data in database {
+                data.test_signature();
+            }
+        }
+    }
 }
-
-// Test signature against TVs and verify
-// #[cfg(test)]
-// mod test {
-//     use super::*;
-//     use crate::{
-//         parameter::{
-//             FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
-//             FAEST256fParameters, FAEST256sParameters, FAESTEM128fParameters, FAESTEM128sParameters,
-//             FAESTEM192fParameters, FAESTEM192sParameters, FAESTEM256fParameters,
-//             FAESTEM256sParameters, FAESTParameters, OWF128, OWF128EM, OWF192, OWF192EM, OWF256,
-//             OWF256EM,
-//         },
-//         utils::test::{hash_array, read_test_data},
-//     };
-//     use core::hash;
-//     use serde::Deserialize;
-
-//     const MSG: [u8; 76] = [
-//         0x54, 0x68, 0x69, 0x73, 0x20, 0x64, 0x6f, 0x63, 0x75, 0x6d, 0x65, 0x6e, 0x74, 0x20, 0x64,
-//         0x65, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x73, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x70,
-//         0x65, 0x63, 0x69, 0x66, 0x69, 0x65, 0x73, 0x20, 0x74, 0x68, 0x65, 0x20, 0x46, 0x41, 0x45,
-//         0x53, 0x54, 0x20, 0x64, 0x69, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x20, 0x73, 0x69, 0x67, 0x6e,
-//         0x61, 0x74, 0x75, 0x72, 0x65, 0x20, 0x61, 0x6c, 0x67, 0x6f, 0x72, 0x69, 0x74, 0x68, 0x6d,
-//         0x2e,
-//     ];
-
-//     const RHO: [u8; 16] = [
-//         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
-//         0x0f,
-//     ];
-
-//     #[derive(Debug, Deserialize)]
-//     #[serde(rename_all = "camelCase")]
-//     struct FaestProveData {
-//         lambda: u16,
-//         em: bool,
-//         sk: Vec<u8>,
-//         hashed_sig_s: Vec<u8>,
-//         hashed_sig_f: Vec<u8>,
-//     }
-//     impl FaestProveData {
-//         fn try_signing<P: FAESTParameters<OWF = O>, O: OWFParameters>(
-//             sk: &SecretKey<O>,
-//             hashed_sig: &[u8],
-//         ) -> Box<GenericArray<u8, P::SignatureSize>> {
-//             let mut signature = GenericArray::default_boxed();
-//             sign::<P, O>(&MSG, &sk, &RHO, &mut signature);
-//             assert_eq!(hashed_sig, hash_array(signature.as_slice()).as_slice());
-//             signature
-//         }
-
-//         fn test_signature_em(&self) {
-//             match self.lambda {
-//                 128 => {
-//                     let sk = SecretKey::<OWF128EM>::try_from(self.sk.as_slice()).unwrap();
-//                     let pk = sk.as_public_key();
-
-//                     println!("FAEST-EM-128s - testing FAEST.sign ..");
-//                     let signature = Self::try_signing::<FAESTEM128sParameters, OWF128EM>(
-//                         &sk,
-//                         &self.hashed_sig_s,
-//                     );
-//                     println!("FAEST-EM-128s - testing FAEST.verify ..");
-//                     assert!(
-//                         verify::<FAESTEM128sParameters, OWF128EM>(&MSG, &pk, &signature).is_ok()
-//                     );
-
-//                     println!("FAEST-EM-128f - testing FAEST.sign..");
-//                     let signature = Self::try_signing::<FAESTEM128fParameters, OWF128EM>(
-//                         &sk,
-//                         &self.hashed_sig_f,
-//                     );
-//                     println!("FAEST-EM-128f - testing FAEST.verify ..");
-//                     assert!(
-//                         verify::<FAESTEM128fParameters, OWF128EM>(&MSG, &pk, &signature).is_ok()
-//                     );
-//                 }
-
-//                 192 => {
-//                     let sk = SecretKey::<OWF192EM>::try_from(self.sk.as_slice()).unwrap();
-//                     let pk = sk.as_public_key();
-
-//                     println!("FAEST-EM-192s - testing FAEST.sign..");
-//                     let signature = Self::try_signing::<FAESTEM192sParameters, OWF192EM>(
-//                         &sk,
-//                         &self.hashed_sig_s,
-//                     );
-//                     println!("FAEST-EM-192s - testing FAEST.verify..");
-//                     assert!(
-//                         verify::<FAESTEM192sParameters, OWF192EM>(&MSG, &pk, &signature).is_ok()
-//                     );
-
-//                     println!("FAEST-EM-192f - testing FAEST.sign..");
-//                     let signature = Self::try_signing::<FAESTEM192fParameters, OWF192EM>(
-//                         &sk,
-//                         &self.hashed_sig_f,
-//                     );
-//                     println!("FAEST-EM-192f - testing FAEST.verify..");
-//                     assert!(
-//                         verify::<FAESTEM192fParameters, OWF192EM>(&MSG, &pk, &signature).is_ok()
-//                     );
-//                 }
-
-//                 _ => {
-//                     let sk = SecretKey::<OWF256EM>::try_from(self.sk.as_slice()).unwrap();
-//                     let pk = sk.as_public_key();
-
-//                     println!("FAEST-EM-256s - testing FAEST.sign..");
-//                     let signature = Self::try_signing::<FAESTEM256sParameters, OWF256EM>(
-//                         &sk,
-//                         &self.hashed_sig_s,
-//                     );
-//                     assert!(
-//                         verify::<FAESTEM256sParameters, OWF256EM>(&MSG, &pk, &signature).is_ok()
-//                     );
-
-//                     println!("FAEST-EM-256f - testing FAEST.verify..");
-//                     let signature = Self::try_signing::<FAESTEM256fParameters, OWF256EM>(
-//                         &sk,
-//                         &self.hashed_sig_f,
-//                     );
-//                     assert!(
-//                         verify::<FAESTEM256fParameters, OWF256EM>(&MSG, &pk, &signature).is_ok()
-//                     );
-//                 }
-//             }
-//         }
-
-//         fn test_signature_aes(&self) {
-//             match self.lambda {
-//                 128 => {
-//                     let sk = SecretKey::<OWF128>::try_from(self.sk.as_slice()).unwrap();
-//                     let pk = sk.as_public_key();
-//                     println!("FAEST-128s - testing FAEST.sign..");
-//                     let signature = Self::try_signing::<FAEST128sParameters, OWF128>(&sk, &self.hashed_sig_s);
-//                     assert!(
-//                         verify::<FAEST128sParameters, OWF128>(&MSG, &pk, &signature).is_ok()
-//                     );
-
-//                     println!("FAEST-128f - testing FAEST.sign..");
-//                     let signature = Self::try_signing::<FAEST128fParameters, OWF128>(&sk, &self.hashed_sig_f);
-//                     assert!(
-//                         verify::<FAEST128fParameters, OWF128>(&MSG, &pk, &signature).is_ok()
-//                     );
-//                 }
-
-//                 192 => {
-//                     let sk = SecretKey::<OWF192>::try_from(self.sk.as_slice()).unwrap();
-//                     let pk = sk.as_public_key();
-
-//                     println!("FAEST-192s - testing FAEST.sign..");
-//                     let signature = Self::try_signing::<FAEST192sParameters, OWF192>(&sk, &self.hashed_sig_s);
-//                     assert!(
-//                         verify::<FAEST192sParameters, OWF192>(&MSG, &pk, &signature).is_ok()
-//                     );
-
-//                     println!("FAEST-192f - testing FAEST.sign..");
-//                     let signature = Self::try_signing::<FAEST192fParameters, OWF192>(&sk, &self.hashed_sig_f);
-//                     assert!(
-//                         verify::<FAEST192fParameters, OWF192>(&MSG, &pk, &signature).is_ok()
-//                     );
-//                 }
-
-//                 _ => {
-//                     let sk = SecretKey::<OWF256>::try_from(self.sk.as_slice()).unwrap();
-//                     let pk = sk.as_public_key();
-
-//                     println!("FAEST-256s - testing FAEST.sign..");
-//                     let signature = Self::try_signing::<FAEST256sParameters, OWF256>(&sk, &self.hashed_sig_s);
-//                     assert!(
-//                         verify::<FAEST256sParameters, OWF256>(&MSG, &pk, &signature).is_ok()
-//                     );
-
-//                     println!("FAEST-256f - testing FAEST.sign..");
-//                     let signature = Self::try_signing::<FAEST256fParameters, OWF256>(&sk, &self.hashed_sig_f);
-//                     assert!(
-//                         verify::<FAEST256fParameters, OWF256>(&MSG, &pk, &signature).is_ok()
-//                     );
-//                 }
-//             }
-//         }
-
-//         pub fn test_signature(&self) {
-//             if self.em {
-//                 self.test_signature_em();
-//             } else {
-//                 self.test_signature_aes();
-//             }
-//         }
-//     }
-
-//     #[test]
-//     fn faest_sign_tvs_test() {
-//         let database: Vec<FaestProveData> = read_test_data("FaestProve.json");
-//         for data in database {
-//             data.test_signature();
-//             break;
-//         }
-//     }
-// }

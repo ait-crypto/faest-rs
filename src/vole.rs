@@ -1,26 +1,18 @@
 use std::{
-    f32::consts::TAU,
-    iter::zip,
     marker::PhantomData,
     mem::swap,
     ops::{Index, IndexMut, Mul},
 };
 
 use crate::{
-    bavc::{
-        BatchVectorCommitment, BavcCommitResult, BavcDecommitment, BavcOpenResult,
-        BavcReconstructResult,
-    },
+    bavc::{BatchVectorCommitment, BavcCommitResult, BavcDecommitment, BavcOpenResult},
     parameter::TauParameters,
-    prg::{PseudoRandomGenerator, Twk, IV},
-    random_oracles::{Hasher, RandomOracle},
-    universal_hashing::{LeafHasher, B},
-    utils::{decode_all_chall_3, Reader},
+    prg::{IV, PseudoRandomGenerator},
+    utils::{Reader, decode_all_chall_3},
 };
 use generic_array::{
-    box_arr,
-    typenum::{Prod, Unsigned, U128, U2, U3, U8},
     ArrayLength, GenericArray,
+    typenum::{Prod, U2, U8, Unsigned},
 };
 use itertools::izip;
 
@@ -41,7 +33,7 @@ where
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
     pub decom: BavcDecommitment<LambdaBytes, NLeafCommit>,
     pub u: Box<GenericArray<u8, LHatBytes>>,
-    pub v: Box<GenericArray<GenericArray<u8, Prod<LambdaBytes, U8>>, LHatBytes>>,
+    pub v: Box<GenericArray<GenericArray<u8, LHatBytes>, Prod<LambdaBytes, U8>>>,
 }
 
 /// Result of VOLE reconstruction
@@ -52,7 +44,7 @@ where
     LHatBytes: ArrayLength,
 {
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
-    pub q: Box<GenericArray<GenericArray<u8, Prod<LambdaBytes, U8>>, LHatBytes>>,
+    pub q: Box<GenericArray<GenericArray<u8, LHatBytes>, Prod<LambdaBytes, U8>>>,
 }
 
 /// Immutable reference to storage area in signature for all `c`s.
@@ -116,9 +108,8 @@ where
     }
 }
 
-#[allow(clippy::type_complexity)]
 fn convert_to_vole<'a, BAVC, LHatBytes>(
-    v: &mut GenericArray<GenericArray<u8, BAVC::Lambda>, LHatBytes>,
+    v: impl ExactSizeIterator<Item = &'a mut GenericArray<u8, LHatBytes>>,
     sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, BAVC::LambdaBytes>>,
     iv: &IV,
     round: u32,
@@ -129,48 +120,46 @@ where
 {
     let twk = round + TWEAK_OFFSET;
 
-    // Step 1
-    let d = BAVC::TAU::bavc_max_node_depth(round as usize);
+    // ::1
     let ni = BAVC::TAU::bavc_max_node_index(round as usize);
+    debug_assert!(sd.len() == ni || sd.len() + 1 == ni);
 
-    // Step 2
+    // ::2
     // As in steps 8,9 we only work with two rows at a time, we just allocate 2 r-vectors
     let mut rj: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
     let mut rj1: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
 
-    debug_assert!(sd.len() == ni || sd.len() + 1 == ni);
+    // ::3,4
     let offset = (sd.len() != ni) as usize;
-
-    // Step 3,4
-    for (i, sdi) in sd.enumerate() {
-        BAVC::PRG::new_prg(sdi, iv, twk).read(&mut rj[i + offset]);
+    for (rji, sdi) in izip!(rj[offset..].iter_mut(), sd) {
+        BAVC::PRG::new_prg(sdi, iv, twk).read(rji);
     }
 
-    let vcol_offset = BAVC::TAU::bavc_depth_offset(round as usize);
-
-    // Step 6..9
-    for j in 0..d {
+    // ::6..9
+    v.enumerate().for_each(|(j, vj)| {
         for i in 0..(ni >> (j + 1)) {
             // Join steps 8 and 9
-            for (vrow, (r_dst, r_src, r_src1)) in
-                izip!(rj1[i].iter_mut(), rj[2 * i].iter(), rj[2 * i + 1].iter()).enumerate()
-            {
-                // Step 8
-                v[vrow][vcol_offset + j] ^= r_src1;
+            for (v_dst, r_dst, r_src, r_src1) in izip!(
+                vj.iter_mut(),
+                rj1[i].iter_mut(),
+                rj[2 * i].iter(),
+                rj[2 * i + 1].iter()
+            ) {
+                // ::8
+                *v_dst ^= r_src1;
 
-                // Step 9
+                // ::9
                 *r_dst = r_src ^ r_src1;
             }
         }
 
         swap(&mut rj, &mut rj1); // At next iteration we want to have last row in rj
-    }
+    });
 
-    // Step 10: after last swap, rj[0] will contain r_d,0)
+    // ::10: after last swap, rj[0] will contain r_d,0)
     rj.into_iter().next().unwrap()
 }
 
-#[allow(clippy::type_complexity)]
 pub fn volecommit<BAVC, LHatBytes>(
     mut c: VoleCommitmentCRefMut<LHatBytes>,
     r: &GenericArray<u8, BAVC::LambdaBytes>,
@@ -184,28 +173,36 @@ where
     BAVC: BatchVectorCommitment,
     LHatBytes: ArrayLength,
 {
+    // ::2
     let BavcCommitResult { com, decom, seeds } = BAVC::commit(r, iv);
 
     let mut v = GenericArray::default_boxed();
+    let mut v_iter = v.iter_mut();
 
-    // Step 3.0
+    let mut seeds_iter = seeds.iter();
+
+    // ::3.0
     let u = convert_to_vole::<BAVC, LHatBytes>(
-        &mut v,
-        seeds[..BAVC::TAU::bavc_max_node_index(0)].iter(),
+        v_iter.by_ref().take(BAVC::TAU::bavc_max_node_depth(0)),
+        seeds_iter.by_ref().take(BAVC::TAU::bavc_max_node_index(0)),
         iv,
         0,
     );
 
-    // Step 3
+    // ::3.1..
     for i in 1..BAVC::Tau::U32 {
-        // Step 4
-        let sdi_start = BAVC::TAU::bavc_index_offset(i as usize);
-        let sdi_end = sdi_start + BAVC::TAU::bavc_max_node_index(i as usize);
+        let ni = BAVC::TAU::bavc_max_node_index(i as usize);
+        let ki = BAVC::TAU::bavc_max_node_depth(i as usize);
 
-        let u_i =
-            convert_to_vole::<BAVC, LHatBytes>(&mut v, seeds[sdi_start..sdi_end].iter(), iv, i);
+        // ::4..6
+        let u_i = convert_to_vole::<BAVC, LHatBytes>(
+            v_iter.by_ref().take(ki),
+            seeds_iter.by_ref().take(ni),
+            iv,
+            i,
+        );
 
-        // Step 8
+        // ::8
         for (u_i, u, c) in izip!(u_i.iter(), u.iter(), &mut c[i as usize - 1]) {
             *c = u_i ^ u;
         }
@@ -214,7 +211,6 @@ where
     VoleCommitResult { com, decom, u, v }
 }
 
-#[allow(clippy::type_complexity)]
 pub fn volereconstruct<BAVC, LHatBytes>(
     chall: &GenericArray<u8, BAVC::LambdaBytes>,
     decom_i: &BavcOpenResult,
@@ -225,57 +221,68 @@ where
     LHatBytes: ArrayLength,
     BAVC: BatchVectorCommitment,
 {
-    // Step 1
+    // ::1
     let i_delta = decode_all_chall_3::<BAVC::TAU>(chall);
 
-    // Skip step 2 as decode_all_chall_3 can't fail (parameter constraints ensure that we only provide valid challenges/indexes)
+    // Skip ::2 as decode_all_chall_3 can't fail (parameter constraints ensure that we only provide valid challenges/indexes)
 
-    // Step 4
-    let rec = BAVC::reconstruct(decom_i, &i_delta, iv).unwrap_or_default();
-    if rec == BavcReconstructResult::default() {
-        return None;
-    }
+    // ::4
+    let rec = BAVC::reconstruct(decom_i, &i_delta, iv)?;
 
-    let mut q = GenericArray::default_boxed();
+    let mut q: Box<
+        GenericArray<GenericArray<u8, LHatBytes>, <BAVC as BatchVectorCommitment>::Lambda>,
+    > = GenericArray::default_boxed();
+    let mut q_ref = q.as_mut_slice();
 
-    let mut sdi_off = 0; // At round i, seeds_i has offset \sum_{j=0}^{i-1} N_j in the seeds vector
-                         // Step 7
+    // At round i, seeds_i has offset \sum_{j=0}^{i-1} N_j in the seeds vector
+    let mut sdi_off = 0;
+
+    // ::7
     for i in 0..BAVC::Tau::U32 {
-        // Step 8
+        // ::8
         let delta_i = i_delta[i as usize];
         let ni = BAVC::TAU::bavc_max_node_index(i as usize);
+        let ki = BAVC::TAU::bavc_max_node_depth(i as usize);
+
+        let qi_ref;
+        (qi_ref, q_ref) = q_ref.split_at_mut(ki);
 
         let seeds_i = (1..ni)
             // To map values in-order, instead of iterating over j we iterate over j ^ delta_i
             .map(|j_xor_delta| {
-                // Step 9
                 let j = j_xor_delta ^ delta_i as usize;
 
-                if j < delta_i as usize {
-                    return &rec.seeds[sdi_off + j];
-                }
+                let seeds_idx = if j < delta_i as usize {
+                    sdi_off + j
+                } else {
+                    sdi_off + j - 1
+                };
 
+                // ::9
                 // As we start from j_xor_delta = 1, we skip case j = delta_i
-                &rec.seeds[sdi_off + j - 1]
+                &rec.seeds[seeds_idx]
             });
 
-        // Step 10
-        let _ = convert_to_vole::<BAVC, LHatBytes>(&mut q, seeds_i, iv, i);
+        // ::10
+        let _ = convert_to_vole::<BAVC, LHatBytes>(qi_ref.iter_mut(), seeds_i, iv, i);
 
-        // Step 14
+        // ::14
         if i != 0 {
-            let q_col_offset = BAVC::TAU::bavc_depth_offset(i as usize);
-            let ki = BAVC::TAU::bavc_max_node_depth(i as usize);
-            // Step 15
-            for j in (0..ki).filter(|j| delta_i & (1 << j) != 0) {
-                // xor column q_{i,j} with c_i
-                for (row, c_ij) in c[i as usize - 1].iter().enumerate() {
-                    q[row][q_col_offset + j] ^= c_ij; // Column range q_col_offset,...,q_col_offset + k_i
+            // ::15
+            for (_, q_ij) in qi_ref
+                .iter_mut()
+                .enumerate()
+                .filter(|(j, _)| delta_i & (1 << j) != 0)
+            {
+                // xor column q_{i,j} with correction c_i
+                for (q_ij, c_ij) in izip!(q_ij.iter_mut(), c[i as usize - 1].iter()) {
+                    *q_ij ^= c_ij;
                 }
             }
         }
 
-        sdi_off += ni - 1; // Round i+1 will write the next N_{i+1} columns
+        // Round i+1 will write the next N_{i+1} columns
+        sdi_off += ni - 1;
     }
 
     Some(VoleReconstructResult { com: rec.com, q })
@@ -283,31 +290,19 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::{f64::consts::TAU, str::FromStr};
 
     use super::*;
 
-    use generic_array::{
-        sequence::GenericSequence,
-        typenum::{U210, U434, U486},
-        GenericArray,
-    };
+    use generic_array::GenericArray;
     use serde::Deserialize;
 
     use crate::{
         bavc::{
-            self, BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast,
-            BAVC192FastEM, BAVC192Small, BAVC192SmallEM, BAVC256Fast, BAVC256FastEM, BAVC256Small,
-            BAVC256SmallEM, BatchVectorCommitment,
+            BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast, BAVC192FastEM,
+            BAVC192Small, BAVC192SmallEM, BAVC256Fast, BAVC256FastEM, BAVC256Small, BAVC256SmallEM,
+            BatchVectorCommitment,
         },
-        parameter::{
-            OWFParameters, Tau128Fast, Tau128Small, Tau192Fast, Tau192Small, Tau256Fast,
-            Tau256FastEM, Tau256Small, MAX_TAU, OWF128, OWF128EM, OWF192, OWF192EM, OWF256,
-            OWF256EM,
-        },
-        prg::PRG128,
-        random_oracles::RandomOracleShake128,
-        universal_hashing::LeafHasher128,
+        parameter::{OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM, OWFParameters},
         utils::test::{hash_array, read_test_data},
     };
 
@@ -333,13 +328,11 @@ mod test {
         }
 
         pub fn check_v(&self, expected_v: &[u8]) -> bool {
-            let v_trans = transpose_matrix(
-                &self
-                    .v
-                    .iter()
-                    .map(|row| row.as_slice())
-                    .collect::<Vec<&[u8]>>(),
-            );
+            let v_trans = self
+                .v
+                .iter()
+                .flat_map(|row| row.to_owned())
+                .collect::<Vec<u8>>();
             hash_array(&v_trans) == expected_v
         }
 
@@ -367,14 +360,12 @@ mod test {
         }
 
         pub fn check_q(&self, expected_q: &[u8]) -> bool {
-            let q_trans = transpose_matrix(
-                &self
-                    .q
-                    .iter()
-                    .map(|row| row.as_slice())
-                    .collect::<Vec<&[u8]>>(),
-            );
-            hash_array(&q_trans) == expected_q
+            let q = self
+                .q
+                .iter()
+                .flat_map(|row| row.to_owned())
+                .collect::<Vec<u8>>();
+            hash_array(q.as_slice()) == expected_q
         }
 
         pub fn verify(&self, expected_com: &[u8], expected_q: &[u8]) -> bool {
@@ -393,16 +384,6 @@ mod test {
         hashed_v: Vec<u8>,
         chall: Vec<u8>,
         hashed_q: Vec<u8>,
-    }
-
-    fn transpose_matrix(m: &[&[u8]]) -> Vec<u8> {
-        let mut m_trans = vec![vec![]; m[0].len()];
-        for i in 0..m[0].len() {
-            for j in 0..m.len() {
-                m_trans[i].push(m[j][i]);
-            }
-        }
-        m_trans.into_iter().flatten().collect()
     }
 
     fn vole_check<OWF: OWFParameters, BAVC: BatchVectorCommitment>(

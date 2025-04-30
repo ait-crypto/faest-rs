@@ -1,31 +1,19 @@
-use core::panic;
-use std::{
-    convert, default,
-    marker::PhantomData,
-    ops::{Add, Mul, Sub},
-    process::{id, Output},
-    vec,
-};
+use std::{marker::PhantomData, ops::Mul, vec};
 
-use aes::cipher::KeyInit;
 use bit_set::BitSet;
 
 use generic_array::{
-    typenum::{
-        Const, Diff, IsEqual, Negate, Prod, Sum, Unsigned, U1, U10, U128, U16, U2, U216, U3, U4,
-        U48, U64, U8,
-    },
-    ArrayLength, GenericArray, IntoArrayLength,
+    ArrayLength, GenericArray,
+    typenum::{Prod, U2, U3, U8, Unsigned},
 };
 
 use crate::{
-    fields::{BigGaloisField, Field, GF128},
     parameter::{
         Tau128Fast, Tau128FastEM, Tau128Small, Tau128SmallEM, Tau192Fast, Tau192FastEM,
         Tau192Small, Tau192SmallEM, Tau256Fast, Tau256FastEM, Tau256Small, Tau256SmallEM,
         TauParameters,
     },
-    prg::{PseudoRandomGenerator, Twk, IV, PRG128, PRG192, PRG256},
+    prg::{IV, PRG128, PRG192, PRG256, PseudoRandomGenerator, Twk},
     random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256},
     universal_hashing::{LeafHasher, LeafHasher128, LeafHasher192, LeafHasher256},
     utils::Reader,
@@ -151,12 +139,9 @@ where
 }
 
 mod bavc_common {
-    use std::ops::Sub;
-
-    use generic_array::typenum::Diff;
 
     use super::*;
-    // Need to find an alternative way to define helper functions (maybe in a private struct)
+
     pub(super) fn construct_keys<PRG, L>(
         r: &GenericArray<u8, PRG::KeySize>,
         iv: &IV,
@@ -326,7 +311,6 @@ where
     ) -> Option<BavcReconstructResult<Self::LambdaBytes>>;
 }
 
-// It would be nice to avoid all this code duplication between BAVC and BAVCEM
 pub(crate) struct Bavc<RO, PRG, LH, TAU>(
     PhantomData<RO>,
     PhantomData<PRG>,
@@ -669,14 +653,9 @@ pub(crate) type BAVC256FastEM = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher
 mod test {
     use super::*;
     use core::panic;
-    use std::iter::zip;
 
-    use generic_array::{
-        typenum::{U16, U31, U32, U4, U5, U63},
-        GenericArray,
-    };
-    use serde::{de::Expected, Deserialize};
-    use serde_json::de;
+    use generic_array::GenericArray;
+    use serde::Deserialize;
 
     use crate::{
         parameter::{
@@ -684,44 +663,8 @@ mod test {
             Tau192Small, Tau192SmallEM, Tau256Fast, Tau256FastEM, Tau256Small, Tau256SmallEM,
         },
         prg::{IVSize, PRG128, PRG192, PRG256},
-        random_oracles::{RandomOracleShake128, RandomOracleShake256},
         utils::test::read_test_data,
     };
-
-    impl<LambdaBytes, NLeafCommit> BavcDecommitment<LambdaBytes, NLeafCommit>
-    where
-        LambdaBytes: ArrayLength + Mul<NLeafCommit, Output: ArrayLength>,
-        NLeafCommit: ArrayLength,
-    {
-        pub fn bytes(&self) -> Vec<u8> {
-            let mut v: Vec<u8> = self.keys.iter().flat_map(|a| a.to_vec()).collect();
-
-            v.extend(
-                self.coms
-                    .iter()
-                    .flat_map(|c| c.to_vec())
-                    .collect::<Vec<u8>>(),
-            );
-
-            v
-        }
-    }
-
-    impl<LambdaBytes, NLeafCommit> BavcCommitResult<LambdaBytes, NLeafCommit>
-    where
-        LambdaBytes: ArrayLength
-            + Mul<U2, Output: ArrayLength>
-            + Mul<NLeafCommit, Output: ArrayLength>
-            + PartialEq,
-        NLeafCommit: ArrayLength,
-    {
-        pub fn bytes(&self) -> Vec<u8> {
-            let mut v = self.com.to_vec();
-            v.extend(self.decom.bytes());
-            v.extend(self.seeds.iter().flat_map(|s| s.to_vec()));
-            v
-        }
-    }
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -822,10 +765,7 @@ mod test {
     }
 
     fn hash_array(data: &[u8]) -> Vec<u8> {
-        use sha3::{
-            digest::{ExtendableOutput, Update, XofReader},
-            Shake256,
-        };
+        use sha3::digest::{ExtendableOutput, Update, XofReader};
 
         let mut hasher = sha3::Shake256::default();
         hasher.update(data);

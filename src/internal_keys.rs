@@ -4,9 +4,9 @@
 
 use std::fmt::{self, Debug};
 
-use crate::{parameter::OWFParameters, utils::get_bit, ByteEncoding, Error};
+use crate::{ByteEncoding, Error, parameter::OWFParameters, utils::get_bit};
 
-use generic_array::{typenum::Unsigned, GenericArray};
+use generic_array::{GenericArray, typenum::Unsigned};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "zeroize")]

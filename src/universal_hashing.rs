@@ -1,21 +1,19 @@
 use std::{
     array,
-    iter::zip,
-    marker::PhantomData,
     ops::{Add, Mul},
 };
 
 use generic_array::{
-    typenum::{
-        IsEqual, Le, Length, Prod, Quot, Sum, Unsigned, U128, U16, U2, U3, U4, U5, U64, U8, U96,
-    },
     ArrayLength, GenericArray,
+    typenum::{Prod, Quot, Sum, U2, U3, U4, U5, U8, U16, Unsigned},
 };
 use itertools::{chain, izip};
 
-use crate::fields::{BigGaloisField, Field, GF128, GF192, GF256, GF384, GF576, GF64, GF768};
+use crate::fields::{
+    BigGaloisField, ExtensionField, Field, GF64, GF128, GF192, GF256, GF384, GF576, GF768,
+};
 
-use crate::prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree};
+use crate::prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo};
 
 type BBits = U16;
 // Additional bytes returned by VOLE hash
@@ -300,6 +298,30 @@ where
         debug_assert_eq!(b_sq.key * a.key - b.key, F::ZERO);
     }
 
+    pub(crate) fn odd_round_cstrnts(
+        &mut self,
+        si: &FieldCommitDegOne<F>,
+        si_sq: &FieldCommitDegOne<F>,
+        st0_i: &FieldCommitDegTwo<F>,
+        st1_i: &FieldCommitDegTwo<F>,
+    ) where
+        F: BigGaloisField,
+    {
+        self.update(&(si_sq.to_owned() * st0_i + si));
+        self.update(&(si.to_owned() * st1_i + st0_i));
+    }
+
+    pub(crate) fn inv_norm_constraints(
+        &mut self,
+        conjugates: &[FieldCommitDegOne<F>],
+        y: &FieldCommitDegOne<F>,
+    ) where
+        F: Field,
+    {
+        let cnstr = y.to_owned() * &conjugates[1] * &conjugates[4] + &conjugates[0];
+        self.update(&cnstr);
+    }
+
     pub(crate) fn finalize(self, u: &F, u_plus_v: &F, v: &F) -> (F, F, F) {
         let a0 = self.a0_hasher.finalize(u);
         let a1 = self.a1_hasher.finalize(u_plus_v);
@@ -343,6 +365,14 @@ where
         self.b_hasher.update(&cnstr);
     }
 
+    pub(crate) fn odd_round_cstrnts(&mut self, si: &F, si_sq: &F, st0_i: &F, st1_i: &F)
+    where
+        F: BigGaloisField,
+    {
+        self.update(&(self.delta_squared * si + *si_sq * st0_i));
+        self.update(&(self.delta * st0_i + *si * st1_i));
+    }
+
     pub(crate) fn lift_and_process(&mut self, a: &F, a_sq: &F, b: &F, b_sq: &F)
     where
         F: BigGaloisField,
@@ -352,17 +382,6 @@ where
         // Raise to degree 3 and update
         self.update(&(self.delta * (*a_sq * b - self.delta * a)));
         self.update(&(self.delta * (*a * b_sq - self.delta * b)));
-    }
-
-    pub(crate) fn process<I1, I2>(&mut self, qs: I1, qs_b: I2)
-    where
-        I1: Iterator<Item = F>,
-        I2: Iterator<Item = F>,
-    {
-        for (q, qb) in zip(qs, qs_b) {
-            let b = q * qb + self.delta_squared;
-            self.b_hasher.update(&b);
-        }
     }
 
     pub(crate) fn finalize(self, v: &F) -> F {
@@ -378,14 +397,13 @@ where
         + Mul<U4, Output = Self::LambdaBytesTimes4>
         + Mul<U8, Output = Self::Lambda>
         + PartialEq,
-
     Self::ExtensionField: for<'a> From<&'a [u8]>
         + for<'a> Mul<&'a Self::F, Output = Self::ExtensionField>
         + for<'a> Add<&'a Self::ExtensionField, Output = Self::ExtensionField>
         + Mul<Self::F, Output = Self::ExtensionField>,
 {
     type F: Field + for<'a> From<&'a [u8]>;
-    type ExtensionField: Field<Length = Self::LambdaBytesTimes3>;
+    type ExtensionField: ExtensionField<Length = Self::LambdaBytesTimes3, BaseField = Self::F>;
     type Lambda: ArrayLength;
     type LambdaBytes: ArrayLength;
     type LambdaBytesTimes2: ArrayLength;
@@ -408,7 +426,6 @@ where
         h.as_boxed_bytes()
     }
 }
-
 pub(crate) struct LeafHasher128;
 impl LeafHasher for LeafHasher128 {
     type F = GF128;
@@ -447,7 +464,7 @@ mod test {
     use super::*;
 
     use generic_array::GenericArray;
-    use serde::{de::DeserializeOwned, Deserialize};
+    use serde::{Deserialize, de::DeserializeOwned};
 
     use crate::{
         fields::{GF128, GF192, GF256},
