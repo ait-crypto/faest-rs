@@ -590,7 +590,7 @@ mod test {
             let x = GenericArray::from_slice(&data.x);
             let uhash = GenericArray::from_slice(&data.uhash);
 
-            let h = LeafHasher128::hash(&uhash, &x);
+            let h = LeafHasher128::hash(uhash, x);
             assert_eq!(h.as_slice(), &data.expected_h)
         }
     }
@@ -603,7 +603,7 @@ mod test {
             let x = GenericArray::from_slice(&data.x);
             let uhash = GenericArray::from_slice(&data.uhash);
 
-            let h = LeafHasher192::hash(&uhash, &x);
+            let h = LeafHasher192::hash(uhash, x);
             assert_eq!(h.as_slice(), &data.expected_h)
         }
     }
@@ -616,7 +616,7 @@ mod test {
             let x = GenericArray::from_slice(&data.x);
             let uhash = GenericArray::from_slice(&data.uhash);
 
-            let h = LeafHasher256::hash(&uhash, &x);
+            let h = LeafHasher256::hash(uhash, x);
 
             assert_eq!(h.as_slice(), &data.expected_h)
         }
