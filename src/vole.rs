@@ -445,10 +445,10 @@ mod test {
 
                     if data.mode == "s" {
                         println!("FAEST-128s - testing VOLE..");
-                        vole_check::<OWF128, BAVC128Small>(data, &r);
+                        vole_check::<OWF128, BAVC128Small>(data, r);
                     } else {
                         println!("FAEST-128f - testing VOLE..");
-                        vole_check::<OWF128, BAVC128Fast>(data, &r);
+                        vole_check::<OWF128, BAVC128Fast>(data, r);
                     }
                 }
 
@@ -457,10 +457,10 @@ mod test {
 
                     if data.mode == "s" {
                         println!("FAEST-192s - testing VOLE..");
-                        vole_check::<OWF192, BAVC192Small>(data, &r);
+                        vole_check::<OWF192, BAVC192Small>(data, r);
                     } else {
                         println!("FAEST-192f - testing VOLE..");
-                        vole_check::<OWF192, BAVC192Fast>(data, &r);
+                        vole_check::<OWF192, BAVC192Fast>(data, r);
                     }
                 }
 
@@ -494,10 +494,10 @@ mod test {
 
                     if data.mode == "s" {
                         println!("FAEST-EM-128s - testing VOLE..");
-                        vole_check::<OWF128EM, BAVC128SmallEM>(data, &r);
+                        vole_check::<OWF128EM, BAVC128SmallEM>(data, r);
                     } else {
                         println!("FAEST-EM-128f - testing VOLE..");
-                        vole_check::<OWF128EM, BAVC128FastEM>(data, &r);
+                        vole_check::<OWF128EM, BAVC128FastEM>(data, r);
                     }
                 }
 
@@ -506,10 +506,10 @@ mod test {
 
                     if data.mode == "s" {
                         println!("FAEST-EM-192s - testing VOLE..");
-                        vole_check::<OWF192EM, BAVC192SmallEM>(data, &r);
+                        vole_check::<OWF192EM, BAVC192SmallEM>(data, r);
                     } else {
                         println!("FAEST-EM-192s - testing VOLE..");
-                        vole_check::<OWF192EM, BAVC192FastEM>(data, &r);
+                        vole_check::<OWF192EM, BAVC192FastEM>(data, r);
                     }
                 }
 

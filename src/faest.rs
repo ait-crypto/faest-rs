@@ -676,7 +676,7 @@ mod test {
                 hashed_sig: &[u8],
             ) -> Box<GenericArray<u8, P::SignatureSize>> {
                 let mut signature = GenericArray::default_boxed();
-                sign::<P, O>(&MSG, &sk, &RHO, &mut signature);
+                sign::<P, O>(&MSG, sk, &RHO, &mut signature);
                 assert_eq!(hashed_sig, hash_array(signature.as_slice()).as_slice());
                 signature
             }

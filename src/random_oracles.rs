@@ -132,7 +132,7 @@ mod test {
     use super::*;
 
     fn verify(mut hasher: impl Hasher, input: &[u8], output: &[u8]) {
-        hasher.update(&input);
+        hasher.update(input);
         let mut reader = hasher.finish();
         let mut res = vec![0; output.len()];
         reader.read(&mut res);
