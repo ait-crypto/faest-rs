@@ -5,7 +5,6 @@ use crate::{
         large_fields::ByteCombineSquaredConstants,
     },
     parameter::{BaseParameters, OWFField, OWFParameters, SecurityParameter},
-    utils::get_bits,
 };
 
 use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
@@ -303,17 +302,10 @@ where
                 // ::4
                 let a_key = self.keys[4 * c + r];
                 let a_tags = &self.tags[32 * c + 8 * r..32 * c + 8 * r + 8];
-                let a_key_bits = get_bits(a_key);
 
                 // ::5
-                let b_key = a_key_bits[7]
-                    | ((a_key_bits[0] ^ a_key_bits[7]) << 1)
-                    | (a_key_bits[1] << 2)
-                    | ((a_key_bits[2] ^ a_key_bits[7]) << 3)
-                    | ((a_key_bits[3] ^ a_key_bits[7]) << 4)
-                    | (a_key_bits[4] << 5)
-                    | (a_key_bits[5] << 6)
-                    | (a_key_bits[6] << 7);
+                let a_key_7 = a_key & 0x80;
+                let b_key = a_key.rotate_left(1) ^ (a_key_7 >> 6) ^ (a_key_7 >> 4) ^ (a_key_7 >> 3);
                 let b_tags = [
                     a_tags[7],
                     a_tags[0] + a_tags[7],
