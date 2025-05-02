@@ -21,6 +21,14 @@ pub(crate) type IV = GenericArray<u8, IVSize>;
 /// TWEAK of the PRG
 pub(crate) type Twk = u32;
 
+/// Add tweak to the IV
+fn add_tweak(iv: &IV, tweak: Twk) -> GenericArray_0_14<u8, IVSize> {
+    let mut iv = GenericArray_0_14::from_slice(iv.as_slice()).to_owned();
+    let tweaked_word = u32::from_le_bytes([iv[12], iv[13], iv[14], iv[15]]).wrapping_add(tweak);
+    iv[12..].copy_from_slice(&tweaked_word.to_le_bytes());
+    iv
+}
+
 /// Interface for the PRG
 pub(crate) trait PseudoRandomGenerator: Sized + Reader {
     /// Size of the PRG key
@@ -28,14 +36,6 @@ pub(crate) trait PseudoRandomGenerator: Sized + Reader {
 
     /// Instantiate new PRG instance
     fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self;
-
-    // Add tweak to the IV
-    fn add_tweak(iv: &IV, tweak: Twk) -> IV {
-        let mut iv = iv.to_owned();
-        let tweaked_word = u32::from_le_bytes([iv[12], iv[13], iv[14], iv[15]]).wrapping_add(tweak);
-        iv[12..].copy_from_slice(&tweaked_word.to_le_bytes());
-        iv
-    }
 }
 
 #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
@@ -47,7 +47,7 @@ impl PseudoRandomGenerator for PRG128 {
     fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
         Self(Aes128Ctr32LE::new(
             GenericArray_0_14::from_slice(k.as_slice()),
-            GenericArray_0_14::from_slice(Self::add_tweak(iv, tweak).as_slice()),
+            &add_tweak(iv, tweak),
         ))
     }
 }
@@ -67,7 +67,7 @@ impl PseudoRandomGenerator for PRG192 {
     fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
         Self(Aes192Ctr32LE::new(
             GenericArray_0_14::from_slice(k.as_slice()),
-            GenericArray_0_14::from_slice(Self::add_tweak(iv, tweak).as_slice()),
+            &add_tweak(iv, tweak),
         ))
     }
 }
@@ -87,7 +87,7 @@ impl PseudoRandomGenerator for PRG256 {
     fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
         Self(Aes256Ctr32LE::new(
             GenericArray_0_14::from_slice(k.as_slice()),
-            GenericArray_0_14::from_slice(Self::add_tweak(iv, tweak).as_slice()),
+            &add_tweak(iv, tweak),
         ))
     }
 }
