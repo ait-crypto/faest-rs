@@ -137,143 +137,128 @@ where
     }
 }
 
-mod bavc_common {
-    use bit_set::BitSet;
-    use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
+fn construct_keys<PRG, L>(
+    r: &GenericArray<u8, PRG::KeySize>,
+    iv: &IV,
+) -> Vec<GenericArray<u8, PRG::KeySize>>
+where
+    PRG: PseudoRandomGenerator,
+    L: ArrayLength,
+{
+    let mut keys = vec![GenericArray::default(); 2 * L::USIZE - 1];
+    keys[0].copy_from_slice(r);
 
-    use crate::{
-        parameter::TauParameters,
-        prg::{IV, PseudoRandomGenerator, Twk},
-    };
-
-    pub(super) fn construct_keys<PRG, L>(
-        r: &GenericArray<u8, PRG::KeySize>,
-        iv: &IV,
-    ) -> Vec<GenericArray<u8, PRG::KeySize>>
-    where
-        PRG: PseudoRandomGenerator,
-        L: ArrayLength,
-    {
-        let mut keys = vec![GenericArray::default(); 2 * L::USIZE - 1];
-        keys[0].copy_from_slice(r);
-
-        for alpha in 0..L::USIZE - 1 {
-            let mut prg = PRG::new_prg(&keys[alpha], iv, alpha as Twk);
-            prg.read(&mut keys[2 * alpha + 1]);
-            prg.read(&mut keys[2 * alpha + 2]);
-        }
-
-        keys
+    for alpha in 0..L::USIZE - 1 {
+        let mut prg = PRG::new_prg(&keys[alpha], iv, alpha as Twk);
+        prg.read(&mut keys[2 * alpha + 1]);
+        prg.read(&mut keys[2 * alpha + 2]);
     }
 
-    pub(super) fn reconstruct_keys<PRG, TAU>(
-        s: &mut BitSet,
-        decom_keys: &[&[u8]],
-        i_delta: &GenericArray<u16, TAU::Tau>,
-        iv: &IV,
-    ) -> Option<Vec<GenericArray<u8, PRG::KeySize>>>
-    where
-        PRG: PseudoRandomGenerator,
-        TAU: TauParameters,
-    {
-        // Steps 8..11
-        for i in 0..TAU::Tau::USIZE {
-            let alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
-            s.insert(alpha);
+    keys
+}
+
+fn reconstruct_keys<PRG, TAU>(
+    s: &mut BitSet,
+    decom_keys: &[&[u8]],
+    i_delta: &GenericArray<u16, TAU::Tau>,
+    iv: &IV,
+) -> Option<Vec<GenericArray<u8, PRG::KeySize>>>
+where
+    PRG: PseudoRandomGenerator,
+    TAU: TauParameters,
+{
+    // Steps 8..11
+    for i in 0..TAU::Tau::USIZE {
+        let alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
+        s.insert(alpha);
+    }
+
+    // Steps 13..21
+    let mut keys = vec![GenericArray::default(); 2 * TAU::L::USIZE - 1];
+    let mut decom_iter = decom_keys.iter();
+    for i in (0..TAU::L::USIZE - 1).rev() {
+        let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
+
+        if left_child | right_child {
+            s.insert(i);
         }
 
-        // Steps 13..21
-        let mut keys = vec![GenericArray::default(); 2 * TAU::L::USIZE - 1];
-        let mut decom_iter = decom_keys.iter();
-        for i in (0..TAU::L::USIZE - 1).rev() {
-            let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
-
-            if left_child | right_child {
-                s.insert(i);
-            }
-
-            if left_child ^ right_child {
-                if let Some(key) = decom_iter.next() {
-                    let alpha = 2 * i + 1 + (left_child as usize);
-                    keys[alpha].copy_from_slice(key);
-                } else {
-                    return None;
-                }
-            }
-        }
-
-        // Step 22
-        for &pad in decom_iter {
-            if pad.iter().any(|&x| x != 0) {
+        if left_child ^ right_child {
+            if let Some(key) = decom_iter.next() {
+                let alpha = 2 * i + 1 + (left_child as usize);
+                keys[alpha].copy_from_slice(key);
+            } else {
                 return None;
             }
         }
-
-        // Steps 25..27
-        for i in 0..TAU::L::USIZE - 1 {
-            if !s.contains(i) {
-                let mut rng = PRG::new_prg(&keys[i], iv, i as Twk);
-                rng.read(&mut keys[2 * i + 1]);
-                rng.read(&mut keys[2 * i + 2]);
-            }
-        }
-
-        Some(keys)
     }
 
-    pub(super) fn mark_nodes<TAU>(
-        s: &mut BitSet,
-        i_delta: &GenericArray<u16, TAU::Tau>,
-    ) -> Option<u32>
-    where
-        TAU: TauParameters,
-    {
-        // Steps 6 ..15
-        let mut n_h = 0;
-        for i in 0..TAU::Tau::USIZE {
-            let mut alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
-            s.insert(alpha);
-            n_h += 1;
-            while alpha > 0 && s.insert((alpha - 1) / 2) {
-                alpha = (alpha - 1) / 2;
-                n_h += 1;
-            }
-        }
-
-        // Step 16
-        if n_h - 2 * TAU::Tau::U32 + 1 > TAU::Topen::U32 {
+    // Step 22
+    for &pad in decom_iter {
+        if pad.iter().any(|&x| x != 0) {
             return None;
         }
-
-        Some(n_h)
     }
 
-    pub(super) fn construct_nodes<'a, LambdaBytes, L>(
-        keys: &'a [GenericArray<u8, LambdaBytes>],
-        s: &BitSet,
-    ) -> Vec<&'a [u8]>
-    where
-        L: ArrayLength,
-        LambdaBytes: ArrayLength,
-    {
-        // Steps 19..22
-        (0..L::USIZE - 1)
-            .rev()
-            .filter_map(|i| {
-                let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
+    // Steps 25..27
+    for i in 0..TAU::L::USIZE - 1 {
+        if !s.contains(i) {
+            let mut rng = PRG::new_prg(&keys[i], iv, i as Twk);
+            rng.read(&mut keys[2 * i + 1]);
+            rng.read(&mut keys[2 * i + 2]);
+        }
+    }
 
-                if left_child ^ right_child {
-                    let alpha = 2 * i + 1 + (left_child as usize);
-                    return Some(keys[alpha].as_ref());
-                }
+    Some(keys)
+}
 
-                None
-            })
-            .collect()
+fn mark_nodes<TAU>(s: &mut BitSet, i_delta: &GenericArray<u16, TAU::Tau>) -> Option<u32>
+where
+    TAU: TauParameters,
+{
+    // Steps 6 ..15
+    let mut n_h = 0;
+    for i in 0..TAU::Tau::USIZE {
+        let mut alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
+        s.insert(alpha);
+        n_h += 1;
+        while alpha > 0 && s.insert((alpha - 1) / 2) {
+            alpha = (alpha - 1) / 2;
+            n_h += 1;
+        }
+    }
+
+    // Step 16
+    if n_h - 2 * TAU::Tau::U32 + 1 > TAU::Topen::U32 {
+        None
+    } else {
+        Some(n_h)
     }
 }
 
-use bavc_common::{construct_keys, construct_nodes, mark_nodes, reconstruct_keys};
+fn construct_nodes<'a, LambdaBytes, L>(
+    keys: &'a [GenericArray<u8, LambdaBytes>],
+    s: &BitSet,
+) -> Vec<&'a [u8]>
+where
+    L: ArrayLength,
+    LambdaBytes: ArrayLength,
+{
+    // Steps 19..22
+    (0..L::USIZE - 1)
+        .rev()
+        .filter_map(|i| {
+            let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
+
+            if left_child ^ right_child {
+                let alpha = 2 * i + 1 + (left_child as usize);
+                Some(keys[alpha].as_ref())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
 
 pub(crate) trait BatchVectorCommitment
 where
