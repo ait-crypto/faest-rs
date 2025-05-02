@@ -4,7 +4,7 @@ use generic_array::{ArrayLength, GenericArray, typenum::U8};
 
 use crate::{fields::BigGaloisField, utils::get_bit};
 
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct VoleCommits<'a, F: BigGaloisField, L: ArrayLength> {
     pub(crate) scalars: Box<GenericArray<F, L>>,
     pub(crate) delta: &'a F,
@@ -62,7 +62,7 @@ where
     }
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub(crate) struct VoleCommitsRef<'a, F: BigGaloisField, L: ArrayLength> {
     pub(crate) scalars: &'a GenericArray<F, L>,
     pub(crate) delta: &'a F,

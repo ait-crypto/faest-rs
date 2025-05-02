@@ -21,7 +21,7 @@ use crate::{
 const TWEAK_OFFSET: u32 = 1 << 31;
 
 /// Result of VOLE commitment
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct VoleCommitResult<LambdaBytes, NLeafCommit, LHatBytes>
 where
     LambdaBytes: ArrayLength
@@ -38,7 +38,7 @@ where
 }
 
 /// Result of VOLE reconstruction
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct VoleReconstructResult<LambdaBytes, LHatBytes>
 where
     LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<U8, Output: ArrayLength>,

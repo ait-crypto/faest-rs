@@ -18,7 +18,7 @@ use crate::{
     utils::Reader,
 };
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct BavcCommitResult<LambdaBytes, NLeafCommit>
 where
     LambdaBytes: ArrayLength
@@ -32,13 +32,13 @@ where
     pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct BavcOpenResult<'a> {
     pub coms: Vec<&'a [u8]>,
     pub nodes: Vec<&'a [u8]>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct BavcReconstructResult<LambdaBytes>
 where
     LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + PartialEq,
@@ -47,7 +47,7 @@ where
     pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct BavcDecommitment<LambdaBytes, NLeafCommit>
 where
     LambdaBytes: ArrayLength + Mul<NLeafCommit, Output: ArrayLength>,
