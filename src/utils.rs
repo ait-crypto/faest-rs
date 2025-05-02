@@ -28,19 +28,24 @@ pub(crate) trait Reader {
 }
 
 #[inline]
-fn extract_k_bits_first_byte(chall: &[u8], first_byte: usize, bit_off: usize, k: usize) -> u16 {
+const fn extract_k_bits_first_byte(
+    chall: &[u8],
+    first_byte: usize,
+    bit_off: usize,
+    k: usize,
+) -> u16 {
     let mask = (1 << k) - 1;
     (chall[first_byte] as u16 >> bit_off) & mask
 }
 
 #[inline]
-fn extract_k_bits_next_bytes(chall: &[u8], byte_idx: usize, k: usize) -> u16 {
+const fn extract_k_bits_next_bytes(chall: &[u8], byte_idx: usize, k: usize) -> u16 {
     let mask = (1 << k) - 1;
     chall[byte_idx] as u16 & mask
 }
 
 /// Directly convert `chal[start_bit...start_bit+k]` into a 16-bit integer
-fn chall_to_u16(chall: &[u8], start_bit: usize, k: usize) -> u16 {
+const fn chall_to_u16(chall: &[u8], start_bit: usize, k: usize) -> u16 {
     // As by current specification, we assume k<16
     debug_assert!(k < 16);
     debug_assert!(chall.len() >= k);
@@ -118,7 +123,7 @@ pub(crate) fn xor_arrays_inplace(lhs: &mut [u8], rhs: &[u8]) {
 ///
 /// Panics if the index is out of bounds.
 #[inline]
-pub(crate) fn get_bit(input: &[u8], index: usize) -> u8 {
+pub(crate) const fn get_bit(input: &[u8], index: usize) -> u8 {
     let byte_index = index / 8;
     let bit_offset = index % 8;
     (input[byte_index] >> bit_offset) & 1
