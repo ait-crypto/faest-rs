@@ -51,12 +51,12 @@ where
     }
 
     pub(crate) fn get_field_commit(&self, idx: usize) -> F {
-        debug_assert!(idx * 8 + 8 < L::USIZE);
+        debug_assert!(idx * 8 + 8 <= L::USIZE);
         F::byte_combine_slice(&self.scalars[8 * idx..8 * idx + 8])
     }
 
     pub(crate) fn get_field_commit_sq(&self, idx: usize) -> F {
-        debug_assert!(idx * 8 + 8 < L::USIZE);
+        debug_assert!(idx * 8 + 8 <= L::USIZE);
         F::byte_combine_sq_slice(&self.scalars[8 * idx..8 * idx + 8])
     }
 }
