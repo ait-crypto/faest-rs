@@ -181,20 +181,21 @@ where
 
 /// Binary field `2^3`
 pub(crate) type GF8 = SmallGF<u8>;
+
 impl Square for GF8 {
-    type Output = GF8;
+    type Output = Self;
 
     fn square(mut self) -> Self::Output {
-        let mut result_value = -(self.0 & GF8::ONE) & self.0;
+        let mut result_value = -(self.0 & Self::ONE) & self.0;
         let right = self.0;
 
-        for i in 1..GF8::BITS {
-            let mask = -((self.0 >> (GF8::BITS - 1)) & GF8::ONE);
-            self.0 = (self.0 << 1) ^ (mask & GF8::MODULUS);
-            result_value ^= -((right >> i) & GF8::ONE) & self.0;
+        for i in 1..Self::BITS {
+            let mask = -((self.0 >> (Self::BITS - 1)) & Self::ONE);
+            self.0 = (self.0 << 1) ^ (mask & Self::MODULUS);
+            result_value ^= -((right >> i) & Self::ONE) & self.0;
         }
 
-        SmallGF(result_value)
+        Self(result_value)
     }
 }
 

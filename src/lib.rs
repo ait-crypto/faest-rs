@@ -55,6 +55,8 @@
 #![warn(missing_docs)]
 // TODO: fix this
 #![allow(clippy::type_complexity)]
+#![warn(clippy::use_self)]
+
 use generic_array::{GenericArray, typenum::Unsigned};
 use paste::paste;
 use rand_core::CryptoRngCore;

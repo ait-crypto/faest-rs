@@ -50,7 +50,7 @@ where
         keys: Box<GenericArray<u8, L>>,
         tags: Box<GenericArray<F, Prod<L, U8>>>,
     ) -> Self {
-        ByteCommits { keys, tags }
+        Self { keys, tags }
     }
 
     pub(crate) fn get_field_commit(&self, index: usize) -> FieldCommitDegOne<F> {

@@ -58,7 +58,7 @@ impl<F> Add<&Self> for FieldCommitDegOne<F>
 where
     F: BigGaloisField,
 {
-    type Output = FieldCommitDegOne<F>;
+    type Output = Self;
 
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
@@ -154,7 +154,7 @@ impl<F> Mul<&F> for FieldCommitDegOne<F>
 where
     F: BigGaloisField,
 {
-    type Output = FieldCommitDegOne<F>;
+    type Output = Self;
 
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
@@ -408,7 +408,7 @@ impl<F> Add<&Self> for FieldCommitDegThree<F>
 where
     F: BigGaloisField,
 {
-    type Output = FieldCommitDegThree<F>;
+    type Output = Self;
 
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
@@ -422,7 +422,7 @@ impl<F> Add<&FieldCommitDegOne<F>> for FieldCommitDegThree<F>
 where
     F: BigGaloisField,
 {
-    type Output = FieldCommitDegThree<F>;
+    type Output = Self;
 
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
@@ -439,7 +439,7 @@ impl<F> Add<&FieldCommitDegTwo<F>> for FieldCommitDegThree<F>
 where
     F: BigGaloisField,
 {
-    type Output = FieldCommitDegThree<F>;
+    type Output = Self;
 
     #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
