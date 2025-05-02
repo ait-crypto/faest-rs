@@ -1,3 +1,11 @@
+use std::ops::Mul;
+
+use generic_array::{
+    ArrayLength, GenericArray,
+    typenum::{U4, U8, marker_traits::Unsigned},
+};
+use itertools::izip;
+
 use crate::{
     aes::{
         AddRoundKey, AddRoundKeyAssign, AddRoundKeyBytes, BytewiseMixColumns, InverseAffine,
@@ -10,12 +18,6 @@ use crate::{
     parameter::{OWFField, OWFParameters},
     verifier::{VoleCommits, VoleCommitsRef},
 };
-use generic_array::{
-    ArrayLength, GenericArray,
-    typenum::{U4, U8, marker_traits::Unsigned},
-};
-use itertools::izip;
-use std::ops::Mul;
 
 impl<O> StateToBytes<O> for VoleCommits<'_, OWFField<O>, O::NSTBits>
 where

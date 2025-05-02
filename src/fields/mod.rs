@@ -1,3 +1,7 @@
+use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+
+use generic_array::{ArrayLength, GenericArray};
+
 pub(crate) mod large_fields;
 pub(crate) mod small_fields;
 
@@ -8,10 +12,6 @@ pub(crate) mod small_fields;
     target_feature = "pclmulqdq"
 ))]
 pub(crate) mod x86_simd_large_fields;
-
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-
-use generic_array::{ArrayLength, GenericArray};
 
 pub(crate) use large_fields::{
     Betas, BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquaredConstants, FromBit,

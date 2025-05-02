@@ -4,17 +4,18 @@ use std::{
     ops::{Index, IndexMut, Mul},
 };
 
+use generic_array::{
+    ArrayLength, GenericArray,
+    typenum::{Prod, U2, U8, Unsigned},
+};
+use itertools::izip;
+
 use crate::{
     bavc::{BatchVectorCommitment, BavcCommitResult, BavcDecommitment, BavcOpenResult},
     parameter::TauParameters,
     prg::{IV, PseudoRandomGenerator},
     utils::{Reader, decode_all_chall_3},
 };
-use generic_array::{
-    ArrayLength, GenericArray,
-    typenum::{Prod, U2, U8, Unsigned},
-};
-use itertools::izip;
 
 /// Initial tweak value as by FEAST specification
 const TWEAK_OFFSET: u32 = 1 << 31;

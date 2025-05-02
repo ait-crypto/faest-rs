@@ -1,5 +1,6 @@
-use crate::fields::{BigGaloisField, Square};
 use std::ops::{Add, AddAssign, Mul};
+
+use crate::fields::{BigGaloisField, Square};
 
 /// Represents a polynomial commitment in GF of degree one
 #[derive(Default, Debug, Clone, PartialEq, PartialOrd)]

@@ -1,5 +1,10 @@
 use std::iter::zip;
 
+use generic_array::{GenericArray, typenum::Unsigned};
+use itertools::izip;
+use rand_core::CryptoRngCore;
+use std::iter::repeat_n;
+
 use crate::{
     Error,
     bavc::{BatchVectorCommitment, BavcOpenResult},
@@ -15,11 +20,6 @@ use crate::{
         volecommit, volereconstruct,
     },
 };
-
-use generic_array::{GenericArray, typenum::Unsigned};
-use itertools::izip;
-use rand_core::CryptoRngCore;
-use std::iter::repeat_n;
 
 type RO<P> =
     <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle;

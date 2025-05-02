@@ -1,7 +1,8 @@
-use crate::{fields::BigGaloisField, utils::get_bit};
+use std::ops::{Index, Mul, Range};
+
 use generic_array::{ArrayLength, GenericArray, typenum::U8};
-use std::ops::Range;
-use std::ops::{Index, Mul};
+
+use crate::{fields::BigGaloisField, utils::get_bit};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub(crate) struct VoleCommits<'a, F: BigGaloisField, L: ArrayLength> {

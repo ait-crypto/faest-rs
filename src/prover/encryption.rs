@@ -1,3 +1,11 @@
+use std::ops::AddAssign;
+
+use generic_array::{
+    GenericArray,
+    typenum::{Quot, U2, U4, U8, Unsigned},
+};
+use itertools::izip;
+
 use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use crate::{
     aes::*,
@@ -7,12 +15,6 @@ use crate::{
     universal_hashing::ZKProofHasher,
     utils::square_array,
 };
-use generic_array::{
-    GenericArray,
-    typenum::{Quot, U2, U4, U8, Unsigned},
-};
-use itertools::izip;
-use std::ops::AddAssign;
 
 pub(crate) fn enc_cstrnts<O, K, S>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,

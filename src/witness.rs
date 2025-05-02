@@ -1,8 +1,9 @@
+use std::mem::size_of;
+
 use generic_array::{
     GenericArray,
     typenum::{U3, Unsigned},
 };
-use std::mem::size_of;
 
 use crate::{
     fields::small_fields::GF8_INV_NORM,

@@ -1,5 +1,6 @@
-use crate::{fields::Square, parameter::TauParameters};
 use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
+
+use crate::{fields::Square, parameter::TauParameters};
 
 /// Reader interface for PRGs and random oracles
 pub(crate) trait Reader {

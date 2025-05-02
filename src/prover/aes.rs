@@ -1,3 +1,12 @@
+use std::ops::{AddAssign, Mul};
+
+use generic_array::{
+    ArrayLength, GenericArray,
+    typenum::{Prod, U4, U8, Unsigned},
+};
+use itertools::izip;
+
+use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use crate::{
     aes::*,
     fields::{
@@ -6,14 +15,6 @@ use crate::{
     },
     parameter::{BaseParameters, OWFField, OWFParameters, SecurityParameter},
 };
-
-use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
-use generic_array::{
-    ArrayLength, GenericArray,
-    typenum::{Prod, U4, U8, Unsigned},
-};
-use itertools::izip;
-use std::ops::{AddAssign, Mul};
 
 // Helper type aliases
 

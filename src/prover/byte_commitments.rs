@@ -1,10 +1,14 @@
-use crate::fields::{BigGaloisField, GF8};
-use crate::prover::field_commitment::FieldCommitDegOne;
+use std::ops::Mul;
+
 use generic_array::{
     ArrayLength, GenericArray,
     typenum::{Prod, U8},
 };
-use std::ops::Mul;
+
+use crate::{
+    fields::{BigGaloisField, GF8},
+    prover::field_commitment::FieldCommitDegOne,
+};
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub(crate) struct ByteCommitment<F>

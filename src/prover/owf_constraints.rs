@@ -1,3 +1,8 @@
+use generic_array::{GenericArray, typenum::Unsigned};
+
+use super::{
+    ByteCommitsRef, FieldCommitDegThree, encryption::enc_cstrnts, key_expansion::key_exp_cstrnts,
+};
 use crate::{
     fields::{Field, FromBit},
     internal_keys::PublicKey,
@@ -5,11 +10,6 @@ use crate::{
     rijndael_32::{convert_from_batchblocks, inv_bitslice, rijndael_key_schedule},
     universal_hashing::ZKProofHasher,
     utils::xor_arrays,
-};
-use generic_array::{GenericArray, typenum::Unsigned};
-
-use super::{
-    ByteCommitsRef, FieldCommitDegThree, encryption::enc_cstrnts, key_expansion::key_exp_cstrnts,
 };
 
 pub(crate) fn owf_constraints<O>(

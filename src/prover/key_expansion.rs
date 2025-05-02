@@ -1,3 +1,9 @@
+use generic_array::{
+    GenericArray,
+    typenum::{U8, Unsigned},
+};
+use itertools::iproduct;
+
 use crate::{
     fields::{BigGaloisField, ByteCombine},
     parameter::{BaseParameters, OWFField, OWFParameters},
@@ -5,12 +11,6 @@ use crate::{
     rijndael_32::RCON_TABLE,
     universal_hashing::ZKProofHasher,
 };
-
-use generic_array::{
-    GenericArray,
-    typenum::{U8, Unsigned},
-};
-use itertools::iproduct;
 
 pub(super) fn key_exp_cstrnts<O>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,

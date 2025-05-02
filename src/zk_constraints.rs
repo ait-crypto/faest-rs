@@ -1,3 +1,5 @@
+use generic_array::{GenericArray, typenum::Unsigned};
+
 use crate::{
     fields::{Square, SumPoly},
     internal_keys::PublicKey,
@@ -9,7 +11,6 @@ use crate::{
     verifier,
     verifier::VoleCommitsRef,
 };
-use generic_array::{GenericArray, typenum::Unsigned};
 
 pub(crate) type CstrntsVal<'a, O> = &'a GenericArray<
     GenericArray<u8, <O as OWFParameters>::LHATBYTES>,

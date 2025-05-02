@@ -9,8 +9,6 @@ use std::{
     },
 };
 
-use super::{Double, ExtensionField, Field, GF8, GF64, Square};
-
 use generic_array::{
     GenericArray,
     typenum::{U16, U24, U32, U48, U72, U96},
@@ -20,6 +18,8 @@ use rand::{
     Rng,
     distributions::{Distribution, Standard},
 };
+
+use super::{Double, ExtensionField, Field, GF8, GF64, Square};
 
 /// Helper trait that define "alphas" for calculating embedings as part of [`ByteCombine`]
 pub(crate) trait Alphas: Sized {

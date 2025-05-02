@@ -4,13 +4,13 @@
 
 use std::fmt::{self, Debug};
 
-use crate::{ByteEncoding, Error, parameter::OWFParameters, utils::get_bit};
-
 use generic_array::{GenericArray, typenum::Unsigned};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
+
+use crate::{ByteEncoding, Error, parameter::OWFParameters, utils::get_bit};
 
 /// Internal representation of a secret key.
 #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
