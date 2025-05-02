@@ -73,10 +73,10 @@ where
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
     F: BigGaloisField,
 {
-    type Output = ByteCommits<F, L>;
+    type Output = Self;
 
     fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
-        ByteCommits::new(
+        Self::new(
             self.keys.iter().zip(rhs).map(|(a, b)| a ^ b).collect(),
             self.tags.to_owned(),
         )
@@ -127,10 +127,10 @@ where
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
     F: BigGaloisField,
 {
-    type Output = ByteCommits<F, L>;
+    type Output = Self;
 
     fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
-        ByteCommits {
+        Self {
             keys: self.keys.iter().zip(rhs.keys).map(|(a, b)| a ^ b).collect(),
             tags: self
                 .tags

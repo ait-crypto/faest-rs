@@ -2158,7 +2158,7 @@ fn mul_gf384_gf128(lhs: (__m256i, __m128i), y0: __m128i) -> (__m256i, __m128i) {
 }
 
 impl Mul<GF128> for GF384 {
-    type Output = GF384;
+    type Output = Self;
 
     #[inline(always)]
     fn mul(self, rhs: GF128) -> Self::Output {
@@ -2444,7 +2444,7 @@ fn mul_gf576_gf192(lhs: (__m256i, __m256i, u64), rhs: __m256i) -> (__m256i, __m2
 }
 
 impl Mul<GF192> for GF576 {
-    type Output = GF576;
+    type Output = Self;
 
     #[inline(always)]
     fn mul(self, rhs: GF192) -> Self::Output {
@@ -2454,7 +2454,7 @@ impl Mul<GF192> for GF576 {
 }
 
 impl Mul<&GF192> for GF576 {
-    type Output = GF576;
+    type Output = Self;
 
     #[inline(always)]
     fn mul(self, rhs: &GF192) -> Self::Output {
@@ -2757,7 +2757,7 @@ fn mul_gf768_gf256(lhs: (__m256i, __m256i, __m256i), rhs: __m256i) -> (__m256i, 
 }
 
 impl Mul<GF256> for GF768 {
-    type Output = GF768;
+    type Output = Self;
 
     #[inline(always)]
     fn mul(self, rhs: GF256) -> Self::Output {
@@ -2766,7 +2766,7 @@ impl Mul<GF256> for GF768 {
 }
 
 impl Mul<&GF256> for GF768 {
-    type Output = GF768;
+    type Output = Self;
 
     #[inline(always)]
     fn mul(self, rhs: &GF256) -> Self::Output {
