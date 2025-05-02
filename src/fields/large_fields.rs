@@ -1479,15 +1479,6 @@ impl ExtensionField for GF384 {
         ret[32..].copy_from_slice(&self.0[2].to_le_bytes());
         ret
     }
-
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut arr = GenericArray::default_boxed();
-        arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
-        arr[16..32].copy_from_slice(&self.0[1].to_le_bytes());
-        arr[32..].copy_from_slice(&self.0[2].to_le_bytes());
-
-        arr
-    }
 }
 
 impl From<&[u8]> for GF384 {
@@ -1568,17 +1559,6 @@ impl ExtensionField for GF576 {
         ret[48..64].copy_from_slice(&self.0[3].to_le_bytes());
         ret[64..].copy_from_slice(&self.0[4].to_le_bytes()[..8]);
         ret
-    }
-
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut arr = GenericArray::default_boxed();
-        arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
-        arr[16..32].copy_from_slice(&self.0[1].to_le_bytes());
-        arr[32..48].copy_from_slice(&self.0[2].to_le_bytes());
-        arr[48..64].copy_from_slice(&self.0[3].to_le_bytes());
-        arr[64..].copy_from_slice(&self.0[4].to_le_bytes()[..8]);
-
-        arr
     }
 }
 
@@ -1667,19 +1647,6 @@ impl ExtensionField for GF768 {
             ret[idx * 16..(idx + 1) * 16].copy_from_slice(&self.0[idx].to_le_bytes());
         });
         ret
-    }
-
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut arr = GenericArray::default_boxed();
-
-        arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
-        arr[16..32].copy_from_slice(&self.0[1].to_le_bytes());
-        arr[32..48].copy_from_slice(&self.0[2].to_le_bytes());
-        arr[48..64].copy_from_slice(&self.0[3].to_le_bytes());
-        arr[64..80].copy_from_slice(&self.0[4].to_le_bytes());
-        arr[80..].copy_from_slice(&self.0[5].to_le_bytes());
-
-        arr
     }
 }
 

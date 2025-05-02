@@ -413,7 +413,7 @@ where
     fn hash(
         uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
         x: &GenericArray<u8, Self::LambdaBytesTimes4>,
-    ) -> Box<GenericArray<u8, Self::LambdaBytesTimes3>> {
+    ) -> GenericArray<u8, Self::LambdaBytesTimes3> {
         let u = <Self as LeafHasher>::ExtensionField::from(uhash.as_slice());
         let x0 =
             <Self as LeafHasher>::F::from(&x[..<<Self as LeafHasher>::F as Field>::Length::USIZE]);
@@ -421,9 +421,8 @@ where
             &x[<<Self as LeafHasher>::F as Field>::Length::USIZE..],
         );
 
-        let h = (u * &x0) + &x1;
-
-        h.as_boxed_bytes()
+        let h = (u * x0) + x1;
+        h.as_bytes()
     }
 }
 pub(crate) struct LeafHasher128;

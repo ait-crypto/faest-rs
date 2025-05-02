@@ -2189,13 +2189,6 @@ impl ExtensionField for GF384 {
         unsafe { _mm_storeu_si128(ret.as_mut_ptr().add(32).cast(), self.1) };
         ret
     }
-
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe { _mm_storeu_si128(ret.as_mut_ptr().add(32).cast(), self.1) };
-        ret
-    }
 }
 
 /// Optimized implementation of the 576 bit Galois field
@@ -2473,14 +2466,6 @@ impl ExtensionField for GF576 {
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::<u8, Self::Length>::default();
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1) };
-        ret[64..].copy_from_slice(&self.2.to_le_bytes());
-        ret
-    }
-
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1) };
         ret[64..].copy_from_slice(&self.2.to_le_bytes());
@@ -2784,14 +2769,6 @@ impl ExtensionField for GF768 {
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::<u8, Self::Length>::default();
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(64).cast(), self.2) };
-        ret
-    }
-
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1) };
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(64).cast(), self.2) };
@@ -3118,13 +3095,9 @@ mod test {
                 assert_eq!(elem.as_bytes(), bytes.as_bytes());
 
                 let elem_bytes_1 = elem.as_bytes();
-                let elem_bytes_2 = elem.as_boxed_bytes();
-
                 let elem1 = F::from(elem_bytes_1.as_slice());
-                let elem2 = F::from(elem_bytes_2.as_slice());
 
                 assert_eq!(elem, elem1);
-                assert_eq!(elem, elem2);
             }
         }
 

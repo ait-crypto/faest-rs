@@ -54,7 +54,7 @@ where
     NLeafCommit: ArrayLength,
 {
     keys: Vec<GenericArray<u8, LambdaBytes>>,
-    coms: Vec<Box<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>>>>,
+    coms: Vec<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>>>,
 }
 
 pub(crate) trait LeafCommit {
@@ -71,7 +71,7 @@ pub(crate) trait LeafCommit {
         uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
     ) -> (
         GenericArray<u8, Self::LambdaBytes>,
-        Box<GenericArray<u8, Self::LambdaBytesTimes3>>,
+        GenericArray<u8, Self::LambdaBytesTimes3>,
     );
 
     fn commit_em(
@@ -80,7 +80,7 @@ pub(crate) trait LeafCommit {
         tewak: Twk,
     ) -> (
         GenericArray<u8, Self::LambdaBytes>,
-        Box<GenericArray<u8, Self::LambdaBytesTimes2>>,
+        GenericArray<u8, Self::LambdaBytesTimes2>,
     );
 }
 
@@ -107,7 +107,7 @@ where
         uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
     ) -> (
         GenericArray<u8, Self::LambdaBytes>,
-        Box<GenericArray<u8, Self::LambdaBytesTimes3>>,
+        GenericArray<u8, Self::LambdaBytesTimes3>,
     ) {
         // Step 2
         let hash = PRG::new_prg(r, iv, tweak).read_into();
@@ -125,10 +125,10 @@ where
         tweak: Twk,
     ) -> (
         GenericArray<u8, Self::LambdaBytes>,
-        Box<GenericArray<u8, Self::LambdaBytesTimes2>>,
+        GenericArray<u8, Self::LambdaBytesTimes2>,
     ) {
         // Step 1
-        let com = PRG::new_prg(r, iv, tweak).read_into_boxed();
+        let com = PRG::new_prg(r, iv, tweak).read_into();
 
         // Step 2
         let sd = r.to_owned();
