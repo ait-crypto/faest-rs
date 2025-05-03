@@ -6,7 +6,7 @@ use generic_array::{
 };
 
 use crate::{
-    fields::small_fields::GF8_INV_NORM,
+    fields::{GF8, Square},
     parameter::OWFParameters,
     rijndael_32::{
         State, bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0,
@@ -90,9 +90,30 @@ where
     }
 }
 
+fn gf8_exp_238(x: GF8) -> GF8 {
+    // 238 == 0b11101110
+    let y = x.square(); // x^2
+    let x = y.square(); // x^4
+    let y = x * y;
+    let x = x.square(); // x^8
+    let y = x * y;
+    let x = x.square(); // x^16
+    let x = x.square(); // x^32
+    let y = x * y;
+    let x = x.square(); // x^64
+    let y = x * y;
+    let x = x.square(); // x^128
+    x * y
+}
+
+fn invnorm(x: u8) -> u8 {
+    let x = u8::from(gf8_exp_238(x.into()));
+    (x & 1) ^ ((x >> 5) & 6) ^ ((x << 1) & 8)
+}
+
 #[inline]
 fn store_invnorm_state(dst: &mut u8, lo_idx: u8, hi_idx: u8) {
-    *dst = GF8_INV_NORM[lo_idx as usize] | GF8_INV_NORM[hi_idx as usize] << 4;
+    *dst = invnorm(lo_idx) | (invnorm(hi_idx) << 4);
 }
 
 #[allow(clippy::too_many_arguments)]
