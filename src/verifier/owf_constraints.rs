@@ -109,7 +109,6 @@ where
     O: OWFParameters,
 {
     rijndael_key_schedule::<O::NST, O::NK, O::R>(key, O::SKE::USIZE)
-        .0
         .chunks_exact(8)
         .take(O::R::USIZE + 1)
         .map(|chunk| {

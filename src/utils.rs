@@ -87,15 +87,6 @@ pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> GenericArr
     first_half.chain(second_half).collect()
 }
 
-/// Check for `0` in buffers for key validity.
-///
-/// This function does not need to be constant time. It may only return early
-/// during key generation. During witness extension it always returns `false`
-/// and iterates over all bytes of the buffer.
-pub(crate) fn contains_zeros(buf: &[u8]) -> bool {
-    buf.contains(&0)
-}
-
 /// Xors the input slices and retuns an iterator over the resulting elements.
 ///
 /// The length of the resulting iterator is equal to the length of the shortest input slice.

@@ -25,8 +25,6 @@ use generic_array::{
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
-use crate::utils::contains_zeros;
-
 /// AES block batch size for this implementation
 pub(crate) type FixsliceBlocks = U2;
 
@@ -44,27 +42,13 @@ pub(crate) const RCON_TABLE: [u8; 30] = [
 pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
     key: &[u8],
     ske: usize,
-) -> (Vec<u32>, bool) {
-    let mut zeros = false;
+) -> Vec<u32> {
     let mut rkeys = vec![0u32; (NST::USIZE.div_ceil(NK::USIZE) * 8 * (R::USIZE + 1)) + 8];
 
     bitslice(&mut rkeys[..8], &key[..16], &key[16..]);
 
     let mut rk_off = 0;
-    let mut count = 0;
     for rcon in RCON_TABLE.iter().take(ske / 4).copied() {
-        let inv = inv_bitslice(&rkeys[rk_off..(rk_off + 8)]);
-        if NK::USIZE == 8 {
-            if count < ske / 4 {
-                zeros |= contains_zeros(&inv[1][12..]);
-                count += 1;
-            }
-        } else if NK::USIZE == 6 {
-            zeros |= contains_zeros(&inv[1][4..8]);
-        } else {
-            zeros |= contains_zeros(&inv[0][12..]);
-        }
-
         memshift32(&mut rkeys, rk_off);
         rk_off += 8;
         sub_bytes(&mut rkeys[rk_off..(rk_off + 8)]);
@@ -84,11 +68,6 @@ pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
         }
 
         xor_columns::<NK>(&mut rkeys, rk_off);
-        if NK::USIZE == 8 && count < ske / 4 {
-            let inv = inv_bitslice(&rkeys[rk_off..(rk_off + 8)]);
-            zeros |= contains_zeros(&inv[0][12..]);
-            count += 1;
-        }
     }
 
     let mut final_res: Vec<u8> = vec![];
@@ -177,7 +156,7 @@ pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
             &final_res[(32 * i) + 16..32 * (i + 1)],
         );
     }
-    (final_bitsliced_res, zeros)
+    final_bitsliced_res
 }
 
 /// Fully-fixsliced AES-128 encryption (the ShiftRows is completely omitted).
@@ -696,7 +675,10 @@ impl KeySizeUser for Rijndael192 {
 
 impl KeyInit for Rijndael192 {
     fn new(key: &aes::cipher::Key<Self>) -> Self {
-        Self(rijndael_key_schedule::<U6, U6, U12>(key.as_slice(), ske(12, 6, 6)).0)
+        Self(rijndael_key_schedule::<U6, U6, U12>(
+            key.as_slice(),
+            ske(12, 6, 6),
+        ))
     }
 }
 
@@ -732,7 +714,10 @@ impl KeySizeUser for Rijndael256 {
 
 impl KeyInit for Rijndael256 {
     fn new(key: &aes::cipher::Key<Self>) -> Self {
-        Self(rijndael_key_schedule::<U8, U8, U14>(key.as_slice(), ske(14, 8, 8)).0)
+        Self(rijndael_key_schedule::<U8, U8, U14>(
+            key.as_slice(),
+            ske(14, 8, 8),
+        ))
     }
 }
 
@@ -781,7 +766,7 @@ mod test {
         output: Vec<u8>,
     }
 
-    fn rijndael_key_schedule(key: &[u8], bc: usize, kc: usize, ske: usize) -> (Vec<u32>, bool) {
+    fn rijndael_key_schedule(key: &[u8], bc: usize, kc: usize, ske: usize) -> Vec<u32> {
         match (bc, kc) {
             (4, 4) => super::rijndael_key_schedule::<U4, U4, U10>(key, ske),
             (6, 4) => super::rijndael_key_schedule::<U6, U4, U12>(key, ske),
@@ -822,7 +807,7 @@ mod test {
                 data.kc,
                 4 * (((r + 1) * data.bc) / data.kc),
             );
-            let res = rijndael_encrypt(&rkeys.0, &input, data.bc, r);
+            let res = rijndael_encrypt(&rkeys, &input, data.bc, r);
             for i in 0..data.bc {
                 let input = u32::from_le_bytes(
                     res[i / 4][(i % 4) * 4..(i % 4) * 4 + 4].try_into().unwrap(),

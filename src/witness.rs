@@ -30,7 +30,7 @@ where
     // Step 6
     // Note: for FAEST-LAMBDA-EM, SKE is set to the actual number of S-Boxes in Rijndael-LAMBDA.KeyExpansion.
     // This slightly differs from FAEST Spec v2, where SKE is always set to 0 in EM mode.
-    let (kb, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(owf_secret, O::SKE::USIZE);
+    let kb = rijndael_key_schedule::<O::NST, O::NK, O::R>(owf_secret, O::SKE::USIZE);
 
     let mut index = 0;
 
