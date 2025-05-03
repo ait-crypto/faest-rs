@@ -714,11 +714,13 @@ impl Field for GF128 {
         ret
     }
 
+    /*
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe { _mm_storeu_si128(ret.as_mut_ptr().cast(), self.0) };
         ret
     }
+    */
 }
 
 impl From<&[u8]> for GF128 {
@@ -1216,6 +1218,7 @@ impl Field for GF192 {
         ret
     }
 
+    /*
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe {
@@ -1227,6 +1230,7 @@ impl Field for GF192 {
         };
         ret
     }
+    */
 }
 
 impl From<&[u8]> for GF192 {
@@ -1697,11 +1701,13 @@ impl Field for GF256 {
         ret
     }
 
+    /*
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
         ret
     }
+    */
 }
 
 impl From<&[u8]> for GF256 {

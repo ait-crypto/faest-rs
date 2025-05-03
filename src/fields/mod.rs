@@ -59,9 +59,10 @@ pub(crate) trait Field:
     /// Obtain byte representation of the field element
     fn as_bytes(&self) -> GenericArray<u8, Self::Length>;
 
+    /*/
     /// Obtain a boxed byte representation of the field element
-    #[allow(dead_code)]
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>>;
+    */
 }
 
 /// Double a field element

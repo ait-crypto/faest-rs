@@ -1189,18 +1189,6 @@ type U23476 = Sum<Prod<U1000, U23>, U476>;
 mod test {
     use super::*;
 
-    use serde::Deserialize;
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    #[allow(dead_code)]
-    struct DataChalDec {
-        chal: Vec<u8>,
-        i: [usize; 1],
-        k0: [usize; 1],
-        res: Vec<u8>,
-    }
-
     #[generic_tests::define]
     mod owf_parameters {
         use super::*;

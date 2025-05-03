@@ -249,11 +249,13 @@ impl Field for GF64 {
         GenericArray::from(self.0.0.to_le_bytes())
     }
 
+    /*
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut arr = GenericArray::default_boxed();
         arr.copy_from_slice(&self.0.0.to_le_bytes());
         arr
     }
+    */
 }
 
 impl From<&[u8]> for GF64 {

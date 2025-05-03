@@ -70,7 +70,6 @@ where
 {
 }
 
-#[allow(dead_code)]
 /// Trait providing methods for "byte combination"
 pub trait ByteCombine: Field {
     /// "Combine" field elements
@@ -797,11 +796,13 @@ impl Field for BigGF<u128, 1, 128> {
         GenericArray::from(self.0[0].to_le_bytes())
     }
 
+    /*
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut arr = GenericArray::default_boxed();
         arr.copy_from_slice(&self.0[0].to_le_bytes());
         arr
     }
+    */
 }
 
 impl Alphas for BigGF<u128, 1, 128> {
@@ -935,12 +936,14 @@ impl Field for BigGF<u128, 2, 192> {
         ret
     }
 
+    /*
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut arr = GenericArray::default_boxed();
         arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
         arr[16..].copy_from_slice(&self.0[1].to_le_bytes()[..8]);
         arr
     }
+    */
 }
 
 impl Alphas for BigGF<u128, 2, 192> {
@@ -1188,12 +1191,14 @@ impl Field for BigGF<u128, 2, 256> {
         ret
     }
 
+    /*
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut arr = GenericArray::default_boxed();
         arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
         arr[16..].copy_from_slice(&self.0[1].to_le_bytes());
         arr
     }
+    */
 }
 
 impl Alphas for BigGF<u128, 2, 256> {

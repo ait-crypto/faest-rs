@@ -1,4 +1,3 @@
-#![allow(unused_imports, dead_code)]
 use faest::*;
 use signature::RandomizedSigner;
 use signature::{Signer, Verifier};
