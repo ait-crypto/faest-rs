@@ -42,22 +42,26 @@ const fn _MM_SHUFFLE(z: u32, y: u32, x: u32, w: u32) -> i32 {
     ((z << 6) | (y << 4) | (x << 2) | w) as i32
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn m128_clmul_ll(x: __m128i, y: __m128i) -> __m128i {
     unsafe { _mm_clmulepi64_si128(x, y, 0x00) }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn m128_clmul_lh(x: __m128i, y: __m128i) -> __m128i {
     unsafe { _mm_clmulepi64_si128(x, y, 0x10) }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn m128_clmul_hh(x: __m128i, y: __m128i) -> __m128i {
     unsafe { _mm_clmulepi64_si128(x, y, 0x11) }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn m256_shift_left_1(x: __m256i) -> __m256i {
     unsafe {
         _mm256_or_si256(
@@ -71,21 +75,24 @@ unsafe fn m256_shift_left_1(x: __m256i) -> __m256i {
     }
 }
 
-#[inline(always)]
-fn m128_setones() -> __m128i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m128_setones() -> __m128i {
     unsafe {
         let zero = _mm_setzero_si128();
         _mm_cmpeq_epi32(zero, zero)
     }
 }
 
-#[inline(always)]
-fn m128_set_epi32_15() -> __m128i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m128_set_epi32_15() -> __m128i {
     unsafe { _mm_srli_epi32(m128_setones(), 28) }
 }
 
-#[inline(always)]
-fn m128_set_msb() -> __m128i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m128_set_msb() -> __m128i {
     unsafe {
         let all_ones = m128_setones();
         let one = _mm_slli_epi64(all_ones, 63);
@@ -93,20 +100,23 @@ fn m128_set_msb() -> __m128i {
     }
 }
 
-#[inline(always)]
-fn m256_setones() -> __m256i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m256_setones() -> __m256i {
     unsafe {
         let zero = _mm256_setzero_si256();
         _mm256_cmpeq_epi32(zero, zero)
     }
 }
 
-#[inline(always)]
-fn m256_set_epi32_7() -> __m256i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m256_set_epi32_7() -> __m256i {
     unsafe { _mm256_srli_epi32(m256_setones(), 29) }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn m256_set_epi32_5() -> __m256i {
     unsafe {
         let one = _mm256_srli_epi32(m256_setones(), 31);
@@ -114,8 +124,9 @@ unsafe fn m256_set_epi32_5() -> __m256i {
     }
 }
 
-#[inline(always)]
-fn m256_set_msb_192() -> __m256i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m256_set_msb_192() -> __m256i {
     unsafe {
         _mm256_blend_epi32(
             _mm256_setzero_si256(),
@@ -125,8 +136,9 @@ fn m256_set_msb_192() -> __m256i {
     }
 }
 
-#[inline(always)]
-fn m256_set_msb() -> __m256i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m256_set_msb() -> __m256i {
     unsafe {
         _mm256_blend_epi32(
             _mm256_setzero_si256(),
@@ -138,6 +150,7 @@ fn m256_set_msb() -> __m256i {
 
 // Karatsuba multiplication, but end right after the multiplications
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn karatsuba_mul_128_uninterpolated_other_sum(
     x: __m128i,
     y: __m128i,
@@ -156,6 +169,7 @@ unsafe fn karatsuba_mul_128_uninterpolated_other_sum(
 }
 
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn karatsuba_mul_128_uninterpolated(x: __m128i, y: __m128i) -> [__m128i; 3] {
     unsafe {
         let x0y0 = m128_clmul_ll(x, y);
@@ -171,6 +185,7 @@ unsafe fn karatsuba_mul_128_uninterpolated(x: __m128i, y: __m128i) -> [__m128i; 
 
 // Karatsuba multiplication, but don't combine the 3 128-bit polynomials into a 256-bit polynomial.
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn karatsuba_mul_128_uncombined(x: __m128i, y: __m128i) -> [__m128i; 3] {
     unsafe {
         let mut out = karatsuba_mul_128_uninterpolated(x, y);
@@ -180,6 +195,7 @@ unsafe fn karatsuba_mul_128_uncombined(x: __m128i, y: __m128i) -> [__m128i; 3] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn karatsuba_square_128_uninterpolated_other_sum(
     x: __m128i,
     x_for_sum: __m128i,
@@ -195,6 +211,8 @@ unsafe fn karatsuba_square_128_uninterpolated_other_sum(
     }
 }
 
+#[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn karatsuba_square_128_uninterpolated(x: __m128i) -> [__m128i; 3] {
     unsafe {
         let x0y0 = m128_clmul_ll(x, x);
@@ -208,6 +226,7 @@ unsafe fn karatsuba_square_128_uninterpolated(x: __m128i) -> [__m128i; 3] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn karatsuba_square_128_uncombined(x: __m128i) -> [__m128i; 3] {
     unsafe {
         let mut out = karatsuba_square_128_uninterpolated(x);
@@ -217,6 +236,7 @@ unsafe fn karatsuba_square_128_uncombined(x: __m128i) -> [__m128i; 3] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn combine_poly128s_3(v: [__m128i; 3]) -> [__m128i; 2] {
     unsafe {
         [
@@ -227,6 +247,7 @@ unsafe fn combine_poly128s_3(v: [__m128i; 3]) -> [__m128i; 2] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn combine_poly128s_4(v: [__m128i; 4]) -> [__m128i; 3] {
     unsafe {
         [
@@ -238,6 +259,7 @@ unsafe fn combine_poly128s_4(v: [__m128i; 4]) -> [__m128i; 3] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn combine_poly128s_5(v: [__m128i; 5]) -> [__m128i; 3] {
     unsafe {
         [
@@ -249,6 +271,7 @@ unsafe fn combine_poly128s_5(v: [__m128i; 5]) -> [__m128i; 3] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn combine_poly128s_7(v: [__m128i; 7]) -> [__m128i; 4] {
     unsafe {
         [
@@ -261,6 +284,7 @@ unsafe fn combine_poly128s_7(v: [__m128i; 7]) -> [__m128i; 4] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
 fn combine_poly128s_13(v: [__m128i; 13]) -> [__m128i; 6] {
     unsafe {
         [
@@ -438,7 +462,8 @@ impl Neg for GF128 {
 
 // implementation of Mul and MulAssign
 
-fn mul_gf128(lhs: __m128i, rhs: __m128i) -> __m128i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf128(lhs: __m128i, rhs: __m128i) -> __m128i {
     unsafe {
         let mask = _mm_setr_epi32(-1, 0x0, 0x0, 0x0);
         let tmp3 = m128_clmul_ll(lhs, rhs);
@@ -474,7 +499,8 @@ fn mul_gf128(lhs: __m128i, rhs: __m128i) -> __m128i {
     }
 }
 
-fn square_gf128(lhs: __m128i) -> __m128i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn square_gf128(lhs: __m128i) -> __m128i {
     unsafe {
         let mask = _mm_setr_epi32(-1, 0x0, 0x0, 0x0);
         let tmp3 = m128_clmul_ll(lhs, lhs);
@@ -508,7 +534,8 @@ fn square_gf128(lhs: __m128i) -> __m128i {
     }
 }
 
-fn mul_gf128_u64(lhs: __m128i, rhs: u64) -> __m128i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf128_u64(lhs: __m128i, rhs: u64) -> __m128i {
     unsafe {
         let mask = _mm_setr_epi32(-1, 0x0, 0x0, 0x0);
         let rhs = _mm_set_epi64x(0, rhs as i64);
@@ -547,7 +574,7 @@ impl Mul for GF128 {
 
     #[inline(always)]
     fn mul(self, rhs: Self) -> Self::Output {
-        Self(mul_gf128(self.0, rhs.0))
+        Self(unsafe { mul_gf128(self.0, rhs.0) })
     }
 }
 
@@ -556,7 +583,7 @@ impl Mul<&Self> for GF128 {
 
     #[inline(always)]
     fn mul(self, rhs: &Self) -> Self::Output {
-        Self(mul_gf128(self.0, rhs.0))
+        Self(unsafe { mul_gf128(self.0, rhs.0) })
     }
 }
 
@@ -565,7 +592,7 @@ impl Mul<GF128> for &GF128 {
 
     #[inline(always)]
     fn mul(self, rhs: GF128) -> Self::Output {
-        GF128(mul_gf128(self.0, rhs.0))
+        GF128(unsafe { mul_gf128(self.0, rhs.0) })
     }
 }
 
@@ -574,7 +601,7 @@ impl Mul<GF64> for GF128 {
 
     #[inline(always)]
     fn mul(self, rhs: GF64) -> Self::Output {
-        Self(mul_gf128_u64(self.0, rhs.into()))
+        Self(unsafe { mul_gf128_u64(self.0, rhs.into()) })
     }
 }
 
@@ -594,18 +621,19 @@ impl Mul<u8> for GF128 {
 impl MulAssign for GF128 {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
-        self.0 = mul_gf128(self.0, rhs.0);
+        self.0 = unsafe { mul_gf128(self.0, rhs.0) };
     }
 }
 
 impl MulAssign<&Self> for GF128 {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: &Self) {
-        self.0 = mul_gf128(self.0, rhs.0);
+        self.0 = unsafe { mul_gf128(self.0, rhs.0) };
     }
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn m128_apply_mask_msb(v: __m128i, m: __m128i) -> __m128i {
     unsafe {
         // extract MSB
@@ -664,7 +692,7 @@ impl Square for GF128 {
 
     #[inline]
     fn square(self) -> Self::Output {
-        Self(square_gf128(self.0))
+        Self(unsafe { square_gf128(self.0) })
     }
 }
 
@@ -997,6 +1025,7 @@ impl Neg for GF192 {
 
 const GF192_MOD_M128: __m128i = u128_as_m128(UnoptimizedGF192::MODULUS);
 
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn poly384_reduce192(x: [__m128i; 3]) -> __m256i {
     unsafe {
         let reduced_320 = m128_clmul_lh(GF192_MOD_M128, x[2]);
@@ -1016,6 +1045,7 @@ unsafe fn poly384_reduce192(x: [__m128i; 3]) -> __m256i {
     }
 }
 
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn poly256_reduce192(x: [__m128i; 2]) -> __m256i {
     unsafe {
         let low = _mm_xor_si128(x[0], m128_clmul_lh(GF192_MOD_M128, x[1]));
@@ -1023,11 +1053,13 @@ unsafe fn poly256_reduce192(x: [__m128i; 2]) -> __m256i {
     }
 }
 
+#[target_feature(enable = "avx2")]
 unsafe fn m128_broadcast_low(v: __m128i) -> __m128i {
     unsafe { _mm_xor_si128(v, _mm_bslli_si128(v, 8)) }
 }
 
-fn mul_gf192(lhs: __m256i, rhs: __m256i) -> __m256i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf192(lhs: __m256i, rhs: __m256i) -> __m256i {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs, 0);
         let x1 = _mm256_extracti128_si256(lhs, 1);
@@ -1062,7 +1094,8 @@ fn mul_gf192(lhs: __m256i, rhs: __m256i) -> __m256i {
     }
 }
 
-fn square_gf192(lhs: __m256i) -> __m256i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn square_gf192(lhs: __m256i) -> __m256i {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs, 0);
         let x1 = _mm256_extracti128_si256(lhs, 1);
@@ -1095,7 +1128,8 @@ fn square_gf192(lhs: __m256i) -> __m256i {
     }
 }
 
-fn mul_gf192_u64(lhs: __m256i, rhs: u64) -> __m256i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf192_u64(lhs: __m256i, rhs: u64) -> __m256i {
     unsafe {
         let rhs = _mm_set_epi64x(0, rhs as i64);
         let x0 = _mm256_extracti128_si256(lhs, 0);
@@ -1114,7 +1148,7 @@ impl Mul for GF192 {
 
     #[inline(always)]
     fn mul(self, rhs: Self) -> Self::Output {
-        Self(mul_gf192(self.0, rhs.0))
+        Self(unsafe { mul_gf192(self.0, rhs.0) })
     }
 }
 
@@ -1123,7 +1157,7 @@ impl Mul<&Self> for GF192 {
 
     #[inline(always)]
     fn mul(self, rhs: &Self) -> Self::Output {
-        Self(mul_gf192(self.0, rhs.0))
+        Self(unsafe { mul_gf192(self.0, rhs.0) })
     }
 }
 
@@ -1132,7 +1166,7 @@ impl Mul<GF192> for &GF192 {
 
     #[inline(always)]
     fn mul(self, rhs: GF192) -> Self::Output {
-        GF192(mul_gf192(self.0, rhs.0))
+        GF192(unsafe { mul_gf192(self.0, rhs.0) })
     }
 }
 
@@ -1141,7 +1175,7 @@ impl Mul<GF64> for GF192 {
 
     #[inline(always)]
     fn mul(self, rhs: GF64) -> Self::Output {
-        Self(mul_gf192_u64(self.0, rhs.into()))
+        Self(unsafe { mul_gf192_u64(self.0, rhs.into()) })
     }
 }
 
@@ -1161,20 +1195,21 @@ impl Mul<u8> for GF192 {
 impl MulAssign for GF192 {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
-        self.0 = mul_gf192(self.0, rhs.0);
+        self.0 = unsafe { mul_gf192(self.0, rhs.0) };
     }
 }
 
 impl MulAssign<&Self> for GF192 {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: &Self) {
-        self.0 = mul_gf192(self.0, rhs.0);
+        self.0 = unsafe { mul_gf192(self.0, rhs.0) };
     }
 }
 
 // implementation of Double
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn m192_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
     unsafe {
         let m = _mm256_and_si256(m, m256_set_msb_192());
@@ -1208,7 +1243,7 @@ impl Square for GF192 {
 
     #[inline]
     fn square(self) -> Self::Output {
-        Self(square_gf192(self.0))
+        Self(unsafe { square_gf192(self.0) })
     }
 }
 
@@ -1559,6 +1594,7 @@ impl Neg for GF256 {
 const GF256_MOD_M128: __m128i = u128_as_m128(UnoptimizedGF256::MODULUS);
 
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn poly512_reduce256(x: [__m128i; 4]) -> __m256i {
     unsafe {
         let xmod = [
@@ -1581,6 +1617,7 @@ unsafe fn poly512_reduce256(x: [__m128i; 4]) -> __m256i {
 }
 
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn poly320_reduce256(x: [__m128i; 3]) -> __m256i {
     unsafe {
         let tmp = _mm_xor_si128(x[0], m128_clmul_ll(GF256_MOD_M128, x[2]));
@@ -1588,7 +1625,8 @@ unsafe fn poly320_reduce256(x: [__m128i; 3]) -> __m256i {
     }
 }
 
-fn mul_gf256(lhs: __m256i, rhs: __m256i) -> __m256i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf256(lhs: __m256i, rhs: __m256i) -> __m256i {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs, 0);
         let x1 = _mm256_extracti128_si256(lhs, 1);
@@ -1611,7 +1649,8 @@ fn mul_gf256(lhs: __m256i, rhs: __m256i) -> __m256i {
     }
 }
 
-fn square_gf256(lhs: __m256i) -> __m256i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn square_gf256(lhs: __m256i) -> __m256i {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs, 0);
         let x1 = _mm256_extracti128_si256(lhs, 1);
@@ -1632,7 +1671,8 @@ fn square_gf256(lhs: __m256i) -> __m256i {
     }
 }
 
-fn mul_gf256_u64(lhs: __m256i, rhs: u64) -> __m256i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf256_u64(lhs: __m256i, rhs: u64) -> __m256i {
     unsafe {
         let rhs = _mm_set_epi64x(0, rhs as i64);
         let x0 = _mm256_extracti128_si256(lhs, 0);
@@ -1652,7 +1692,7 @@ impl Mul for GF256 {
 
     #[inline(always)]
     fn mul(self, rhs: Self) -> Self::Output {
-        Self(mul_gf256(self.0, rhs.0))
+        Self(unsafe { mul_gf256(self.0, rhs.0) })
     }
 }
 
@@ -1661,7 +1701,7 @@ impl Mul<&Self> for GF256 {
 
     #[inline(always)]
     fn mul(self, rhs: &Self) -> Self::Output {
-        Self(mul_gf256(self.0, rhs.0))
+        Self(unsafe { mul_gf256(self.0, rhs.0) })
     }
 }
 
@@ -1670,7 +1710,7 @@ impl Mul<GF256> for &GF256 {
 
     #[inline(always)]
     fn mul(self, rhs: GF256) -> Self::Output {
-        GF256(mul_gf256(self.0, rhs.0))
+        GF256(unsafe { mul_gf256(self.0, rhs.0) })
     }
 }
 
@@ -1679,7 +1719,7 @@ impl Mul<GF64> for GF256 {
 
     #[inline(always)]
     fn mul(self, rhs: GF64) -> Self::Output {
-        Self(mul_gf256_u64(self.0, rhs.into()))
+        Self(unsafe { mul_gf256_u64(self.0, rhs.into()) })
     }
 }
 
@@ -1699,20 +1739,21 @@ impl Mul<u8> for GF256 {
 impl MulAssign for GF256 {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
-        self.0 = mul_gf256(self.0, rhs.0);
+        self.0 = unsafe { mul_gf256(self.0, rhs.0) };
     }
 }
 
 impl MulAssign<&Self> for GF256 {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: &Self) {
-        self.0 = mul_gf256(self.0, rhs.0);
+        self.0 = unsafe { mul_gf256(self.0, rhs.0) };
     }
 }
 
 // implementation of Double
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn m256_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
     unsafe {
         let mask = m256_set_msb();
@@ -1744,7 +1785,7 @@ impl Square for GF256 {
 
     #[inline]
     fn square(self) -> Self::Output {
-        Self(square_gf256(self.0))
+        Self(unsafe { square_gf256(self.0) })
     }
 }
 
