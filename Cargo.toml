@@ -1,17 +1,18 @@
 [package]
 name = "faest"
 description = "Pure Rust implementation of the FAEST post-quantum secure digital signature scheme"
-version = "0.1.3"
+version = "0.2.0"
 authors = [
   "Sebastian Ramacher <sebastian.ramacher@ait.ac.at>",
   "Clément Naves <clement.naves@ait.ac.at>",
+  "Alessandro Colombo <alessandro.colombo@ait.ac.at>",
 ]
 homepage = "https://faest.info"
 repository = "https://github.com/ait-crypto/faest-rs"
 license = "Apache-2.0 OR MIT"
 edition = "2024"
 rust-version = "1.85"
-keywords = ["signatures", "FAEST"]
+keywords = ["signatures", "FAEST", "post-quantum"]
 categories = ["cryptography"]
 exclude = ["tests/data/*.json", "tests/data/PQCsignKAT_*.rsp"]
 
