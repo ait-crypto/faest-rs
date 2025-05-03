@@ -176,7 +176,7 @@ pub trait ByteCombineSquaredConstants: Field {
 
 impl<T> SumPoly for T
 where
-    T: Copy + Field + Double<Output = Self> + for<'a> Add<&'a Self, Output = Self>,
+    T: Copy + Field + Double<Output = Self> + for<'a> Add<&'a Self, Output = Self> + FromBit,
 {
     fn sum_poly(v: &[Self]) -> Self {
         v.iter()
@@ -186,34 +186,9 @@ where
     }
 
     fn sum_poly_bits(v: &[u8]) -> Self {
-        // let mut ret = if ((v[127 / 8] >> (127 % 8)) & 1) != 0 {
-        //     T::ONE
-        // } else {
-        //     T::ZERO
-        // };
-
-        // // let n_bits = v.len() * 8;
-        // for i in 1..128 {
-        //     ret = ret.double();
-        //     let bit_idx = 127 - i;
-        //     if ((v[bit_idx / 8] >> (bit_idx % 8)) & 1) != 0 {
-        //         ret += T::ONE;
-        //     }
-        // }
-
-        // ret
-
-        let init = if (v[v.len() - 1] & (1 << 7)) != 0 {
-            T::ONE
-        } else {
-            T::ZERO
-        };
-        (0..v.len() * 8).rev().skip(1).fold(init, |mut sum, i| {
-            sum = sum.double();
-            if v[i / 8] & (1 << (i % 8)) != 0 {
-                sum += T::ONE;
-            }
-            sum
+        let init = Self::from_bit(v[v.len() - 1] >> 7);
+        (0..v.len() * 8).rev().skip(1).fold(init, |sum, i| {
+            sum.double() + Self::from_bit(v[i / 8] >> (i % 8))
         })
     }
 }
@@ -232,16 +207,14 @@ where
 }
 
 // generic implementation of FromBit
-impl<F> FromBit for F
+
+impl<T, const N: usize, const LENGTH: usize> FromBit for BigGF<T, N, LENGTH>
 where
-    F: Field,
+    Self: Field + ApplyMask<T, Output = Self>,
+    u8: ToMask<T>,
 {
     fn from_bit(x: u8) -> Self {
-        if (x & 1) == 0 {
-            return Self::ZERO;
-        }
-
-        Self::ONE
+        Self::ONE.apply_mask(x.to_mask_bit(0))
     }
 }
 
@@ -1712,6 +1685,14 @@ mod test {
 
         use generic_array::typenum::Unsigned;
         use rand::{RngCore, SeedableRng, rngs::SmallRng};
+
+        #[test]
+        fn from_bit<F: BigGaloisField + Debug + Eq>() {
+            assert_eq!(F::ONE, F::from_bit(1));
+            assert_eq!(F::ZERO, F::from_bit(0));
+            assert_eq!(F::ONE, F::from_bit(3));
+            assert_eq!(F::ZERO, F::from_bit(2));
+        }
 
         #[test]
         fn add<F: BigGaloisField + Debug + Eq>()

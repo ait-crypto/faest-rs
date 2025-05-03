@@ -29,7 +29,7 @@ use generic_array::{
 
 use super::{
     BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquaredConstants, Double,
-    ExtensionField, Field, GF8, GF64, Sigmas, Square,
+    ExtensionField, Field, FromBit, GF8, GF64, Sigmas, Square,
     large_fields::{
         Alphas, Betas, ByteCombineSquared, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192,
         GF256 as UnoptimizedGF256, GF384 as UnoptimizedGF384, GF576 as UnoptimizedGF576,
@@ -362,6 +362,12 @@ impl PartialEq for GF128 {
 }
 
 impl Eq for GF128 {}
+
+impl FromBit for GF128 {
+    fn from_bit(bit: u8) -> Self {
+        Self::ONE * bit
+    }
+}
 
 // implementations of Add and AddAssign
 
@@ -880,6 +886,12 @@ impl PartialEq for GF192 {
 }
 
 impl Eq for GF192 {}
+
+impl FromBit for GF192 {
+    fn from_bit(bit: u8) -> Self {
+        Self::ONE * bit
+    }
+}
 
 // implementations of Add and AddAssign
 
@@ -1405,6 +1417,12 @@ impl PartialEq for GF256 {
 }
 
 impl Eq for GF256 {}
+
+impl FromBit for GF256 {
+    fn from_bit(bit: u8) -> Self {
+        Self::ONE * bit
+    }
+}
 
 // implementations of Add and AddAssign
 
