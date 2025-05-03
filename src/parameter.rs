@@ -28,7 +28,6 @@ use crate::{
     random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake256},
     rijndael_32::{Rijndael192, Rijndael256},
     universal_hashing::{B, VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit},
-    utils::get_bit,
     witness::aes_extendedwitness,
     zk_constraints::aes_verify,
     zk_constraints::{CstrntsVal, aes_prove},
@@ -225,18 +224,15 @@ pub(crate) trait OWFParameters: Sized {
     ) -> OWFField<Self>;
 
     fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<Self> {
-        let mut owf_input = GenericArray::default();
         let mut owf_key = GenericArray::default();
-
-        let mut done = false;
-        while !done {
+        loop {
             rng.fill_bytes(&mut owf_key);
-
-            if (get_bit(&owf_key, 0) & get_bit(&owf_key, 1)) == 0 {
-                done = true;
+            if owf_key[0] & 0b11 != 0b11 {
+                break;
             }
         }
 
+        let mut owf_input = GenericArray::default();
         rng.fill_bytes(&mut owf_input);
 
         let mut owf_output = GenericArray::default();

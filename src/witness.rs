@@ -112,11 +112,10 @@ fn invnorm(x: u8) -> u8 {
 }
 
 #[inline]
-fn store_invnorm_state(dst: &mut u8, lo_idx: u8, hi_idx: u8) {
-    *dst = invnorm(lo_idx) | (invnorm(hi_idx) << 4);
+fn store_invnorm_state(lo_idx: u8, hi_idx: u8) -> u8 {
+    invnorm(lo_idx) | (invnorm(hi_idx) << 4)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn round_with_save<O>(
     input1: &[u8], // in
     kb: &[u32],    // k_bar
@@ -140,9 +139,9 @@ fn round_with_save<O>(
         if even_round {
             let to_take = if !O::is_em() { 4 } else { O::NK::USIZE };
             for i in convert_from_batchblocks(inv_bitslice(&state)).take(to_take) {
-                store_invnorm_state(&mut witness[*index], i[0], i[1]);
+                witness[*index] = store_invnorm_state(i[0], i[1]);
                 *index += 1;
-                store_invnorm_state(&mut witness[*index], i[2], i[3]);
+                witness[*index] = store_invnorm_state(i[2], i[3]);
                 *index += 1;
             }
         }
