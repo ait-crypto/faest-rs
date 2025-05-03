@@ -1842,9 +1842,7 @@ pub(crate) struct GF384(__m256i, __m128i);
 impl Default for GF384 {
     #[inline(always)]
     fn default() -> Self {
-        Self(unsafe { _mm256_setzero_si256() }, unsafe {
-            _mm_setzero_si128()
-        })
+        unsafe { Self(_mm256_setzero_si256(), _mm_setzero_si128()) }
     }
 }
 
@@ -1867,9 +1865,12 @@ impl Add for GF384 {
 
     #[inline(always)]
     fn add(self, rhs: Self) -> Self::Output {
-        Self(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
-            _mm_xor_si128(self.1, rhs.1)
-        })
+        unsafe {
+            Self(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm_xor_si128(self.1, rhs.1),
+            )
+        }
     }
 }
 
@@ -1878,9 +1879,12 @@ impl Add<&Self> for GF384 {
 
     #[inline(always)]
     fn add(self, rhs: &Self) -> Self::Output {
-        Self(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
-            _mm_xor_si128(self.1, rhs.1)
-        })
+        unsafe {
+            Self(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm_xor_si128(self.1, rhs.1),
+            )
+        }
     }
 }
 
@@ -1889,25 +1893,32 @@ impl Add<GF384> for &GF384 {
 
     #[inline(always)]
     fn add(self, rhs: GF384) -> Self::Output {
-        GF384(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
-            _mm_xor_si128(self.1, rhs.1)
-        })
+        unsafe {
+            GF384(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm_xor_si128(self.1, rhs.1),
+            )
+        }
     }
 }
 
 impl AddAssign for GF384 {
     #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm_xor_si128(self.1, rhs.1) };
+        unsafe {
+            self.0 = _mm256_xor_si256(self.0, rhs.0);
+            self.1 = _mm_xor_si128(self.1, rhs.1);
+        }
     }
 }
 
 impl AddAssign<&Self> for GF384 {
     #[inline(always)]
     fn add_assign(&mut self, rhs: &Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm_xor_si128(self.1, rhs.1) };
+        unsafe {
+            self.0 = _mm256_xor_si256(self.0, rhs.0);
+            self.1 = _mm_xor_si128(self.1, rhs.1);
+        }
     }
 }
 
@@ -1917,10 +1928,9 @@ impl Sub for GF384 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: Self) -> Self::Output {
-        Self(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
-            _mm_xor_si128(self.1, rhs.1)
-        })
+        self + rhs
     }
 }
 
@@ -1928,10 +1938,9 @@ impl Sub<&Self> for GF384 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: &Self) -> Self::Output {
-        Self(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
-            _mm_xor_si128(self.1, rhs.1)
-        })
+        self + rhs
     }
 }
 
@@ -1939,26 +1948,25 @@ impl Sub<GF384> for &GF384 {
     type Output = GF384;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: GF384) -> Self::Output {
-        GF384(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
-            _mm_xor_si128(self.1, rhs.1)
-        })
+        self + rhs
     }
 }
 
 impl SubAssign for GF384 {
     #[inline(always)]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm_xor_si128(self.1, rhs.1) };
+        *self += rhs;
     }
 }
 
 impl SubAssign<&Self> for GF384 {
     #[inline(always)]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: &Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm_xor_si128(self.1, rhs.1) };
+        *self += rhs;
     }
 }
 
@@ -2108,11 +2116,13 @@ impl Add for GF576 {
     #[inline(always)]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: Self) -> Self::Output {
-        Self(
-            unsafe { _mm256_xor_si256(self.0, rhs.0) },
-            unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            self.2 ^ rhs.2,
-        )
+        unsafe {
+            Self(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm256_xor_si256(self.1, rhs.1),
+                self.2 ^ rhs.2,
+            )
+        }
     }
 }
 
@@ -2122,11 +2132,13 @@ impl Add<&Self> for GF576 {
     #[inline(always)]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: &Self) -> Self::Output {
-        Self(
-            unsafe { _mm256_xor_si256(self.0, rhs.0) },
-            unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            self.2 ^ rhs.2,
-        )
+        unsafe {
+            Self(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm256_xor_si256(self.1, rhs.1),
+                self.2 ^ rhs.2,
+            )
+        }
     }
 }
 
@@ -2136,11 +2148,13 @@ impl Add<GF576> for &GF576 {
     #[inline(always)]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: GF576) -> Self::Output {
-        GF576(
-            unsafe { _mm256_xor_si256(self.0, rhs.0) },
-            unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            self.2 ^ rhs.2,
-        )
+        unsafe {
+            GF576(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm256_xor_si256(self.1, rhs.1),
+                self.2 ^ rhs.2,
+            )
+        }
     }
 }
 
@@ -2148,8 +2162,10 @@ impl AddAssign for GF576 {
     #[inline(always)]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
+        unsafe {
+            self.0 = _mm256_xor_si256(self.0, rhs.0);
+            self.1 = _mm256_xor_si256(self.1, rhs.1);
+        }
         self.2 ^= rhs.2;
     }
 }
@@ -2158,8 +2174,10 @@ impl AddAssign<&Self> for GF576 {
     #[inline(always)]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: &Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
+        unsafe {
+            self.0 = _mm256_xor_si256(self.0, rhs.0);
+            self.1 = _mm256_xor_si256(self.1, rhs.1);
+        }
         self.2 ^= rhs.2;
     }
 }
@@ -2170,8 +2188,9 @@ impl Sub for GF576 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: Self) -> Self::Output {
-        self.add(rhs)
+        self + rhs
     }
 }
 
@@ -2179,8 +2198,9 @@ impl Sub<&Self> for GF576 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: &Self) -> Self::Output {
-        self.add(rhs)
+        self + rhs
     }
 }
 
@@ -2188,8 +2208,9 @@ impl Sub<GF576> for &GF576 {
     type Output = GF576;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: GF576) -> Self::Output {
-        self.add(rhs)
+        self + rhs
     }
 }
 
@@ -2362,11 +2383,13 @@ pub(crate) struct GF768(__m256i, __m256i, __m256i);
 impl Default for GF768 {
     #[inline(always)]
     fn default() -> Self {
-        Self(
-            unsafe { _mm256_setzero_si256() },
-            unsafe { _mm256_setzero_si256() },
-            unsafe { _mm256_setzero_si256() },
-        )
+        unsafe {
+            Self(
+                _mm256_setzero_si256(),
+                _mm256_setzero_si256(),
+                _mm256_setzero_si256(),
+            )
+        }
     }
 }
 
@@ -2393,11 +2416,13 @@ impl Add for GF768 {
 
     #[inline(always)]
     fn add(self, rhs: Self) -> Self::Output {
-        Self(
-            unsafe { _mm256_xor_si256(self.0, rhs.0) },
-            unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            unsafe { _mm256_xor_si256(self.2, rhs.2) },
-        )
+        unsafe {
+            Self(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm256_xor_si256(self.1, rhs.1),
+                _mm256_xor_si256(self.2, rhs.2),
+            )
+        }
     }
 }
 
@@ -2406,11 +2431,13 @@ impl Add<&Self> for GF768 {
 
     #[inline(always)]
     fn add(self, rhs: &Self) -> Self::Output {
-        Self(
-            unsafe { _mm256_xor_si256(self.0, rhs.0) },
-            unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            unsafe { _mm256_xor_si256(self.2, rhs.2) },
-        )
+        unsafe {
+            Self(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm256_xor_si256(self.1, rhs.1),
+                _mm256_xor_si256(self.2, rhs.2),
+            )
+        }
     }
 }
 
@@ -2419,29 +2446,35 @@ impl Add<GF768> for &GF768 {
 
     #[inline(always)]
     fn add(self, rhs: GF768) -> Self::Output {
-        GF768(
-            unsafe { _mm256_xor_si256(self.0, rhs.0) },
-            unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            unsafe { _mm256_xor_si256(self.2, rhs.2) },
-        )
+        unsafe {
+            GF768(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm256_xor_si256(self.1, rhs.1),
+                _mm256_xor_si256(self.2, rhs.2),
+            )
+        }
     }
 }
 
 impl AddAssign for GF768 {
     #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
-        self.2 = unsafe { _mm256_xor_si256(self.2, rhs.2) };
+        unsafe {
+            self.0 = _mm256_xor_si256(self.0, rhs.0);
+            self.1 = _mm256_xor_si256(self.1, rhs.1);
+            self.2 = _mm256_xor_si256(self.2, rhs.2);
+        }
     }
 }
 
 impl AddAssign<&Self> for GF768 {
     #[inline(always)]
     fn add_assign(&mut self, rhs: &Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
-        self.2 = unsafe { _mm256_xor_si256(self.2, rhs.2) };
+        unsafe {
+            self.0 = _mm256_xor_si256(self.0, rhs.0);
+            self.1 = _mm256_xor_si256(self.1, rhs.1);
+            self.2 = _mm256_xor_si256(self.2, rhs.2);
+        }
     }
 }
 
@@ -2451,8 +2484,9 @@ impl Sub for GF768 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: Self) -> Self::Output {
-        self.add(rhs)
+        self + rhs
     }
 }
 
@@ -2460,8 +2494,9 @@ impl Sub<&Self> for GF768 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: &Self) -> Self::Output {
-        self.add(rhs)
+        self + rhs
     }
 }
 
@@ -2469,8 +2504,9 @@ impl Sub<GF768> for &GF768 {
     type Output = GF768;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: GF768) -> Self::Output {
-        self.add(rhs)
+        self + rhs
     }
 }
 
