@@ -29,11 +29,11 @@ use generic_array::{
 
 use super::{
     BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquaredConstants, Double,
-    ExtensionField, Field, FromBit, GF8, GF64, Sigmas, Square,
+    ExtensionField, Field, FromBit, GF64, Sigmas, Square,
     large_fields::{
-        Alphas, Betas, ByteCombineSquared, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192,
+        Alphas, Betas, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192,
         GF256 as UnoptimizedGF256, GF384 as UnoptimizedGF384, GF576 as UnoptimizedGF576,
-        GF768 as UnoptimizedGF768, Modulus, SquareBytes,
+        GF768 as UnoptimizedGF768, Modulus,
     },
 };
 
@@ -780,24 +780,6 @@ impl ByteCombineSquaredConstants for GF128 {
     const BYTE_COMBINE_SQ_3: Self = Self(gfu128_as_m128(UnoptimizedGF128::BYTE_COMBINE_SQ_3));
 }
 
-impl ByteCombineSquared for GF128 {
-    fn byte_combine_sq(x: &[Self; 8]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    fn byte_combine_sq_slice(x: &[Self]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    fn byte_combine_bits_sq(x: u8) -> Self {
-        // TODO: define optimized implementation for GF8
-        let sq_bits = GF8::square_bits(x);
-        Self::byte_combine_bits(sq_bits)
-    }
-}
-
 impl Betas for GF128 {
     const BETA_SQUARES: [Self; 5] = [
         Self(gfu128_as_m128(UnoptimizedGF128::BETA_SQUARES[0])),
@@ -1311,24 +1293,6 @@ impl ByteCombineSquaredConstants for GF192 {
     const BYTE_COMBINE_SQ_3: Self = Self(gfu192_as_m256(UnoptimizedGF192::BYTE_COMBINE_SQ_3));
 }
 
-impl ByteCombineSquared for GF192 {
-    fn byte_combine_sq(x: &[Self; 8]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    fn byte_combine_sq_slice(x: &[Self]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    fn byte_combine_bits_sq(x: u8) -> Self {
-        // TODO: define optimized implementation for GF8
-        let sq_bits = GF8::square_bits(x);
-        Self::byte_combine_bits(sq_bits)
-    }
-}
-
 impl Betas for GF192 {
     const BETA_SQUARES: [Self; 5] = [
         Self(gfu192_as_m256(UnoptimizedGF192::BETA_SQUARES[0])),
@@ -1797,24 +1761,6 @@ impl ByteCombine for GF256 {
 impl ByteCombineSquaredConstants for GF256 {
     const BYTE_COMBINE_SQ_2: Self = Self(gfu256_as_m256(UnoptimizedGF256::BYTE_COMBINE_SQ_2));
     const BYTE_COMBINE_SQ_3: Self = Self(gfu256_as_m256(UnoptimizedGF256::BYTE_COMBINE_SQ_3));
-}
-
-impl ByteCombineSquared for GF256 {
-    fn byte_combine_sq(x: &[Self; 8]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    fn byte_combine_sq_slice(x: &[Self]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    fn byte_combine_bits_sq(x: u8) -> Self {
-        // TODO: define optimized implementation for GF8
-        let sq_bits = GF8::square_bits(x);
-        Self::byte_combine_bits(sq_bits)
-    }
 }
 
 impl Betas for GF256 {
