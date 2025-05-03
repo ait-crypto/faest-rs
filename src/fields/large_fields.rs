@@ -110,6 +110,48 @@ pub trait SquareBytes: Field {
     fn square_byte_inplace(x: &mut [Self]);
 }
 
+impl<T> SquareBytes for T
+where
+    T: BigGaloisField,
+{
+    fn square_byte(x: &[Self]) -> [Self; 8] {
+        let mut sq = [<Self as Field>::ZERO; 8];
+        sq[0] = x[0] + x[4] + x[6];
+        sq[2] = x[1] + x[5];
+        sq[4] = x[2] + x[4] + x[7];
+        sq[5] = x[5] + x[6];
+        sq[6] = x[3] + x[5];
+        sq[7] = x[6] + x[7];
+
+        sq[1] = x[4] + sq[7];
+        sq[3] = x[5] + sq[1];
+
+        sq
+    }
+
+    fn square_byte_inplace(x: &mut [Self]) {
+        let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
+
+        // x0 = x0 + x4 + x6
+        x[0] += x[4] + x[6];
+        // x2 = x1 + x5
+        x[2] = x[1] + x[5];
+        // x4 = x4 + x2 + x7
+        x[4] += i2 + x[7];
+        // x5 = x5 + x6
+        x[5] += x[6];
+        // x6 = x3 + x5
+        x[6] = x[3] + i5;
+        // x7 = x6 + x7
+        x[7] += i6;
+
+        // x1 = x4 + (x6 + x7)
+        x[1] = i4 + x[7];
+        // x3 = x5 + (x4 + x6 + x7)
+        x[3] = i5 + x[1];
+    }
+}
+
 /// Trait providing methods for "squared byte combination"
 #[allow(dead_code)]
 pub trait ByteCombineSquared: Field {
@@ -231,54 +273,6 @@ where
             Self::ONE.apply_mask(x.to_mask_bit(0)),
             |sum, (index, alpha)| sum + alpha.apply_mask(x.to_mask_bit(index + 1)),
         )
-    }
-}
-
-// generic implementation of SquareBytes
-
-impl<T, const N: usize, const LENGTH: usize> SquareBytes for BigGF<T, N, LENGTH>
-where
-    Self:
-        Alphas + Field + Copy + ApplyMask<T, Output = Self> + for<'a> Mul<&'a Self, Output = Self>,
-    u8: ToMask<T>,
-{
-    fn square_byte(x: &[Self]) -> [Self; 8] {
-        let mut sq = [<Self as Field>::ZERO; 8];
-        sq[0] = x[0] + x[4] + x[6];
-        sq[2] = x[1] + x[5];
-        sq[4] = x[2] + x[4] + x[7];
-        sq[5] = x[5] + x[6];
-        sq[6] = x[3] + x[5];
-        sq[7] = x[6] + x[7];
-
-        // x[4] + (x[6] + x[7])
-        sq[1] = x[4] + sq[7];
-        // (x[5] + x[6]) + (x[4] + x[7])
-        sq[3] = x[5] + sq[1];
-
-        sq
-    }
-
-    fn square_byte_inplace(x: &mut [Self]) {
-        let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
-
-        // x0 = x0 + x4 + x6
-        x[0] += x[4] + x[6];
-        // x2 = x1 + x5
-        x[2] = x[1] + x[5];
-        // x4 = x4 + x2 + x7
-        x[4] += i2 + x[7];
-        // x5 = x5 + x6
-        x[5] += x[6];
-        // x6 = x3 + x5
-        x[6] = x[3] + i5;
-        // x7 = x6 + x7
-        x[7] += i6;
-
-        // x1 = x4 + (x6 + x7)
-        x[1] = i4 + x[7];
-        // x3 = x5 + (x4 + x6 + x7)
-        x[3] = i5 + x[1];
     }
 }
 

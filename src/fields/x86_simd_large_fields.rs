@@ -722,49 +722,6 @@ impl From<&[u8]> for GF128 {
     }
 }
 
-// Implementation of SquareBytes
-
-impl SquareBytes for GF128 {
-    // TODO: Should we define a generic implementation for F: Field in large fields instead?
-
-    fn square_byte(x: &[Self]) -> [Self; 8] {
-        let mut sq = [<Self as Field>::ZERO; 8];
-        sq[0] = x[0] + x[4] + x[6];
-        sq[2] = x[1] + x[5];
-        sq[4] = x[2] + x[4] + x[7];
-        sq[5] = x[5] + x[6];
-        sq[6] = x[3] + x[5];
-        sq[7] = x[6] + x[7];
-
-        sq[1] = x[4] + sq[7];
-        sq[3] = x[5] + sq[1];
-
-        sq
-    }
-
-    fn square_byte_inplace(x: &mut [Self]) {
-        let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
-
-        // x0 = x0 + x4 + x6
-        x[0] += x[4] + x[6];
-        // x2 = x1 + x5
-        x[2] = x[1] + x[5];
-        // x4 = x4 + x2 + x7
-        x[4] += i2 + x[7];
-        // x5 = x5 + x6
-        x[5] += x[6];
-        // x6 = x3 + x5
-        x[6] = x[3] + i5;
-        // x7 = x6 + x7
-        x[7] += i6;
-
-        // x1 = x4 + (x6 + x7)
-        x[1] = i4 + x[7];
-        // x3 = x5 + (x4 + x6 + x7)
-        x[3] = i5 + x[1];
-    }
-}
-
 // implementation of ByteCombine
 
 impl Alphas for GF128 {
@@ -1278,49 +1235,6 @@ impl Field for GF192 {
     }
 }
 
-// Implementation of SquareBytes
-
-impl SquareBytes for GF192 {
-    // TODO: Should we define a generic implementation for F: Field in large fields instead?
-
-    fn square_byte(x: &[Self]) -> [Self; 8] {
-        let mut sq = [<Self as Field>::ZERO; 8];
-        sq[0] = x[0] + x[4] + x[6];
-        sq[2] = x[1] + x[5];
-        sq[4] = x[2] + x[4] + x[7];
-        sq[5] = x[5] + x[6];
-        sq[6] = x[3] + x[5];
-        sq[7] = x[6] + x[7];
-
-        sq[1] = x[4] + sq[7];
-        sq[3] = x[5] + sq[1];
-
-        sq
-    }
-
-    fn square_byte_inplace(x: &mut [Self]) {
-        let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
-
-        // x0 = x0 + x4 + x6
-        x[0] += x[4] + x[6];
-        // x2 = x1 + x5
-        x[2] = x[1] + x[5];
-        // x4 = x4 + x2 + x7
-        x[4] += i2 + x[7];
-        // x5 = x5 + x6
-        x[5] += x[6];
-        // x6 = x3 + x5
-        x[6] = x[3] + i5;
-        // x7 = x6 + x7
-        x[7] += i6;
-
-        // x1 = x4 + (x6 + x7)
-        x[1] = i4 + x[7];
-        // x3 = x5 + (x4 + x6 + x7)
-        x[3] = i5 + x[1];
-    }
-}
-
 impl From<&[u8]> for GF192 {
     fn from(value: &[u8]) -> Self {
         debug_assert_eq!(value.len(), <Self as Field>::Length::USIZE);
@@ -1805,49 +1719,6 @@ impl Field for GF256 {
         let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
         ret
-    }
-}
-
-// Implementation of SquareBytes
-
-impl SquareBytes for GF256 {
-    // TODO: Should we define a generic implementation for F: Field in large fields instead?
-
-    fn square_byte(x: &[Self]) -> [Self; 8] {
-        let mut sq = [<Self as Field>::ZERO; 8];
-        sq[0] = x[0] + x[4] + x[6];
-        sq[2] = x[1] + x[5];
-        sq[4] = x[2] + x[4] + x[7];
-        sq[5] = x[5] + x[6];
-        sq[6] = x[3] + x[5];
-        sq[7] = x[6] + x[7];
-
-        sq[1] = x[4] + sq[7];
-        sq[3] = x[5] + sq[1];
-
-        sq
-    }
-
-    fn square_byte_inplace(x: &mut [Self]) {
-        let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
-
-        // x0 = x0 + x4 + x6
-        x[0] += x[4] + x[6];
-        // x2 = x1 + x5
-        x[2] = x[1] + x[5];
-        // x4 = x4 + x2 + x7
-        x[4] += i2 + x[7];
-        // x5 = x5 + x6
-        x[5] += x[6];
-        // x6 = x3 + x5
-        x[6] = x[3] + i5;
-        // x7 = x6 + x7
-        x[7] += i6;
-
-        // x1 = x4 + (x6 + x7)
-        x[1] = i4 + x[7];
-        // x3 = x5 + (x4 + x6 + x7)
-        x[3] = i5 + x[1];
     }
 }
 
