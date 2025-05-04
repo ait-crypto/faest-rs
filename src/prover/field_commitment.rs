@@ -3,7 +3,8 @@ use std::ops::{Add, AddAssign, Mul};
 use crate::fields::{BigGaloisField, Square};
 
 /// Represents a polynomial commitment in GF of degree one
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 pub(crate) struct FieldCommitDegOne<F>
 where
     F: BigGaloisField,
@@ -191,7 +192,8 @@ where
 }
 
 /// Represents a polynomial commitment in GF of degree 2
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 pub(crate) struct FieldCommitDegTwo<F>
 where
     F: BigGaloisField,
@@ -356,7 +358,8 @@ where
 }
 
 /// Represents a polynomial commitment in GF of degree 3
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
 pub(crate) struct FieldCommitDegThree<F>
 where
     F: BigGaloisField,

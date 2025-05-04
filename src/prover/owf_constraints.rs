@@ -6,7 +6,7 @@ use super::{
 use crate::{
     fields::{Field, FromBit},
     internal_keys::PublicKey,
-    parameter::{BaseParameters, OWFField, OWFParameters},
+    parameter::{OWFField, OWFParameters},
     rijndael_32::{convert_from_batchblocks, inv_bitslice, rijndael_key_schedule},
     universal_hashing::ZKProofHasher,
     utils::xor_arrays,
@@ -18,7 +18,6 @@ pub(crate) fn owf_constraints<O>(
     pk: &PublicKey<O>,
 ) where
     O: OWFParameters,
-    <<O as OWFParameters>::BaseParams as BaseParameters>::Field: PartialEq,
 {
     // ::1
     let PublicKey {

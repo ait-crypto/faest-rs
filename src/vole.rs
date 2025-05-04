@@ -21,7 +21,7 @@ use crate::{
 const TWEAK_OFFSET: u32 = 1 << 31;
 
 /// Result of VOLE commitment
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub struct VoleCommitResult<LambdaBytes, NLeafCommit, LHatBytes>
 where
     LambdaBytes: ArrayLength
@@ -38,7 +38,7 @@ where
 }
 
 /// Result of VOLE reconstruction
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub struct VoleReconstructResult<LambdaBytes, LHatBytes>
 where
     LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<U8, Output: ArrayLength>,
@@ -49,7 +49,7 @@ where
 }
 
 /// Immutable reference to storage area in signature for all `c`s.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct VoleCommitmentCRef<'a, LHatBytes>(&'a [u8], PhantomData<LHatBytes>);
 
 impl<LHatBytes> Index<usize> for VoleCommitmentCRef<'_, LHatBytes>
@@ -77,7 +77,7 @@ where
 }
 
 /// Mutable eference to storage area in signature for all `c`s.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub(crate) struct VoleCommitmentCRefMut<'a, LHatBytes>(&'a mut [u8], PhantomData<LHatBytes>);
 
 impl<'a, LHatBytes> VoleCommitmentCRefMut<'a, LHatBytes>
@@ -291,7 +291,6 @@ where
 
 #[cfg(test)]
 mod test {
-
     use super::*;
 
     use generic_array::GenericArray;

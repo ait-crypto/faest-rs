@@ -10,7 +10,7 @@ use crate::{
     prover::field_commitment::FieldCommitDegOne,
 };
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct ByteCommitment<F>
 where
     F: BigGaloisField,
@@ -36,7 +36,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct ByteCommits<F, L>
 where
     F: BigGaloisField,
@@ -100,7 +100,7 @@ where
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct ByteCommitsRef<'a, F, L>
 where
     F: BigGaloisField,

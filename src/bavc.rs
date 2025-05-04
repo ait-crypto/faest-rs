@@ -18,13 +18,10 @@ use crate::{
     utils::Reader,
 };
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct BavcCommitResult<LambdaBytes, NLeafCommit>
 where
-    LambdaBytes: ArrayLength
-        + Mul<U2, Output: ArrayLength>
-        + Mul<NLeafCommit, Output: ArrayLength>
-        + PartialEq,
+    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<NLeafCommit, Output: ArrayLength>,
     NLeafCommit: ArrayLength,
 {
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
@@ -32,22 +29,22 @@ where
     pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct BavcOpenResult<'a> {
     pub coms: Vec<&'a [u8]>,
     pub nodes: Vec<&'a [u8]>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct BavcReconstructResult<LambdaBytes>
 where
-    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + PartialEq,
+    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength>,
 {
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
     pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct BavcDecommitment<LambdaBytes, NLeafCommit>
 where
     LambdaBytes: ArrayLength + Mul<NLeafCommit, Output: ArrayLength>,
@@ -265,8 +262,7 @@ where
     Self::LambdaBytes: Mul<U2, Output = Self::LambdaBytesTimes2>
         + Mul<U3, Output = Self::LambdaBytesTimes3>
         + Mul<U8, Output = Self::Lambda>
-        + Mul<Self::NLeafCommit, Output: ArrayLength>
-        + PartialEq,
+        + Mul<Self::NLeafCommit, Output: ArrayLength>,
 {
     type PRG: PseudoRandomGenerator<KeySize = Self::LambdaBytes>;
     type TAU: TauParameters<Tau = Self::Tau, L = Self::L>;
@@ -702,10 +698,7 @@ mod test {
     );
 
     fn compare_expected_with_result<
-        Lambda: ArrayLength
-            + Mul<NLeafCommit, Output: ArrayLength>
-            + Mul<U2, Output: ArrayLength>
-            + PartialEq,
+        Lambda: ArrayLength + Mul<NLeafCommit, Output: ArrayLength> + Mul<U2, Output: ArrayLength>,
         NLeafCommit: ArrayLength,
         TAU: TauParameters,
     >(
