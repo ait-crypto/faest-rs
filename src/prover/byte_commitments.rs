@@ -25,7 +25,7 @@ where
 {
     pub fn square_inplace(&mut self) {
         F::square_byte_inplace(self.tags.as_mut_slice());
-        GF8::square_bits_inplace(&mut self.key);
+        self.key = GF8::square_bits(self.key);
     }
 
     pub fn combine(&self) -> FieldCommitDegOne<F> {

@@ -186,9 +186,6 @@ where
     }
 }
 
-/// Binary field `2^3`
-pub(crate) type GF8 = SmallGF<u8>;
-
 impl Square for GF8 {
     type Output = Self;
 
@@ -206,33 +203,20 @@ impl Square for GF8 {
     }
 }
 
+/// Binary field `2^8`
+pub type GF8 = SmallGF<u8>;
+
 impl GF8 {
-    pub(crate) fn square_bits_inplace(x: &mut u8) {
-        let bits = [
-            *x & 0b1,
-            (*x & 0b10) >> 1,
-            (*x & 0b100) >> 2,
-            (*x & 0b1000) >> 3,
-            (*x & 0b10000) >> 4,
-            (*x & 0b100000) >> 5,
-            (*x & 0b1000000) >> 6,
-            (*x & 0b10000000) >> 7,
-        ];
-
-        *x = bits[0] ^ bits[4] ^ bits[6];
-        *x |= (bits[4] ^ bits[6] ^ bits[7]) << 1;
-        *x |= (bits[1] ^ bits[5]) << 2;
-        *x |= (bits[4] ^ bits[5] ^ bits[6] ^ bits[7]) << 3;
-        *x |= (bits[2] ^ bits[4] ^ bits[7]) << 4;
-        *x |= (bits[5] ^ bits[6]) << 5;
-        *x |= (bits[3] ^ bits[5]) << 6;
-        *x |= (bits[6] ^ bits[7]) << 7;
-    }
-
-    pub(crate) fn square_bits(x: u8) -> u8 {
-        let mut x = x;
-        Self::square_bits_inplace(&mut x);
-        x
+    pub fn square_bits(x: u8) -> u8 {
+        let mut res = (x ^ (x >> 4) ^ (x >> 6)) & 0x1;
+        res |= ((x >> 3) ^ (x >> 5) ^ (x >> 6)) & 0x2;
+        res |= ((x << 1) ^ (x >> 3)) & 0x4;
+        res |= ((x >> 1) ^ (x >> 2) ^ (x >> 3) ^ (x >> 4)) & 0x8;
+        res |= ((x << 2) ^ x ^ (x >> 3)) & 0x10;
+        res |= (x ^ (x >> 1)) & 0x20;
+        res |= ((x << 3) ^ (x << 1)) & 0x40;
+        res |= ((x << 1) ^ x) & 0x80;
+        res
     }
 }
 
