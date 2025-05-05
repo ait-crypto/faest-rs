@@ -186,20 +186,22 @@ where
     }
 }
 
-impl Square for GF8 {
+impl<T> Square for SmallGF<T>
+where
+    Self: GaloisFieldHelper<T>,
+    T: Sized + Copy,
+    Wrapping<T>: BitAnd<Output = Wrapping<T>>
+        + BitXor<Output = Wrapping<T>>
+        + BitXorAssign
+        + Neg<Output = Wrapping<T>>
+        + Shl<usize, Output = Wrapping<T>>
+        + Shr<usize, Output = Wrapping<T>>,
+{
     type Output = Self;
 
-    fn square(mut self) -> Self::Output {
-        let mut result_value = -(self.0 & Self::ONE) & self.0;
-        let right = self.0;
-
-        for i in 1..Self::BITS {
-            let mask = -((self.0 >> (Self::BITS - 1)) & Self::ONE);
-            self.0 = (self.0 << 1) ^ (mask & Self::MODULUS);
-            result_value ^= -((right >> i) & Self::ONE) & self.0;
-        }
-
-        Self(result_value)
+    #[inline]
+    fn square(self) -> Self::Output {
+        Self(Self::mul_helper(self.0, self.0))
     }
 }
 
