@@ -16,6 +16,16 @@ pub(crate) trait Reader {
         self.read(&mut dst);
         dst
     }
+
+    /// Read into boxed array and consume the reader
+    fn read_into_boxed<Length: ArrayLength>(mut self) -> Box<GenericArray<u8, Length>>
+    where
+        Self: Sized,
+    {
+        let mut dst = GenericArray::default_boxed();
+        self.read(&mut dst);
+        dst
+    }
 }
 
 #[inline]

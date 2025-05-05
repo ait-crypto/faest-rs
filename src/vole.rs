@@ -127,13 +127,16 @@ where
 
     // ::2
     // As in steps 8,9 we only work with two rows at a time, we just allocate 2 r-vectors
-    let mut rj: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
+    let mut rj: Vec<Box<GenericArray<u8, LHatBytes>>> = Vec::with_capacity(ni);
     let mut rj1: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
 
     // ::3,4
     let offset = (sd.len() != ni) as usize;
-    for (rji, sdi) in izip!(rj[offset..].iter_mut(), sd) {
-        BAVC::PRG::new_prg(sdi, iv, twk).read(rji);
+    if offset != 0 {
+        rj.push(GenericArray::default_boxed());
+    }
+    for sdi in sd {
+        rj.push(BAVC::PRG::new_prg(sdi, iv, twk).read_into_boxed());
     }
 
     // ::6..9
@@ -157,7 +160,8 @@ where
         swap(&mut rj, &mut rj1); // At next iteration we want to have last row in rj
     });
 
-    // ::10: after last swap, rj[0] will contain r_d,0)
+    // ::10: after last swap, rj[0] will contain r_{d,0}
+    // SAFETY: FAEST parameters ensure LHATBYTES > 0 (hence rj is not empty)
     rj.into_iter().next().unwrap()
 }
 
