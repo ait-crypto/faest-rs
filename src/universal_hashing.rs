@@ -285,14 +285,14 @@ where
         // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
 
         // Degree 1
-        self.a1_hasher.update(&(a_sq.tag * b.tag));
-        self.a1_hasher.update(&(b_sq.tag * a.tag));
+        self.a1_hasher.update(&(a_sq.tag[0] * b.tag[0]));
+        self.a1_hasher.update(&(b_sq.tag[0] * a.tag[0]));
 
         // Degree 2
         self.a2_hasher
-            .update(&(a_sq.key * b.tag + a_sq.tag * b.key - a.tag));
+            .update(&(a_sq.key * b.tag[0] + a_sq.tag[0] * b.key - a.tag[0]));
         self.a2_hasher
-            .update(&(b_sq.key * a.tag + b_sq.tag * a.key - b.tag));
+            .update(&(b_sq.key * a.tag[0] + b_sq.tag[0] * a.key - b.tag[0]));
 
         // Degree 3 (i.e., commitments) should be zero
         debug_assert_eq!(a_sq.key * b.key - a.key, F::ZERO);

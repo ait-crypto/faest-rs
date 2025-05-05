@@ -1,85 +1,121 @@
 use std::ops::{Add, AddAssign, Mul};
 
+use itertools::izip;
+
 use crate::fields::{BigGaloisField, Square};
 
-/// Represents a polynomial commitment in GF of degree one
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(test, derive(PartialEq))]
-pub(crate) struct FieldCommitDegOne<F>
+pub(crate) struct FieldCommitment<F, const TAG_SIZE: usize>
 where
     F: BigGaloisField,
 {
-    pub(crate) key: F,
-    pub(crate) tag: F,
+    pub key: F,
+    pub tag: [F; TAG_SIZE],
 }
 
-impl<F> FieldCommitDegOne<F>
+impl<F, const TAG_SIZE: usize> Default for FieldCommitment<F, TAG_SIZE>
 where
     F: BigGaloisField,
 {
-    pub(crate) fn new(key: F, tag: F) -> Self {
-        Self { key, tag }
+    fn default() -> Self {
+        Self {
+            key: F::ZERO,
+            tag: [F::ZERO; TAG_SIZE],
+        }
     }
 }
 
-impl<F> AddAssign<Self> for FieldCommitDegOne<F>
+impl<F, const TAG_SIZE: usize> AddAssign<Self> for FieldCommitment<F, TAG_SIZE>
 where
     F: BigGaloisField,
 {
     fn add_assign(&mut self, rhs: Self) {
         self.key += rhs.key;
-        self.tag += rhs.tag;
+        for (l, r) in izip!(self.tag.iter_mut(), rhs.tag) {
+            *l += r;
+        }
     }
 }
 
-impl<F> AddAssign<&Self> for FieldCommitDegOne<F>
+impl<F, const TAG_SIZE: usize> AddAssign<&Self> for FieldCommitment<F, TAG_SIZE>
 where
     F: BigGaloisField,
 {
     fn add_assign(&mut self, rhs: &Self) {
         self.key += rhs.key;
-        self.tag += rhs.tag;
+        for (l, r) in izip!(self.tag.iter_mut(), rhs.tag) {
+            *l += r;
+        }
     }
 }
 
-impl<F> Add for FieldCommitDegOne<F>
+impl<F, const TAG_SIZE: usize> AddAssign<F> for FieldCommitment<F, TAG_SIZE>
+where
+    F: BigGaloisField,
+{
+    fn add_assign(&mut self, rhs: F) {
+        self.key += rhs;
+    }
+}
+
+impl<F, const TAG_SIZE: usize> AddAssign<&F> for FieldCommitment<F, TAG_SIZE>
+where
+    F: BigGaloisField,
+{
+    fn add_assign(&mut self, rhs: &F) {
+        self.key += rhs;
+    }
+}
+
+impl<F, const TAG_SIZE: usize> Add for FieldCommitment<F, TAG_SIZE>
 where
     F: BigGaloisField,
 {
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(mut self, rhs: Self) -> Self::Output {
         self += rhs;
         self
     }
 }
 
-impl<F> Add<&Self> for FieldCommitDegOne<F>
+impl<F, const TAG_SIZE: usize> Add<&Self> for FieldCommitment<F, TAG_SIZE>
 where
     F: BigGaloisField,
 {
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(mut self, rhs: &Self) -> Self::Output {
         self += rhs;
         self
     }
 }
 
-impl<F> Add for &FieldCommitDegOne<F>
+impl<F, const TAG_SIZE: usize> Add for &FieldCommitment<F, TAG_SIZE>
 where
     F: BigGaloisField,
 {
-    type Output = FieldCommitDegOne<F>;
+    type Output = FieldCommitment<F, TAG_SIZE>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: Self) -> Self::Output {
+        // TODO: implement without clone
         self.clone() + rhs
+    }
+}
+
+/// Represents a polynomial commitment in GF of degree one
+pub type FieldCommitDegOne<F> = FieldCommitment<F, 1>;
+
+impl<F> FieldCommitDegOne<F>
+where
+    F: BigGaloisField,
+{
+    pub fn new(key: F, tag: F) -> Self {
+        Self { key, tag: [tag] }
     }
 }
 
@@ -90,11 +126,13 @@ where
     type Output = FieldCommitDegTwo<F>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: &Self) -> Self::Output {
         FieldCommitDegTwo {
             key: self.key * rhs.key,
-            tag: [self.tag * rhs.tag, self.key * rhs.tag + self.tag * rhs.key],
+            tag: [
+                self.tag[0] * rhs.tag[0],
+                self.key * rhs.tag[0] + self.tag[0] * rhs.key,
+            ],
         }
     }
 }
@@ -106,9 +144,14 @@ where
     type Output = FieldCommitDegTwo<F>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: Self) -> Self::Output {
-        self * &rhs
+        FieldCommitDegTwo {
+            key: self.key * rhs.key,
+            tag: [
+                self.tag[0] * rhs.tag[0],
+                self.key * rhs.tag[0] + self.tag[0] * rhs.key,
+            ],
+        }
     }
 }
 
@@ -119,14 +162,13 @@ where
     type Output = FieldCommitDegThree<F>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: FieldCommitDegTwo<F>) -> Self::Output {
         FieldCommitDegThree {
             key: self.key * rhs.key,
             tag: [
-                self.tag * rhs.tag[0],
-                self.key * rhs.tag[0] + self.tag * rhs.tag[1],
-                self.key * rhs.tag[1] + self.tag * rhs.key,
+                self.tag[0] * rhs.tag[0],
+                self.key * rhs.tag[0] + self.tag[0] * rhs.tag[1],
+                self.key * rhs.tag[1] + self.tag[0] * rhs.key,
             ],
         }
     }
@@ -139,14 +181,13 @@ where
     type Output = FieldCommitDegThree<F>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: &FieldCommitDegTwo<F>) -> Self::Output {
         FieldCommitDegThree {
             key: self.key * rhs.key,
             tag: [
-                self.tag * rhs.tag[0],
-                self.key * rhs.tag[0] + self.tag * rhs.tag[1],
-                self.key * rhs.tag[1] + self.tag * rhs.key,
+                self.tag[0] * rhs.tag[0],
+                self.key * rhs.tag[0] + self.tag[0] * rhs.tag[1],
+                self.key * rhs.tag[1] + self.tag[0] * rhs.key,
             ],
         }
     }
@@ -159,10 +200,11 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
-    fn mul(mut self, rhs: &F) -> Self::Output {
-        self.key *= rhs;
-        self
+    fn mul(self, rhs: &F) -> Self::Output {
+        Self {
+            key: self.key * rhs,
+            tag: self.tag,
+        }
     }
 }
 
@@ -175,7 +217,7 @@ where
     fn square(self) -> Self::Output {
         FieldCommitDegTwo {
             key: self.key.square(),
-            tag: [self.tag.square(), F::ZERO],
+            tag: [self.tag[0].square(), F::ZERO],
         }
     }
 }
@@ -187,19 +229,25 @@ where
     type Output = FieldCommitDegTwo<F>;
 
     fn square(self) -> Self::Output {
-        (&self).square()
+        FieldCommitDegTwo {
+            key: self.key.square(),
+            tag: [self.tag[0].square(), F::ZERO],
+        }
     }
 }
 
 /// Represents a polynomial commitment in GF of degree 2
-#[derive(Default, Debug, Clone)]
-#[cfg_attr(test, derive(PartialEq))]
-pub(crate) struct FieldCommitDegTwo<F>
+pub type FieldCommitDegTwo<F> = FieldCommitment<F, 2>;
+
+impl<F> AddAssign<&FieldCommitDegOne<F>> for FieldCommitDegTwo<F>
 where
     F: BigGaloisField,
 {
-    pub(crate) key: F,
-    pub(crate) tag: [F; 2],
+    #[inline]
+    fn add_assign(&mut self, rhs: &FieldCommitDegOne<F>) {
+        self.key += rhs.key;
+        self.tag[1] += rhs.tag[0];
+    }
 }
 
 impl<F> Mul<F> for FieldCommitDegTwo<F>
@@ -212,7 +260,6 @@ where
         self.key *= rhs;
         self.tag[0] *= rhs;
         self.tag[1] *= rhs;
-
         self
     }
 }
@@ -231,99 +278,6 @@ where
     }
 }
 
-// impl<F> Mul<&FieldCommitDegTwo<F>> for F
-// where
-//     F: BigGaloisField,
-// {
-//     type Output = FieldCommitDegTwo<F>;
-
-//     fn mul(mut self, rhs: &FieldCommitDegTwo<F>) -> Self::Output {
-
-//         FieldCommitDegTwo{
-//             key: self * rhs,
-//             tag: [self * rhs.tag[0], self * rhs.tag[1]]
-//         }
-//     }
-// }
-
-impl<F> AddAssign<Self> for FieldCommitDegTwo<F>
-where
-    F: BigGaloisField,
-{
-    fn add_assign(&mut self, rhs: Self) {
-        self.key += rhs.key;
-        self.tag[0] += rhs.tag[0];
-        self.tag[1] += rhs.tag[1];
-    }
-}
-
-impl<F> AddAssign<&Self> for FieldCommitDegTwo<F>
-where
-    F: BigGaloisField,
-{
-    fn add_assign(&mut self, rhs: &Self) {
-        self.key += rhs.key;
-        self.tag[0] += rhs.tag[0];
-        self.tag[1] += rhs.tag[1];
-    }
-}
-
-impl<F> AddAssign<&FieldCommitDegOne<F>> for FieldCommitDegTwo<F>
-where
-    F: BigGaloisField,
-{
-    fn add_assign(&mut self, rhs: &FieldCommitDegOne<F>) {
-        self.key += rhs.key;
-        self.tag[1] += rhs.tag;
-    }
-}
-
-impl<F> AddAssign<F> for FieldCommitDegTwo<F>
-where
-    F: BigGaloisField,
-{
-    fn add_assign(&mut self, rhs: F) {
-        self.key += rhs;
-    }
-}
-
-impl<F> AddAssign<&F> for FieldCommitDegTwo<F>
-where
-    F: BigGaloisField,
-{
-    fn add_assign(&mut self, rhs: &F) {
-        self.key += rhs;
-    }
-}
-
-impl<F> Add for FieldCommitDegTwo<F>
-where
-    F: BigGaloisField,
-{
-    type Output = Self;
-
-    #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
-    fn add(mut self, rhs: Self) -> Self::Output {
-        self += rhs;
-        self
-    }
-}
-
-impl<F> Add<&Self> for FieldCommitDegTwo<F>
-where
-    F: BigGaloisField,
-{
-    type Output = Self;
-
-    #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
-    fn add(mut self, rhs: &Self) -> Self::Output {
-        self += rhs;
-        self
-    }
-}
-
 impl<F> Mul<FieldCommitDegOne<F>> for FieldCommitDegTwo<F>
 where
     F: BigGaloisField,
@@ -331,7 +285,6 @@ where
     type Output = FieldCommitDegThree<F>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: FieldCommitDegOne<F>) -> Self::Output {
         self * &rhs
     }
@@ -344,83 +297,20 @@ where
     type Output = FieldCommitDegThree<F>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: &FieldCommitDegOne<F>) -> Self::Output {
         FieldCommitDegThree {
             key: self.key * rhs.key,
             tag: [
-                rhs.tag * self.tag[0],
-                rhs.key * self.tag[0] + rhs.tag * self.tag[1],
-                rhs.key * self.tag[1] + rhs.tag * self.key,
+                rhs.tag[0] * self.tag[0],
+                rhs.key * self.tag[0] + rhs.tag[0] * self.tag[1],
+                rhs.key * self.tag[1] + rhs.tag[0] * self.key,
             ],
         }
     }
 }
 
 /// Represents a polynomial commitment in GF of degree 3
-#[derive(Default, Debug, Clone)]
-#[cfg_attr(test, derive(PartialEq))]
-pub(crate) struct FieldCommitDegThree<F>
-where
-    F: BigGaloisField,
-{
-    pub(crate) key: F,
-    pub(crate) tag: [F; 3],
-}
-
-impl<F> AddAssign<Self> for FieldCommitDegThree<F>
-where
-    F: BigGaloisField,
-{
-    fn add_assign(&mut self, rhs: Self) {
-        self.key += rhs.key;
-        self.tag
-            .iter_mut()
-            .zip(rhs.tag)
-            .for_each(|(a, b)| *a = *a + b);
-    }
-}
-
-impl<F> AddAssign<&Self> for FieldCommitDegThree<F>
-where
-    F: BigGaloisField,
-{
-    fn add_assign(&mut self, rhs: &Self) {
-        self.key += rhs.key;
-        self.tag
-            .iter_mut()
-            .zip(rhs.tag.iter())
-            .for_each(|(a, b)| *a = *a + b);
-    }
-}
-
-impl<F> Add for FieldCommitDegThree<F>
-where
-    F: BigGaloisField,
-{
-    type Output = Self;
-
-    #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
-    fn add(mut self, rhs: Self) -> Self::Output {
-        self += rhs;
-        self
-    }
-}
-
-impl<F> Add<&Self> for FieldCommitDegThree<F>
-where
-    F: BigGaloisField,
-{
-    type Output = Self;
-
-    #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
-    fn add(mut self, rhs: &Self) -> Self::Output {
-        self += rhs;
-        self
-    }
-}
+pub type FieldCommitDegThree<F> = FieldCommitment<F, 3>;
 
 impl<F> Add<&FieldCommitDegOne<F>> for FieldCommitDegThree<F>
 where
@@ -429,12 +319,10 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
-    fn add(mut self, rhs: &FieldCommitDegOne<F>) -> Self::Output {
-        self.tag[2] += rhs.tag;
+    fn add(self, rhs: &FieldCommitDegOne<F>) -> Self::Output {
         Self {
             key: self.key + rhs.key,
-            tag: self.tag,
+            tag: [self.tag[0], self.tag[1], self.tag[2] + rhs.tag[0]],
         }
     }
 }
@@ -446,13 +334,14 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
-    fn add(mut self, rhs: &FieldCommitDegTwo<F>) -> Self::Output {
-        self.tag[2] += rhs.tag[1];
-        self.tag[1] += rhs.tag[0];
+    fn add(self, rhs: &FieldCommitDegTwo<F>) -> Self::Output {
         Self {
             key: self.key + rhs.key,
-            tag: self.tag,
+            tag: [
+                self.tag[0],
+                self.tag[1] + rhs.tag[0],
+                self.tag[2] + rhs.tag[1],
+            ],
         }
     }
 }
