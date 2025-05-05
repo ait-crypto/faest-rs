@@ -53,7 +53,6 @@ where
     witness
 }
 
-#[allow(clippy::too_many_arguments)]
 fn save_key_bits<O>(witness: &mut [u8], key: &[u8], index: &mut usize)
 where
     O: OWFParameters,
@@ -62,7 +61,6 @@ where
     *index += O::LAMBDABYTES::USIZE;
 }
 
-#[allow(clippy::too_many_arguments)]
 fn save_non_lin_bits<O>(witness: &mut [u8], kb: &[u32], index: &mut usize)
 where
     O: OWFParameters,
