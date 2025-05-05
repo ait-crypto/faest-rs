@@ -181,12 +181,9 @@ where
         }
 
         if left_child ^ right_child {
-            if let Some(key) = decom_iter.next() {
-                let alpha = 2 * i + 1 + (left_child as usize);
-                keys[alpha].copy_from_slice(key);
-            } else {
-                return None;
-            }
+            let key = decom_iter.next()?;
+            let alpha = 2 * i + 1 + (left_child as usize);
+            keys[alpha].copy_from_slice(key);
         }
     }
 
@@ -442,10 +439,9 @@ where
                     h1_hasher.update(&h);
                 }
                 // Step 31
-                else if let Some(com_ij) = com_it.next() {
+                else {
+                    let com_ij = com_it.next()?;
                     h1_hasher.update(com_ij);
-                } else {
-                    return None;
                 }
             }
 
@@ -573,11 +569,7 @@ where
         }
 
         // Steps 13..21
-        let keys =
-            reconstruct_keys::<PRG, TAU>(&mut s, &decom_i.nodes, i_delta, iv).unwrap_or_default();
-        if keys.is_empty() {
-            return None;
-        }
+        let keys = reconstruct_keys::<PRG, TAU>(&mut s, &decom_i.nodes, i_delta, iv)?;
 
         // Steps 28..34
         let mut h1_com_hasher = RO::h1_init();
@@ -594,15 +586,13 @@ where
                 // Step 33
                 if !s.contains(alpha) {
                     let (sd, h) = Self::LC::commit_em(&keys[alpha], iv, i + TAU::L::U32 - 1);
-
                     seeds.push(sd);
                     h1_hasher.update(&h);
                 }
                 // Step 31
-                else if let Some(com_ij) = com_it.next() {
+                else {
+                    let com_ij = com_it.next()?;
                     h1_hasher.update(com_ij);
-                } else {
-                    return None;
                 }
             }
 
