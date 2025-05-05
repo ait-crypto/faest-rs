@@ -1,5 +1,6 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use faest::*;
+use nist_pqc_seeded_rng::{NistPqcAes256CtrRng, Seed};
 use rand::{RngCore, SeedableRng};
 use signature::{RandomizedSigner, Signer, Verifier};
 
@@ -16,7 +17,7 @@ where
     KP: KeypairGenerator + Signer<S> + RandomizedSigner<S>,
     KP::VerifyingKey: Verifier<S>,
 {
-    let mut rng = rand_chacha::ChaCha8Rng::from_seed([0; 32]);
+    let mut rng = NistPqcAes256CtrRng::from_seed(Seed::default());
     let mut c = c.benchmark_group(name);
 
     c.bench_function("keygen", |b| b.iter(|| black_box(KP::generate(&mut rng))));
