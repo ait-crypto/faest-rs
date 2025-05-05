@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0 (2025-05-03)
+
+* Implement version 2 of the FAEST specification.
+* Bump edition to 2024.
+
 ## 0.1.3 (2025-01-09)
 
 * Update itertools to 0.14.

@@ -1,3 +1,9 @@
+use generic_array::{
+    GenericArray,
+    typenum::{Prod, U8, Unsigned},
+};
+use itertools::iproduct;
+
 use super::vole_commitments::{VoleCommits, VoleCommitsRef};
 use crate::{
     fields::{ByteCombine, large_fields::ByteCombineSquared},
@@ -6,11 +12,6 @@ use crate::{
     universal_hashing::ZKVerifyHasher,
     utils::get_bit,
 };
-use generic_array::{
-    GenericArray,
-    typenum::{Prod, U8, Unsigned},
-};
-use itertools::iproduct;
 
 pub(crate) fn key_exp_fwd<O>(
     w: VoleCommitsRef<OWFField<O>, O::LKE>,

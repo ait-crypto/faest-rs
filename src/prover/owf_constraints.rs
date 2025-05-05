@@ -1,15 +1,15 @@
-use crate::{
-    fields::{Field, FromBit},
-    internal_keys::PublicKey,
-    parameter::{BaseParameters, OWFField, OWFParameters},
-    rijndael_32::{convert_from_batchblocks, inv_bitslice, rijndael_key_schedule},
-    universal_hashing::ZKProofHasher,
-    utils::xor_arrays,
-};
 use generic_array::{GenericArray, typenum::Unsigned};
 
 use super::{
     ByteCommitsRef, FieldCommitDegThree, encryption::enc_cstrnts, key_expansion::key_exp_cstrnts,
+};
+use crate::{
+    fields::{Field, FromBit},
+    internal_keys::PublicKey,
+    parameter::{OWFField, OWFParameters},
+    rijndael_32::{convert_from_batchblocks, inv_bitslice, rijndael_key_schedule},
+    universal_hashing::ZKProofHasher,
+    utils::xor_arrays,
 };
 
 pub(crate) fn owf_constraints<O>(
@@ -18,7 +18,6 @@ pub(crate) fn owf_constraints<O>(
     pk: &PublicKey<O>,
 ) where
     O: OWFParameters,
-    <<O as OWFParameters>::BaseParams as BaseParameters>::Field: PartialEq,
 {
     // ::1
     let PublicKey {
@@ -101,7 +100,6 @@ where
     O: OWFParameters,
 {
     rijndael_key_schedule::<O::NST, O::NK, O::R>(key, O::SKE::USIZE)
-        .0
         .chunks_exact(8)
         .map(|chunk| {
             GenericArray::from_iter(

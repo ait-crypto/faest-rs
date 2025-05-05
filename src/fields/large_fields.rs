@@ -9,8 +9,6 @@ use std::{
     },
 };
 
-use super::{Double, ExtensionField, Field, GF8, GF64, Square};
-
 use generic_array::{
     GenericArray,
     typenum::{U16, U24, U32, U48, U72, U96},
@@ -20,6 +18,8 @@ use rand::{
     Rng,
     distributions::{Distribution, Standard},
 };
+
+use super::{Double, ExtensionField, Field, GF8, GF64, Square};
 
 /// Helper trait that define "alphas" for calculating embedings as part of [`ByteCombine`]
 pub(crate) trait Alphas: Sized {
@@ -70,7 +70,6 @@ where
 {
 }
 
-#[allow(dead_code)]
 /// Trait providing methods for "byte combination"
 pub trait ByteCombine: Field {
     /// "Combine" field elements
@@ -110,12 +109,89 @@ pub trait SquareBytes: Field {
     fn square_byte_inplace(x: &mut [Self]);
 }
 
+impl<T> SquareBytes for T
+where
+    T: BigGaloisField,
+{
+    fn square_byte(x: &[Self]) -> [Self; 8] {
+        let mut sq = [<Self as Field>::ZERO; 8];
+        sq[0] = x[0] + x[4] + x[6];
+        sq[2] = x[1] + x[5];
+        sq[4] = x[2] + x[4] + x[7];
+        sq[5] = x[5] + x[6];
+        sq[6] = x[3] + x[5];
+        sq[7] = x[6] + x[7];
+
+        sq[1] = x[4] + sq[7];
+        sq[3] = x[5] + sq[1];
+
+        sq
+    }
+
+    fn square_byte_inplace(x: &mut [Self]) {
+        let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
+
+        // x0 = x0 + x4 + x6
+        x[0] += x[4] + x[6];
+        // x2 = x1 + x5
+        x[2] = x[1] + x[5];
+        // x4 = x4 + x2 + x7
+        x[4] += i2 + x[7];
+        // x5 = x5 + x6
+        x[5] += x[6];
+        // x6 = x3 + x5
+        x[6] = x[3] + i5;
+        // x7 = x6 + x7
+        x[7] += i6;
+
+        // x1 = x4 + (x6 + x7)
+        x[1] = i4 + x[7];
+        // x3 = x5 + (x4 + x6 + x7)
+        x[3] = i5 + x[1];
+    }
+}
+
 /// Trait providing methods for "squared byte combination"
-#[allow(dead_code)]
 pub trait ByteCombineSquared: Field {
+    /*
+    /// "Square and Combine" field elements.
+    ///
+    /// Each input field element is associated to a bit. The function computes bitwise squaring of the input and combines the result.
     fn byte_combine_sq(x: &[Self; 8]) -> Self;
+    */
+
+    /// "Square and Combine" field elements
+    ///
+    /// This is the same as [`Self::byte_combine_sq`] but takes a slice instead. It
+    /// panics if the slice has less than `8` elements.
     fn byte_combine_sq_slice(x: &[Self]) -> Self;
+
+    /// "Square and Combine" bits
+    ///
+    /// This is equivalient to calling the other functions with each bit
+    /// expressed a `0` or `1` field elements.`
     fn byte_combine_bits_sq(x: u8) -> Self;
+}
+
+// blanket implementation of byte combine squared
+
+impl<F> ByteCombineSquared for F
+where
+    F: Field + SquareBytes + ByteCombine,
+{
+    /*
+    fn byte_combine_sq(x: &[Self; 8]) -> Self {
+        Self::byte_combine(&Self::square_byte(x))
+    }
+    */
+
+    fn byte_combine_sq_slice(x: &[Self]) -> Self {
+        Self::byte_combine(&Self::square_byte(x))
+    }
+
+    fn byte_combine_bits_sq(x: u8) -> Self {
+        Self::byte_combine_bits(GF8::square_bits(x))
+    }
 }
 
 // Trait providing for deriving a field element from a bit value
@@ -134,7 +210,7 @@ pub trait ByteCombineSquaredConstants: Field {
 
 impl<T> SumPoly for T
 where
-    T: Copy + Field + Double<Output = Self> + for<'a> Add<&'a Self, Output = Self>,
+    T: Copy + Field + Double<Output = Self> + for<'a> Add<&'a Self, Output = Self> + FromBit,
 {
     fn sum_poly(v: &[Self]) -> Self {
         v.iter()
@@ -144,34 +220,9 @@ where
     }
 
     fn sum_poly_bits(v: &[u8]) -> Self {
-        // let mut ret = if ((v[127 / 8] >> (127 % 8)) & 1) != 0 {
-        //     T::ONE
-        // } else {
-        //     T::ZERO
-        // };
-
-        // // let n_bits = v.len() * 8;
-        // for i in 1..128 {
-        //     ret = ret.double();
-        //     let bit_idx = 127 - i;
-        //     if ((v[bit_idx / 8] >> (bit_idx % 8)) & 1) != 0 {
-        //         ret += T::ONE;
-        //     }
-        // }
-
-        // ret
-
-        let init = if (v[v.len() - 1] & (1 << 7)) != 0 {
-            T::ONE
-        } else {
-            T::ZERO
-        };
-        (0..v.len() * 8).rev().skip(1).fold(init, |mut sum, i| {
-            sum = sum.double();
-            if v[i / 8] & (1 << (i % 8)) != 0 {
-                sum += T::ONE;
-            }
-            sum
+        let init = Self::from_bit(v[v.len() - 1] >> 7);
+        (0..v.len() * 8).rev().skip(1).fold(init, |sum, i| {
+            sum.double() + Self::from_bit(v[i / 8] >> (i % 8))
         })
     }
 }
@@ -190,16 +241,14 @@ where
 }
 
 // generic implementation of FromBit
-impl<F> FromBit for F
+
+impl<T, const N: usize, const LENGTH: usize> FromBit for BigGF<T, N, LENGTH>
 where
-    F: Field,
+    Self: Field + ApplyMask<T, Output = Self>,
+    u8: ToMask<T>,
 {
     fn from_bit(x: u8) -> Self {
-        if (x & 1) == 0 {
-            return Self::ZERO;
-        }
-
-        Self::ONE
+        Self::ONE.apply_mask(x.to_mask_bit(0))
     }
 }
 
@@ -231,93 +280,6 @@ where
             Self::ONE.apply_mask(x.to_mask_bit(0)),
             |sum, (index, alpha)| sum + alpha.apply_mask(x.to_mask_bit(index + 1)),
         )
-    }
-}
-
-// generic implementation of SquareBytes
-
-impl<T, const N: usize, const LENGTH: usize> SquareBytes for BigGF<T, N, LENGTH>
-where
-    Self:
-        Alphas + Field + Copy + ApplyMask<T, Output = Self> + for<'a> Mul<&'a Self, Output = Self>,
-    u8: ToMask<T>,
-{
-    fn square_byte(x: &[Self]) -> [Self; 8] {
-        let mut sq = [<Self as Field>::ZERO; 8];
-        sq[0] = x[0] + x[4] + x[6];
-        sq[2] = x[1] + x[5];
-        sq[4] = x[2] + x[4] + x[7];
-        sq[5] = x[5] + x[6];
-        sq[6] = x[3] + x[5];
-        sq[7] = x[6] + x[7];
-
-        // x[4] + (x[6] + x[7])
-        sq[1] = x[4] + sq[7];
-        // (x[5] + x[6]) + (x[4] + x[7])
-        sq[3] = x[5] + sq[1];
-
-        sq
-    }
-
-    fn square_byte_inplace(x: &mut [Self]) {
-        let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
-
-        // x0 = x0 + x4 + x6
-        x[0] += x[4] + x[6];
-        // x2 = x1 + x5
-        x[2] = x[1] + x[5];
-        // x4 = x4 + x2 + x7
-        x[4] += i2 + x[7];
-        // x5 = x5 + x6
-        x[5] += x[6];
-        // x6 = x3 + x5
-        x[6] = x[3] + i5;
-        // x7 = x6 + x7
-        x[7] += i6;
-
-        // x1 = x4 + (x6 + x7)
-        x[1] = i4 + x[7];
-        // x3 = x5 + (x4 + x6 + x7)
-        x[3] = i5 + x[1];
-    }
-}
-
-// generic implementation of byte combine squared
-
-impl<T, const N: usize, const LENGTH: usize> ByteCombineSquared for BigGF<T, N, LENGTH>
-where
-    Self: Alphas
-        + Field
-        + Copy
-        + ApplyMask<T, Output = Self>
-        + for<'a> Mul<&'a Self, Output = Self>
-        + SquareBytes,
-    u8: ToMask<T>,
-{
-    /// "Square and Combine" field elements.
-    ///
-    /// Each input field element is associated to a bit. The function computes bitwise squaring of the input and combines the result.
-    fn byte_combine_sq(x: &[Self; 8]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    /// "Square and Combine" field elements
-    ///
-    /// This is the same as [`Self::byte_combine_sq`] but takes a slice instead. It
-    /// panics if the slice has less than `8` elements.
-    fn byte_combine_sq_slice(x: &[Self]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    /// "Square and Combine" bits
-    ///
-    /// This is equivalient to calling the other functions with each bit
-    /// expressed a `0` or `1` field elements.`
-    fn byte_combine_bits_sq(x: u8) -> Self {
-        let sq_bits = GF8::square_bits(x);
-        Self::byte_combine_bits(sq_bits)
     }
 }
 
@@ -834,11 +796,13 @@ impl Field for BigGF<u128, 1, 128> {
         GenericArray::from(self.0[0].to_le_bytes())
     }
 
+    /*
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut arr = GenericArray::default_boxed();
         arr.copy_from_slice(&self.0[0].to_le_bytes());
         arr
     }
+    */
 }
 
 impl Alphas for BigGF<u128, 1, 128> {
@@ -972,12 +936,14 @@ impl Field for BigGF<u128, 2, 192> {
         ret
     }
 
+    /*
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut arr = GenericArray::default_boxed();
         arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
         arr[16..].copy_from_slice(&self.0[1].to_le_bytes()[..8]);
         arr
     }
+    */
 }
 
 impl Alphas for BigGF<u128, 2, 192> {
@@ -1225,12 +1191,14 @@ impl Field for BigGF<u128, 2, 256> {
         ret
     }
 
+    /*
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut arr = GenericArray::default_boxed();
         arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
         arr[16..].copy_from_slice(&self.0[1].to_le_bytes());
         arr
     }
+    */
 }
 
 impl Alphas for BigGF<u128, 2, 256> {
@@ -1479,15 +1447,6 @@ impl ExtensionField for GF384 {
         ret[32..].copy_from_slice(&self.0[2].to_le_bytes());
         ret
     }
-
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut arr = GenericArray::default_boxed();
-        arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
-        arr[16..32].copy_from_slice(&self.0[1].to_le_bytes());
-        arr[32..].copy_from_slice(&self.0[2].to_le_bytes());
-
-        arr
-    }
 }
 
 impl From<&[u8]> for GF384 {
@@ -1568,17 +1527,6 @@ impl ExtensionField for GF576 {
         ret[48..64].copy_from_slice(&self.0[3].to_le_bytes());
         ret[64..].copy_from_slice(&self.0[4].to_le_bytes()[..8]);
         ret
-    }
-
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut arr = GenericArray::default_boxed();
-        arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
-        arr[16..32].copy_from_slice(&self.0[1].to_le_bytes());
-        arr[32..48].copy_from_slice(&self.0[2].to_le_bytes());
-        arr[48..64].copy_from_slice(&self.0[3].to_le_bytes());
-        arr[64..].copy_from_slice(&self.0[4].to_le_bytes()[..8]);
-
-        arr
     }
 }
 
@@ -1668,19 +1616,6 @@ impl ExtensionField for GF768 {
         });
         ret
     }
-
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut arr = GenericArray::default_boxed();
-
-        arr[..16].copy_from_slice(&self.0[0].to_le_bytes());
-        arr[16..32].copy_from_slice(&self.0[1].to_le_bytes());
-        arr[32..48].copy_from_slice(&self.0[2].to_le_bytes());
-        arr[48..64].copy_from_slice(&self.0[3].to_le_bytes());
-        arr[64..80].copy_from_slice(&self.0[4].to_le_bytes());
-        arr[80..].copy_from_slice(&self.0[5].to_le_bytes());
-
-        arr
-    }
 }
 
 impl From<&[u8]> for GF768 {
@@ -1751,6 +1686,14 @@ mod test {
 
         use generic_array::typenum::Unsigned;
         use rand::{RngCore, SeedableRng, rngs::SmallRng};
+
+        #[test]
+        fn from_bit<F: BigGaloisField + Debug + Eq>() {
+            assert_eq!(F::ONE, F::from_bit(1));
+            assert_eq!(F::ZERO, F::from_bit(0));
+            assert_eq!(F::ONE, F::from_bit(3));
+            assert_eq!(F::ZERO, F::from_bit(2));
+        }
 
         #[test]
         fn add<F: BigGaloisField + Debug + Eq>()

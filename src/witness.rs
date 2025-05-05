@@ -1,11 +1,12 @@
+use std::mem::size_of;
+
 use generic_array::{
     GenericArray,
     typenum::{U3, Unsigned},
 };
-use std::mem::size_of;
 
 use crate::{
-    fields::small_fields::GF8_INV_NORM,
+    fields::{GF8, Square},
     parameter::OWFParameters,
     rijndael_32::{
         State, bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0,
@@ -29,7 +30,7 @@ where
     // Step 6
     // Note: for FAEST-LAMBDA-EM, SKE is set to the actual number of S-Boxes in Rijndael-LAMBDA.KeyExpansion.
     // This slightly differs from FAEST Spec v2, where SKE is always set to 0 in EM mode.
-    let (kb, _) = rijndael_key_schedule::<O::NST, O::NK, O::R>(owf_secret, O::SKE::USIZE);
+    let kb = rijndael_key_schedule::<O::NST, O::NK, O::R>(owf_secret, O::SKE::USIZE);
 
     let mut index = 0;
 
@@ -89,12 +90,32 @@ where
     }
 }
 
-#[inline]
-fn store_invnorm_state(dst: &mut u8, lo_idx: u8, hi_idx: u8) {
-    *dst = GF8_INV_NORM[lo_idx as usize] | GF8_INV_NORM[hi_idx as usize] << 4;
+fn gf8_exp_238(x: GF8) -> GF8 {
+    // 238 == 0b11101110
+    let y = x.square(); // x^2
+    let x = y.square(); // x^4
+    let y = x * y;
+    let x = x.square(); // x^8
+    let y = x * y;
+    let x = x.square(); // x^16
+    let x = x.square(); // x^32
+    let y = x * y;
+    let x = x.square(); // x^64
+    let y = x * y;
+    let x = x.square(); // x^128
+    x * y
 }
 
-#[allow(clippy::too_many_arguments)]
+fn invnorm(x: u8) -> u8 {
+    let x = u8::from(gf8_exp_238(x.into()));
+    (x & 1) ^ ((x >> 5) & 6) ^ ((x << 1) & 8)
+}
+
+#[inline]
+fn store_invnorm_state(lo_idx: u8, hi_idx: u8) -> u8 {
+    invnorm(lo_idx) | (invnorm(hi_idx) << 4)
+}
+
 fn round_with_save<O>(
     input1: &[u8], // in
     kb: &[u32],    // k_bar
@@ -118,9 +139,9 @@ fn round_with_save<O>(
         if even_round {
             let to_take = if !O::is_em() { 4 } else { O::NK::USIZE };
             for i in convert_from_batchblocks(inv_bitslice(&state)).take(to_take) {
-                store_invnorm_state(&mut witness[*index], i[0], i[1]);
+                witness[*index] = store_invnorm_state(i[0], i[1]);
                 *index += 1;
-                store_invnorm_state(&mut witness[*index], i[2], i[3]);
+                witness[*index] = store_invnorm_state(i[2], i[3]);
                 *index += 1;
             }
         }

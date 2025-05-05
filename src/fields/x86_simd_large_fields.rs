@@ -29,11 +29,11 @@ use generic_array::{
 
 use super::{
     BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquaredConstants, Double,
-    ExtensionField, Field, GF8, GF64, Sigmas, Square,
+    ExtensionField, Field, FromBit, GF64, Sigmas, Square,
     large_fields::{
-        Alphas, Betas, ByteCombineSquared, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192,
+        Alphas, Betas, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192,
         GF256 as UnoptimizedGF256, GF384 as UnoptimizedGF384, GF576 as UnoptimizedGF576,
-        GF768 as UnoptimizedGF768, Modulus, SquareBytes,
+        GF768 as UnoptimizedGF768, Modulus,
     },
 };
 
@@ -42,22 +42,26 @@ const fn _MM_SHUFFLE(z: u32, y: u32, x: u32, w: u32) -> i32 {
     ((z << 6) | (y << 4) | (x << 2) | w) as i32
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn m128_clmul_ll(x: __m128i, y: __m128i) -> __m128i {
     unsafe { _mm_clmulepi64_si128(x, y, 0x00) }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn m128_clmul_lh(x: __m128i, y: __m128i) -> __m128i {
     unsafe { _mm_clmulepi64_si128(x, y, 0x10) }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn m128_clmul_hh(x: __m128i, y: __m128i) -> __m128i {
     unsafe { _mm_clmulepi64_si128(x, y, 0x11) }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn m256_shift_left_1(x: __m256i) -> __m256i {
     unsafe {
         _mm256_or_si256(
@@ -71,21 +75,24 @@ unsafe fn m256_shift_left_1(x: __m256i) -> __m256i {
     }
 }
 
-#[inline(always)]
-fn m128_setones() -> __m128i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m128_setones() -> __m128i {
     unsafe {
         let zero = _mm_setzero_si128();
         _mm_cmpeq_epi32(zero, zero)
     }
 }
 
-#[inline(always)]
-fn m128_set_epi32_15() -> __m128i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m128_set_epi32_15() -> __m128i {
     unsafe { _mm_srli_epi32(m128_setones(), 28) }
 }
 
-#[inline(always)]
-fn m128_set_msb() -> __m128i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m128_set_msb() -> __m128i {
     unsafe {
         let all_ones = m128_setones();
         let one = _mm_slli_epi64(all_ones, 63);
@@ -93,20 +100,23 @@ fn m128_set_msb() -> __m128i {
     }
 }
 
-#[inline(always)]
-fn m256_setones() -> __m256i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m256_setones() -> __m256i {
     unsafe {
         let zero = _mm256_setzero_si256();
         _mm256_cmpeq_epi32(zero, zero)
     }
 }
 
-#[inline(always)]
-fn m256_set_epi32_7() -> __m256i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m256_set_epi32_7() -> __m256i {
     unsafe { _mm256_srli_epi32(m256_setones(), 29) }
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn m256_set_epi32_5() -> __m256i {
     unsafe {
         let one = _mm256_srli_epi32(m256_setones(), 31);
@@ -114,8 +124,9 @@ unsafe fn m256_set_epi32_5() -> __m256i {
     }
 }
 
-#[inline(always)]
-fn m256_set_msb_192() -> __m256i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m256_set_msb_192() -> __m256i {
     unsafe {
         _mm256_blend_epi32(
             _mm256_setzero_si256(),
@@ -125,8 +136,9 @@ fn m256_set_msb_192() -> __m256i {
     }
 }
 
-#[inline(always)]
-fn m256_set_msb() -> __m256i {
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn m256_set_msb() -> __m256i {
     unsafe {
         _mm256_blend_epi32(
             _mm256_setzero_si256(),
@@ -138,6 +150,7 @@ fn m256_set_msb() -> __m256i {
 
 // Karatsuba multiplication, but end right after the multiplications
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn karatsuba_mul_128_uninterpolated_other_sum(
     x: __m128i,
     y: __m128i,
@@ -156,6 +169,7 @@ unsafe fn karatsuba_mul_128_uninterpolated_other_sum(
 }
 
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn karatsuba_mul_128_uninterpolated(x: __m128i, y: __m128i) -> [__m128i; 3] {
     unsafe {
         let x0y0 = m128_clmul_ll(x, y);
@@ -171,6 +185,7 @@ unsafe fn karatsuba_mul_128_uninterpolated(x: __m128i, y: __m128i) -> [__m128i; 
 
 // Karatsuba multiplication, but don't combine the 3 128-bit polynomials into a 256-bit polynomial.
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn karatsuba_mul_128_uncombined(x: __m128i, y: __m128i) -> [__m128i; 3] {
     unsafe {
         let mut out = karatsuba_mul_128_uninterpolated(x, y);
@@ -180,6 +195,7 @@ unsafe fn karatsuba_mul_128_uncombined(x: __m128i, y: __m128i) -> [__m128i; 3] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn karatsuba_square_128_uninterpolated_other_sum(
     x: __m128i,
     x_for_sum: __m128i,
@@ -195,6 +211,8 @@ unsafe fn karatsuba_square_128_uninterpolated_other_sum(
     }
 }
 
+#[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn karatsuba_square_128_uninterpolated(x: __m128i) -> [__m128i; 3] {
     unsafe {
         let x0y0 = m128_clmul_ll(x, x);
@@ -208,6 +226,7 @@ unsafe fn karatsuba_square_128_uninterpolated(x: __m128i) -> [__m128i; 3] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn karatsuba_square_128_uncombined(x: __m128i) -> [__m128i; 3] {
     unsafe {
         let mut out = karatsuba_square_128_uninterpolated(x);
@@ -217,6 +236,7 @@ unsafe fn karatsuba_square_128_uncombined(x: __m128i) -> [__m128i; 3] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn combine_poly128s_3(v: [__m128i; 3]) -> [__m128i; 2] {
     unsafe {
         [
@@ -227,6 +247,7 @@ unsafe fn combine_poly128s_3(v: [__m128i; 3]) -> [__m128i; 2] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn combine_poly128s_4(v: [__m128i; 4]) -> [__m128i; 3] {
     unsafe {
         [
@@ -238,6 +259,7 @@ unsafe fn combine_poly128s_4(v: [__m128i; 4]) -> [__m128i; 3] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn combine_poly128s_5(v: [__m128i; 5]) -> [__m128i; 3] {
     unsafe {
         [
@@ -249,6 +271,7 @@ unsafe fn combine_poly128s_5(v: [__m128i; 5]) -> [__m128i; 3] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn combine_poly128s_7(v: [__m128i; 7]) -> [__m128i; 4] {
     unsafe {
         [
@@ -261,6 +284,7 @@ unsafe fn combine_poly128s_7(v: [__m128i; 7]) -> [__m128i; 4] {
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
 fn combine_poly128s_13(v: [__m128i; 13]) -> [__m128i; 6] {
     unsafe {
         [
@@ -338,6 +362,12 @@ impl PartialEq for GF128 {
 }
 
 impl Eq for GF128 {}
+
+impl FromBit for GF128 {
+    fn from_bit(bit: u8) -> Self {
+        Self::ONE * bit
+    }
+}
 
 // implementations of Add and AddAssign
 
@@ -438,7 +468,8 @@ impl Neg for GF128 {
 
 // implementation of Mul and MulAssign
 
-fn mul_gf128(lhs: __m128i, rhs: __m128i) -> __m128i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf128(lhs: __m128i, rhs: __m128i) -> __m128i {
     unsafe {
         let mask = _mm_setr_epi32(-1, 0x0, 0x0, 0x0);
         let tmp3 = m128_clmul_ll(lhs, rhs);
@@ -474,7 +505,8 @@ fn mul_gf128(lhs: __m128i, rhs: __m128i) -> __m128i {
     }
 }
 
-fn square_gf128(lhs: __m128i) -> __m128i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn square_gf128(lhs: __m128i) -> __m128i {
     unsafe {
         let mask = _mm_setr_epi32(-1, 0x0, 0x0, 0x0);
         let tmp3 = m128_clmul_ll(lhs, lhs);
@@ -508,7 +540,8 @@ fn square_gf128(lhs: __m128i) -> __m128i {
     }
 }
 
-fn mul_gf128_u64(lhs: __m128i, rhs: u64) -> __m128i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf128_u64(lhs: __m128i, rhs: u64) -> __m128i {
     unsafe {
         let mask = _mm_setr_epi32(-1, 0x0, 0x0, 0x0);
         let rhs = _mm_set_epi64x(0, rhs as i64);
@@ -547,7 +580,7 @@ impl Mul for GF128 {
 
     #[inline(always)]
     fn mul(self, rhs: Self) -> Self::Output {
-        Self(mul_gf128(self.0, rhs.0))
+        Self(unsafe { mul_gf128(self.0, rhs.0) })
     }
 }
 
@@ -556,7 +589,7 @@ impl Mul<&Self> for GF128 {
 
     #[inline(always)]
     fn mul(self, rhs: &Self) -> Self::Output {
-        Self(mul_gf128(self.0, rhs.0))
+        Self(unsafe { mul_gf128(self.0, rhs.0) })
     }
 }
 
@@ -565,7 +598,7 @@ impl Mul<GF128> for &GF128 {
 
     #[inline(always)]
     fn mul(self, rhs: GF128) -> Self::Output {
-        GF128(mul_gf128(self.0, rhs.0))
+        GF128(unsafe { mul_gf128(self.0, rhs.0) })
     }
 }
 
@@ -574,7 +607,7 @@ impl Mul<GF64> for GF128 {
 
     #[inline(always)]
     fn mul(self, rhs: GF64) -> Self::Output {
-        Self(mul_gf128_u64(self.0, rhs.into()))
+        Self(unsafe { mul_gf128_u64(self.0, rhs.into()) })
     }
 }
 
@@ -594,18 +627,19 @@ impl Mul<u8> for GF128 {
 impl MulAssign for GF128 {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
-        self.0 = mul_gf128(self.0, rhs.0);
+        self.0 = unsafe { mul_gf128(self.0, rhs.0) };
     }
 }
 
 impl MulAssign<&Self> for GF128 {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: &Self) {
-        self.0 = mul_gf128(self.0, rhs.0);
+        self.0 = unsafe { mul_gf128(self.0, rhs.0) };
     }
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn m128_apply_mask_msb(v: __m128i, m: __m128i) -> __m128i {
     unsafe {
         // extract MSB
@@ -664,7 +698,7 @@ impl Square for GF128 {
 
     #[inline]
     fn square(self) -> Self::Output {
-        Self(square_gf128(self.0))
+        Self(unsafe { square_gf128(self.0) })
     }
 }
 
@@ -680,60 +714,19 @@ impl Field for GF128 {
         ret
     }
 
+    /*
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe { _mm_storeu_si128(ret.as_mut_ptr().cast(), self.0) };
         ret
     }
+    */
 }
 
 impl From<&[u8]> for GF128 {
     fn from(value: &[u8]) -> Self {
         debug_assert_eq!(value.len(), <Self as Field>::Length::USIZE);
         Self(unsafe { _mm_loadu_si128(value.as_ptr().cast()) })
-    }
-}
-
-// Implementation of SquareBytes
-
-impl SquareBytes for GF128 {
-    // TODO: Should we define a generic implementation for F: Field in large fields instead?
-
-    fn square_byte(x: &[Self]) -> [Self; 8] {
-        let mut sq = [<Self as Field>::ZERO; 8];
-        sq[0] = x[0] + x[4] + x[6];
-        sq[2] = x[1] + x[5];
-        sq[4] = x[2] + x[4] + x[7];
-        sq[5] = x[5] + x[6];
-        sq[6] = x[3] + x[5];
-        sq[7] = x[6] + x[7];
-
-        sq[1] = x[4] + sq[7];
-        sq[3] = x[5] + sq[1];
-
-        sq
-    }
-
-    fn square_byte_inplace(x: &mut [Self]) {
-        let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
-
-        // x0 = x0 + x4 + x6
-        x[0] += x[4] + x[6];
-        // x2 = x1 + x5
-        x[2] = x[1] + x[5];
-        // x4 = x4 + x2 + x7
-        x[4] += i2 + x[7];
-        // x5 = x5 + x6
-        x[5] += x[6];
-        // x6 = x3 + x5
-        x[6] = x[3] + i5;
-        // x7 = x6 + x7
-        x[7] += i6;
-
-        // x1 = x4 + (x6 + x7)
-        x[1] = i4 + x[7];
-        // x3 = x5 + (x4 + x6 + x7)
-        x[3] = i5 + x[1];
     }
 }
 
@@ -787,24 +780,6 @@ impl ByteCombine for GF128 {
 impl ByteCombineSquaredConstants for GF128 {
     const BYTE_COMBINE_SQ_2: Self = Self(gfu128_as_m128(UnoptimizedGF128::BYTE_COMBINE_SQ_2));
     const BYTE_COMBINE_SQ_3: Self = Self(gfu128_as_m128(UnoptimizedGF128::BYTE_COMBINE_SQ_3));
-}
-
-impl ByteCombineSquared for GF128 {
-    fn byte_combine_sq(x: &[Self; 8]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    fn byte_combine_sq_slice(x: &[Self]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    fn byte_combine_bits_sq(x: u8) -> Self {
-        // TODO: define optimized implementation for GF8
-        let sq_bits = GF8::square_bits(x);
-        Self::byte_combine_bits(sq_bits)
-    }
 }
 
 impl Betas for GF128 {
@@ -895,6 +870,12 @@ impl PartialEq for GF192 {
 }
 
 impl Eq for GF192 {}
+
+impl FromBit for GF192 {
+    fn from_bit(bit: u8) -> Self {
+        Self::ONE * bit
+    }
+}
 
 // implementations of Add and AddAssign
 
@@ -997,6 +978,7 @@ impl Neg for GF192 {
 
 const GF192_MOD_M128: __m128i = u128_as_m128(UnoptimizedGF192::MODULUS);
 
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn poly384_reduce192(x: [__m128i; 3]) -> __m256i {
     unsafe {
         let reduced_320 = m128_clmul_lh(GF192_MOD_M128, x[2]);
@@ -1016,6 +998,7 @@ unsafe fn poly384_reduce192(x: [__m128i; 3]) -> __m256i {
     }
 }
 
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn poly256_reduce192(x: [__m128i; 2]) -> __m256i {
     unsafe {
         let low = _mm_xor_si128(x[0], m128_clmul_lh(GF192_MOD_M128, x[1]));
@@ -1023,11 +1006,13 @@ unsafe fn poly256_reduce192(x: [__m128i; 2]) -> __m256i {
     }
 }
 
+#[target_feature(enable = "avx2")]
 unsafe fn m128_broadcast_low(v: __m128i) -> __m128i {
     unsafe { _mm_xor_si128(v, _mm_bslli_si128(v, 8)) }
 }
 
-fn mul_gf192(lhs: __m256i, rhs: __m256i) -> __m256i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf192(lhs: __m256i, rhs: __m256i) -> __m256i {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs, 0);
         let x1 = _mm256_extracti128_si256(lhs, 1);
@@ -1062,7 +1047,8 @@ fn mul_gf192(lhs: __m256i, rhs: __m256i) -> __m256i {
     }
 }
 
-fn square_gf192(lhs: __m256i) -> __m256i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn square_gf192(lhs: __m256i) -> __m256i {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs, 0);
         let x1 = _mm256_extracti128_si256(lhs, 1);
@@ -1095,7 +1081,8 @@ fn square_gf192(lhs: __m256i) -> __m256i {
     }
 }
 
-fn mul_gf192_u64(lhs: __m256i, rhs: u64) -> __m256i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf192_u64(lhs: __m256i, rhs: u64) -> __m256i {
     unsafe {
         let rhs = _mm_set_epi64x(0, rhs as i64);
         let x0 = _mm256_extracti128_si256(lhs, 0);
@@ -1114,7 +1101,7 @@ impl Mul for GF192 {
 
     #[inline(always)]
     fn mul(self, rhs: Self) -> Self::Output {
-        Self(mul_gf192(self.0, rhs.0))
+        Self(unsafe { mul_gf192(self.0, rhs.0) })
     }
 }
 
@@ -1123,7 +1110,7 @@ impl Mul<&Self> for GF192 {
 
     #[inline(always)]
     fn mul(self, rhs: &Self) -> Self::Output {
-        Self(mul_gf192(self.0, rhs.0))
+        Self(unsafe { mul_gf192(self.0, rhs.0) })
     }
 }
 
@@ -1132,7 +1119,7 @@ impl Mul<GF192> for &GF192 {
 
     #[inline(always)]
     fn mul(self, rhs: GF192) -> Self::Output {
-        GF192(mul_gf192(self.0, rhs.0))
+        GF192(unsafe { mul_gf192(self.0, rhs.0) })
     }
 }
 
@@ -1141,7 +1128,7 @@ impl Mul<GF64> for GF192 {
 
     #[inline(always)]
     fn mul(self, rhs: GF64) -> Self::Output {
-        Self(mul_gf192_u64(self.0, rhs.into()))
+        Self(unsafe { mul_gf192_u64(self.0, rhs.into()) })
     }
 }
 
@@ -1161,20 +1148,21 @@ impl Mul<u8> for GF192 {
 impl MulAssign for GF192 {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
-        self.0 = mul_gf192(self.0, rhs.0);
+        self.0 = unsafe { mul_gf192(self.0, rhs.0) };
     }
 }
 
 impl MulAssign<&Self> for GF192 {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: &Self) {
-        self.0 = mul_gf192(self.0, rhs.0);
+        self.0 = unsafe { mul_gf192(self.0, rhs.0) };
     }
 }
 
 // implementation of Double
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn m192_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
     unsafe {
         let m = _mm256_and_si256(m, m256_set_msb_192());
@@ -1208,7 +1196,7 @@ impl Square for GF192 {
 
     #[inline]
     fn square(self) -> Self::Output {
-        Self(square_gf192(self.0))
+        Self(unsafe { square_gf192(self.0) })
     }
 }
 
@@ -1230,6 +1218,7 @@ impl Field for GF192 {
         ret
     }
 
+    /*
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe {
@@ -1241,49 +1230,7 @@ impl Field for GF192 {
         };
         ret
     }
-}
-
-// Implementation of SquareBytes
-
-impl SquareBytes for GF192 {
-    // TODO: Should we define a generic implementation for F: Field in large fields instead?
-
-    fn square_byte(x: &[Self]) -> [Self; 8] {
-        let mut sq = [<Self as Field>::ZERO; 8];
-        sq[0] = x[0] + x[4] + x[6];
-        sq[2] = x[1] + x[5];
-        sq[4] = x[2] + x[4] + x[7];
-        sq[5] = x[5] + x[6];
-        sq[6] = x[3] + x[5];
-        sq[7] = x[6] + x[7];
-
-        sq[1] = x[4] + sq[7];
-        sq[3] = x[5] + sq[1];
-
-        sq
-    }
-
-    fn square_byte_inplace(x: &mut [Self]) {
-        let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
-
-        // x0 = x0 + x4 + x6
-        x[0] += x[4] + x[6];
-        // x2 = x1 + x5
-        x[2] = x[1] + x[5];
-        // x4 = x4 + x2 + x7
-        x[4] += i2 + x[7];
-        // x5 = x5 + x6
-        x[5] += x[6];
-        // x6 = x3 + x5
-        x[6] = x[3] + i5;
-        // x7 = x6 + x7
-        x[7] += i6;
-
-        // x1 = x4 + (x6 + x7)
-        x[1] = i4 + x[7];
-        // x3 = x5 + (x4 + x6 + x7)
-        x[3] = i5 + x[1];
-    }
+    */
 }
 
 impl From<&[u8]> for GF192 {
@@ -1348,24 +1295,6 @@ impl ByteCombine for GF192 {
 impl ByteCombineSquaredConstants for GF192 {
     const BYTE_COMBINE_SQ_2: Self = Self(gfu192_as_m256(UnoptimizedGF192::BYTE_COMBINE_SQ_2));
     const BYTE_COMBINE_SQ_3: Self = Self(gfu192_as_m256(UnoptimizedGF192::BYTE_COMBINE_SQ_3));
-}
-
-impl ByteCombineSquared for GF192 {
-    fn byte_combine_sq(x: &[Self; 8]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    fn byte_combine_sq_slice(x: &[Self]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    fn byte_combine_bits_sq(x: u8) -> Self {
-        // TODO: define optimized implementation for GF8
-        let sq_bits = GF8::square_bits(x);
-        Self::byte_combine_bits(sq_bits)
-    }
 }
 
 impl Betas for GF192 {
@@ -1456,6 +1385,12 @@ impl PartialEq for GF256 {
 }
 
 impl Eq for GF256 {}
+
+impl FromBit for GF256 {
+    fn from_bit(bit: u8) -> Self {
+        Self::ONE * bit
+    }
+}
 
 // implementations of Add and AddAssign
 
@@ -1559,6 +1494,7 @@ impl Neg for GF256 {
 const GF256_MOD_M128: __m128i = u128_as_m128(UnoptimizedGF256::MODULUS);
 
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn poly512_reduce256(x: [__m128i; 4]) -> __m256i {
     unsafe {
         let xmod = [
@@ -1581,6 +1517,7 @@ unsafe fn poly512_reduce256(x: [__m128i; 4]) -> __m256i {
 }
 
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn poly320_reduce256(x: [__m128i; 3]) -> __m256i {
     unsafe {
         let tmp = _mm_xor_si128(x[0], m128_clmul_ll(GF256_MOD_M128, x[2]));
@@ -1588,7 +1525,8 @@ unsafe fn poly320_reduce256(x: [__m128i; 3]) -> __m256i {
     }
 }
 
-fn mul_gf256(lhs: __m256i, rhs: __m256i) -> __m256i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf256(lhs: __m256i, rhs: __m256i) -> __m256i {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs, 0);
         let x1 = _mm256_extracti128_si256(lhs, 1);
@@ -1611,7 +1549,8 @@ fn mul_gf256(lhs: __m256i, rhs: __m256i) -> __m256i {
     }
 }
 
-fn square_gf256(lhs: __m256i) -> __m256i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn square_gf256(lhs: __m256i) -> __m256i {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs, 0);
         let x1 = _mm256_extracti128_si256(lhs, 1);
@@ -1632,7 +1571,8 @@ fn square_gf256(lhs: __m256i) -> __m256i {
     }
 }
 
-fn mul_gf256_u64(lhs: __m256i, rhs: u64) -> __m256i {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf256_u64(lhs: __m256i, rhs: u64) -> __m256i {
     unsafe {
         let rhs = _mm_set_epi64x(0, rhs as i64);
         let x0 = _mm256_extracti128_si256(lhs, 0);
@@ -1652,7 +1592,7 @@ impl Mul for GF256 {
 
     #[inline(always)]
     fn mul(self, rhs: Self) -> Self::Output {
-        Self(mul_gf256(self.0, rhs.0))
+        Self(unsafe { mul_gf256(self.0, rhs.0) })
     }
 }
 
@@ -1661,7 +1601,7 @@ impl Mul<&Self> for GF256 {
 
     #[inline(always)]
     fn mul(self, rhs: &Self) -> Self::Output {
-        Self(mul_gf256(self.0, rhs.0))
+        Self(unsafe { mul_gf256(self.0, rhs.0) })
     }
 }
 
@@ -1670,7 +1610,7 @@ impl Mul<GF256> for &GF256 {
 
     #[inline(always)]
     fn mul(self, rhs: GF256) -> Self::Output {
-        GF256(mul_gf256(self.0, rhs.0))
+        GF256(unsafe { mul_gf256(self.0, rhs.0) })
     }
 }
 
@@ -1679,7 +1619,7 @@ impl Mul<GF64> for GF256 {
 
     #[inline(always)]
     fn mul(self, rhs: GF64) -> Self::Output {
-        Self(mul_gf256_u64(self.0, rhs.into()))
+        Self(unsafe { mul_gf256_u64(self.0, rhs.into()) })
     }
 }
 
@@ -1699,20 +1639,21 @@ impl Mul<u8> for GF256 {
 impl MulAssign for GF256 {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: Self) {
-        self.0 = mul_gf256(self.0, rhs.0);
+        self.0 = unsafe { mul_gf256(self.0, rhs.0) };
     }
 }
 
 impl MulAssign<&Self> for GF256 {
     #[inline(always)]
     fn mul_assign(&mut self, rhs: &Self) {
-        self.0 = mul_gf256(self.0, rhs.0);
+        self.0 = unsafe { mul_gf256(self.0, rhs.0) };
     }
 }
 
 // implementation of Double
 
 #[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn m256_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
     unsafe {
         let mask = m256_set_msb();
@@ -1744,7 +1685,7 @@ impl Square for GF256 {
 
     #[inline]
     fn square(self) -> Self::Output {
-        Self(square_gf256(self.0))
+        Self(unsafe { square_gf256(self.0) })
     }
 }
 
@@ -1760,54 +1701,13 @@ impl Field for GF256 {
         ret
     }
 
+    /*
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
         let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
         ret
     }
-}
-
-// Implementation of SquareBytes
-
-impl SquareBytes for GF256 {
-    // TODO: Should we define a generic implementation for F: Field in large fields instead?
-
-    fn square_byte(x: &[Self]) -> [Self; 8] {
-        let mut sq = [<Self as Field>::ZERO; 8];
-        sq[0] = x[0] + x[4] + x[6];
-        sq[2] = x[1] + x[5];
-        sq[4] = x[2] + x[4] + x[7];
-        sq[5] = x[5] + x[6];
-        sq[6] = x[3] + x[5];
-        sq[7] = x[6] + x[7];
-
-        sq[1] = x[4] + sq[7];
-        sq[3] = x[5] + sq[1];
-
-        sq
-    }
-
-    fn square_byte_inplace(x: &mut [Self]) {
-        let (i2, i4, i5, i6) = (x[2], x[4], x[5], x[6]);
-
-        // x0 = x0 + x4 + x6
-        x[0] += x[4] + x[6];
-        // x2 = x1 + x5
-        x[2] = x[1] + x[5];
-        // x4 = x4 + x2 + x7
-        x[4] += i2 + x[7];
-        // x5 = x5 + x6
-        x[5] += x[6];
-        // x6 = x3 + x5
-        x[6] = x[3] + i5;
-        // x7 = x6 + x7
-        x[7] += i6;
-
-        // x1 = x4 + (x6 + x7)
-        x[1] = i4 + x[7];
-        // x3 = x5 + (x4 + x6 + x7)
-        x[3] = i5 + x[1];
-    }
+    */
 }
 
 impl From<&[u8]> for GF256 {
@@ -1867,24 +1767,6 @@ impl ByteCombine for GF256 {
 impl ByteCombineSquaredConstants for GF256 {
     const BYTE_COMBINE_SQ_2: Self = Self(gfu256_as_m256(UnoptimizedGF256::BYTE_COMBINE_SQ_2));
     const BYTE_COMBINE_SQ_3: Self = Self(gfu256_as_m256(UnoptimizedGF256::BYTE_COMBINE_SQ_3));
-}
-
-impl ByteCombineSquared for GF256 {
-    fn byte_combine_sq(x: &[Self; 8]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    fn byte_combine_sq_slice(x: &[Self]) -> Self {
-        let sq = Self::square_byte(x);
-        Self::byte_combine(&sq)
-    }
-
-    fn byte_combine_bits_sq(x: u8) -> Self {
-        // TODO: define optimized implementation for GF8
-        let sq_bits = GF8::square_bits(x);
-        Self::byte_combine_bits(sq_bits)
-    }
 }
 
 impl Betas for GF256 {
@@ -1960,9 +1842,7 @@ pub(crate) struct GF384(__m256i, __m128i);
 impl Default for GF384 {
     #[inline(always)]
     fn default() -> Self {
-        Self(unsafe { _mm256_setzero_si256() }, unsafe {
-            _mm_setzero_si128()
-        })
+        unsafe { Self(_mm256_setzero_si256(), _mm_setzero_si128()) }
     }
 }
 
@@ -1985,9 +1865,12 @@ impl Add for GF384 {
 
     #[inline(always)]
     fn add(self, rhs: Self) -> Self::Output {
-        Self(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
-            _mm_xor_si128(self.1, rhs.1)
-        })
+        unsafe {
+            Self(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm_xor_si128(self.1, rhs.1),
+            )
+        }
     }
 }
 
@@ -1996,9 +1879,12 @@ impl Add<&Self> for GF384 {
 
     #[inline(always)]
     fn add(self, rhs: &Self) -> Self::Output {
-        Self(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
-            _mm_xor_si128(self.1, rhs.1)
-        })
+        unsafe {
+            Self(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm_xor_si128(self.1, rhs.1),
+            )
+        }
     }
 }
 
@@ -2007,25 +1893,32 @@ impl Add<GF384> for &GF384 {
 
     #[inline(always)]
     fn add(self, rhs: GF384) -> Self::Output {
-        GF384(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
-            _mm_xor_si128(self.1, rhs.1)
-        })
+        unsafe {
+            GF384(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm_xor_si128(self.1, rhs.1),
+            )
+        }
     }
 }
 
 impl AddAssign for GF384 {
     #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm_xor_si128(self.1, rhs.1) };
+        unsafe {
+            self.0 = _mm256_xor_si256(self.0, rhs.0);
+            self.1 = _mm_xor_si128(self.1, rhs.1);
+        }
     }
 }
 
 impl AddAssign<&Self> for GF384 {
     #[inline(always)]
     fn add_assign(&mut self, rhs: &Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm_xor_si128(self.1, rhs.1) };
+        unsafe {
+            self.0 = _mm256_xor_si256(self.0, rhs.0);
+            self.1 = _mm_xor_si128(self.1, rhs.1);
+        }
     }
 }
 
@@ -2035,10 +1928,9 @@ impl Sub for GF384 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: Self) -> Self::Output {
-        Self(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
-            _mm_xor_si128(self.1, rhs.1)
-        })
+        self + rhs
     }
 }
 
@@ -2046,10 +1938,9 @@ impl Sub<&Self> for GF384 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: &Self) -> Self::Output {
-        Self(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
-            _mm_xor_si128(self.1, rhs.1)
-        })
+        self + rhs
     }
 }
 
@@ -2057,26 +1948,25 @@ impl Sub<GF384> for &GF384 {
     type Output = GF384;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: GF384) -> Self::Output {
-        GF384(unsafe { _mm256_xor_si256(self.0, rhs.0) }, unsafe {
-            _mm_xor_si128(self.1, rhs.1)
-        })
+        self + rhs
     }
 }
 
 impl SubAssign for GF384 {
     #[inline(always)]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm_xor_si128(self.1, rhs.1) };
+        *self += rhs;
     }
 }
 
 impl SubAssign<&Self> for GF384 {
     #[inline(always)]
+    #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: &Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm_xor_si128(self.1, rhs.1) };
+        *self += rhs;
     }
 }
 
@@ -2189,13 +2079,6 @@ impl ExtensionField for GF384 {
         unsafe { _mm_storeu_si128(ret.as_mut_ptr().add(32).cast(), self.1) };
         ret
     }
-
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe { _mm_storeu_si128(ret.as_mut_ptr().add(32).cast(), self.1) };
-        ret
-    }
 }
 
 /// Optimized implementation of the 576 bit Galois field
@@ -2233,11 +2116,13 @@ impl Add for GF576 {
     #[inline(always)]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: Self) -> Self::Output {
-        Self(
-            unsafe { _mm256_xor_si256(self.0, rhs.0) },
-            unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            self.2 ^ rhs.2,
-        )
+        unsafe {
+            Self(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm256_xor_si256(self.1, rhs.1),
+                self.2 ^ rhs.2,
+            )
+        }
     }
 }
 
@@ -2247,11 +2132,13 @@ impl Add<&Self> for GF576 {
     #[inline(always)]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: &Self) -> Self::Output {
-        Self(
-            unsafe { _mm256_xor_si256(self.0, rhs.0) },
-            unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            self.2 ^ rhs.2,
-        )
+        unsafe {
+            Self(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm256_xor_si256(self.1, rhs.1),
+                self.2 ^ rhs.2,
+            )
+        }
     }
 }
 
@@ -2261,11 +2148,13 @@ impl Add<GF576> for &GF576 {
     #[inline(always)]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: GF576) -> Self::Output {
-        GF576(
-            unsafe { _mm256_xor_si256(self.0, rhs.0) },
-            unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            self.2 ^ rhs.2,
-        )
+        unsafe {
+            GF576(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm256_xor_si256(self.1, rhs.1),
+                self.2 ^ rhs.2,
+            )
+        }
     }
 }
 
@@ -2273,8 +2162,10 @@ impl AddAssign for GF576 {
     #[inline(always)]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
+        unsafe {
+            self.0 = _mm256_xor_si256(self.0, rhs.0);
+            self.1 = _mm256_xor_si256(self.1, rhs.1);
+        }
         self.2 ^= rhs.2;
     }
 }
@@ -2283,8 +2174,10 @@ impl AddAssign<&Self> for GF576 {
     #[inline(always)]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: &Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
+        unsafe {
+            self.0 = _mm256_xor_si256(self.0, rhs.0);
+            self.1 = _mm256_xor_si256(self.1, rhs.1);
+        }
         self.2 ^= rhs.2;
     }
 }
@@ -2295,8 +2188,9 @@ impl Sub for GF576 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: Self) -> Self::Output {
-        self.add(rhs)
+        self + rhs
     }
 }
 
@@ -2304,8 +2198,9 @@ impl Sub<&Self> for GF576 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: &Self) -> Self::Output {
-        self.add(rhs)
+        self + rhs
     }
 }
 
@@ -2313,8 +2208,9 @@ impl Sub<GF576> for &GF576 {
     type Output = GF576;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: GF576) -> Self::Output {
-        self.add(rhs)
+        self + rhs
     }
 }
 
@@ -2478,14 +2374,6 @@ impl ExtensionField for GF576 {
         ret[64..].copy_from_slice(&self.2.to_le_bytes());
         ret
     }
-
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1) };
-        ret[64..].copy_from_slice(&self.2.to_le_bytes());
-        ret
-    }
 }
 
 /// Optimized implementation of the 768 bit Galois field
@@ -2495,11 +2383,13 @@ pub(crate) struct GF768(__m256i, __m256i, __m256i);
 impl Default for GF768 {
     #[inline(always)]
     fn default() -> Self {
-        Self(
-            unsafe { _mm256_setzero_si256() },
-            unsafe { _mm256_setzero_si256() },
-            unsafe { _mm256_setzero_si256() },
-        )
+        unsafe {
+            Self(
+                _mm256_setzero_si256(),
+                _mm256_setzero_si256(),
+                _mm256_setzero_si256(),
+            )
+        }
     }
 }
 
@@ -2526,11 +2416,13 @@ impl Add for GF768 {
 
     #[inline(always)]
     fn add(self, rhs: Self) -> Self::Output {
-        Self(
-            unsafe { _mm256_xor_si256(self.0, rhs.0) },
-            unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            unsafe { _mm256_xor_si256(self.2, rhs.2) },
-        )
+        unsafe {
+            Self(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm256_xor_si256(self.1, rhs.1),
+                _mm256_xor_si256(self.2, rhs.2),
+            )
+        }
     }
 }
 
@@ -2539,11 +2431,13 @@ impl Add<&Self> for GF768 {
 
     #[inline(always)]
     fn add(self, rhs: &Self) -> Self::Output {
-        Self(
-            unsafe { _mm256_xor_si256(self.0, rhs.0) },
-            unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            unsafe { _mm256_xor_si256(self.2, rhs.2) },
-        )
+        unsafe {
+            Self(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm256_xor_si256(self.1, rhs.1),
+                _mm256_xor_si256(self.2, rhs.2),
+            )
+        }
     }
 }
 
@@ -2552,29 +2446,35 @@ impl Add<GF768> for &GF768 {
 
     #[inline(always)]
     fn add(self, rhs: GF768) -> Self::Output {
-        GF768(
-            unsafe { _mm256_xor_si256(self.0, rhs.0) },
-            unsafe { _mm256_xor_si256(self.1, rhs.1) },
-            unsafe { _mm256_xor_si256(self.2, rhs.2) },
-        )
+        unsafe {
+            GF768(
+                _mm256_xor_si256(self.0, rhs.0),
+                _mm256_xor_si256(self.1, rhs.1),
+                _mm256_xor_si256(self.2, rhs.2),
+            )
+        }
     }
 }
 
 impl AddAssign for GF768 {
     #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
-        self.2 = unsafe { _mm256_xor_si256(self.2, rhs.2) };
+        unsafe {
+            self.0 = _mm256_xor_si256(self.0, rhs.0);
+            self.1 = _mm256_xor_si256(self.1, rhs.1);
+            self.2 = _mm256_xor_si256(self.2, rhs.2);
+        }
     }
 }
 
 impl AddAssign<&Self> for GF768 {
     #[inline(always)]
     fn add_assign(&mut self, rhs: &Self) {
-        self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
-        self.1 = unsafe { _mm256_xor_si256(self.1, rhs.1) };
-        self.2 = unsafe { _mm256_xor_si256(self.2, rhs.2) };
+        unsafe {
+            self.0 = _mm256_xor_si256(self.0, rhs.0);
+            self.1 = _mm256_xor_si256(self.1, rhs.1);
+            self.2 = _mm256_xor_si256(self.2, rhs.2);
+        }
     }
 }
 
@@ -2584,8 +2484,9 @@ impl Sub for GF768 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: Self) -> Self::Output {
-        self.add(rhs)
+        self + rhs
     }
 }
 
@@ -2593,8 +2494,9 @@ impl Sub<&Self> for GF768 {
     type Output = Self;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: &Self) -> Self::Output {
-        self.add(rhs)
+        self + rhs
     }
 }
 
@@ -2602,8 +2504,9 @@ impl Sub<GF768> for &GF768 {
     type Output = GF768;
 
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: GF768) -> Self::Output {
-        self.add(rhs)
+        self + rhs
     }
 }
 
@@ -2784,14 +2687,6 @@ impl ExtensionField for GF768 {
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::<u8, Self::Length>::default();
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1) };
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(64).cast(), self.2) };
-        ret
-    }
-
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1) };
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().add(64).cast(), self.2) };
@@ -3118,13 +3013,9 @@ mod test {
                 assert_eq!(elem.as_bytes(), bytes.as_bytes());
 
                 let elem_bytes_1 = elem.as_bytes();
-                let elem_bytes_2 = elem.as_boxed_bytes();
-
                 let elem1 = F::from(elem_bytes_1.as_slice());
-                let elem2 = F::from(elem_bytes_2.as_slice());
 
                 assert_eq!(elem, elem1);
-                assert_eq!(elem, elem2);
             }
         }
 

@@ -1,4 +1,3 @@
-#![allow(unused_imports, dead_code)]
 use std::{
     fmt::Debug,
     fs::File,

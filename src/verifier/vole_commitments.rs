@@ -1,9 +1,10 @@
-use crate::{fields::BigGaloisField, utils::get_bit};
-use generic_array::{ArrayLength, GenericArray, typenum::U8};
-use std::ops::Range;
-use std::ops::{Index, Mul};
+use std::ops::{Index, Mul, Range};
 
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
+use generic_array::{ArrayLength, GenericArray, typenum::U8};
+
+use crate::{fields::BigGaloisField, utils::get_bit};
+
+#[derive(Debug, Clone)]
 pub(crate) struct VoleCommits<'a, F: BigGaloisField, L: ArrayLength> {
     pub(crate) scalars: Box<GenericArray<F, L>>,
     pub(crate) delta: &'a F,
@@ -61,7 +62,7 @@ where
     }
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub(crate) struct VoleCommitsRef<'a, F: BigGaloisField, L: ArrayLength> {
     pub(crate) scalars: &'a GenericArray<F, L>,
     pub(crate) delta: &'a F,

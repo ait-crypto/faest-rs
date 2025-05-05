@@ -1,5 +1,6 @@
-use crate::{fields::Square, parameter::TauParameters};
 use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
+
+use crate::{fields::Square, parameter::TauParameters};
 
 /// Reader interface for PRGs and random oracles
 pub(crate) trait Reader {
@@ -12,16 +13,6 @@ pub(crate) trait Reader {
         Self: Sized,
     {
         let mut dst = GenericArray::default();
-        self.read(&mut dst);
-        dst
-    }
-
-    /// Read into boxed array and consume the reader
-    fn read_into_boxed<Length: ArrayLength>(mut self) -> Box<GenericArray<u8, Length>>
-    where
-        Self: Sized,
-    {
-        let mut dst = GenericArray::default_boxed();
         self.read(&mut dst);
         dst
     }
@@ -94,15 +85,6 @@ pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> GenericArr
         .map(|i| chall_to_u16(chall, TAU::tau0_offset_unchecked(i), k - 1));
 
     first_half.chain(second_half).collect()
-}
-
-/// Check for `0` in buffers for key validity.
-///
-/// This function does not need to be constant time. It may only return early
-/// during key generation. During witness extension it always returns `false`
-/// and iterates over all bytes of the buffer.
-pub(crate) fn contains_zeros(buf: &[u8]) -> bool {
-    buf.contains(&0)
 }
 
 /// Xors the input slices and retuns an iterator over the resulting elements.

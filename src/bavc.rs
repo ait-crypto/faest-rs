@@ -18,13 +18,10 @@ use crate::{
     utils::Reader,
 };
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct BavcCommitResult<LambdaBytes, NLeafCommit>
 where
-    LambdaBytes: ArrayLength
-        + Mul<U2, Output: ArrayLength>
-        + Mul<NLeafCommit, Output: ArrayLength>
-        + PartialEq,
+    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<NLeafCommit, Output: ArrayLength>,
     NLeafCommit: ArrayLength,
 {
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
@@ -32,29 +29,29 @@ where
     pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct BavcOpenResult<'a> {
     pub coms: Vec<&'a [u8]>,
     pub nodes: Vec<&'a [u8]>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct BavcReconstructResult<LambdaBytes>
 where
-    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + PartialEq,
+    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength>,
 {
     pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
     pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct BavcDecommitment<LambdaBytes, NLeafCommit>
 where
     LambdaBytes: ArrayLength + Mul<NLeafCommit, Output: ArrayLength>,
     NLeafCommit: ArrayLength,
 {
     keys: Vec<GenericArray<u8, LambdaBytes>>,
-    coms: Vec<Box<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>>>>,
+    coms: Vec<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>>>,
 }
 
 pub(crate) trait LeafCommit {
@@ -71,7 +68,7 @@ pub(crate) trait LeafCommit {
         uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
     ) -> (
         GenericArray<u8, Self::LambdaBytes>,
-        Box<GenericArray<u8, Self::LambdaBytesTimes3>>,
+        GenericArray<u8, Self::LambdaBytesTimes3>,
     );
 
     fn commit_em(
@@ -80,7 +77,7 @@ pub(crate) trait LeafCommit {
         tewak: Twk,
     ) -> (
         GenericArray<u8, Self::LambdaBytes>,
-        Box<GenericArray<u8, Self::LambdaBytesTimes2>>,
+        GenericArray<u8, Self::LambdaBytesTimes2>,
     );
 }
 
@@ -107,7 +104,7 @@ where
         uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
     ) -> (
         GenericArray<u8, Self::LambdaBytes>,
-        Box<GenericArray<u8, Self::LambdaBytesTimes3>>,
+        GenericArray<u8, Self::LambdaBytesTimes3>,
     ) {
         // Step 2
         let hash = PRG::new_prg(r, iv, tweak).read_into();
@@ -125,10 +122,10 @@ where
         tweak: Twk,
     ) -> (
         GenericArray<u8, Self::LambdaBytes>,
-        Box<GenericArray<u8, Self::LambdaBytesTimes2>>,
+        GenericArray<u8, Self::LambdaBytesTimes2>,
     ) {
         // Step 1
-        let com = PRG::new_prg(r, iv, tweak).read_into_boxed();
+        let com = PRG::new_prg(r, iv, tweak).read_into();
 
         // Step 2
         let sd = r.to_owned();
@@ -265,8 +262,7 @@ where
     Self::LambdaBytes: Mul<U2, Output = Self::LambdaBytesTimes2>
         + Mul<U3, Output = Self::LambdaBytesTimes3>
         + Mul<U8, Output = Self::Lambda>
-        + Mul<Self::NLeafCommit, Output: ArrayLength>
-        + PartialEq,
+        + Mul<Self::NLeafCommit, Output: ArrayLength>,
 {
     type PRG: PseudoRandomGenerator<KeySize = Self::LambdaBytes>;
     type TAU: TauParameters<Tau = Self::Tau, L = Self::L>;
@@ -702,10 +698,7 @@ mod test {
     );
 
     fn compare_expected_with_result<
-        Lambda: ArrayLength
-            + Mul<NLeafCommit, Output: ArrayLength>
-            + Mul<U2, Output: ArrayLength>
-            + PartialEq,
+        Lambda: ArrayLength + Mul<NLeafCommit, Output: ArrayLength> + Mul<U2, Output: ArrayLength>,
         NLeafCommit: ArrayLength,
         TAU: TauParameters,
     >(

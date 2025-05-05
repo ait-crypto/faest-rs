@@ -1,16 +1,16 @@
-use crate::{
-    fields::{BigGaloisField, ByteCombine},
-    parameter::{BaseParameters, OWFField, OWFParameters},
-    prover::{ByteCommits, ByteCommitsRef},
-    rijndael_32::RCON_TABLE,
-    universal_hashing::ZKProofHasher,
-};
-
 use generic_array::{
     GenericArray,
     typenum::{U8, Unsigned},
 };
 use itertools::iproduct;
+
+use crate::{
+    fields::{BigGaloisField, ByteCombine},
+    parameter::{OWFField, OWFParameters},
+    prover::{ByteCommits, ByteCommitsRef},
+    rijndael_32::RCON_TABLE,
+    universal_hashing::ZKProofHasher,
+};
 
 pub(super) fn key_exp_cstrnts<O>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,
@@ -19,7 +19,6 @@ pub(super) fn key_exp_cstrnts<O>(
 where
     O: OWFParameters,
     OWFField<O>: BigGaloisField + ByteCombine,
-    <<O as OWFParameters>::BaseParams as BaseParameters>::Field: PartialEq,
 {
     // ::1
     let k = key_exp_fwd::<O>(w);

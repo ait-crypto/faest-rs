@@ -1,12 +1,16 @@
-use crate::fields::{BigGaloisField, GF8};
-use crate::prover::field_commitment::FieldCommitDegOne;
+use std::ops::Mul;
+
 use generic_array::{
     ArrayLength, GenericArray,
     typenum::{Prod, U8},
 };
-use std::ops::Mul;
 
-#[derive(Clone, Debug, PartialEq, Default)]
+use crate::{
+    fields::{BigGaloisField, GF8},
+    prover::field_commitment::FieldCommitDegOne,
+};
+
+#[derive(Clone, Debug, Default)]
 pub(crate) struct ByteCommitment<F>
 where
     F: BigGaloisField,
@@ -32,7 +36,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct ByteCommits<F, L>
 where
     F: BigGaloisField,
@@ -96,7 +100,7 @@ where
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct ByteCommitsRef<'a, F, L>
 where
     F: BigGaloisField,

@@ -10,7 +10,7 @@ use crate::{
     aes::AddRoundKey,
     fields::BigGaloisField,
     internal_keys::PublicKey,
-    parameter::{BaseParameters, OWFField, OWFParameters},
+    parameter::{OWFField, OWFParameters},
     rijndael_32::{convert_from_batchblocks, inv_bitslice, rijndael_key_schedule},
     universal_hashing::ZKVerifyHasher,
     utils::get_bit,
@@ -23,7 +23,6 @@ pub(crate) fn owf_constraints<O>(
     pk: &PublicKey<O>,
 ) where
     O: OWFParameters,
-    <<O as OWFParameters>::BaseParams as BaseParameters>::Field: PartialEq,
 {
     // ::1
     let PublicKey {
@@ -109,7 +108,6 @@ where
     O: OWFParameters,
 {
     rijndael_key_schedule::<O::NST, O::NK, O::R>(key, O::SKE::USIZE)
-        .0
         .chunks_exact(8)
         .take(O::R::USIZE + 1)
         .map(|chunk| {

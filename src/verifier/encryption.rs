@@ -1,3 +1,9 @@
+use generic_array::{
+    GenericArray,
+    typenum::{Quot, U2, U4, U8, Unsigned},
+};
+use itertools::izip;
+
 use super::vole_commitments::{VoleCommits, VoleCommitsRef};
 use crate::{
     aes::{
@@ -12,11 +18,6 @@ use crate::{
     universal_hashing::ZKVerifyHasher,
     utils::square_array,
 };
-use generic_array::{
-    GenericArray,
-    typenum::{Quot, U2, U4, U8, Unsigned},
-};
-use itertools::izip;
 
 pub(crate) fn enc_cstrnts<'a, O, K>(
     zk_hasher: &mut ZKVerifyHasher<OWFField<O>>,
