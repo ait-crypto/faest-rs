@@ -430,13 +430,7 @@ where
             self.scalars[i2] = tmp[2] * v2 + tmp[3] * v3 + tmp[0] + tmp[1];
 
             // ::10
-            // SAFETY: tmp has length 4, hence unwrapping the first 4 elements is safe
-            let mut tmp = tmp.into_iter();
-            let tmp0 = tmp.next().unwrap();
-            let tmp1 = tmp.next().unwrap();
-            let tmp2 = tmp.next().unwrap();
-            let tmp3 = tmp.next().unwrap();
-
+            let (tmp0, tmp1, tmp2, tmp3) = tmp.into();
             self.scalars[i3] = tmp0 * v3 + tmp3 * v2 + tmp1 + tmp2;
         }
     }
