@@ -53,7 +53,6 @@ where {
 }
 
 // Scalar commitments to known state
-// TODO: Only return the keys (efficiency)
 impl<O, L> StateToBytes<O> for GenericArray<u8, L>
 where
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
