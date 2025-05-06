@@ -18,19 +18,19 @@ use crate::{
 
 pub(crate) fn enc_cstrnts<O, K, S>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,
-    input: impl for<'a> AddRoundKey<&'a K, Output = ByteCommits<OWFField<O>, O::NSTBytes>>,
-    output: impl for<'a> AddRoundKey<&'a K, Output = ByteCommits<OWFField<O>, O::NSTBytes>>,
-    w: ByteCommitsRef<OWFField<O>, O::LENCBytes>,
+    input: impl for<'a> AddRoundKey<&'a K, Output = ByteCommits<OWFField<O>, O::NStBytes>>,
+    output: impl for<'a> AddRoundKey<&'a K, Output = ByteCommits<OWFField<O>, O::NStBytes>>,
+    w: ByteCommitsRef<OWFField<O>, O::LEncBytes>,
     extended_key: &[K],
 ) where
     O: OWFParameters,
-    K: StateToBytes<O, Output = Box<GenericArray<S, O::NSTBytes>>>,
+    K: StateToBytes<O, Output = Box<GenericArray<S, O::NStBytes>>>,
     S: Square + Clone,
     for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a S>,
     for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a <S as Square>::Output>,
-    ByteCommits<OWFField<O>, O::NSTBytes>: for<'a> AddRoundKeyAssign<&'a K>,
-    for<'a> ByteCommitsRef<'a, OWFField<O>, O::NSTBytes>:
-        BytewiseMixColumns<O, Output = ByteCommits<OWFField<O>, O::NSTBytes>>,
+    ByteCommits<OWFField<O>, O::NStBytes>: for<'a> AddRoundKeyAssign<&'a K>,
+    for<'a> ByteCommitsRef<'a, OWFField<O>, O::NStBytes>:
+        BytewiseMixColumns<O, Output = ByteCommits<OWFField<O>, O::NStBytes>>,
 {
     // ::1
     let mut state = input.add_round_key(&extended_key[0]);
@@ -41,7 +41,7 @@ pub(crate) fn enc_cstrnts<O, K, S>(
         let state_prime = enc_cstrnts_even::<O>(
             zk_hasher,
             &state,
-            w.get_commits_ref::<Quot<O::NSTBytes, U2>>(3 * O::NSTBytes::USIZE * r / 2),
+            w.get_commits_ref::<Quot<O::NStBytes, U2>>(3 * O::NStBytes::USIZE * r / 2),
         );
 
         // ::16-17
@@ -55,8 +55,8 @@ pub(crate) fn enc_cstrnts<O, K, S>(
         let round_key = &extended_key[2 * r + 2];
 
         if r != O::R::USIZE / 2 - 1 {
-            let s_tilde = w.get_commits_ref::<O::NSTBytes>(
-                O::NSTBytes::USIZE / 2 + 3 * O::NSTBytes::USIZE * r / 2,
+            let s_tilde = w.get_commits_ref::<O::NStBytes>(
+                O::NStBytes::USIZE / 2 + 3 * O::NStBytes::USIZE * r / 2,
             );
 
             // ::29-38
@@ -76,8 +76,8 @@ pub(crate) fn enc_cstrnts<O, K, S>(
 
 fn enc_cstrnts_even<O>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,
-    state: &ByteCommits<OWFField<O>, O::NSTBytes>,
-    w: ByteCommitsRef<OWFField<O>, Quot<O::NSTBytes, U2>>,
+    state: &ByteCommits<OWFField<O>, O::NStBytes>,
+    w: ByteCommitsRef<OWFField<O>, Quot<O::NStBytes, U2>>,
 ) -> StateBitsSquaredCommits<O>
 where
     O: OWFParameters,
@@ -88,7 +88,7 @@ where
     let mut state_prime = StateBitsSquaredCommits::<O>::default();
 
     // ::7
-    for i in 0..O::NSTBytes::USIZE {
+    for i in 0..O::NStBytes::USIZE {
         // ::9
         let norm = (w.keys[i / 2] >> ((i % 2) * 4)) & 0xf;
         let ys = invnorm_to_conjugates::<O>(norm, &w.tags[4 * i..4 * i + 4]);
@@ -107,14 +107,14 @@ where
 
 fn enc_cstrnts_odd<O>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,
-    s_tilde: ByteCommitsRef<OWFField<O>, O::NSTBytes>,
+    s_tilde: ByteCommitsRef<OWFField<O>, O::NStBytes>,
     st_0: &StateBytesSquaredCommits<O>,
     st_1: &StateBytesSquaredCommits<O>,
 ) where
     O: OWFParameters,
-    ByteCommits<OWFField<O>, O::NSTBytes>: InverseAffine,
-    for<'a> ByteCommitsRef<'a, OWFField<O>, O::NSTBytes>:
-        InverseShiftRows<O, Output = ByteCommits<OWFField<O>, O::NSTBytes>>,
+    ByteCommits<OWFField<O>, O::NStBytes>: InverseAffine,
+    for<'a> ByteCommitsRef<'a, OWFField<O>, O::NStBytes>:
+        InverseShiftRows<O, Output = ByteCommits<OWFField<O>, O::NStBytes>>,
 {
     // ::29-30
     let mut s = s_tilde.inverse_shift_rows();
@@ -139,7 +139,7 @@ fn enc_cstrnts_odd<O>(
 
 fn aes_round<O, T>(
     state: &StateBitsSquaredCommits<O>,
-    key_bytes: &GenericArray<T, O::NSTBytes>,
+    key_bytes: &GenericArray<T, O::NStBytes>,
     sq: bool,
 ) -> StateBytesSquaredCommits<O>
 where
@@ -188,12 +188,12 @@ where
 }
 
 pub(crate) fn f256_f2_conjugates<O>(
-    state: &ByteCommits<OWFField<O>, O::NSTBytes>,
-) -> Box<GenericArray<FieldCommitDegOne<OWFField<O>>, O::NSTBits>>
+    state: &ByteCommits<OWFField<O>, O::NStBytes>,
+) -> Box<GenericArray<FieldCommitDegOne<OWFField<O>>, O::NStBits>>
 where
     O: OWFParameters,
 {
-    (0..O::NSTBytes::USIZE)
+    (0..O::NStBytes::USIZE)
         .flat_map(|i| {
             let mut x0 = state.get(i);
 

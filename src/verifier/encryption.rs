@@ -21,16 +21,16 @@ use crate::{
 
 pub(crate) fn enc_cstrnts<'a, O, K>(
     zk_hasher: &mut ZKVerifyHasher<OWFField<O>>,
-    input: impl AddRoundKey<&'a K, Output = VoleCommits<'a, OWFField<O>, O::NSTBits>>,
-    output: impl AddRoundKey<&'a K, Output = VoleCommits<'a, OWFField<O>, O::NSTBits>>,
-    w: VoleCommitsRef<'a, OWFField<O>, O::LENC>,
+    input: impl AddRoundKey<&'a K, Output = VoleCommits<'a, OWFField<O>, O::NStBits>>,
+    output: impl AddRoundKey<&'a K, Output = VoleCommits<'a, OWFField<O>, O::NStBits>>,
+    w: VoleCommitsRef<'a, OWFField<O>, O::LEnc>,
     extended_key: &'a [K],
 ) where
     O: OWFParameters,
-    K: StateToBytes<O, Output = GenericArray<OWFField<O>, O::NSTBytes>>,
-    VoleCommits<'a, OWFField<O>, O::NSTBits>: AddRoundKeyAssign<&'a K>,
-    VoleCommitsRef<'a, OWFField<O>, O::NSTBits>:
-        BytewiseMixColumns<O, Output = VoleCommits<'a, OWFField<O>, O::NSTBits>>,
+    K: StateToBytes<O, Output = GenericArray<OWFField<O>, O::NStBytes>>,
+    VoleCommits<'a, OWFField<O>, O::NStBits>: AddRoundKeyAssign<&'a K>,
+    VoleCommitsRef<'a, OWFField<O>, O::NStBits>:
+        BytewiseMixColumns<O, Output = VoleCommits<'a, OWFField<O>, O::NStBits>>,
 {
     // ::1
     let mut state = input.add_round_key(&extended_key[0]);
@@ -41,7 +41,7 @@ pub(crate) fn enc_cstrnts<'a, O, K>(
         let state_prime = enc_cstrnts_even::<O>(
             zk_hasher,
             &state,
-            w.get_commits_ref::<Quot<O::NSTBits, U2>>(3 * O::NSTBits::USIZE * r / 2),
+            w.get_commits_ref::<Quot<O::NStBits, U2>>(3 * O::NStBits::USIZE * r / 2),
         );
 
         // ::16-17
@@ -55,8 +55,8 @@ pub(crate) fn enc_cstrnts<'a, O, K>(
         let round_key = &extended_key[2 * r + 2];
 
         if r != O::R::USIZE / 2 - 1 {
-            let s_tilde = w.get_commits_ref::<O::NSTBits>(
-                O::NSTBits::USIZE / 2 + 3 * O::NSTBits::USIZE * r / 2,
+            let s_tilde = w.get_commits_ref::<O::NStBits>(
+                O::NStBits::USIZE / 2 + 3 * O::NStBits::USIZE * r / 2,
             );
 
             // ::29-38
@@ -75,17 +75,17 @@ pub(crate) fn enc_cstrnts<'a, O, K>(
 }
 
 fn aes_round<'a, O, T>(
-    state: &VoleCommits<'a, OWFField<O>, O::NSTBits>,
-    key_bytes: &GenericArray<T, O::NSTBytes>,
+    state: &VoleCommits<'a, OWFField<O>, O::NStBits>,
+    key_bytes: &GenericArray<T, O::NStBytes>,
     sq: bool,
-) -> VoleCommits<'a, OWFField<O>, O::NSTBytes>
+) -> VoleCommits<'a, OWFField<O>, O::NStBytes>
 where
     O: OWFParameters,
-    VoleCommits<'a, OWFField<O>, O::NSTBits>:
-        SBoxAffine<O, Output = VoleCommits<'a, OWFField<O>, O::NSTBytes>>,
-    VoleCommits<'a, OWFField<O>, O::NSTBytes>: MixColumns<O>,
-    VoleCommits<'a, OWFField<O>, O::NSTBytes>:
-        for<'b> AddRoundKeyBytes<&'b GenericArray<T, O::NSTBytes>>,
+    VoleCommits<'a, OWFField<O>, O::NStBits>:
+        SBoxAffine<O, Output = VoleCommits<'a, OWFField<O>, O::NStBytes>>,
+    VoleCommits<'a, OWFField<O>, O::NStBytes>: MixColumns<O>,
+    VoleCommits<'a, OWFField<O>, O::NStBytes>:
+        for<'b> AddRoundKeyBytes<&'b GenericArray<T, O::NStBytes>>,
 {
     // ::19-22
     let mut st = state.s_box_affine(sq);
@@ -97,9 +97,9 @@ where
 
 fn enc_cstrnts_even<'a, O>(
     zk_hasher: &mut ZKVerifyHasher<OWFField<O>>,
-    state: &VoleCommits<'a, OWFField<O>, O::NSTBits>,
-    w: VoleCommitsRef<'_, OWFField<O>, Quot<O::NSTBits, U2>>,
-) -> VoleCommits<'a, OWFField<O>, O::NSTBits>
+    state: &VoleCommits<'a, OWFField<O>, O::NStBits>,
+    w: VoleCommitsRef<'_, OWFField<O>, Quot<O::NStBits, U2>>,
+) -> VoleCommits<'a, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
@@ -109,7 +109,7 @@ where
     let mut state_prime = GenericArray::default_boxed();
 
     // ::7
-    for i in 0..O::NSTBytes::USIZE {
+    for i in 0..O::NStBytes::USIZE {
         // ::9
         let ys = invnorm_to_conjugates::<O>(&w[4 * i..4 * i + 4]);
 
@@ -130,9 +130,9 @@ where
 
 fn enc_cstrnts_odd<'a, O>(
     zk_hasher: &mut ZKVerifyHasher<OWFField<O>>,
-    s_tilde: impl InverseShiftRows<O, Output = VoleCommits<'a, OWFField<O>, O::NSTBits>>,
-    st_0: &VoleCommits<'a, OWFField<O>, O::NSTBytes>,
-    st_1: &VoleCommits<'a, OWFField<O>, O::NSTBytes>,
+    s_tilde: impl InverseShiftRows<O, Output = VoleCommits<'a, OWFField<O>, O::NStBits>>,
+    st_0: &VoleCommits<'a, OWFField<O>, O::NStBytes>,
+    st_1: &VoleCommits<'a, OWFField<O>, O::NStBytes>,
 ) where
     O: OWFParameters,
 {
@@ -170,12 +170,12 @@ where
 }
 
 pub(crate) fn f256_f2_conjugates<O>(
-    state: &GenericArray<OWFField<O>, O::NSTBits>,
-) -> GenericArray<OWFField<O>, O::NSTBits>
+    state: &GenericArray<OWFField<O>, O::NStBits>,
+) -> GenericArray<OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    (0..O::NSTBytes::USIZE)
+    (0..O::NStBytes::USIZE)
         .flat_map(|i| {
             let mut x0: GenericArray<OWFField<O>, U8> =
                 GenericArray::from_slice(&state[8 * i..8 * i + 8]).to_owned();

@@ -161,7 +161,7 @@ where
     });
 
     // ::10: after last swap, rj[0] will contain r_{d,0}
-    // SAFETY: FAEST parameters ensure LHATBYTES > 0 (hence rj is not empty)
+    // SAFETY: FAEST parameters ensure LHatBytes > 0 (hence rj is not empty)
     rj.into_iter().next().unwrap()
 }
 
@@ -409,18 +409,18 @@ mod test {
 
         let mut c = vec![
             0;
-            OWF::LHATBYTES::USIZE
+            OWF::LHatBytes::USIZE
                 * (<<BAVC as BatchVectorCommitment>::TAU as TauParameters>::Tau::USIZE
                     - 1)
         ];
 
         let res_commit =
-            volecommit::<BAVC, OWF::LHATBYTES>(VoleCommitmentCRefMut::new(&mut c), r, &iv);
+            volecommit::<BAVC, OWF::LHatBytes>(VoleCommitmentCRefMut::new(&mut c), r, &iv);
 
         let i_delta = decode_all_chall_3::<BAVC::TAU>(&chall);
         let decom_i = BAVC::open(&res_commit.decom, &i_delta).unwrap();
 
-        let res_rec = volereconstruct::<BAVC, OWF::LHATBYTES>(
+        let res_rec = volereconstruct::<BAVC, OWF::LHatBytes>(
             GenericArray::from_slice(&chall),
             &decom_i,
             VoleCommitmentCRef::new(&c),

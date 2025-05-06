@@ -19,13 +19,13 @@ use crate::{
 // Helper type aliases
 
 pub(crate) type StateBitsSquaredCommits<O> =
-    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
+    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NStBits>>;
 
 pub(crate) type StateBytesCommits<O> =
-    Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
+    Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NStBytes>>;
 
 pub(crate) type StateBytesSquaredCommits<O> =
-    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
+    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NStBytes>>;
 
 // implementations of StateToBytes
 
@@ -39,7 +39,7 @@ where
 
     fn state_to_bytes(&self) -> Self::Output
 where {
-        (0..O::NSTBytes::USIZE)
+        (0..O::NStBytes::USIZE)
             .map(|i| {
                 FieldCommitDegOne::new(
                     OWFField::<O>::byte_combine_bits(self.keys[i]),
@@ -57,7 +57,7 @@ where
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
     O: OWFParameters,
 {
-    type Output = Box<GenericArray<OWFField<O>, O::NSTBytes>>;
+    type Output = Box<GenericArray<OWFField<O>, O::NStBytes>>;
 
     fn state_to_bytes(&self) -> Self::Output {
         self.iter()
@@ -213,22 +213,22 @@ where
     }
 }
 
-impl<O> InverseShiftRows<O> for ByteCommitsRef<'_, OWFField<O>, O::NSTBytes>
+impl<O> InverseShiftRows<O> for ByteCommitsRef<'_, OWFField<O>, O::NStBytes>
 where
     O: OWFParameters,
 {
-    type Output = ByteCommits<OWFField<O>, O::NSTBytes>;
+    type Output = ByteCommits<OWFField<O>, O::NStBytes>;
 
     fn inverse_shift_rows(&self) -> Self::Output {
-        let mut state_prime = ByteCommits::<OWFField<O>, O::NSTBytes>::default();
+        let mut state_prime = ByteCommits::<OWFField<O>, O::NStBytes>::default();
 
         for r in 0..4 {
-            for c in 0..O::NST::USIZE {
+            for c in 0..O::NSt::USIZE {
                 // :: 3-6
-                let i = if (O::NST::USIZE != 8) || (r <= 1) {
-                    4 * ((O::NST::USIZE + c - r) % O::NST::USIZE) + r
+                let i = if (O::NSt::USIZE != 8) || (r <= 1) {
+                    4 * ((O::NSt::USIZE + c - r) % O::NSt::USIZE) + r
                 } else {
-                    4 * ((O::NST::USIZE + c - r - 1) % O::NST::USIZE) + r
+                    4 * ((O::NSt::USIZE + c - r - 1) % O::NSt::USIZE) + r
                 };
 
                 // :: 7
@@ -258,7 +258,7 @@ where
             OWFField::<O>::BYTE_COMBINE_3
         };
 
-        for c in 0..O::NST::USIZE {
+        for c in 0..O::NSt::USIZE {
             // Save the 4 state's columns that will be modified in this round
             let tmp = GenericArray::<_, U4>::from_slice(&self[4 * c..4 * c + 4]).to_owned();
 
@@ -289,16 +289,16 @@ where
     }
 }
 
-impl<O> BytewiseMixColumns<O> for ByteCommitsRef<'_, OWFField<O>, O::NSTBytes>
+impl<O> BytewiseMixColumns<O> for ByteCommitsRef<'_, OWFField<O>, O::NStBytes>
 where
     O: OWFParameters,
 {
-    type Output = ByteCommits<OWFField<O>, O::NSTBytes>;
+    type Output = ByteCommits<OWFField<O>, O::NStBytes>;
 
     fn bytewise_mix_columns(&self) -> Self::Output {
-        let mut o = ByteCommits::<_, O::NSTBytes>::default();
+        let mut o = ByteCommits::<_, O::NStBytes>::default();
 
-        for c in 0..O::NST::USIZE {
+        for c in 0..O::NSt::USIZE {
             for r in 0..4 {
                 // ::4
                 let a_key = self.keys[4 * c + r];
@@ -367,7 +367,7 @@ where
         let t = sq as usize;
 
         // :: 8-10
-        (0..O::NSTBytes::USIZE)
+        (0..O::NStBytes::USIZE)
             .map(|i| {
                 // :: 9
 

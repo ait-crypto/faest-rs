@@ -19,27 +19,27 @@ use crate::{
     verifier::{VoleCommits, VoleCommitsRef},
 };
 
-impl<O> StateToBytes<O> for VoleCommits<'_, OWFField<O>, O::NSTBits>
+impl<O> StateToBytes<O> for VoleCommits<'_, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = GenericArray<OWFField<O>, O::NSTBytes>;
+    type Output = GenericArray<OWFField<O>, O::NStBytes>;
 
     fn state_to_bytes(&self) -> Self::Output {
-        (0..O::NSTBytes::USIZE)
+        (0..O::NStBytes::USIZE)
             .map(|i| OWFField::<O>::byte_combine_slice(&self.scalars[8 * i..8 * i + 8]))
             .collect()
     }
 }
 
-impl<O> StateToBytes<O> for VoleCommitsRef<'_, OWFField<O>, O::NSTBits>
+impl<O> StateToBytes<O> for VoleCommitsRef<'_, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = GenericArray<OWFField<O>, O::NSTBytes>;
+    type Output = GenericArray<OWFField<O>, O::NStBytes>;
 
     fn state_to_bytes(&self) -> Self::Output {
-        (0..O::NSTBytes::USIZE)
+        (0..O::NStBytes::USIZE)
             .map(|i| OWFField::<O>::byte_combine_slice(&self.scalars[8 * i..8 * i + 8]))
             .collect()
     }
@@ -194,22 +194,22 @@ where
     }
 }
 
-impl<'a, O> InverseShiftRows<O> for VoleCommitsRef<'a, OWFField<O>, O::NSTBits>
+impl<'a, O> InverseShiftRows<O> for VoleCommitsRef<'a, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = VoleCommits<'a, OWFField<O>, O::NSTBits>;
+    type Output = VoleCommits<'a, OWFField<O>, O::NStBits>;
 
     fn inverse_shift_rows(&self) -> Self::Output {
         let mut state_prime = GenericArray::default_boxed();
 
         for r in 0..4 {
-            for c in 0..O::NST::USIZE {
+            for c in 0..O::NSt::USIZE {
                 // :: 3-6
-                let i = if (O::NST::USIZE != 8) || (r <= 1) {
-                    4 * ((O::NST::USIZE + c - r) % O::NST::USIZE) + r
+                let i = if (O::NSt::USIZE != 8) || (r <= 1) {
+                    4 * ((O::NSt::USIZE + c - r) % O::NSt::USIZE) + r
                 } else {
-                    4 * ((O::NST::USIZE + c - r - 1) % O::NST::USIZE) + r
+                    4 * ((O::NSt::USIZE + c - r - 1) % O::NSt::USIZE) + r
                 };
 
                 // :: 7
@@ -225,22 +225,22 @@ where
     }
 }
 
-impl<'a, O> InverseShiftRows<O> for &VoleCommits<'a, OWFField<O>, O::NSTBits>
+impl<'a, O> InverseShiftRows<O> for &VoleCommits<'a, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = VoleCommits<'a, OWFField<O>, O::NSTBits>;
+    type Output = VoleCommits<'a, OWFField<O>, O::NStBits>;
 
     fn inverse_shift_rows(&self) -> Self::Output {
         let mut state_prime = GenericArray::default_boxed();
 
         for r in 0..4 {
-            for c in 0..O::NST::USIZE {
+            for c in 0..O::NSt::USIZE {
                 // :: 3-6
-                let i = if (O::NST::USIZE != 8) || (r <= 1) {
-                    4 * ((O::NST::USIZE + c - r) % O::NST::USIZE) + r
+                let i = if (O::NSt::USIZE != 8) || (r <= 1) {
+                    4 * ((O::NSt::USIZE + c - r) % O::NSt::USIZE) + r
                 } else {
-                    4 * ((O::NST::USIZE + c - r - 1) % O::NST::USIZE) + r
+                    4 * ((O::NSt::USIZE + c - r - 1) % O::NSt::USIZE) + r
                 };
 
                 // :: 7
@@ -256,16 +256,16 @@ where
     }
 }
 
-impl<'a, O> BytewiseMixColumns<O> for VoleCommitsRef<'a, OWFField<O>, O::NSTBits>
+impl<'a, O> BytewiseMixColumns<O> for VoleCommitsRef<'a, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = VoleCommits<'a, OWFField<O>, O::NSTBits>;
+    type Output = VoleCommits<'a, OWFField<O>, O::NStBits>;
 
     fn bytewise_mix_columns(&self) -> Self::Output {
-        let mut o = GenericArray::<_, O::NSTBits>::default_boxed();
+        let mut o = GenericArray::<_, O::NStBits>::default_boxed();
 
-        for c in 0..O::NST::USIZE {
+        for c in 0..O::NSt::USIZE {
             for r in 0..4 {
                 // ::4
                 let a_key = &self.scalars[32 * c + 8 * r..32 * c + 8 * r + 8];
@@ -313,11 +313,11 @@ where
     }
 }
 
-impl<'a, O> SBoxAffine<O> for VoleCommits<'a, OWFField<O>, O::NSTBits>
+impl<'a, O> SBoxAffine<O> for VoleCommits<'a, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = VoleCommits<'a, OWFField<O>, O::NSTBytes>;
+    type Output = VoleCommits<'a, OWFField<O>, O::NStBytes>;
 
     fn s_box_affine(&self, sq: bool) -> Self::Output {
         let sigmas = if sq {
@@ -329,7 +329,7 @@ where
         let t = sq as usize;
 
         // :: 8-10
-        let scalars = (0..O::NSTBytes::USIZE)
+        let scalars = (0..O::NStBytes::USIZE)
             .map(|i| {
                 // :: 9
                 let mut y_i = sigmas[8] * self.delta.square();
@@ -397,7 +397,7 @@ where
     }
 }
 
-impl<O> MixColumns<O> for VoleCommits<'_, OWFField<O>, O::NSTBytes>
+impl<O> MixColumns<O> for VoleCommits<'_, OWFField<O>, O::NStBytes>
 where
     O: OWFParameters,
 {
@@ -411,7 +411,7 @@ where
             (OWFField::<O>::BYTE_COMBINE_2, OWFField::<O>::BYTE_COMBINE_3)
         };
 
-        for c in 0..O::NST::USIZE {
+        for c in 0..O::NSt::USIZE {
             // Save the 4 state's columns that will be modified in this round
             let tmp = GenericArray::<_, U4>::from_slice(&self.scalars[4 * c..4 * c + 4]).to_owned();
 

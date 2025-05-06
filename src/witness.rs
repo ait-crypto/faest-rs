@@ -15,9 +15,9 @@ use crate::{
 };
 
 pub(crate) fn aes_extendedwitness<O>(
-    owf_secret: &GenericArray<u8, O::LAMBDABYTES>,
+    owf_secret: &GenericArray<u8, O::LambdaBytes>,
     owf_input: &GenericArray<u8, O::InputSize>,
-) -> Box<GenericArray<u8, O::LBYTES>>
+) -> Box<GenericArray<u8, O::LBytes>>
 where
     O: OWFParameters,
 {
@@ -30,7 +30,7 @@ where
     // Step 6
     // Note: for FAEST-LAMBDA-EM, SKE is set to the actual number of S-Boxes in Rijndael-LAMBDA.KeyExpansion.
     // This slightly differs from FAEST Spec v2, where SKE is always set to 0 in EM mode.
-    let kb = rijndael_key_schedule::<O::NST, O::NK, O::R>(owf_secret, O::SKE::USIZE);
+    let kb = rijndael_key_schedule::<O::NSt, O::NK, O::R>(owf_secret, O::SKe::USIZE);
 
     let mut index = 0;
 
@@ -45,7 +45,7 @@ where
     }
 
     // Step 14
-    for _ in 0..O::BETA::USIZE {
+    for _ in 0..O::Beta::USIZE {
         round_with_save::<O>(&input, &kb, &mut witness, &mut index);
         input[0] ^= 1;
     }
@@ -57,8 +57,8 @@ fn save_key_bits<O>(witness: &mut [u8], key: &[u8], index: &mut usize)
 where
     O: OWFParameters,
 {
-    witness[..O::LAMBDABYTES::USIZE].copy_from_slice(key);
-    *index += O::LAMBDABYTES::USIZE;
+    witness[..O::LambdaBytes::USIZE].copy_from_slice(key);
+    *index += O::LambdaBytes::USIZE;
 }
 
 fn save_non_lin_bits<O>(witness: &mut [u8], kb: &[u32], index: &mut usize)
@@ -68,9 +68,9 @@ where
     let start_off = 1 + (O::NK::USIZE / 8);
 
     let non_lin_blocks = if O::NK::USIZE % 4 == 0 {
-        O::SKE::USIZE / 4
+        O::SKe::USIZE / 4
     } else {
-        O::SKE::USIZE * 3 / 8
+        O::SKe::USIZE * 3 / 8
     };
 
     for j in start_off..start_off + non_lin_blocks {
@@ -148,12 +148,12 @@ fn round_with_save<O>(
         rijndael_sub_bytes(&mut state);
 
         // Step 24
-        rijndael_shift_rows_1::<O::NST>(&mut state);
+        rijndael_shift_rows_1::<O::NSt>(&mut state);
 
         // Step 25
         if !even_round {
             // Step 26
-            for i in convert_from_batchblocks(inv_bitslice(&state)).take(O::NST::USIZE) {
+            for i in convert_from_batchblocks(inv_bitslice(&state)).take(O::NSt::USIZE) {
                 witness[*index..*index + size_of::<u32>()].copy_from_slice(&i);
                 *index += size_of::<u32>();
             }

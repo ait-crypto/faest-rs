@@ -14,8 +14,8 @@ use crate::{
 
 pub(super) fn key_exp_cstrnts<O>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,
-    w: ByteCommitsRef<OWFField<O>, O::LKEBytes>,
-) -> ByteCommits<OWFField<O>, O::PRODRUN128Bytes>
+    w: ByteCommitsRef<OWFField<O>, O::LKeBytes>,
+) -> ByteCommits<OWFField<O>, O::R1Times128Bytes>
 where
     O: OWFParameters,
     OWFField<O>: BigGaloisField + ByteCombine,
@@ -25,7 +25,7 @@ where
 
     // ::2
     let w_flat = key_exp_bkwd::<O>(
-        w.get_commits_ref::<O::DIFFLKELAMBDABytes>(O::LAMBDABYTES::USIZE),
+        w.get_commits_ref::<O::LKeMinusLambdaBytes>(O::LambdaBytes::USIZE),
         k.to_ref(),
     );
 
@@ -34,7 +34,7 @@ where
     let mut do_rot_word = true;
 
     // ::7
-    iproduct!(0..O::SKE::USIZE / 4, 0..4).for_each(|(j, r)| {
+    iproduct!(0..O::SKe::USIZE / 4, 0..4).for_each(|(j, r)| {
         // ::11
         let r_prime_inv = if do_rot_word { (4 + r - 3) % 4 } else { r };
 
@@ -51,12 +51,12 @@ where
 
         if r == 3 {
             // ::16
-            if O::LAMBDA::USIZE == 256 {
+            if O::Lambda::USIZE == 256 {
                 do_rot_word = !do_rot_word;
             }
 
             // ::21
-            if O::LAMBDA::USIZE == 192 {
+            if O::Lambda::USIZE == 192 {
                 iwd += 192;
             } else {
                 iwd += 128;
@@ -68,19 +68,19 @@ where
 }
 
 fn key_exp_fwd<O>(
-    w: ByteCommitsRef<OWFField<O>, O::LKEBytes>,
-) -> ByteCommits<OWFField<O>, O::PRODRUN128Bytes>
+    w: ByteCommitsRef<OWFField<O>, O::LKeBytes>,
+) -> ByteCommits<OWFField<O>, O::R1Times128Bytes>
 where
     O: OWFParameters,
 {
     let mut y = ByteCommits::default();
 
     // ::1
-    y.keys[..O::LAMBDABYTES::USIZE].copy_from_slice(&w.keys[..O::LAMBDABYTES::USIZE]);
-    y.tags[..O::LAMBDA::USIZE].copy_from_slice(&w.tags[..O::LAMBDA::USIZE]);
+    y.keys[..O::LambdaBytes::USIZE].copy_from_slice(&w.keys[..O::LambdaBytes::USIZE]);
+    y.tags[..O::Lambda::USIZE].copy_from_slice(&w.tags[..O::Lambda::USIZE]);
 
     // ::2
-    let mut i_wd = O::LAMBDA::USIZE;
+    let mut i_wd = O::Lambda::USIZE;
 
     for j in O::NK::USIZE..(4 * (O::R::USIZE + 1)) {
         // ::5
@@ -108,9 +108,9 @@ where
 }
 
 fn key_exp_bkwd<O>(
-    x: ByteCommitsRef<OWFField<O>, O::DIFFLKELAMBDABytes>,
-    xk: ByteCommitsRef<OWFField<O>, O::PRODRUN128Bytes>,
-) -> ByteCommits<OWFField<O>, O::SKE>
+    x: ByteCommitsRef<OWFField<O>, O::LKeMinusLambdaBytes>,
+    xk: ByteCommitsRef<OWFField<O>, O::R1Times128Bytes>,
+) -> ByteCommits<OWFField<O>, O::SKe>
 where
     O: OWFParameters,
 {
@@ -118,9 +118,9 @@ where
 
     let mut iwd = 0;
 
-    let rcon_evry = 4 * (O::LAMBDA::USIZE / 128);
+    let rcon_evry = 4 * (O::Lambda::USIZE / 128);
 
-    for j in 0..O::SKE::USIZE {
+    for j in 0..O::SKe::USIZE {
         // ::7
         let mut x_tilde = x.keys[j] ^ xk.keys[iwd / 8 + (j % 4)];
 
@@ -142,8 +142,8 @@ where
 
         // ::12
         if j % 4 == 3 {
-            if O::LAMBDA::USIZE != 256 {
-                iwd += O::LAMBDA::USIZE;
+            if O::Lambda::USIZE != 256 {
+                iwd += O::Lambda::USIZE;
             } else {
                 iwd += 128;
             }

@@ -36,6 +36,12 @@ use crate::{
 // l_hat = l + 3*lambda + B
 type LHatBytes<LBytes, LambdaBytes, B> = Sum<LBytes, Sum<Prod<U3, LambdaBytes>, Quot<B, U8>>>;
 
+/// Extract base field from OWF parameters
+pub(crate) type OWFField<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
+
+/// The QuickSilver proof message
+pub(crate) type QSProof<O> = (OWFField<O>, OWFField<O>, OWFField<O>);
+
 pub(crate) trait SecurityParameter:
     ArrayLength
     + Add<Self, Output: ArrayLength>
@@ -67,11 +73,11 @@ pub(crate) trait BaseParameters {
     type RandomOracle: RandomOracle;
     /// Associated PRG
     type PRG: PseudoRandomGenerator<KeySize = Self::LambdaBytes>;
-
     /// Security parameter (in bits)
     type Lambda: ArrayLength;
     /// Security parameter (in bytes)
     type LambdaBytes: SecurityParameter;
+    /// Two times the security parameter (in bytes)
     type LambdaBytesTimes2: ArrayLength;
     type Chall: ArrayLength;
     type Chall1: ArrayLength;
@@ -135,79 +141,91 @@ impl BaseParameters for BaseParams256 {
     type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
 }
 
-pub(crate) type QSProof<O> = (
-    <<O as OWFParameters>::BaseParams as BaseParameters>::Field,
-    <<O as OWFParameters>::BaseParams as BaseParameters>::Field,
-    <<O as OWFParameters>::BaseParams as BaseParameters>::Field,
-);
-
-pub(crate) type OWFField<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
-
 pub(crate) trait OWFParameters: Sized {
     // Base parameters of the OWF
-    type BaseParams: BaseParameters<Lambda = Self::LAMBDA, LambdaBytes = Self::LAMBDABYTES>;
+    type BaseParams: BaseParameters<Lambda = Self::Lambda, LambdaBytes = Self::LambdaBytes>;
+    /// Length of secret key (in bytes)
+    type SK: ArrayLength;
+    /// Length of public key (in bytes)
+    type PK: ArrayLength;
     /// The input size of the OWF (in bytes)
     type InputSize: ArrayLength + Mul<U8, Output: ArrayLength>;
     /// The output size of the OWF (in bytes)
     type OutputSize: ArrayLength + Mul<U8, Output: ArrayLength>;
-
-    type B: ArrayLength;
-    type LAMBDA: ArrayLength + Mul<U2, Output: ArrayLength>;
-    type LAMBDABYTES: SecurityParameter
+    /// Security parameter (in bits)
+    type Lambda: ArrayLength + Mul<U2, Output: ArrayLength>;
+    /// Security parameter (in bytes)
+    type LambdaBytes: SecurityParameter
         + Mul<Self::NLeafCommit, Output: ArrayLength>
-        + Mul<U2, Output = Self::LAMBDABYTESTWO>
-        + Mul<U8, Output = Self::LAMBDA>;
-    type LAMBDABYTESTWO: ArrayLength + Add<Self::LBYTES, Output = Self::LAMBDALBYTES>;
-
+        + Mul<U2, Output = Self::LambdaBytesTimes2>
+        + Mul<U8, Output = Self::Lambda>;
+    /// Two times the security parameter (in bytes)
+    type LambdaBytesTimes2: ArrayLength + Add<Self::LBytes, Output = Self::LProdLambdaBytes>;
+    /// Extra length padding for the VOLE check
+    type B: ArrayLength;
+    /// Witness length for the zk proof (in bytes)
+    type LBytes: ArrayLength + Mul<U8, Output = Self::L>;
+    /// Witness length for the zk proof (in bits)
     type L: ArrayLength;
-    type LBYTES: ArrayLength + Mul<U8, Output = Self::L>;
-    type LHATBYTES: ArrayLength + Mul<U8, Output: ArrayLength>;
-
-    type BETA: ArrayLength;
+    /// Witness length plus extra randomness for VOLE + ZK checks
+    type LHatBytes: ArrayLength + Mul<U8, Output: ArrayLength>;
+    /// Number of message blocks
+    type Beta: ArrayLength;
+    /// Number of 32-bit words in key
     type NK: ArrayLength;
+    /// Number of encryption rounds
     type R: ArrayLength;
-    type SKE: ArrayLength + Mul<U8, Output: ArrayLength>;
-    type LKE: ArrayLength;
-    type LKEBytes: ArrayLength + Mul<U8, Output = Self::LKE>;
-    type LENC: ArrayLength;
-    type LENCBytes: ArrayLength + Mul<U8, Output: ArrayLength>;
-    type NST: ArrayLength + Mul<U4, Output = Self::NSTBytes>;
-    type NSTBytes: SecurityParameter
-        + Mul<U8, Output = Self::NSTBits>
+    /// Number of S-boxes in key schedule
+    type SKe: ArrayLength + Mul<U8, Output: ArrayLength>;
+    /// Number of witness bits for key schedule (in bits)
+    type LKe: ArrayLength;
+    /// Number of witness bits for key schedule (in bytes)
+    type LKeBytes: ArrayLength + Mul<U8, Output = Self::LKe>;
+    /// Number of witness bits for encryption (in bits)
+    type LEnc: ArrayLength;
+    /// Number of witness bits for encryption (in bytes)
+    type LEncBytes: ArrayLength + Mul<U8, Output: ArrayLength>;
+    /// Block size (in 32-bit words)
+    type NSt: ArrayLength + Mul<U4, Output = Self::NStBytes>;
+    /// Block size (in bytes)
+    type NStBytes: SecurityParameter
+        + Mul<U8, Output = Self::NStBits>
         + Div<U2, Output: ArrayLength + Mul<U8, Output: ArrayLength>>;
-    type NSTBits: ArrayLength
+    /// Block size (in bits)
+    type NStBits: ArrayLength
         + Mul<U4, Output: ArrayLength>
         + Div<U2, Output: ArrayLength + Mul<U8, Output: ArrayLength>>;
+    /// Number of Lambda-bit blocks in each leaf commitment
     type NLeafCommit: ArrayLength;
-    type LAMBDALBYTES: ArrayLength + Mul<U8, Output: ArrayLength>;
-
-    type PRODRUN128Bytes: ArrayLength
-        + Mul<U8, Output = Self::PRODRUN128>
-        + Sub<Self::LKEBytes, Output: ArrayLength>;
-    type PRODRUN128: ArrayLength + Sub<Self::LKE, Output: ArrayLength>;
-
-    type DIFFLKELAMBDA: ArrayLength;
-    type DIFFLKELAMBDABytes: ArrayLength + Mul<U8, Output: ArrayLength>;
-
-    type SK: ArrayLength;
-    type PK: ArrayLength;
+    /// Result of [`Self::L`] * [`Self::Lambda`] (in bytes)
+    type LProdLambdaBytes: ArrayLength + Mul<U8, Output: ArrayLength>;
+    /// Result of ([`Self::R`] + 1) * 128 (in bytes)
+    type R1Times128Bytes: ArrayLength
+        + Mul<U8, Output = Self::R1Times128>
+        + Sub<Self::LKeBytes, Output: ArrayLength>;
+    /// Result of ([`Self::R`] + 1) * 128 (in bits)
+    type R1Times128: ArrayLength + Sub<Self::LKe, Output: ArrayLength>;
+    /// Result of [`Self::LKe`] - [`Self::Lambda`] (in bytes)
+    type LKeMinusLambdaBytes: ArrayLength + Mul<U8, Output: ArrayLength>;
+    /// Result of [`Self::LKe`] - [`Self::Lambda`] (in bits)
+    type LKeMinusLambda: ArrayLength;
 
     fn is_em() -> bool;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]);
 
     fn extendwitness(
-        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_key: &GenericArray<u8, Self::LambdaBytes>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> Box<GenericArray<u8, Self::LBYTES>>;
+    ) -> Box<GenericArray<u8, Self::LBytes>>;
 
-    fn witness(sk: &SecretKey<Self>) -> Box<GenericArray<u8, Self::LBYTES>> {
+    fn witness(sk: &SecretKey<Self>) -> Box<GenericArray<u8, Self::LBytes>> {
         Self::extendwitness(&sk.owf_key, &sk.pk.owf_input)
     }
 
     fn prove(
-        w: &GenericArray<u8, Self::LBYTES>,
-        u: &GenericArray<u8, Self::LAMBDABYTESTWO>,
+        w: &GenericArray<u8, Self::LBytes>,
+        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
         v: CstrntsVal<Self>,
         pk: &PublicKey<Self>,
         chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
@@ -215,16 +233,17 @@ pub(crate) trait OWFParameters: Sized {
 
     fn verify(
         q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBYTES>,
+        d: &GenericArray<u8, Self::LBytes>,
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall_3: &GenericArray<u8, Self::LambdaBytes>,
         a1_tilde: &OWFField<Self>,
         a2_tilde: &OWFField<Self>,
     ) -> OWFField<Self>;
 
     fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<Self> {
         let mut owf_key = GenericArray::default();
+
         loop {
             rng.fill_bytes(&mut owf_key);
             if owf_key[0] & 0b11 != 0b11 {
@@ -257,32 +276,32 @@ impl OWFParameters for OWF128 {
     type OutputSize = U16;
 
     type B = U16;
-    type LAMBDA = U128;
-    type LAMBDABYTES = U16;
-    type LAMBDABYTESTWO = Prod<Self::LAMBDABYTES, U2>;
-    type LBYTES = U160;
-    type L = Prod<Self::LBYTES, U8>;
-    type LHATBYTES = LHatBytes<Self::LBYTES, Self::LAMBDABYTES, Self::B>;
+    type Lambda = U128;
+    type LambdaBytes = U16;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LBytes = U160;
+    type L = Prod<Self::LBytes, U8>;
+    type LHatBytes = LHatBytes<Self::LBytes, Self::LambdaBytes, Self::B>;
 
     type NK = U4;
     type R = U10;
-    type SKE = U40;
-    type BETA = U1;
-    type LKE = U448;
-    type LKEBytes = Quot<Self::LKE, U8>;
-    type LENC = U832;
-    type LENCBytes = Quot<Self::LENC, U8>;
-    type NST = U4;
-    type NSTBytes = Prod<Self::NST, U4>;
-    type NSTBits = Prod<Self::NSTBytes, U8>;
+    type SKe = U40;
+    type Beta = U1;
+    type LKe = U448;
+    type LKeBytes = Quot<Self::LKe, U8>;
+    type LEnc = U832;
+    type LEncBytes = Quot<Self::LEnc, U8>;
+    type NSt = U4;
+    type NStBytes = Prod<Self::NSt, U4>;
+    type NStBits = Prod<Self::NStBytes, U8>;
     type NLeafCommit = U3;
-    type LAMBDALBYTES = Sum<Self::LAMBDABYTESTWO, Self::LBYTES>;
+    type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
 
-    type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
-    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
+    type R1Times128 = Prod<Sum<Self::R, U1>, U128>;
+    type R1Times128Bytes = Quot<Self::R1Times128, U8>;
 
-    type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
-    type DIFFLKELAMBDABytes = Quot<Self::DIFFLKELAMBDA, U8>;
+    type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
+    type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
 
     type SK = U32;
     type PK = U32;
@@ -301,16 +320,16 @@ impl OWFParameters for OWF128 {
 
     #[inline]
     fn extendwitness(
-        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_key: &GenericArray<u8, Self::LambdaBytes>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> Box<GenericArray<u8, Self::LBYTES>> {
+    ) -> Box<GenericArray<u8, Self::LBytes>> {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
     #[inline]
     fn prove(
-        w: &GenericArray<u8, Self::LBYTES>,
-        u: &GenericArray<u8, Self::LAMBDABYTESTWO>,
+        w: &GenericArray<u8, Self::LBytes>,
+        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
         v: CstrntsVal<Self>,
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
@@ -321,10 +340,10 @@ impl OWFParameters for OWF128 {
     #[inline]
     fn verify(
         q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBYTES>,
+        d: &GenericArray<u8, Self::LBytes>,
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall_3: &GenericArray<u8, Self::LambdaBytes>,
         a1_tilde: &OWFField<Self>,
         a2_tilde: &OWFField<Self>,
     ) -> OWFField<Self> {
@@ -341,32 +360,32 @@ impl OWFParameters for OWF192 {
     type OutputSize = U32;
 
     type B = U16;
-    type LAMBDA = U192;
-    type LAMBDABYTES = U24;
-    type LAMBDABYTESTWO = Prod<Self::LAMBDABYTES, U2>;
-    type LBYTES = U312;
-    type L = Prod<Self::LBYTES, U8>;
-    type LHATBYTES = LHatBytes<Self::LBYTES, Self::LAMBDABYTES, Self::B>;
-    type LAMBDALBYTES = Sum<Self::LAMBDABYTESTWO, Self::LBYTES>;
+    type Lambda = U192;
+    type LambdaBytes = U24;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LBytes = U312;
+    type L = Prod<Self::LBytes, U8>;
+    type LHatBytes = LHatBytes<Self::LBytes, Self::LambdaBytes, Self::B>;
+    type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
 
     type NK = U6;
     type R = U12;
-    type SKE = U32;
-    type BETA = U2;
-    type LKE = U448;
-    type LKEBytes = Quot<Self::LKE, U8>;
-    type LENC = U1024;
-    type LENCBytes = Quot<Self::LENC, U8>;
-    type NST = U4;
-    type NSTBytes = Prod<Self::NST, U4>;
-    type NSTBits = Prod<Self::NSTBytes, U8>;
+    type SKe = U32;
+    type Beta = U2;
+    type LKe = U448;
+    type LKeBytes = Quot<Self::LKe, U8>;
+    type LEnc = U1024;
+    type LEncBytes = Quot<Self::LEnc, U8>;
+    type NSt = U4;
+    type NStBytes = Prod<Self::NSt, U4>;
+    type NStBits = Prod<Self::NStBytes, U8>;
     type NLeafCommit = U3;
 
-    type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
-    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
+    type R1Times128 = Prod<Sum<Self::R, U1>, U128>;
+    type R1Times128Bytes = Quot<Self::R1Times128, U8>;
 
-    type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
-    type DIFFLKELAMBDABytes = Quot<Self::DIFFLKELAMBDA, U8>;
+    type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
+    type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
 
     type SK = U40;
     type PK = U48;
@@ -393,16 +412,16 @@ impl OWFParameters for OWF192 {
 
     #[inline]
     fn extendwitness(
-        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_key: &GenericArray<u8, Self::LambdaBytes>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> Box<GenericArray<u8, Self::LBYTES>> {
+    ) -> Box<GenericArray<u8, Self::LBytes>> {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
     #[inline]
     fn prove(
-        w: &GenericArray<u8, Self::LBYTES>,
-        u: &GenericArray<u8, Self::LAMBDABYTESTWO>,
+        w: &GenericArray<u8, Self::LBytes>,
+        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
         v: CstrntsVal<Self>,
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
@@ -413,10 +432,10 @@ impl OWFParameters for OWF192 {
     #[inline]
     fn verify(
         q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBYTES>,
+        d: &GenericArray<u8, Self::LBytes>,
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall_3: &GenericArray<u8, Self::LambdaBytes>,
         a1_tilde: &OWFField<Self>,
         a2_tilde: &OWFField<Self>,
     ) -> OWFField<Self> {
@@ -435,32 +454,32 @@ impl OWFParameters for OWF256 {
     type OutputSize = U32;
 
     type B = U16;
-    type LAMBDA = U256;
-    type LAMBDABYTES = U32;
-    type LAMBDABYTESTWO = Prod<Self::LAMBDABYTES, U2>;
-    type LBYTES = U388;
-    type L = Prod<Self::LBYTES, U8>;
-    type LHATBYTES = LHatBytes<Self::LBYTES, Self::LAMBDABYTES, Self::B>;
-    type LAMBDALBYTES = Sum<Self::LAMBDABYTESTWO, Self::LBYTES>;
+    type Lambda = U256;
+    type LambdaBytes = U32;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LBytes = U388;
+    type L = Prod<Self::LBytes, U8>;
+    type LHatBytes = LHatBytes<Self::LBytes, Self::LambdaBytes, Self::B>;
+    type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
 
     type NK = U8;
     type R = U14;
-    type SKE = U52;
-    type BETA = U2;
-    type LKE = U672;
-    type LKEBytes = Quot<Self::LKE, U8>;
-    type LENC = U1216;
-    type LENCBytes = Quot<Self::LENC, U8>;
-    type NST = U4;
-    type NSTBytes = Prod<Self::NST, U4>;
-    type NSTBits = Prod<Self::NSTBytes, U8>;
+    type SKe = U52;
+    type Beta = U2;
+    type LKe = U672;
+    type LKeBytes = Quot<Self::LKe, U8>;
+    type LEnc = U1216;
+    type LEncBytes = Quot<Self::LEnc, U8>;
+    type NSt = U4;
+    type NStBytes = Prod<Self::NSt, U4>;
+    type NStBits = Prod<Self::NStBytes, U8>;
     type NLeafCommit = U3;
 
-    type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
-    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
+    type R1Times128 = Prod<Sum<Self::R, U1>, U128>;
+    type R1Times128Bytes = Quot<Self::R1Times128, U8>;
 
-    type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
-    type DIFFLKELAMBDABytes = Quot<Self::DIFFLKELAMBDA, U8>;
+    type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
+    type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
 
     type SK = U48;
     type PK = U48;
@@ -487,16 +506,16 @@ impl OWFParameters for OWF256 {
 
     #[inline]
     fn extendwitness(
-        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_key: &GenericArray<u8, Self::LambdaBytes>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> Box<GenericArray<u8, Self::LBYTES>> {
+    ) -> Box<GenericArray<u8, Self::LBytes>> {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
     #[inline]
     fn prove(
-        w: &GenericArray<u8, Self::LBYTES>,
-        u: &GenericArray<u8, Self::LAMBDABYTESTWO>,
+        w: &GenericArray<u8, Self::LBytes>,
+        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
         v: CstrntsVal<Self>,
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
@@ -507,10 +526,10 @@ impl OWFParameters for OWF256 {
     #[inline]
     fn verify(
         q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBYTES>,
+        d: &GenericArray<u8, Self::LBytes>,
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall_3: &GenericArray<u8, Self::LambdaBytes>,
         a1_tilde: &OWFField<Self>,
         a2_tilde: &OWFField<Self>,
     ) -> OWFField<Self> {
@@ -527,32 +546,32 @@ impl OWFParameters for OWF128EM {
     type OutputSize = U16;
 
     type B = U16;
-    type LAMBDA = U128;
-    type LAMBDABYTES = U16;
-    type LAMBDABYTESTWO = Prod<Self::LAMBDABYTES, U2>;
-    type LBYTES = U120;
-    type L = Prod<Self::LBYTES, U8>;
-    type LHATBYTES = LHatBytes<Self::LBYTES, Self::LAMBDABYTES, Self::B>;
-    type LAMBDALBYTES = Sum<Self::LAMBDABYTESTWO, Self::LBYTES>;
+    type Lambda = U128;
+    type LambdaBytes = U16;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LBytes = U120;
+    type L = Prod<Self::LBytes, U8>;
+    type LHatBytes = LHatBytes<Self::LBytes, Self::LambdaBytes, Self::B>;
+    type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
 
     type NK = U4;
-    type NST = U4;
-    type NSTBytes = Prod<Self::NST, U4>;
-    type NSTBits = Prod<Self::NSTBytes, U8>;
+    type NSt = U4;
+    type NStBytes = Prod<Self::NSt, U4>;
+    type NStBits = Prod<Self::NStBytes, U8>;
     type R = U10;
-    type SKE = U40;
-    type BETA = U1;
-    type LKE = U128;
-    type LKEBytes = Quot<Self::LKE, U8>;
-    type LENC = U832;
-    type LENCBytes = Quot<Self::LENC, U8>;
+    type SKe = U40;
+    type Beta = U1;
+    type LKe = U128;
+    type LKeBytes = Quot<Self::LKe, U8>;
+    type LEnc = U832;
+    type LEncBytes = Quot<Self::LEnc, U8>;
     type NLeafCommit = U2;
 
-    type PRODRUN128 = Prod<Sum<Self::R, U1>, U128>;
-    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
+    type R1Times128 = Prod<Sum<Self::R, U1>, U128>;
+    type R1Times128Bytes = Quot<Self::R1Times128, U8>;
 
-    type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
-    type DIFFLKELAMBDABytes = Quot<Self::DIFFLKELAMBDA, U8>;
+    type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
+    type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
 
     type SK = U32;
     type PK = U32;
@@ -574,16 +593,16 @@ impl OWFParameters for OWF128EM {
 
     #[inline]
     fn extendwitness(
-        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_key: &GenericArray<u8, Self::LambdaBytes>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> Box<GenericArray<u8, Self::LBYTES>> {
+    ) -> Box<GenericArray<u8, Self::LBytes>> {
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
     #[inline]
     fn prove(
-        w: &GenericArray<u8, Self::LBYTES>,
-        u: &GenericArray<u8, Self::LAMBDABYTESTWO>,
+        w: &GenericArray<u8, Self::LBytes>,
+        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
         v: CstrntsVal<Self>,
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
@@ -594,10 +613,10 @@ impl OWFParameters for OWF128EM {
     #[inline]
     fn verify(
         q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBYTES>,
+        d: &GenericArray<u8, Self::LBytes>,
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall_3: &GenericArray<u8, Self::LambdaBytes>,
         a1_tilde: &OWFField<Self>,
         a2_tilde: &OWFField<Self>,
     ) -> OWFField<Self> {
@@ -616,32 +635,32 @@ impl OWFParameters for OWF192EM {
     type OutputSize = U24;
 
     type B = U16;
-    type LAMBDA = U192;
-    type LAMBDABYTES = U24;
-    type LAMBDABYTESTWO = Prod<Self::LAMBDABYTES, U2>;
-    type LBYTES = U216;
-    type L = Prod<Self::LBYTES, U8>;
-    type LHATBYTES = LHatBytes<Self::LBYTES, Self::LAMBDABYTES, Self::B>;
-    type LAMBDALBYTES = Sum<Self::LAMBDABYTESTWO, Self::LBYTES>;
+    type Lambda = U192;
+    type LambdaBytes = U24;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LBytes = U216;
+    type L = Prod<Self::LBytes, U8>;
+    type LHatBytes = LHatBytes<Self::LBytes, Self::LambdaBytes, Self::B>;
+    type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
 
     type NK = U6;
-    type NST = U6;
-    type NSTBytes = Prod<Self::NST, U4>;
-    type NSTBits = Prod<Self::NSTBytes, U8>;
-    type BETA = U1;
+    type NSt = U6;
+    type NStBytes = Prod<Self::NSt, U4>;
+    type NStBits = Prod<Self::NStBytes, U8>;
+    type Beta = U1;
     type R = U12;
-    type SKE = U52;
-    type LKE = U192;
-    type LKEBytes = Quot<Self::LKE, U8>;
-    type LENC = U1536;
-    type LENCBytes = Quot<Self::LENC, U8>;
+    type SKe = U52;
+    type LKe = U192;
+    type LKeBytes = Quot<Self::LKe, U8>;
+    type LEnc = U1536;
+    type LEncBytes = Quot<Self::LEnc, U8>;
     type NLeafCommit = U2;
 
-    type PRODRUN128 = Prod<Sum<Self::R, U1>, Self::LAMBDA>;
-    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
+    type R1Times128 = Prod<Sum<Self::R, U1>, Self::Lambda>;
+    type R1Times128Bytes = Quot<Self::R1Times128, U8>;
 
-    type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
-    type DIFFLKELAMBDABytes = Quot<Self::DIFFLKELAMBDA, U8>;
+    type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
+    type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
 
     type SK = U48;
     type PK = U48;
@@ -662,16 +681,16 @@ impl OWFParameters for OWF192EM {
 
     #[inline]
     fn extendwitness(
-        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_key: &GenericArray<u8, Self::LambdaBytes>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> Box<GenericArray<u8, Self::LBYTES>> {
+    ) -> Box<GenericArray<u8, Self::LBytes>> {
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
     #[inline]
     fn prove(
-        w: &GenericArray<u8, Self::LBYTES>,
-        u: &GenericArray<u8, Self::LAMBDABYTESTWO>,
+        w: &GenericArray<u8, Self::LBytes>,
+        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
         v: CstrntsVal<Self>,
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
@@ -682,10 +701,10 @@ impl OWFParameters for OWF192EM {
     #[inline]
     fn verify(
         q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBYTES>,
+        d: &GenericArray<u8, Self::LBytes>,
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall_3: &GenericArray<u8, Self::LambdaBytes>,
         a1_tilde: &OWFField<Self>,
         a2_tilde: &OWFField<Self>,
     ) -> OWFField<Self> {
@@ -704,32 +723,32 @@ impl OWFParameters for OWF256EM {
     type OutputSize = U32;
 
     type B = U16;
-    type LAMBDA = U256;
-    type LAMBDABYTES = U32;
-    type LAMBDABYTESTWO = Prod<Self::LAMBDABYTES, U2>;
-    type LBYTES = U336;
-    type L = Prod<Self::LBYTES, U8>;
-    type LHATBYTES = LHatBytes<Self::LBYTES, Self::LAMBDABYTES, Self::B>;
-    type LAMBDALBYTES = Sum<Self::LAMBDABYTESTWO, Self::LBYTES>;
+    type Lambda = U256;
+    type LambdaBytes = U32;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LBytes = U336;
+    type L = Prod<Self::LBytes, U8>;
+    type LHatBytes = LHatBytes<Self::LBytes, Self::LambdaBytes, Self::B>;
+    type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
 
     type NK = U8;
-    type NST = U8;
-    type NSTBytes = Prod<Self::NST, U4>;
-    type NSTBits = Prod<Self::NSTBytes, U8>;
-    type BETA = U1;
+    type NSt = U8;
+    type NStBytes = Prod<Self::NSt, U4>;
+    type NStBits = Prod<Self::NStBytes, U8>;
+    type Beta = U1;
     type R = U14;
-    type SKE = U60;
-    type LKE = U256;
-    type LKEBytes = Quot<Self::LKE, U8>;
-    type LENC = U2432;
-    type LENCBytes = Quot<Self::LENC, U8>;
+    type SKe = U60;
+    type LKe = U256;
+    type LKeBytes = Quot<Self::LKe, U8>;
+    type LEnc = U2432;
+    type LEncBytes = Quot<Self::LEnc, U8>;
     type NLeafCommit = U2;
 
-    type PRODRUN128 = Prod<Sum<Self::R, U1>, Self::LAMBDA>;
-    type PRODRUN128Bytes = Quot<Self::PRODRUN128, U8>;
+    type R1Times128 = Prod<Sum<Self::R, U1>, Self::Lambda>;
+    type R1Times128Bytes = Quot<Self::R1Times128, U8>;
 
-    type DIFFLKELAMBDA = Diff<Self::LKE, Self::LAMBDA>;
-    type DIFFLKELAMBDABytes = Quot<Self::DIFFLKELAMBDA, U8>;
+    type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
+    type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
 
     type SK = U64;
     type PK = U64;
@@ -751,16 +770,16 @@ impl OWFParameters for OWF256EM {
 
     #[inline]
     fn extendwitness(
-        owf_key: &GenericArray<u8, Self::LAMBDABYTES>,
+        owf_key: &GenericArray<u8, Self::LambdaBytes>,
         owf_input: &GenericArray<u8, Self::InputSize>,
-    ) -> Box<GenericArray<u8, Self::LBYTES>> {
+    ) -> Box<GenericArray<u8, Self::LBytes>> {
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
     #[inline]
     fn prove(
-        w: &GenericArray<u8, Self::LBYTES>,
-        u: &GenericArray<u8, Self::LAMBDABYTESTWO>,
+        w: &GenericArray<u8, Self::LBytes>,
+        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
         v: CstrntsVal<Self>,
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
@@ -771,10 +790,10 @@ impl OWFParameters for OWF256EM {
     #[inline]
     fn verify(
         q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBYTES>,
+        d: &GenericArray<u8, Self::LBytes>,
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LAMBDABYTES>,
+        chall_3: &GenericArray<u8, Self::LambdaBytes>,
         a1_tilde: &OWFField<Self>,
         a2_tilde: &OWFField<Self>,
     ) -> OWFField<Self> {
@@ -1016,12 +1035,12 @@ pub(crate) trait FAESTParameters {
     fn get_decom_size() -> usize {
         // coms
         <<Self as FAESTParameters>::OWF as OWFParameters>::NLeafCommit::USIZE
-            * <<Self as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES::USIZE
+            * <<Self as FAESTParameters>::OWF as OWFParameters>::LambdaBytes::USIZE
             * <<Self as FAESTParameters>::Tau as TauParameters>::Tau::USIZE
             +
             // nodes
             <<Self as FAESTParameters>::Tau as TauParameters>::Topen::USIZE
-                * <<Self as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES::USIZE
+                * <<Self as FAESTParameters>::OWF as OWFParameters>::LambdaBytes::USIZE
     }
 }
 
@@ -1195,23 +1214,23 @@ mod test {
 
         #[test]
         fn lambda<O: OWFParameters>() {
-            assert!(O::LAMBDA::USIZE == 128 || O::LAMBDA::USIZE == 192 || O::LAMBDA::USIZE == 256);
-            assert_eq!(O::LAMBDABYTES::USIZE * 8, O::LAMBDA::USIZE);
+            assert!(O::Lambda::USIZE == 128 || O::Lambda::USIZE == 192 || O::Lambda::USIZE == 256);
+            assert_eq!(O::LambdaBytes::USIZE * 8, O::Lambda::USIZE);
         }
 
         #[test]
         fn pk_sk_size<O: OWFParameters>() {
-            assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LAMBDABYTES::USIZE);
+            assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LambdaBytes::USIZE);
             assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::OutputSize::USIZE);
         }
 
         #[test]
         fn owf_parameters<O: OWFParameters>() {
-            assert_eq!(O::LKE::USIZE % 8, 0);
-            assert_eq!(O::LKEBytes::USIZE * 8, O::LKE::USIZE);
-            assert_eq!(O::LENC::USIZE % 8, 0);
+            assert_eq!(O::LKe::USIZE % 8, 0);
+            assert_eq!(O::LKeBytes::USIZE * 8, O::LKe::USIZE);
+            assert_eq!(O::LEnc::USIZE % 8, 0);
             assert_eq!(O::L::USIZE % 8, 0);
-            assert_eq!(O::LBYTES::USIZE * 8, O::L::USIZE);
+            assert_eq!(O::LBytes::USIZE * 8, O::L::USIZE);
         }
 
         #[instantiate_tests(<OWF128>)]
@@ -1240,7 +1259,7 @@ mod test {
         #[test]
         fn tau_config<P: FAESTParameters>() {
             assert_eq!(
-                <P::OWF as OWFParameters>::LAMBDA::USIZE,
+                <P::OWF as OWFParameters>::Lambda::USIZE,
                 <P::Tau as TauParameters>::Tau1::USIZE * <P::Tau as TauParameters>::K::USIZE
                     + <P::Tau as TauParameters>::Tau0::USIZE
                         * (<P::Tau as TauParameters>::K::USIZE - 1)
