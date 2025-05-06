@@ -531,21 +531,6 @@ mod tests {
             .expect("signature verifies");
     }
 
-    /*
-    #[cfg(feature = "subtle")]
-    #[test]
-    fn subtle_eq<P: Parameters>() {
-        use subtle::ConstantTimeEq;
-
-        let (sk1, _vk1) = SigningKey::<P>::random().expect("keygen success");
-        let (sk2, _vk2) = SigningKey::<P>::random().expect("keygen success");
-        let sk3 = sk1.clone();
-
-        assert!(bool::from(sk1.ct_eq(&sk1)));
-        assert!(bool::from(sk1.ct_eq(&sk3)));
-        assert!(!bool::from(sk1.ct_eq(&sk2)));
-    }
-    */
     #[cfg(feature = "serde")]
     #[test]
     fn serde_serialization<KP, S>()
