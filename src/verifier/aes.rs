@@ -26,8 +26,9 @@ where
     type Output = GenericArray<OWFField<O>, O::NStBytes>;
 
     fn state_to_bytes(&self) -> Self::Output {
-        (0..O::NStBytes::USIZE)
-            .map(|i| OWFField::<O>::byte_combine_slice(&self.scalars[8 * i..8 * i + 8]))
+        self.scalars
+            .chunks_exact(8)
+            .map(OWFField::<O>::byte_combine_slice)
             .collect()
     }
 }
@@ -39,8 +40,9 @@ where
     type Output = GenericArray<OWFField<O>, O::NStBytes>;
 
     fn state_to_bytes(&self) -> Self::Output {
-        (0..O::NStBytes::USIZE)
-            .map(|i| OWFField::<O>::byte_combine_slice(&self.scalars[8 * i..8 * i + 8]))
+        self.scalars
+            .chunks_exact(8)
+            .map(OWFField::<O>::byte_combine_slice)
             .collect()
     }
 }
@@ -54,13 +56,9 @@ where
 
     fn add_round_key(&self, rhs: Self) -> Self::Output {
         Self::Output {
-            scalars: self
-                .scalars
-                .iter()
-                .zip(rhs.scalars.iter())
+            scalars: izip!(self.scalars.iter(), rhs.scalars.iter())
                 .map(|(x, y)| *x + y)
                 .collect(),
-
             delta: self.delta,
         }
     }
@@ -75,13 +73,9 @@ where
 
     fn add_round_key(&self, rhs: &VoleCommits<'a, F, L>) -> Self::Output {
         Self::Output {
-            scalars: self
-                .scalars
-                .iter()
-                .zip(rhs.scalars.iter())
+            scalars: izip!(self.scalars, rhs.scalars.iter())
                 .map(|(x, y)| *x + y)
                 .collect(),
-
             delta: self.delta,
         }
     }
@@ -96,13 +90,9 @@ where
 
     fn add_round_key(&self, rhs: &Self) -> Self::Output {
         Self::Output {
-            scalars: self
-                .scalars
-                .iter()
-                .zip(rhs.scalars.iter())
+            scalars: izip!(self.scalars, rhs.scalars)
                 .map(|(x, y)| *x + y)
                 .collect(),
-
             delta: self.delta,
         }
     }
@@ -117,13 +107,7 @@ where
 
     fn add_round_key(&self, rhs: &GenericArray<F, L>) -> Self::Output {
         Self::Output {
-            scalars: self
-                .scalars
-                .iter()
-                .zip(rhs.iter())
-                .map(|(x, y)| *x + y)
-                .collect(),
-
+            scalars: izip!(self.scalars, rhs).map(|(x, y)| *x + y).collect(),
             delta: self.delta,
         }
     }
@@ -140,14 +124,11 @@ where
     fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
         let scalars = self
             .scalars
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(i, comm_i)| {
                 let scal_i = (rhs[i / 8] >> (i % 8)) & 1;
-                if scal_i == 1 {
-                    return *comm_i + self.delta;
-                }
-                *comm_i
+                *comm_i + *self.delta * scal_i
             })
             .collect();
 
@@ -416,9 +397,9 @@ where
             let tmp = GenericArray::<_, U4>::from_slice(&self.scalars[4 * c..4 * c + 4]).to_owned();
 
             let i0 = 4 * c;
-            let i1 = 4 * c + 1;
-            let i2 = 4 * c + 2;
-            let i3 = 4 * c + 3;
+            let i1 = i0 + 1;
+            let i2 = i0 + 2;
+            let i3 = i0 + 3;
 
             // ::7
             self.scalars[i0] = tmp[0] * v2 + tmp[1] * v3 + tmp[2] + tmp[3];
@@ -442,14 +423,9 @@ where
     L: ArrayLength,
 {
     fn add_round_key_bytes(&mut self, rhs: &GenericArray<F, L>, sq: bool) {
-        if sq {
-            for (st, k) in izip!(self.scalars.iter_mut(), rhs) {
-                (*st) += k;
-            }
-        } else {
-            for (st, k) in izip!(self.scalars.iter_mut(), rhs) {
-                (*st) += *k * self.delta;
-            }
+        let lift_term = if sq { &F::ONE } else { self.delta };
+        for (st, &k) in izip!(self.scalars.iter_mut(), rhs) {
+            (*st) += k * lift_term;
         }
     }
 }
