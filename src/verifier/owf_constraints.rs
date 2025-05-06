@@ -13,7 +13,6 @@ use crate::{
     parameter::{OWFField, OWFParameters},
     rijndael_32::{convert_from_batchblocks, inv_bitslice, rijndael_key_schedule},
     universal_hashing::ZKVerifyHasher,
-    utils::get_bit,
 };
 
 pub(crate) fn owf_constraints<O>(
@@ -91,12 +90,7 @@ fn byte_to_vole<F>(x: u8, delta: &F) -> impl Iterator<Item = F> + '_
 where
     F: BigGaloisField,
 {
-    (0..8).map(move |i| {
-        if get_bit(&[x], i) != 0 {
-            return *delta;
-        }
-        F::ZERO
-    })
+    (0..8).map(move |i| *delta * ((x >> i) & 1))
 }
 
 #[inline]
