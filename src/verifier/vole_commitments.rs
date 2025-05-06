@@ -24,12 +24,9 @@ where
         L: ArrayLength + Mul<U8, Output = L2>,
         L2: ArrayLength,
     {
-        let scalars = <Box<GenericArray<F, L2>>>::from_iter((0..L2::USIZE).map(|i| {
-            if get_bit(input, i) != 0 {
-                return *delta;
-            }
-            F::ZERO
-        }));
+        let scalars = <Box<GenericArray<F, L2>>>::from_iter(
+            (0..L2::USIZE).map(|i| *delta * get_bit(input, i)),
+        );
 
         VoleCommits { scalars, delta }
     }

@@ -2,7 +2,7 @@ use std::ops::{AddAssign, Mul};
 
 use generic_array::{
     ArrayLength, GenericArray,
-    typenum::{Prod, U4, U8, Unsigned},
+    typenum::{U4, U8, Unsigned},
 };
 use itertools::izip;
 
@@ -14,6 +14,7 @@ use crate::{
         large_fields::ByteCombineSquaredConstants,
     },
     parameter::{BaseParameters, OWFField, OWFParameters, SecurityParameter},
+    utils::xor_arrays_inplace,
 };
 
 // Helper type aliases
@@ -144,10 +145,7 @@ where
     F: BigGaloisField,
 {
     fn add_round_key_assign(&mut self, rhs: &GenericArray<u8, L>) {
-        self.keys
-            .iter_mut()
-            .zip(rhs.iter())
-            .for_each(|(a, b)| *a ^= b);
+        xor_arrays_inplace(self.keys.as_mut_slice(), rhs.as_slice());
     }
 }
 
@@ -158,14 +156,8 @@ where
     F: BigGaloisField,
 {
     fn add_round_key_assign(&mut self, rhs: &ByteCommitsRef<'_, F, L>) {
-        self.keys
-            .iter_mut()
-            .zip(rhs.keys.iter())
-            .for_each(|(a, b)| *a ^= b);
-        self.tags
-            .iter_mut()
-            .zip(rhs.tags.iter())
-            .for_each(|(a, b)| *a += b);
+        xor_arrays_inplace(self.keys.as_mut_slice(), rhs.keys.as_slice());
+        izip!(self.tags.iter_mut(), rhs.tags).for_each(|(a, b)| *a += b);
     }
 }
 
@@ -200,7 +192,7 @@ where
 {
     fn add_round_key_bytes(&mut self, key: &GenericArray<T, L>, _sq: bool) {
         for (st, k) in izip!(self.iter_mut(), key) {
-            (*st) += k;
+            *st += k;
         }
     }
 }
