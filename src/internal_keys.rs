@@ -10,7 +10,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::{ByteEncoding, Error, parameter::OWFParameters, utils::get_bit};
+use crate::{ByteEncoding, Error, parameter::OWFParameters};
 
 /// Internal representation of a secret key.
 #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
@@ -49,7 +49,7 @@ where
             let mut owf_output = GenericArray::default();
             O::evaluate_owf(owf_key, owf_input, &mut owf_output);
 
-            if get_bit(owf_key, 0) & get_bit(owf_key, 1) != 0 {
+            if owf_key[0] & 0b11 == 0b11 {
                 return Err(Error::new());
             }
 
