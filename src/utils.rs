@@ -1,4 +1,5 @@
 use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
+use itertools::izip;
 
 use crate::{fields::Square, parameter::TauParameters};
 
@@ -91,14 +92,12 @@ pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> GenericArr
 ///
 /// The length of the resulting iterator is equal to the length of the shortest input slice.
 pub(crate) fn xor_arrays<'a>(lhs: &'a [u8], rhs: &'a [u8]) -> impl Iterator<Item = u8> + use<'a> {
-    lhs.iter().zip(rhs.iter()).map(|(lhs, rhs)| lhs ^ rhs)
+    izip!(lhs, rhs).map(|(lhs, rhs)| lhs ^ rhs)
 }
 
 /// Xors the input slices overwriting the first slice with the resulting elements.
 pub(crate) fn xor_arrays_inplace(lhs: &mut [u8], rhs: &[u8]) {
-    lhs.iter_mut()
-        .zip(rhs.iter())
-        .for_each(|(lhs, rhs)| *lhs ^= rhs);
+    izip!(lhs.iter_mut(), rhs).for_each(|(lhs, rhs)| *lhs ^= rhs);
 }
 
 /// Returns the bit at the given index in the input byte array.
@@ -122,7 +121,7 @@ where
     T: Clone + Square,
     L: ArrayLength,
 {
-    key_bytes.iter().map(|x| x.to_owned().square()).collect()
+    key_bytes.iter().cloned().map(|x| x.square()).collect()
 }
 
 #[cfg(test)]

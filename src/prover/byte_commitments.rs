@@ -5,10 +5,8 @@ use generic_array::{
     typenum::{Prod, U8},
 };
 
-use crate::{
-    fields::{BigGaloisField, GF8},
-    prover::field_commitment::FieldCommitDegOne,
-};
+use super::field_commitment::FieldCommitDegOne;
+use crate::fields::{BigGaloisField, GF8};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ByteCommitment<F>
@@ -109,6 +107,7 @@ where
     pub(crate) keys: &'a GenericArray<u8, L>,
     pub(crate) tags: &'a GenericArray<F, Prod<L, U8>>,
 }
+
 impl<'a, F, L> ByteCommitsRef<'a, F, L>
 where
     F: BigGaloisField,

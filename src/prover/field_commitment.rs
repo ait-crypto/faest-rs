@@ -256,11 +256,11 @@ where
 {
     type Output = Self;
 
-    fn mul(mut self, rhs: F) -> Self::Output {
-        self.key *= rhs;
-        self.tag[0] *= rhs;
-        self.tag[1] *= rhs;
-        self
+    fn mul(self, rhs: F) -> Self::Output {
+        Self {
+            key: self.key * rhs,
+            tag: [self.tag[0] * rhs, self.tag[1] * rhs],
+        }
     }
 }
 
@@ -270,11 +270,11 @@ where
 {
     type Output = Self;
 
-    fn mul(mut self, rhs: &F) -> Self::Output {
-        self.key *= rhs;
-        self.tag[0] *= rhs;
-        self.tag[1] *= rhs;
-        self
+    fn mul(self, rhs: &F) -> Self::Output {
+        Self {
+            key: self.key * rhs,
+            tag: [self.tag[0] * rhs, self.tag[1] * rhs],
+        }
     }
 }
 
@@ -301,9 +301,9 @@ where
         FieldCommitDegThree {
             key: self.key * rhs.key,
             tag: [
-                rhs.tag[0] * self.tag[0],
-                rhs.key * self.tag[0] + rhs.tag[0] * self.tag[1],
-                rhs.key * self.tag[1] + rhs.tag[0] * self.key,
+                self.tag[0] * rhs.tag[0],
+                self.tag[0] * rhs.key + self.tag[1] * rhs.tag[0],
+                self.tag[1] * rhs.key + self.key * rhs.tag[0],
             ],
         }
     }

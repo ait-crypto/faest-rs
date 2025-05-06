@@ -37,8 +37,7 @@ where
 {
     type Output = StateBytesCommits<O>;
 
-    fn state_to_bytes(&self) -> Self::Output
-where {
+    fn state_to_bytes(&self) -> Self::Output {
         (0..O::NSTBytes::USIZE)
             .map(|i| {
                 FieldCommitDegOne::new(
@@ -95,7 +94,7 @@ where
     fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
         ByteCommits {
             keys: self.keys.iter().zip(rhs).map(|(a, b)| a ^ b).collect(),
-            tags: <Box<GenericArray<F, Prod<L, U8>>>>::from_iter(self.tags.to_owned()),
+            tags: <Box<GenericArray<_, _>>>::from_iter(self.tags.iter().cloned()),
         }
     }
 }
@@ -110,14 +109,10 @@ where
 
     fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
         ByteCommits {
-            keys: self
-                .into_iter()
-                .zip(rhs.keys.iter())
+            keys: izip!(self.into_iter(), rhs.keys)
                 .map(|(a, b)| a ^ b)
                 .collect(),
-            tags: <Box<GenericArray<F, Prod<L, U8>>>>::from_iter(
-                rhs.tags[..L::USIZE * 8].to_owned(),
-            ),
+            tags: <Box<GenericArray<_, _>>>::from_iter(rhs.tags[..L::USIZE * 8].iter().cloned()),
         }
     }
 }
@@ -133,10 +128,7 @@ where
     fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
         Self {
             keys: self.keys.iter().zip(rhs.keys).map(|(a, b)| a ^ b).collect(),
-            tags: self
-                .tags
-                .iter()
-                .zip(rhs.tags.iter())
+            tags: izip!(self.tags.iter(), rhs.tags)
                 .map(|(a, b)| *a + b)
                 .collect(),
         }

@@ -163,19 +163,12 @@ fn invnorm_to_conjugates<O>(
 where
     O: OWFParameters,
 {
-    let x_bits = [
-        x_val & 1,
-        (x_val >> 1) & 1,
-        (x_val >> 2) & 1,
-        (x_val >> 3) & 1,
-    ];
-
     (0..4)
         .map(|j| {
-            let key = OWFField::<O>::from_bit(x_bits[0])
-                + OWFField::<O>::BETA_SQUARES[j] * x_bits[1]
-                + OWFField::<O>::BETA_SQUARES[j + 1] * x_bits[2]
-                + OWFField::<O>::BETA_CUBES[j] * x_bits[3];
+            let key = OWFField::<O>::from_bit(x_val & 1)
+                + OWFField::<O>::BETA_SQUARES[j] * ((x_val >> 1) & 1)
+                + OWFField::<O>::BETA_SQUARES[j + 1] * ((x_val >> 2) & 1)
+                + OWFField::<O>::BETA_CUBES[j] * ((x_val >> 3) & 1);
 
             let tag = x_tag[0]
                 + OWFField::<O>::BETA_SQUARES[j] * x_tag[1]
