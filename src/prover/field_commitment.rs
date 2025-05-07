@@ -49,7 +49,6 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(mut self, rhs: Self) -> Self::Output {
         self += rhs;
         self
@@ -63,7 +62,6 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(mut self, rhs: &Self) -> Self::Output {
         self += rhs;
         self
@@ -77,7 +75,6 @@ where
     type Output = FieldCommitDegOne<F>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: Self) -> Self::Output {
         self.clone() + rhs
     }
@@ -90,7 +87,6 @@ where
     type Output = FieldCommitDegTwo<F>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: &Self) -> Self::Output {
         FieldCommitDegTwo {
             key: self.key * rhs.key,
@@ -106,7 +102,6 @@ where
     type Output = FieldCommitDegTwo<F>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: Self) -> Self::Output {
         self * &rhs
     }
@@ -119,7 +114,6 @@ where
     type Output = FieldCommitDegThree<F>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: FieldCommitDegTwo<F>) -> Self::Output {
         FieldCommitDegThree {
             key: self.key * rhs.key,
@@ -139,7 +133,6 @@ where
     type Output = FieldCommitDegThree<F>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: &FieldCommitDegTwo<F>) -> Self::Output {
         FieldCommitDegThree {
             key: self.key * rhs.key,
@@ -159,7 +152,6 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(mut self, rhs: &F) -> Self::Output {
         self.key *= rhs;
         self
@@ -231,20 +223,6 @@ where
     }
 }
 
-// impl<F> Mul<&FieldCommitDegTwo<F>> for F
-// where
-//     F: BigGaloisField,
-// {
-//     type Output = FieldCommitDegTwo<F>;
-
-//     fn mul(mut self, rhs: &FieldCommitDegTwo<F>) -> Self::Output {
-
-//         FieldCommitDegTwo{
-//             key: self * rhs,
-//             tag: [self * rhs.tag[0], self * rhs.tag[1]]
-//         }
-//     }
-// }
 
 impl<F> AddAssign<Self> for FieldCommitDegTwo<F>
 where
@@ -303,7 +281,6 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(mut self, rhs: Self) -> Self::Output {
         self += rhs;
         self
@@ -317,7 +294,6 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(mut self, rhs: &Self) -> Self::Output {
         self += rhs;
         self
@@ -331,7 +307,6 @@ where
     type Output = FieldCommitDegThree<F>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: FieldCommitDegOne<F>) -> Self::Output {
         self * &rhs
     }
@@ -344,7 +319,6 @@ where
     type Output = FieldCommitDegThree<F>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: &FieldCommitDegOne<F>) -> Self::Output {
         FieldCommitDegThree {
             key: self.key * rhs.key,
@@ -401,7 +375,6 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(mut self, rhs: Self) -> Self::Output {
         self += rhs;
         self
@@ -415,7 +388,6 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(mut self, rhs: &Self) -> Self::Output {
         self += rhs;
         self
@@ -429,7 +401,6 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(mut self, rhs: &FieldCommitDegOne<F>) -> Self::Output {
         self.tag[2] += rhs.tag;
         Self {
@@ -446,7 +417,6 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(mut self, rhs: &FieldCommitDegTwo<F>) -> Self::Output {
         self.tag[2] += rhs.tag[1];
         self.tag[1] += rhs.tag[0];
