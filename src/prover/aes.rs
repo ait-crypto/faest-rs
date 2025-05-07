@@ -13,7 +13,7 @@ use crate::{
         BigGaloisField, ByteCombine, ByteCombineConstants, Sigmas,
         large_fields::ByteCombineSquaredConstants,
     },
-    parameter::{BaseParameters, OWFField, OWFParameters, SecurityParameter},
+    parameter::{OWFField, OWFParameters, SecurityParameter},
     utils::xor_arrays_inplace,
 };
 
@@ -232,14 +232,14 @@ where
 {
     fn mix_columns(&mut self, sq: bool) {
         let v2 = if sq {
-            OWFField::<O>::BYTE_COMBINE_SQ_2
+            &OWFField::<O>::BYTE_COMBINE_SQ_2
         } else {
-            OWFField::<O>::BYTE_COMBINE_2
+            &OWFField::<O>::BYTE_COMBINE_2
         };
-        let v3: <<O as OWFParameters>::BaseParams as BaseParameters>::Field = if sq {
-            OWFField::<O>::BYTE_COMBINE_SQ_3
+        let v3 = if sq {
+            &OWFField::<O>::BYTE_COMBINE_SQ_3
         } else {
-            OWFField::<O>::BYTE_COMBINE_3
+            &OWFField::<O>::BYTE_COMBINE_3
         };
 
         for c in 0..O::NST::USIZE {
@@ -252,23 +252,13 @@ where
             let i3 = 4 * c + 3;
 
             // ::7
-            self[i0] = tmp[0].clone() * v2 + tmp[1].clone() * v3 + &tmp[2] + &tmp[3];
-
+            self[i0] = &tmp[0] * v2 + &tmp[1] * v3 + &tmp[2] + &tmp[3];
             // ::8
-            self[i1] = tmp[1].clone() * v2 + tmp[2].clone() * v3 + &tmp[0] + &tmp[3];
-
+            self[i1] = &tmp[1] * v2 + &tmp[2] * v3 + &tmp[0] + &tmp[3];
             // ::9
-            self[i2] = tmp[2].clone() * v2 + tmp[3].clone() * v3 + &tmp[0] + &tmp[1];
-
+            self[i2] = &tmp[2] * v2 + &tmp[3] * v3 + &tmp[0] + &tmp[1];
             // ::10
-            // SAFETY: tmp has length 4, hence unwrapping the first 4 elements is safe
-            let mut tmp = tmp.into_iter();
-            let tmp0 = tmp.next().unwrap();
-            let tmp1 = tmp.next().unwrap();
-            let tmp2 = tmp.next().unwrap();
-            let tmp3 = tmp.next().unwrap();
-
-            self[i3] = tmp0 * v3 + tmp3 * v2 + &tmp1 + &tmp2;
+            self[i3] = &tmp[0] * v3 + &tmp[3] * v2 + &tmp[1] + &tmp[2];
         }
     }
 }
@@ -280,7 +270,7 @@ where
     type Output = ByteCommits<OWFField<O>, O::NSTBytes>;
 
     fn bytewise_mix_columns(&self) -> Self::Output {
-        let mut o = ByteCommits::<_, O::NSTBytes>::default();
+        let mut o = ByteCommits::default();
 
         for c in 0..O::NST::USIZE {
             for r in 0..4 {
@@ -307,26 +297,26 @@ where
                 for j in 0..2 {
                     let off = (4 + r - j) % 4;
                     o.keys[4 * c + off] ^= b_key;
-                    o.tags[32 * c + 8 * off..32 * c + 8 * off + 8]
-                        .iter_mut()
-                        .zip(b_tags.iter())
-                        .for_each(|(o, b)| {
-                            *o += b;
-                        });
+                    izip!(
+                        o.tags[32 * c + 8 * off..32 * c + 8 * off + 8].iter_mut(),
+                        b_tags
+                    )
+                    .for_each(|(o, b)| {
+                        *o += b;
+                    });
                 }
 
                 // Add a(r) to o_{4*c + (r+1 mod 4)}, o_{4*c + (r+2 mod 4)}, o_{4*c + (r+3 mod 4)}
                 for j in 1..4 {
                     let off = (r + j) % 4;
-
                     o.keys[4 * c + off] ^= a_key;
-
-                    o.tags[32 * c + 8 * off..32 * c + 8 * off + 8]
-                        .iter_mut()
-                        .zip(a_tags.iter())
-                        .for_each(|(o, a)| {
-                            *o += a;
-                        });
+                    izip!(
+                        o.tags[32 * c + 8 * off..32 * c + 8 * off + 8].iter_mut(),
+                        a_tags
+                    )
+                    .for_each(|(o, a)| {
+                        *o += a;
+                    });
                 }
             }
         }
@@ -354,15 +344,11 @@ where
         (0..O::NSTBytes::USIZE)
             .map(|i| {
                 // :: 9
-
-                let mut y_i = self[i * 8 + t % 8].clone() * sigmas[0];
-
+                let mut y_i = &self[i * 8 + t % 8] * sigmas[0];
                 for sigma_idx in 1..8 {
-                    y_i += self[i * 8 + (sigma_idx + t) % 8].clone() * sigmas[sigma_idx];
+                    y_i += &self[i * 8 + (sigma_idx + t) % 8] * sigmas[sigma_idx];
                 }
-
                 y_i += sigmas[8];
-
                 y_i
             })
             .collect()
@@ -382,9 +368,8 @@ where
                 ^ self.keys[i].rotate_right(2)
                 ^ 0x5;
 
-            let xi_tags: GenericArray<_, U8> =
-                GenericArray::from_slice(&self.tags[8 * i..8 * i + 8]).to_owned();
-
+            let xi_tags =
+                GenericArray::<_, U8>::from_slice(&self.tags[8 * i..8 * i + 8]).to_owned();
             for bit_i in 0..8 {
                 // ::6
                 self.tags[8 * i + bit_i] = xi_tags[(bit_i + 8 - 1) % 8]

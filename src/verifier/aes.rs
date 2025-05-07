@@ -54,13 +54,9 @@ where
 
     fn add_round_key(&self, rhs: Self) -> Self::Output {
         Self::Output {
-            scalars: self
-                .scalars
-                .iter()
-                .zip(rhs.scalars.iter())
+            scalars: izip!(self.scalars.iter(), rhs.scalars.iter())
                 .map(|(x, y)| *x + y)
                 .collect(),
-
             delta: self.delta,
         }
     }
@@ -75,13 +71,9 @@ where
 
     fn add_round_key(&self, rhs: &VoleCommits<'a, F, L>) -> Self::Output {
         Self::Output {
-            scalars: self
-                .scalars
-                .iter()
-                .zip(rhs.scalars.iter())
+            scalars: izip!(self.scalars.iter(), rhs.scalars.iter())
                 .map(|(x, y)| *x + y)
                 .collect(),
-
             delta: self.delta,
         }
     }
@@ -96,13 +88,9 @@ where
 
     fn add_round_key(&self, rhs: &Self) -> Self::Output {
         Self::Output {
-            scalars: self
-                .scalars
-                .iter()
-                .zip(rhs.scalars.iter())
+            scalars: izip!(self.scalars, rhs.scalars)
                 .map(|(x, y)| *x + y)
                 .collect(),
-
             delta: self.delta,
         }
     }
@@ -117,13 +105,7 @@ where
 
     fn add_round_key(&self, rhs: &GenericArray<F, L>) -> Self::Output {
         Self::Output {
-            scalars: self
-                .scalars
-                .iter()
-                .zip(rhs.iter())
-                .map(|(x, y)| *x + y)
-                .collect(),
-
+            scalars: izip!(self.scalars, rhs).map(|(x, y)| *x + y).collect(),
             delta: self.delta,
         }
     }
@@ -142,13 +124,7 @@ where
             .scalars
             .into_iter()
             .enumerate()
-            .map(|(i, comm_i)| {
-                let scal_i = (rhs[i / 8] >> (i % 8)) & 1;
-                if scal_i == 1 {
-                    return *comm_i + self.delta;
-                }
-                *comm_i
-            })
+            .map(|(i, comm_i)| *comm_i + *self.delta * ((rhs[i / 8] >> (i % 8)) & 1))
             .collect();
 
         VoleCommits {
@@ -176,7 +152,7 @@ where
     L: ArrayLength,
 {
     fn add_round_key_assign(&mut self, rhs: &VoleCommitsRef<'_, F, L>) {
-        for (x, y) in izip!(self.scalars.iter_mut(), rhs.scalars.iter()) {
+        for (x, y) in izip!(self.scalars.iter_mut(), rhs.scalars) {
             *x += y;
         }
     }
@@ -188,7 +164,7 @@ where
     L: ArrayLength,
 {
     fn add_round_key_assign(&mut self, rhs: &GenericArray<F, L>) {
-        for (x, y) in izip!(self.scalars.iter_mut(), rhs.iter()) {
+        for (x, y) in izip!(self.scalars.iter_mut(), rhs) {
             *x += y;
         }
     }
@@ -285,23 +261,16 @@ where
                 // ::6..10
                 for j in 0..2 {
                     let off = 32 * c + 8 * ((4 + r - j) % 4);
-                    o[off..off + 8]
-                        .iter_mut()
-                        .zip(b_key.iter())
-                        .for_each(|(o, b)| {
-                            *o += b;
-                        });
+                    izip!(o[off..off + 8].iter_mut(), b_key.iter()).for_each(|(o, b)| {
+                        *o += b;
+                    });
                 }
 
                 for j in 1..4 {
                     let off = 32 * c + 8 * ((r + j) % 4);
-
-                    o[off..off + 8]
-                        .iter_mut()
-                        .zip(a_key.iter())
-                        .for_each(|(o, a)| {
-                            *o += a;
-                        });
+                    izip!(o[off..off + 8].iter_mut(), a_key.iter()).for_each(|(o, a)| {
+                        *o += a;
+                    });
                 }
             }
         }
@@ -422,22 +391,12 @@ where
 
             // ::7
             self.scalars[i0] = tmp[0] * v2 + tmp[1] * v3 + tmp[2] + tmp[3];
-
             // ::8
             self.scalars[i1] = tmp[1] * v2 + tmp[2] * v3 + tmp[0] + tmp[3];
-
             // ::9
             self.scalars[i2] = tmp[2] * v2 + tmp[3] * v3 + tmp[0] + tmp[1];
-
             // ::10
-            // SAFETY: tmp has length 4, hence unwrapping the first 4 elements is safe
-            let mut tmp = tmp.into_iter();
-            let tmp0 = tmp.next().unwrap();
-            let tmp1 = tmp.next().unwrap();
-            let tmp2 = tmp.next().unwrap();
-            let tmp3 = tmp.next().unwrap();
-
-            self.scalars[i3] = tmp0 * v3 + tmp3 * v2 + tmp1 + tmp2;
+            self.scalars[i3] = tmp[0] * v3 + tmp[3] * v2 + tmp[1] + tmp[2];
         }
     }
 }
