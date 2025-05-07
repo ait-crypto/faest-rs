@@ -27,8 +27,7 @@ where
     F: BigGaloisField,
 {
     fn add_assign(&mut self, rhs: Self) {
-        self.key += rhs.key;
-        self.tag += rhs.tag;
+        *self += &rhs;
     }
 }
 
@@ -49,9 +48,8 @@ where
     type Output = Self;
 
     #[inline]
-    fn add(mut self, rhs: Self) -> Self::Output {
-        self += rhs;
-        self
+    fn add(self, rhs: Self) -> Self::Output {
+        self + &rhs
     }
 }
 
@@ -80,6 +78,18 @@ where
     }
 }
 
+impl<F> Mul for FieldCommitDegOne<F>
+where
+    F: BigGaloisField,
+{
+    type Output = FieldCommitDegTwo<F>;
+
+    #[inline]
+    fn mul(self, rhs: Self) -> Self::Output {
+        self * &rhs
+    }
+}
+
 impl<F> Mul<&Self> for FieldCommitDegOne<F>
 where
     F: BigGaloisField,
@@ -95,18 +105,6 @@ where
     }
 }
 
-impl<F> Mul for FieldCommitDegOne<F>
-where
-    F: BigGaloisField,
-{
-    type Output = FieldCommitDegTwo<F>;
-
-    #[inline]
-    fn mul(self, rhs: Self) -> Self::Output {
-        self * &rhs
-    }
-}
-
 impl<F> Mul<FieldCommitDegTwo<F>> for FieldCommitDegOne<F>
 where
     F: BigGaloisField,
@@ -115,14 +113,7 @@ where
 
     #[inline]
     fn mul(self, rhs: FieldCommitDegTwo<F>) -> Self::Output {
-        FieldCommitDegThree {
-            key: self.key * rhs.key,
-            tag: [
-                self.tag * rhs.tag[0],
-                self.key * rhs.tag[0] + self.tag * rhs.tag[1],
-                self.key * rhs.tag[1] + self.tag * rhs.key,
-            ],
-        }
+        self * &rhs
     }
 }
 
@@ -158,28 +149,30 @@ where
     }
 }
 
-impl<F> Square for &FieldCommitDegOne<F>
-where
-    F: BigGaloisField,
-{
-    type Output = FieldCommitDegTwo<F>;
-
-    fn square(self) -> Self::Output {
-        FieldCommitDegTwo {
-            key: self.key.square(),
-            tag: [self.tag.square(), F::ZERO],
-        }
-    }
-}
-
 impl<F> Square for FieldCommitDegOne<F>
 where
     F: BigGaloisField,
 {
     type Output = FieldCommitDegTwo<F>;
 
+    #[inline]
     fn square(self) -> Self::Output {
         (&self).square()
+    }
+}
+
+impl<F> Square for &FieldCommitDegOne<F>
+where
+    F: BigGaloisField,
+{
+    type Output = FieldCommitDegTwo<F>;
+
+    #[inline]
+    fn square(self) -> Self::Output {
+        FieldCommitDegTwo {
+            key: self.key.square(),
+            tag: [self.tag.square(), F::ZERO],
+        }
     }
 }
 
@@ -200,12 +193,10 @@ where
 {
     type Output = Self;
 
-    fn mul(mut self, rhs: F) -> Self::Output {
-        self.key *= rhs;
-        self.tag[0] *= rhs;
-        self.tag[1] *= rhs;
-
-        self
+    #[inline]
+    #[allow(clippy::op_ref)]
+    fn mul(self, rhs: F) -> Self::Output {
+        self * &rhs
     }
 }
 
@@ -215,6 +206,7 @@ where
 {
     type Output = Self;
 
+    #[inline]
     fn mul(mut self, rhs: &F) -> Self::Output {
         self.key *= rhs;
         self.tag[0] *= rhs;
@@ -223,15 +215,13 @@ where
     }
 }
 
-
 impl<F> AddAssign<Self> for FieldCommitDegTwo<F>
 where
     F: BigGaloisField,
 {
+    #[inline]
     fn add_assign(&mut self, rhs: Self) {
-        self.key += rhs.key;
-        self.tag[0] += rhs.tag[0];
-        self.tag[1] += rhs.tag[1];
+        *self += &rhs;
     }
 }
 
@@ -239,6 +229,7 @@ impl<F> AddAssign<&Self> for FieldCommitDegTwo<F>
 where
     F: BigGaloisField,
 {
+    #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         self.key += rhs.key;
         self.tag[0] += rhs.tag[0];
@@ -246,22 +237,24 @@ where
     }
 }
 
-impl<F> AddAssign<&FieldCommitDegOne<F>> for FieldCommitDegTwo<F>
-where
-    F: BigGaloisField,
-{
-    fn add_assign(&mut self, rhs: &FieldCommitDegOne<F>) {
-        self.key += rhs.key;
-        self.tag[1] += rhs.tag;
-    }
-}
-
 impl<F> AddAssign<F> for FieldCommitDegTwo<F>
 where
     F: BigGaloisField,
 {
+    #[inline]
     fn add_assign(&mut self, rhs: F) {
         self.key += rhs;
+    }
+}
+
+impl<F> AddAssign<&FieldCommitDegOne<F>> for FieldCommitDegTwo<F>
+where
+    F: BigGaloisField,
+{
+    #[inline]
+    fn add_assign(&mut self, rhs: &FieldCommitDegOne<F>) {
+        self.key += rhs.key;
+        self.tag[1] += rhs.tag;
     }
 }
 
@@ -269,6 +262,7 @@ impl<F> AddAssign<&F> for FieldCommitDegTwo<F>
 where
     F: BigGaloisField,
 {
+    #[inline]
     fn add_assign(&mut self, rhs: &F) {
         self.key += rhs;
     }
@@ -346,6 +340,7 @@ impl<F> AddAssign<Self> for FieldCommitDegThree<F>
 where
     F: BigGaloisField,
 {
+    #[inline]
     fn add_assign(&mut self, rhs: Self) {
         self.key += rhs.key;
         self.tag
@@ -359,6 +354,7 @@ impl<F> AddAssign<&Self> for FieldCommitDegThree<F>
 where
     F: BigGaloisField,
 {
+    #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         self.key += rhs.key;
         self.tag
