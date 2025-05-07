@@ -33,6 +33,22 @@ use crate::{
     zk_constraints::{CstrntsVal, aes_prove},
 };
 
+// FAEST signature sizes
+type U4506 = Sum<Prod<U4, U1000>, U506>;
+type U5924 = Sum<Prod<U5, U1000>, U924>;
+type U11260 = Sum<Prod<U11, U1000>, U260>;
+type U14948 = Sum<Prod<U14, U1000>, U948>;
+type U20696 = Sum<Prod<U20, U1000>, U696>;
+type U26548 = Sum<Prod<U26, U1000>, U548>;
+
+// FAEST-EM signature sizes
+type U3906 = Sum<Prod<U1000, U3>, U906>;
+type U5060 = Sum<Prod<U1000, U5>, U60>;
+type U9340 = Sum<Prod<U1000, U9>, U340>;
+type U12380 = Sum<Prod<U1000, U12>, U380>;
+type U17984 = Sum<Prod<U1000, U17>, U984>;
+type U23476 = Sum<Prod<U1000, U23>, U476>;
+
 // l_hat = l + 3*lambda + B
 type LHatBytes<LBytes, LambdaBytes, B> = Sum<LBytes, Sum<Prod<U3, LambdaBytes>, Quot<B, U8>>>;
 
@@ -210,19 +226,24 @@ pub(crate) trait OWFParameters: Sized {
     /// Result of [`Self::LKe`] - [`Self::Lambda`] (in bits)
     type LKeMinusLambda: ArrayLength;
 
+    /// Returns whether the OWF is used in EM mode 
     fn is_em() -> bool;
 
+    /// Applies the OWF using the secret key `key` to `input` and writes the result in the `output` slice
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]);
 
+    /// Compute the extended witness from `owf_key` and `owf_input`
     fn extendwitness(
         owf_key: &GenericArray<u8, Self::LambdaBytes>,
         owf_input: &GenericArray<u8, Self::InputSize>,
     ) -> Box<GenericArray<u8, Self::LBytes>>;
 
+    /// Compute the extended witness using the secret key `sk`
     fn witness(sk: &SecretKey<Self>) -> Box<GenericArray<u8, Self::LBytes>> {
         Self::extendwitness(&sk.owf_key, &sk.pk.owf_input)
     }
 
+    /// Generates the prover's Quicksilver constraints
     fn prove(
         w: &GenericArray<u8, Self::LBytes>,
         u: &GenericArray<u8, Self::LambdaBytesTimes2>,
@@ -231,6 +252,7 @@ pub(crate) trait OWFParameters: Sized {
         chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self>;
 
+    /// Derives the prover's challenge that can be used to verify the Quicksilver constraints
     fn verify(
         q: CstrntsVal<Self>,
         d: &GenericArray<u8, Self::LBytes>,
@@ -241,6 +263,7 @@ pub(crate) trait OWFParameters: Sized {
         a2_tilde: &OWFField<Self>,
     ) -> OWFField<Self>;
 
+    /// Generates the prover's secret key using the input generator
     fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<Self> {
         let mut owf_key = GenericArray::default();
 
@@ -802,13 +825,20 @@ impl OWFParameters for OWF256EM {
 }
 
 pub(crate) trait TauParameters {
+    /// Number of small-VOLE instances
     type Tau: ArrayLength;
+    /// Bit-length of the larger small-VOLE instances (the smaller small-VOLE instances have length K-1)
     type K: ArrayLength;
+    /// Number of smaller small-VOLE instances
     type Tau0: ArrayLength;
+    /// Number of larger small-VOLE instances
     type Tau1: ArrayLength;
+    /// Number of leaves of the GGM tree
     type L: ArrayLength;
+    /// Threshold for the maximum opening size of the GGM tree
     type Topen: ArrayLength;
 
+    /// Returns an iterator over the individual bits of the i-th VOLE sub-challenge (i.e., the one associated to the i-th small-vole instance)
     fn decode_challenge_as_iter(chal: &[u8], i: usize) -> impl Iterator<Item = u8> + '_ {
         let (lo, hi) = if i < Self::Tau1::USIZE {
             let lo = Self::tau1_offset_unchecked(i);
@@ -820,7 +850,6 @@ pub(crate) trait TauParameters {
             let hi = lo + (Self::K::USIZE - 1) - 1;
             (lo, hi)
         };
-
         (lo..=hi).map(move |j| (chal[j / 8] >> (j % 8)) & 1)
     }
 
@@ -834,6 +863,7 @@ pub(crate) trait TauParameters {
         Self::Tau1::USIZE * (Self::K::USIZE) + (Self::K::USIZE - 1) * (i - Self::Tau1::USIZE)
     }
 
+    /// Retuns leaf offset of the i-th small-VOLE instance within the GGM tree
     fn bavc_index_offset(i: usize) -> usize {
         debug_assert!(i < Self::Tau::USIZE);
 
@@ -844,6 +874,7 @@ pub(crate) trait TauParameters {
             + (1 << (Self::K::USIZE - 1)) * (i - Self::Tau1::USIZE)
     }
 
+    /// Returns the maximum depth of the i-th small-VOLE instance
     fn bavc_max_node_depth(i: usize) -> usize {
         if i < Self::Tau1::USIZE {
             Self::K::USIZE
@@ -852,10 +883,12 @@ pub(crate) trait TauParameters {
         }
     }
 
+    /// Returns the maximum node index of the i-th small-VOLE instance
     fn bavc_max_node_index(i: usize) -> usize {
         1usize << Self::bavc_max_node_depth(i)
     }
 
+    /// Maps the j-th entry of the i-th small-VOLE instance to the corresponding leaf in the GGM tree
     fn pos_in_tree(i: usize, j: usize) -> usize {
         let tmp = 1usize << (Self::K::USIZE - 1);
 
@@ -863,7 +896,7 @@ pub(crate) trait TauParameters {
             return Self::L::USIZE - 1 + Self::Tau::USIZE * j + i;
         }
 
-        // mod 2^(k-1) is the same as & 2^(k-1)-1
+        // Applying mod 2^(k-1) is same as taking the k-2 LSB
         let mask = tmp - 1;
         Self::L::USIZE - 1 + Self::Tau::USIZE * tmp + Self::Tau1::USIZE * (j & mask) + i
     }
@@ -1015,10 +1048,11 @@ impl TauParameters for Tau256FastEM {
 }
 
 pub(crate) trait FAESTParameters {
+    /// Associated [`OWFParameters`] type
     type OWF: OWFParameters;
+    /// Associated [`TauParameters`] type
     type Tau: TauParameters<Tau = <<Self as FAESTParameters>::BAVC as BatchVectorCommitment>::Tau>;
-
-    /// Associated BAVC
+    /// Associated [`BatchVectorCommitment`] type
     type BAVC: BatchVectorCommitment<
             RO = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle,
             PRG = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::PRG,
@@ -1026,7 +1060,7 @@ pub(crate) trait FAESTParameters {
             LambdaBytes = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::LambdaBytes,
             NLeafCommit = <Self::OWF as OWFParameters>::NLeafCommit,
         >;
-
+    /// Grinding parameter specifying how many upperbits of the Fiat-Shamir challenge must be set to 0
     type WGRIND: ArrayLength;
     /// Size of the signature (in bytes)
     type SignatureSize: ArrayLength;
@@ -1051,7 +1085,6 @@ impl FAESTParameters for FAEST128sParameters {
     type OWF = OWF128;
     type Tau = Tau128Small;
     type BAVC = BAVC128Small;
-
     type WGRIND = U7;
     type SignatureSize = U4506;
 }
@@ -1063,7 +1096,6 @@ impl FAESTParameters for FAEST128fParameters {
     type OWF = OWF128;
     type Tau = Tau128Fast;
     type BAVC = BAVC128Fast;
-
     type WGRIND = U8;
     type SignatureSize = U5924;
 }
@@ -1075,7 +1107,6 @@ impl FAESTParameters for FAEST192sParameters {
     type OWF = OWF192;
     type Tau = Tau192Small;
     type BAVC = BAVC192Small;
-
     type WGRIND = U12;
     type SignatureSize = U11260;
 }
@@ -1087,7 +1118,6 @@ impl FAESTParameters for FAEST192fParameters {
     type OWF = OWF192;
     type Tau = Tau192Fast;
     type BAVC = BAVC192Fast;
-
     type WGRIND = U8;
     type SignatureSize = U14948;
 }
@@ -1099,7 +1129,6 @@ impl FAESTParameters for FAEST256sParameters {
     type OWF = OWF256;
     type Tau = Tau256Small;
     type BAVC = BAVC256Small;
-
     type WGRIND = U6;
     type SignatureSize = U20696;
 }
@@ -1111,7 +1140,6 @@ impl FAESTParameters for FAEST256fParameters {
     type OWF = OWF256;
     type Tau = Tau256Fast;
     type BAVC = BAVC256Fast;
-
     type WGRIND = U8;
     type SignatureSize = U26548;
 }
@@ -1123,7 +1151,6 @@ impl FAESTParameters for FAESTEM128sParameters {
     type OWF = OWF128EM;
     type Tau = Tau128SmallEM;
     type BAVC = BAVC128SmallEM;
-
     type WGRIND = U7;
     type SignatureSize = U3906;
 }
@@ -1135,7 +1162,6 @@ impl FAESTParameters for FAESTEM128fParameters {
     type OWF = OWF128EM;
     type Tau = Tau128FastEM;
     type BAVC = BAVC128FastEM;
-
     type WGRIND = U8;
     type SignatureSize = U5060;
 }
@@ -1147,7 +1173,6 @@ impl FAESTParameters for FAESTEM192sParameters {
     type OWF = OWF192EM;
     type Tau = Tau192SmallEM;
     type BAVC = BAVC192SmallEM;
-
     type WGRIND = U8;
     type SignatureSize = U9340;
 }
@@ -1159,7 +1184,6 @@ impl FAESTParameters for FAESTEM192fParameters {
     type OWF = OWF192EM;
     type Tau = Tau192FastEM;
     type BAVC = BAVC192FastEM;
-
     type WGRIND = U8;
     type SignatureSize = U12380;
 }
@@ -1171,7 +1195,6 @@ impl FAESTParameters for FAESTEM256sParameters {
     type OWF = OWF256EM;
     type Tau = Tau256SmallEM;
     type BAVC = BAVC256SmallEM;
-
     type WGRIND = U6;
     type SignatureSize = U17984;
 }
@@ -1183,26 +1206,9 @@ impl FAESTParameters for FAESTEM256fParameters {
     type OWF = OWF256EM;
     type Tau = Tau256FastEM;
     type BAVC = BAVC256FastEM;
-
     type WGRIND = U8;
     type SignatureSize = U23476;
 }
-
-// FAEST signature sizes
-type U4506 = Sum<Prod<U4, U1000>, U506>;
-type U5924 = Sum<Prod<U5, U1000>, U924>;
-type U11260 = Sum<Prod<U11, U1000>, U260>;
-type U14948 = Sum<Prod<U14, U1000>, U948>;
-type U20696 = Sum<Prod<U20, U1000>, U696>;
-type U26548 = Sum<Prod<U26, U1000>, U548>;
-
-// FAEST-EM signature sizes
-type U3906 = Sum<Prod<U1000, U3>, U906>;
-type U5060 = Sum<Prod<U1000, U5>, U60>;
-type U9340 = Sum<Prod<U1000, U9>, U340>;
-type U12380 = Sum<Prod<U1000, U12>, U380>;
-type U17984 = Sum<Prod<U1000, U17>, U984>;
-type U23476 = Sum<Prod<U1000, U23>, U476>;
 
 #[cfg(test)]
 mod test {
