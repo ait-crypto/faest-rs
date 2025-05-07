@@ -226,7 +226,7 @@ pub(crate) trait OWFParameters: Sized {
     /// Result of [`Self::LKe`] - [`Self::Lambda`] (in bits)
     type LKeMinusLambda: ArrayLength;
 
-    /// Returns whether the OWF is used in EM mode 
+    /// Returns whether the OWF is used in EM mode
     fn is_em() -> bool;
 
     /// Applies the OWF using the secret key `key` to `input` and writes the result in the `output` slice
