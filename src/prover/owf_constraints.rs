@@ -7,7 +7,7 @@ use crate::{
     fields::{Field, FromBit},
     internal_keys::PublicKey,
     parameter::{OWFField, OWFParameters},
-    rijndael_32::{convert_from_batchblocks, inv_bitslice, rijndael_key_schedule},
+    rijndael_32::rijndael_key_schedule_unbitsliced,
     universal_hashing::ZKProofHasher,
     utils::xor_arrays,
 };
@@ -99,15 +99,15 @@ fn key_schedule_bytes<O>(key: &GenericArray<u8, O::InputSize>) -> Vec<GenericArr
 where
     O: OWFParameters,
 {
-    rijndael_key_schedule::<O::NSt, O::NK, O::R>(key, O::SKe::USIZE)
-        .chunks_exact(8)
-        .map(|chunk| {
-            GenericArray::from_iter(
-                convert_from_batchblocks(inv_bitslice(chunk))
-                    .take(O::NSt::USIZE)
-                    .flatten(),
-            )
-        })
+    rijndael_key_schedule_unbitsliced::<O::NSt, O::NK, O::R>(key, O::SKe::USIZE)
+        .chunks_exact(32)
         .take(O::R::USIZE + 1)
+        .map(|chunk| {
+            chunk
+                .iter()
+                .copied()
+                .take(O::NStBytes::USIZE)
+                .collect::<GenericArray<u8, O::NStBytes>>()
+        })
         .collect()
 }

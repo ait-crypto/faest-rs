@@ -11,9 +11,8 @@ use crate::{
     fields::BigGaloisField,
     internal_keys::PublicKey,
     parameter::{OWFField, OWFParameters},
-    rijndael_32::{convert_from_batchblocks, inv_bitslice, rijndael_key_schedule},
+    rijndael_32::rijndael_key_schedule_unbitsliced,
     universal_hashing::ZKVerifyHasher,
-    utils::get_bit,
 };
 
 pub(crate) fn owf_constraints<O>(
@@ -86,17 +85,21 @@ pub(crate) fn owf_constraints<O>(
     }
 }
 
-// Converts a byte into an iterator of field elements, where the bit 1 is represented by the delta and 0 by the field's neutral element.
-fn byte_to_vole<F>(x: u8, delta: &F) -> impl Iterator<Item = F> + '_
+#[inline]
+fn byte_to_field<F>(byte: u8, delta: F) -> [F; 8]
 where
     F: BigGaloisField,
 {
-    (0..8).map(move |i| {
-        if get_bit(&[x], i) != 0 {
-            return *delta;
-        }
-        F::ZERO
-    })
+    [
+        delta * (byte & 1),
+        delta * (byte >> 1 & 1),
+        delta * (byte >> 2 & 1),
+        delta * (byte >> 3 & 1),
+        delta * (byte >> 4 & 1),
+        delta * (byte >> 5 & 1),
+        delta * (byte >> 6 & 1),
+        delta * (byte >> 7 & 1),
+    ]
 }
 
 #[inline]
@@ -107,16 +110,15 @@ fn key_schedule_bytes<'a, O>(
 where
     O: OWFParameters,
 {
-    rijndael_key_schedule::<O::NSt, O::NK, O::R>(key, O::SKe::USIZE)
-        .chunks_exact(8)
+    rijndael_key_schedule_unbitsliced::<O::NSt, O::NK, O::R>(key, O::SKe::USIZE)
+        .chunks_exact(32)
         .take(O::R::USIZE + 1)
         .map(|chunk| {
-            let scalars = <Box<GenericArray<OWFField<O>, O::NStBits>>>::from_iter(
-                convert_from_batchblocks(inv_bitslice(chunk))
-                    .take(O::NSt::USIZE)
-                    .flat_map(|word| word.into_iter().flat_map(|byte| byte_to_vole(byte, delta))),
-            );
-
+            let scalars = chunk
+                .iter()
+                .take(O::NStBytes::USIZE)
+                .flat_map(|&byte| byte_to_field(byte, *delta))
+                .collect::<Box<GenericArray<OWFField<O>, O::NStBits>>>();
             VoleCommits { scalars, delta }
         })
         .collect()
