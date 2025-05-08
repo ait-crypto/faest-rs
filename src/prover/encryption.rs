@@ -1,10 +1,9 @@
-use std::ops::AddAssign;
+use std::{iter::zip, ops::AddAssign};
 
 use generic_array::{
     GenericArray,
     typenum::{Quot, U2, U4, U8, Unsigned},
 };
-use itertools::izip;
 
 use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use crate::{
@@ -121,7 +120,7 @@ fn enc_cstrnts_odd<O>(
 
     // ::31-37
     for (si, si_sq, st0_i, st1_i) in
-        izip!(st_0.iter(), st_1.iter())
+        zip(st_0.iter(), st_1.iter())
             .enumerate()
             .map(|(byte_i, (st0, st1))| {
                 (

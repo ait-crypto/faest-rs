@@ -1,7 +1,6 @@
 use std::iter::zip;
 
 use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
-use itertools::izip;
 
 use crate::parameter::TauParameters;
 
@@ -104,7 +103,7 @@ pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> GenericArr
 ///
 /// The length of the resulting iterator is equal to the length of the shortest input slice.
 pub(crate) fn xor_arrays<'a>(lhs: &'a [u8], rhs: &'a [u8]) -> impl Iterator<Item = u8> + use<'a> {
-    izip!(lhs, rhs).map(|(lhs, rhs)| lhs ^ rhs)
+    zip(lhs, rhs).map(|(lhs, rhs)| lhs ^ rhs)
 }
 
 /// Xors the input slices overwriting the first slice with the resulting elements.

@@ -2864,7 +2864,7 @@ mod test {
     mod big_gf_ops {
         use super::*;
 
-        use std::fmt::Debug;
+        use std::{fmt::Debug, iter::zip};
 
         use rand::{
             Rng, SeedableRng,
@@ -2913,19 +2913,19 @@ mod test {
             Standard: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length> + Alphas + Debug + Eq,
         {
-            for (x, y) in itertools::izip!(F::ALPHA, Fu::ALPHA) {
+            for (x, y) in zip(F::ALPHA, Fu::ALPHA) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
             }
-            for (x, y) in itertools::izip!(F::BETA_CUBES, Fu::BETA_CUBES) {
+            for (x, y) in zip(F::BETA_CUBES, Fu::BETA_CUBES) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
             }
-            for (x, y) in itertools::izip!(F::BETA_SQUARES, Fu::BETA_SQUARES) {
+            for (x, y) in zip(F::BETA_SQUARES, Fu::BETA_SQUARES) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
             }
-            for (x, y) in itertools::izip!(F::SIGMA, Fu::SIGMA) {
+            for (x, y) in zip(F::SIGMA, Fu::SIGMA) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
             }
-            for (x, y) in itertools::izip!(F::SIGMA_SQUARES, Fu::SIGMA_SQUARES) {
+            for (x, y) in zip(F::SIGMA_SQUARES, Fu::SIGMA_SQUARES) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
             }
         }

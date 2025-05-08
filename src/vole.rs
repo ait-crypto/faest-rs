@@ -141,7 +141,7 @@ where
     }
 
     // ::6..9
-    for (j, v) in v.enumerate() {
+    for (j, vj) in v.enumerate() {
         for i in 0..(ni >> (j + 1)) {
             // Join steps 8 and 9
             for (v_dst, r_dst, r_src, r_src1) in izip!(

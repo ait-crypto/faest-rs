@@ -1,6 +1,7 @@
-use std::ops::{Add, AddAssign, Mul};
-
-use itertools::izip;
+use std::{
+    iter::zip,
+    ops::{Add, AddAssign, Mul},
+};
 
 use crate::fields::{BigGaloisField, Square};
 
@@ -32,7 +33,7 @@ where
 {
     fn add_assign(&mut self, rhs: Self) {
         self.key += rhs.key;
-        for (l, r) in izip!(self.tag.iter_mut(), rhs.tag) {
+        for (l, r) in zip(self.tag.iter_mut(), rhs.tag) {
             *l += r;
         }
     }
@@ -44,7 +45,7 @@ where
 {
     fn add_assign(&mut self, rhs: &Self) {
         self.key += rhs.key;
-        for (l, r) in izip!(self.tag.iter_mut(), rhs.tag) {
+        for (l, r) in zip(self.tag.iter_mut(), rhs.tag) {
             *l += r;
         }
     }
