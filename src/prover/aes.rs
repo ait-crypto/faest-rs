@@ -299,26 +299,24 @@ where
                 for j in 0..2 {
                     let off = (4 + r - j) % 4;
                     o.keys[4 * c + off] ^= b_key;
-                    zip(
+                    for (o, b) in zip(
                         o.tags[32 * c + 8 * off..32 * c + 8 * off + 8].iter_mut(),
                         b_tags,
-                    )
-                    .for_each(|(o, b)| {
+                    ) {
                         *o += b;
-                    });
+                    }
                 }
 
                 // Add a(r) to o_{4*c + (r+1 mod 4)}, o_{4*c + (r+2 mod 4)}, o_{4*c + (r+3 mod 4)}
                 for j in 1..4 {
                     let off = (r + j) % 4;
                     o.keys[4 * c + off] ^= a_key;
-                    zip(
+                    for (o, a) in zip(
                         o.tags[32 * c + 8 * off..32 * c + 8 * off + 8].iter_mut(),
                         a_tags,
-                    )
-                    .for_each(|(o, a)| {
+                    ) {
                         *o += a;
-                    });
+                    }
                 }
             }
         }

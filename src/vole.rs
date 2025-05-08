@@ -141,7 +141,7 @@ where
     }
 
     // ::6..9
-    v.enumerate().for_each(|(j, vj)| {
+    for (j, v) in v.enumerate() {
         for i in 0..(ni >> (j + 1)) {
             // Join steps 8 and 9
             for (v_dst, r_dst, r_src, r_src1) in izip!(
@@ -159,7 +159,7 @@ where
         }
 
         swap(&mut rj, &mut rj1); // At next iteration we want to have last row in rj
-    });
+    }
 
     // ::10: after last swap, rj[0] will contain r_{d,0}
     // SAFETY: FAEST parameters ensure LHatBytes > 0 (hence rj is not empty)

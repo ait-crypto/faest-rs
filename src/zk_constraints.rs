@@ -24,11 +24,11 @@ fn reshape_and_to_field<O: OWFParameters>(m: CstrntsVal<O>) -> Vec<OWFField<O>> 
         .flat_map(|col| {
             let mut ret = vec![GenericArray::<u8, O::LambdaBytes>::default(); 8];
 
-            (0..O::Lambda::USIZE).for_each(|row| {
+            for row in (0..O::Lambda::USIZE) {
                 for (i, ret_i) in ret.iter_mut().enumerate() {
                     ret_i[row / 8] |= get_bit(&[m[row][col]], i) << (row % 8);
                 }
-            });
+            }
 
             ret.into_iter()
                 .map(|r_i| OWFField::<O>::from(r_i.as_slice()))

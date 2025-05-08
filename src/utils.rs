@@ -1,3 +1,5 @@
+use std::iter::zip;
+
 use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
 use itertools::izip;
 
@@ -107,7 +109,9 @@ pub(crate) fn xor_arrays<'a>(lhs: &'a [u8], rhs: &'a [u8]) -> impl Iterator<Item
 
 /// Xors the input slices overwriting the first slice with the resulting elements.
 pub(crate) fn xor_arrays_inplace(lhs: &mut [u8], rhs: &[u8]) {
-    izip!(lhs.iter_mut(), rhs).for_each(|(lhs, rhs)| *lhs ^= rhs);
+    for (lhs, rhs) in zip(lhs.iter_mut(), rhs) {
+        *lhs ^= rhs;
+    }
 }
 
 /// Returns the bit at the given index in the input byte array.

@@ -262,16 +262,16 @@ where
                 // ::6..10
                 for j in 0..2 {
                     let off = 32 * c + 8 * ((4 + r - j) % 4);
-                    zip(o[off..off + 8].iter_mut(), b_key.iter()).for_each(|(o, b)| {
+                    for (o, b) in zip(o[off..off + 8].iter_mut(), b_key.iter()) {
                         *o += b;
-                    });
+                    }
                 }
 
                 for j in 1..4 {
                     let off = 32 * c + 8 * ((r + j) % 4);
-                    zip(o[off..off + 8].iter_mut(), a_key.iter()).for_each(|(o, a)| {
+                    for (o, a) in zip(o[off..off + 8].iter_mut(), a_key.iter()) {
                         *o += a;
-                    });
+                    }
                 }
             }
         }

@@ -1,6 +1,7 @@
 use std::{
     array,
     fmt::Debug,
+    iter::zip,
     mem,
     num::Wrapping,
     ops::{
@@ -1611,9 +1612,9 @@ impl ExtensionField for GF768 {
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
         let mut ret = GenericArray::default();
-        (0..6).for_each(|idx| {
-            ret[idx * 16..(idx + 1) * 16].copy_from_slice(&self.0[idx].to_le_bytes());
-        });
+        for (dst, src) in zip(ret.chunks_exact_mut(16), self.0.as_ref()) {
+            dst.copy_from_slice(&src.to_le_bytes());
+        }
         ret
     }
 }

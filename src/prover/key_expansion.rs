@@ -34,7 +34,7 @@ where
     let mut do_rot_word = true;
 
     // ::7
-    iproduct!(0..O::SKe::USIZE / 4, 0..4).for_each(|(j, r)| {
+    for (j, r) in iproduct!(0..O::SKe::USIZE / 4, 0..4) {
         // ::11
         let r_prime_inv = if do_rot_word { (4 + r - 3) % 4 } else { r };
 
@@ -62,7 +62,7 @@ where
                 iwd += 128;
             }
         }
-    });
+    }
 
     k
 }

@@ -109,7 +109,9 @@ where
 
         let iter = x0.chunks_exact(<F as Field>::Length::USIZE);
         let remainder = iter.remainder();
-        iter.for_each(|data| self.process_block(&mut h0, &mut h1, data));
+        for data in iter {
+            self.process_block(&mut h0, &mut h1, data);
+        }
         if !remainder.is_empty() {
             self.process_unpadded_block(&mut h0, &mut h1, remainder);
         }
@@ -137,10 +139,9 @@ where
 {
     fn process_block(&self, h0: &mut F, h1: &mut GF64, data: &[u8]) {
         *h0 = *h0 * self.s + F::from(data);
-        data.chunks_exact(<GF64 as Field>::Length::USIZE)
-            .for_each(|data| {
-                *h1 = *h1 * self.t + GF64::from(data);
-            });
+        for data in data.chunks_exact(<GF64 as Field>::Length::USIZE) {
+            *h1 = *h1 * self.t + GF64::from(data);
+        }
     }
 
     fn process_unpadded_block(&self, h0: &mut F, h1: &mut GF64, data: &[u8]) {
