@@ -14,17 +14,17 @@ use crate::{
 };
 
 pub(crate) fn key_exp_fwd<O>(
-    w: VoleCommitsRef<OWFField<O>, O::LKE>,
-) -> VoleCommits<OWFField<O>, O::PRODRUN128>
+    w: VoleCommitsRef<OWFField<O>, O::LKe>,
+) -> VoleCommits<OWFField<O>, O::R1Times128>
 where
     O: OWFParameters,
 {
     // ::1
     let mut y_tags = GenericArray::default_boxed();
-    y_tags[..O::LAMBDA::USIZE].copy_from_slice(&w.scalars[..O::LAMBDA::USIZE]);
+    y_tags[..O::Lambda::USIZE].copy_from_slice(&w.scalars[..O::Lambda::USIZE]);
 
     // ::2
-    let mut i_wd = O::LAMBDA::USIZE;
+    let mut i_wd = O::Lambda::USIZE;
 
     for j in O::NK::USIZE..(4 * (O::R::USIZE + 1)) {
         // ::5
@@ -49,9 +49,9 @@ where
 }
 
 pub(crate) fn key_exp_bkwd<'a, O>(
-    x: VoleCommitsRef<'a, OWFField<O>, O::DIFFLKELAMBDA>,
-    xk: VoleCommitsRef<'a, OWFField<O>, O::PRODRUN128>,
-) -> VoleCommits<'a, OWFField<O>, Prod<O::SKE, U8>>
+    x: VoleCommitsRef<'a, OWFField<O>, O::LKeMinusLambda>,
+    xk: VoleCommitsRef<'a, OWFField<O>, O::R1Times128>,
+) -> VoleCommits<'a, OWFField<O>, Prod<O::SKe, U8>>
 where
     O: OWFParameters,
 {
@@ -59,9 +59,9 @@ where
 
     let mut iwd = 0;
 
-    let rcon_evry = 4 * (O::LAMBDA::USIZE / 128);
+    let rcon_evry = 4 * (O::Lambda::USIZE / 128);
 
-    for j in 0..O::SKE::USIZE {
+    for j in 0..O::SKe::USIZE {
         // ::7
 
         let xt_tag: GenericArray<OWFField<O>, U8> = (0..8)
@@ -81,8 +81,8 @@ where
 
         // ::12
         if j % 4 == 3 {
-            if O::LAMBDA::USIZE != 256 {
-                iwd += O::LAMBDA::USIZE;
+            if O::Lambda::USIZE != 256 {
+                iwd += O::Lambda::USIZE;
             } else {
                 iwd += 128;
             }
@@ -112,8 +112,8 @@ pub fn inverse_affine_byte<O>(
 
 pub(crate) fn key_exp_cstrnts<'a, O>(
     zk_hasher: &mut ZKVerifyHasher<OWFField<O>>,
-    w: VoleCommitsRef<'a, OWFField<O>, O::LKE>,
-) -> VoleCommits<'a, OWFField<O>, O::PRODRUN128>
+    w: VoleCommitsRef<'a, OWFField<O>, O::LKe>,
+) -> VoleCommits<'a, OWFField<O>, O::R1Times128>
 where
     O: OWFParameters,
 {
@@ -122,7 +122,7 @@ where
 
     // ::2
     let w_flat = key_exp_bkwd::<O>(
-        w.get_commits_ref::<O::DIFFLKELAMBDA>(O::LAMBDA::USIZE),
+        w.get_commits_ref::<O::LKeMinusLambda>(O::Lambda::USIZE),
         k.to_ref(),
     );
 
@@ -131,7 +131,7 @@ where
     let mut do_rot_word = true;
 
     // ::7
-    iproduct!(0..O::SKE::USIZE / 4, 0..4).for_each(|(j, r)| {
+    iproduct!(0..O::SKe::USIZE / 4, 0..4).for_each(|(j, r)| {
         // ::11
         let r_prime_inv = if do_rot_word { (4 + r - 3) % 4 } else { r };
 
@@ -152,12 +152,12 @@ where
 
         if r == 3 {
             // ::16
-            if O::LAMBDA::USIZE == 256 {
+            if O::Lambda::USIZE == 256 {
                 do_rot_word = !do_rot_word;
             }
 
             // ::21
-            if O::LAMBDA::USIZE == 192 {
+            if O::Lambda::USIZE == 192 {
                 iwd += 192;
             } else {
                 iwd += 128;

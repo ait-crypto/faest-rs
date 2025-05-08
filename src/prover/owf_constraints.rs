@@ -7,14 +7,14 @@ use crate::{
     fields::{Field, FromBit},
     internal_keys::PublicKey,
     parameter::{OWFField, OWFParameters},
-    rijndael_32::{convert_from_batchblocks, inv_bitslice, rijndael_key_schedule},
+    rijndael_32::rijndael_key_schedule_unbitsliced,
     universal_hashing::ZKProofHasher,
     utils::xor_arrays,
 };
 
 pub(crate) fn owf_constraints<O>(
     zk_hasher: &mut ZKProofHasher<OWFField<O>>,
-    w: ByteCommitsRef<OWFField<O>, O::LBYTES>,
+    w: ByteCommitsRef<OWFField<O>, O::LBytes>,
     pk: &PublicKey<O>,
 ) where
     O: OWFParameters,
@@ -43,13 +43,13 @@ pub(crate) fn owf_constraints<O>(
         // ::8-9
         let ext_key = key_schedule_bytes::<O>(x);
         // ::10
-        let owf_input = w.get_commits_ref::<O::NSTBytes>(0);
+        let owf_input = w.get_commits_ref::<O::NStBytes>(0);
         // ::11
-        let owf_output_keys: GenericArray<u8, O::NSTBytes> =
+        let owf_output_keys: GenericArray<u8, O::NStBytes> =
             xor_arrays(owf_input.keys.as_slice(), y.as_slice()).collect();
         let owf_output = ByteCommitsRef::from_slices(&owf_output_keys, owf_input.tags);
         // ::19 - EM = true
-        let w_tilde = w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE);
+        let w_tilde = w.get_commits_ref::<O::LEncBytes>(O::LKeBytes::USIZE);
         // ::21 - EM = true
         enc_cstrnts::<O, _, _>(
             zk_hasher,
@@ -63,17 +63,17 @@ pub(crate) fn owf_constraints<O>(
         let mut owf_input = GenericArray::from_slice(x).to_owned();
 
         // ::16
-        let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKEBytes>(0));
+        let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKeBytes>(0));
         // Get references to the R+1 key commitments
         let extended_key: Vec<_> = (0..O::R::USIZE + 1)
-            .map(|i| k.get_commits_ref::<O::NSTBytes>(i * O::NSTBytes::USIZE))
+            .map(|i| k.get_commits_ref::<O::NStBytes>(i * O::NStBytes::USIZE))
             .collect();
 
         // ::18-22
-        for b in 0..O::BETA::USIZE {
+        for b in 0..O::Beta::USIZE {
             // ::19 - EM = false
             let w_tilde =
-                w.get_commits_ref::<O::LENCBytes>(O::LKEBytes::USIZE + b * O::LENCBytes::USIZE);
+                w.get_commits_ref::<O::LEncBytes>(O::LKeBytes::USIZE + b * O::LEncBytes::USIZE);
 
             let owf_output = GenericArray::from_slice(
                 &y[O::InputSize::USIZE * b..O::InputSize::USIZE * (b + 1)],
@@ -95,19 +95,19 @@ pub(crate) fn owf_constraints<O>(
 }
 
 #[inline]
-fn key_schedule_bytes<O>(key: &GenericArray<u8, O::InputSize>) -> Vec<GenericArray<u8, O::NSTBytes>>
+fn key_schedule_bytes<O>(key: &GenericArray<u8, O::InputSize>) -> Vec<GenericArray<u8, O::NStBytes>>
 where
     O: OWFParameters,
 {
-    rijndael_key_schedule::<O::NST, O::NK, O::R>(key, O::SKE::USIZE)
-        .chunks_exact(8)
-        .map(|chunk| {
-            GenericArray::from_iter(
-                convert_from_batchblocks(inv_bitslice(chunk))
-                    .take(O::NST::USIZE)
-                    .flatten(),
-            )
-        })
+    rijndael_key_schedule_unbitsliced::<O::NSt, O::NK, O::R>(key, O::SKe::USIZE)
+        .chunks_exact(32)
         .take(O::R::USIZE + 1)
+        .map(|chunk| {
+            chunk
+                .iter()
+                .copied()
+                .take(O::NStBytes::USIZE)
+                .collect::<GenericArray<u8, O::NStBytes>>()
+        })
         .collect()
 }

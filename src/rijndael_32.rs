@@ -43,6 +43,24 @@ pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
     key: &[u8],
     ske: usize,
 ) -> Vec<u32> {
+    let final_res = rijndael_key_schedule_unbitsliced::<NST, NK, R>(key, ske);
+
+    let mut final_bitsliced_res = vec![0u32; final_res.len() / 4];
+    for i in 0..final_res.len() / 32 {
+        bitslice(
+            &mut final_bitsliced_res[i * 8..(i + 1) * 8],
+            &final_res[32 * i..(32 * i) + 16],
+            &final_res[(32 * i) + 16..32 * (i + 1)],
+        );
+    }
+    final_bitsliced_res
+}
+
+/// Rijndael key schedule in non fixsliced representation.
+pub(crate) fn rijndael_key_schedule_unbitsliced<NST: Unsigned, NK: Unsigned, R: Unsigned>(
+    key: &[u8],
+    ske: usize,
+) -> Vec<u8> {
     let mut rkeys = vec![0u32; (NST::USIZE.div_ceil(NK::USIZE) * 8 * (R::USIZE + 1)) + 8];
 
     bitslice(&mut rkeys[..8], &key[..16], &key[16..]);
@@ -148,15 +166,7 @@ pub(crate) fn rijndael_key_schedule<NST: Unsigned, NK: Unsigned, R: Unsigned>(
         }
     }
 
-    let mut final_bitsliced_res = vec![0u32; final_res.len() / 4];
-    for i in 0..final_res.len() / 32 {
-        bitslice(
-            &mut final_bitsliced_res[i * 8..(i + 1) * 8],
-            &final_res[32 * i..(32 * i) + 16],
-            &final_res[(32 * i) + 16..32 * (i + 1)],
-        );
-    }
-    final_bitsliced_res
+    final_res
 }
 
 /// Fully-fixsliced AES-128 encryption (the ShiftRows is completely omitted).

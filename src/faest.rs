@@ -197,10 +197,10 @@ where
     P: FAESTParameters,
     O: OWFParameters,
 {
-    let start_byte = (O::LAMBDA::USIZE - P::WGRIND::USIZE) / 8;
+    let start_byte = (O::Lambda::USIZE - P::WGRIND::USIZE) / 8;
 
     // Discard all bits before position "lambda - w_grind"
-    let start_byte_0s = chall3[start_byte] >> ((O::LAMBDA::USIZE - P::WGRIND::USIZE) % 8);
+    let start_byte_0s = chall3[start_byte] >> ((O::Lambda::USIZE - P::WGRIND::USIZE) % 8);
 
     if start_byte_0s != 0 {
         return false;
@@ -242,11 +242,11 @@ where
 {
     let (n_nodes, node_size) = (
         <P::Tau as TauParameters>::Topen::USIZE,
-        O::LAMBDABYTES::USIZE,
+        O::LambdaBytes::USIZE,
     );
     let (n_coms, com_size) = (
         <P::Tau as TauParameters>::Tau::USIZE,
-        O::NLeafCommit::USIZE * O::LAMBDABYTES::USIZE,
+        O::NLeafCommit::USIZE * O::LambdaBytes::USIZE,
     );
 
     let (sigma, nodes) = sigma.split_at(sigma.len() - n_nodes * node_size);
@@ -296,11 +296,11 @@ fn sign<P, O>(
     let (signature, ctr_s) = signature.split_at_mut(P::SignatureSize::USIZE - size_of::<u32>());
 
     // ::3
-    let mut mu = GenericArray::<u8, O::LAMBDABYTESTWO>::default();
+    let mut mu = GenericArray::<u8, O::LambdaBytesTimes2>::default();
     RO::<P>::hash_mu(&mut mu, &sk.pk.owf_input, &sk.pk.owf_output, msg);
 
     // ::4
-    let mut r = GenericArray::<u8, O::LAMBDABYTES>::default();
+    let mut r = GenericArray::<u8, O::LambdaBytes>::default();
     let (signature, iv) = signature.split_at_mut(signature.len() - IVSize::USIZE);
     let iv_pre = GenericArray::from_mut_slice(iv);
     RO::<P>::hash_r_iv(&mut r, iv_pre, &sk.owf_key, &mu, rho);
@@ -311,9 +311,9 @@ fn sign<P, O>(
 
     // ::7
     let (volecommit_cs, signature) =
-        signature.split_at_mut(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
+        signature.split_at_mut(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
     let VoleCommitResult { com, decom, u, v } =
-        volecommit::<P::BAVC, O::LHATBYTES>(VoleCommitmentCRefMut::new(volecommit_cs), &r, &iv);
+        volecommit::<P::BAVC, O::LHatBytes>(VoleCommitmentCRefMut::new(volecommit_cs), &r, &iv);
 
     // ::8
     //Contrarly to specification, faest-ref uses iv instead of iv_pre
@@ -332,7 +332,7 @@ fn sign<P, O>(
     // ::11
     let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), u_t);
     {
-        for i in 0..O::LAMBDA::USIZE {
+        for i in 0..O::Lambda::USIZE {
             // Hash column-wise
             RO::<P>::hash_challenge_2_update(
                 &mut h2_hasher,
@@ -347,8 +347,8 @@ fn sign<P, O>(
 
     // ::13
     // compute and write masked witness 'd' in signature
-    let (d, signature) = signature.split_at_mut(O::LBYTES::USIZE);
-    mask_witness(d, &w, &u[..<O as OWFParameters>::LBYTES::USIZE]);
+    let (d, signature) = signature.split_at_mut(O::LBytes::USIZE);
+    mask_witness(d, &w, &u[..<O as OWFParameters>::LBytes::USIZE]);
 
     // ::14
     let mut chall2 = GenericArray::default();
@@ -358,7 +358,9 @@ fn sign<P, O>(
     let (a0_tilde, a1_tilde, a2_tilde) = P::OWF::prove(
         &w,
         // ::16
-        GenericArray::from_slice(&u[O::LBYTES::USIZE..O::LBYTES::USIZE + O::LAMBDABYTESTWO::USIZE]),
+        GenericArray::from_slice(
+            &u[O::LBytes::USIZE..O::LBytes::USIZE + O::LambdaBytesTimes2::USIZE],
+        ),
         // ::17
         GenericArray::from_slice(&v),
         &sk.pk,
@@ -424,11 +426,11 @@ where
     // ::3
     RO::<P>::hash_iv(&mut iv);
 
-    let (sigma, chall3) = sigma.split_at(sigma.len() - O::LAMBDABYTES::USIZE);
-    let chall3: &GenericArray<u8, O::LAMBDABYTES> = GenericArray::from_slice(chall3);
+    let (sigma, chall3) = sigma.split_at(sigma.len() - O::LambdaBytes::USIZE);
+    let chall3: &GenericArray<u8, O::LambdaBytes> = GenericArray::from_slice(chall3);
 
     // ::2
-    let mut mu = GenericArray::<u8, O::LAMBDABYTESTWO>::default();
+    let mut mu = GenericArray::<u8, O::LambdaBytesTimes2>::default();
     RO::<P>::hash_mu(&mut mu, &pk.owf_input, &pk.owf_output, msg);
 
     // ::4
@@ -437,8 +439,8 @@ where
     }
 
     let (c, sigma) =
-        sigma.split_at(O::LHATBYTES::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
-    let c = VoleCommitmentCRef::<O::LHATBYTES>::new(c);
+        sigma.split_at(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
+    let c = VoleCommitmentCRef::<O::LHatBytes>::new(c);
 
     let (sigma, coms, nodes) = parse_decom::<O, P>(sigma);
 
@@ -448,7 +450,7 @@ where
     };
 
     // ::7
-    let res = volereconstruct::<P::BAVC, O::LHATBYTES>(chall3, &decom_i, c, &iv);
+    let res = volereconstruct::<P::BAVC, O::LHatBytes>(chall3, &decom_i, c, &iv);
 
     // ::8
     if res.is_none() {
@@ -469,7 +471,7 @@ where
     {
         let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
         for (i, d_i) in zip(
-            0..O::LAMBDA::USIZE,
+            0..O::Lambda::USIZE,
             //TODO: make this more readable
             (0..<P::Tau as TauParameters>::Tau::USIZE)
                 .flat_map(|i| P::Tau::decode_challenge_as_iter(chall3, i))
@@ -488,13 +490,13 @@ where
         }
     }
 
-    let (d, sigma) = sigma.split_at(O::LBYTES::USIZE);
+    let (d, sigma) = sigma.split_at(O::LBytes::USIZE);
 
     // ::15
     let mut chall2 = GenericArray::default();
     RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, d);
 
-    let (a1_tilde, a2_tilde) = sigma.split_at(O::LAMBDABYTES::USIZE);
+    let (a1_tilde, a2_tilde) = sigma.split_at(O::LambdaBytes::USIZE);
 
     // ::17
     let a0_tilde = P::OWF::verify(

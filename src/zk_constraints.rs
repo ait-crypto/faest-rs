@@ -13,18 +13,18 @@ use crate::{
 };
 
 pub(crate) type CstrntsVal<'a, O> = &'a GenericArray<
-    GenericArray<u8, <O as OWFParameters>::LHATBYTES>,
-    <O as OWFParameters>::LAMBDA,
+    GenericArray<u8, <O as OWFParameters>::LHatBytes>,
+    <O as OWFParameters>::Lambda,
 >;
 
 // // Reshapes a matrix of size (l_hat/8) x lambda into a matrix of size l_hat x (lambda/8).
 // // Then, it converts all rows in the interval [row_start, rowstart + nrows) to field elements.
 fn reshape_and_to_field<O: OWFParameters>(m: CstrntsVal<O>) -> Vec<OWFField<O>> {
-    (0..O::LBYTES::USIZE + O::LAMBDABYTESTWO::USIZE)
+    (0..O::LBytes::USIZE + O::LambdaBytesTimes2::USIZE)
         .flat_map(|col| {
-            let mut ret = vec![GenericArray::<u8, O::LAMBDABYTES>::default(); 8];
+            let mut ret = vec![GenericArray::<u8, O::LambdaBytes>::default(); 8];
 
-            (0..O::LAMBDA::USIZE).for_each(|row| {
+            (0..O::Lambda::USIZE).for_each(|row| {
                 for (i, ret_i) in ret.iter_mut().enumerate() {
                     ret_i[row / 8] |= get_bit(&[m[row][col]], i) << (row % 8);
                 }
@@ -37,8 +37,8 @@ fn reshape_and_to_field<O: OWFParameters>(m: CstrntsVal<O>) -> Vec<OWFField<O>> 
 }
 
 pub(crate) fn aes_prove<O>(
-    w: &GenericArray<u8, O::LBYTES>,
-    u: &GenericArray<u8, O::LAMBDABYTESTWO>,
+    w: &GenericArray<u8, O::LBytes>,
+    u: &GenericArray<u8, O::LambdaBytesTimes2>,
     v: CstrntsVal<O>,
     pk: &PublicKey<O>,
     chall_2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
@@ -55,12 +55,12 @@ where
     let v = reshape_and_to_field::<O>(v);
 
     // ::7
-    let u0_star = OWFField::<O>::sum_poly_bits(&u[..O::LAMBDABYTES::USIZE]);
-    let u1_star = OWFField::<O>::sum_poly_bits(&u[O::LAMBDABYTES::USIZE..]);
+    let u0_star = OWFField::<O>::sum_poly_bits(&u[..O::LambdaBytes::USIZE]);
+    let u1_star = OWFField::<O>::sum_poly_bits(&u[O::LambdaBytes::USIZE..]);
 
     // ::8
-    let v0_star = OWFField::<O>::sum_poly(&v[O::L::USIZE..O::L::USIZE + O::LAMBDA::USIZE]);
-    let v1_star = OWFField::<O>::sum_poly(&v[O::L::USIZE + O::LAMBDA::USIZE..]);
+    let v0_star = OWFField::<O>::sum_poly(&v[O::L::USIZE..O::L::USIZE + O::Lambda::USIZE]);
+    let v1_star = OWFField::<O>::sum_poly(&v[O::L::USIZE + O::Lambda::USIZE..]);
 
     // ::12
     prover::owf_constraints::<O>(
@@ -75,10 +75,10 @@ where
 
 pub(crate) fn aes_verify<O>(
     q: CstrntsVal<O>,
-    d: &GenericArray<u8, O::LBYTES>,
+    d: &GenericArray<u8, O::LBytes>,
     pk: &PublicKey<O>,
     chall_2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
-    chall_3: &GenericArray<u8, O::LAMBDABYTES>,
+    chall_3: &GenericArray<u8, O::LambdaBytes>,
     a1_tilde: &OWFField<O>,
     a2_tilde: &OWFField<O>,
 ) -> OWFField<O>
@@ -103,9 +103,9 @@ where
     };
 
     // ::7
-    let q0_star = OWFField::<O>::sum_poly(&q[O::L::USIZE..O::L::USIZE + O::LAMBDA::USIZE]);
+    let q0_star = OWFField::<O>::sum_poly(&q[O::L::USIZE..O::L::USIZE + O::Lambda::USIZE]);
     let q1_star = OWFField::<O>::sum_poly(
-        &q[O::L::USIZE + O::LAMBDA::USIZE..O::L::USIZE + O::LAMBDA::USIZE * 2],
+        &q[O::L::USIZE + O::Lambda::USIZE..O::L::USIZE + O::Lambda::USIZE * 2],
     );
 
     // ::10

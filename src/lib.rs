@@ -357,7 +357,7 @@ macro_rules! define_impl {
                 ) -> Result<[<$param Signature>], Error> {
                     let mut rho = GenericArray::<
                         u8,
-                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES,
+                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LambdaBytes,
                     >::default();
                     rng.fill_bytes(&mut rho);
                     let mut signature = GenericArray::default();
@@ -375,7 +375,7 @@ macro_rules! define_impl {
                 ) -> Result<Box<[<$param Signature>]>, Error> {
                     let mut rho = GenericArray::<
                         u8,
-                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LAMBDABYTES,
+                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LambdaBytes,
                     >::default();
                     rng.fill_bytes(&mut rho);
                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));

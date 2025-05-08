@@ -1,10 +1,12 @@
-use std::ops::{AddAssign, Mul};
+use std::{
+    iter::zip,
+    ops::{AddAssign, Mul},
+};
 
 use generic_array::{
     ArrayLength, GenericArray,
     typenum::{U4, U8, Unsigned},
 };
-use itertools::izip;
 
 use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use crate::{
@@ -18,15 +20,14 @@ use crate::{
 };
 
 // Helper type aliases
-
 pub(crate) type StateBitsSquaredCommits<O> =
-    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBits>>;
+    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NStBits>>;
 
 pub(crate) type StateBytesCommits<O> =
-    Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
+    Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NStBytes>>;
 
 pub(crate) type StateBytesSquaredCommits<O> =
-    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NSTBytes>>;
+    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NStBytes>>;
 
 // implementations of StateToBytes
 
@@ -39,11 +40,11 @@ where
     type Output = StateBytesCommits<O>;
 
     fn state_to_bytes(&self) -> Self::Output {
-        (0..O::NSTBytes::USIZE)
-            .map(|i| {
+        zip(self.keys, self.tags.chunks_exact(8))
+            .map(|(&key_i, tags_i)| {
                 FieldCommitDegOne::new(
-                    OWFField::<O>::byte_combine_bits(self.keys[i]),
-                    OWFField::<O>::byte_combine_slice(&self.tags[i * 8..i * 8 + 8]),
+                    OWFField::<O>::byte_combine_bits(key_i),
+                    OWFField::<O>::byte_combine_slice(tags_i),
                 )
             })
             .collect()
@@ -51,17 +52,16 @@ where
 }
 
 // Scalar commitments to known state
-// TODO: Only return the keys (efficiency)
 impl<O, L> StateToBytes<O> for GenericArray<u8, L>
 where
     L: ArrayLength + Mul<U8, Output: ArrayLength>,
     O: OWFParameters,
 {
-    type Output = Box<GenericArray<OWFField<O>, O::NSTBytes>>;
+    type Output = Box<GenericArray<OWFField<O>, O::NStBytes>>;
 
     fn state_to_bytes(&self) -> Self::Output {
         self.iter()
-            .map(|k| OWFField::<O>::byte_combine_bits(*k))
+            .map(|&k| OWFField::<O>::byte_combine_bits(k))
             .collect()
     }
 }
@@ -78,7 +78,7 @@ where
 
     fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
         Self::new(
-            self.keys.iter().zip(rhs).map(|(a, b)| a ^ b).collect(),
+            zip(self.keys.iter(), rhs).map(|(a, b)| a ^ b).collect(),
             self.tags.to_owned(),
         )
     }
@@ -110,9 +110,7 @@ where
 
     fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
         ByteCommits {
-            keys: izip!(self.into_iter(), rhs.keys)
-                .map(|(a, b)| a ^ b)
-                .collect(),
+            keys: zip(self.iter(), rhs.keys).map(|(a, b)| a ^ b).collect(),
             tags: <Box<GenericArray<_, _>>>::from_iter(rhs.tags[..L::USIZE * 8].iter().cloned()),
         }
     }
@@ -128,9 +126,11 @@ where
 
     fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
         Self {
-            keys: self.keys.iter().zip(rhs.keys).map(|(a, b)| a ^ b).collect(),
-            tags: izip!(self.tags.iter(), rhs.tags)
-                .map(|(a, b)| *a + b)
+            keys: zip(self.keys.iter(), rhs.keys)
+                .map(|(a, b)| a ^ b)
+                .collect(),
+            tags: zip(self.tags.iter(), rhs.tags)
+                .map(|(&a, b)| a + b)
                 .collect(),
         }
     }
@@ -157,7 +157,9 @@ where
 {
     fn add_round_key_assign(&mut self, rhs: &ByteCommitsRef<'_, F, L>) {
         xor_arrays_inplace(self.keys.as_mut_slice(), rhs.keys.as_slice());
-        izip!(self.tags.iter_mut(), rhs.tags).for_each(|(a, b)| *a += b);
+        for (a, b) in zip(self.tags.iter_mut(), rhs.tags.iter()) {
+            *a += b;
+        }
     }
 }
 
@@ -169,7 +171,6 @@ where
     fn shift_rows(&mut self) {
         // TODO: Copy row by row instead of entire state
         let mut tmp = self.clone();
-
         let nst = L::USIZE / 4;
 
         for r in 0..4 {
@@ -191,28 +192,28 @@ where
     for<'a> FieldCommitDegTwo<F>: AddAssign<&'a T>,
 {
     fn add_round_key_bytes(&mut self, key: &GenericArray<T, L>, _sq: bool) {
-        for (st, k) in izip!(self.iter_mut(), key) {
+        for (st, k) in zip(self.iter_mut(), key) {
             *st += k;
         }
     }
 }
 
-impl<O> InverseShiftRows<O> for ByteCommitsRef<'_, OWFField<O>, O::NSTBytes>
+impl<O> InverseShiftRows<O> for ByteCommitsRef<'_, OWFField<O>, O::NStBytes>
 where
     O: OWFParameters,
 {
-    type Output = ByteCommits<OWFField<O>, O::NSTBytes>;
+    type Output = ByteCommits<OWFField<O>, O::NStBytes>;
 
     fn inverse_shift_rows(&self) -> Self::Output {
-        let mut state_prime = ByteCommits::<OWFField<O>, O::NSTBytes>::default();
+        let mut state_prime = ByteCommits::<OWFField<O>, O::NStBytes>::default();
 
         for r in 0..4 {
-            for c in 0..O::NST::USIZE {
+            for c in 0..O::NSt::USIZE {
                 // :: 3-6
-                let i = if (O::NST::USIZE != 8) || (r <= 1) {
-                    4 * ((O::NST::USIZE + c - r) % O::NST::USIZE) + r
+                let i = if (O::NSt::USIZE != 8) || (r <= 1) {
+                    4 * ((O::NSt::USIZE + c - r) % O::NSt::USIZE) + r
                 } else {
-                    4 * ((O::NST::USIZE + c - r - 1) % O::NST::USIZE) + r
+                    4 * ((O::NSt::USIZE + c - r - 1) % O::NSt::USIZE) + r
                 };
 
                 // :: 7
@@ -242,14 +243,14 @@ where
             &OWFField::<O>::BYTE_COMBINE_3
         };
 
-        for c in 0..O::NST::USIZE {
+        for c in 0..O::NSt::USIZE {
             // Save the 4 state's columns that will be modified in this round
             let tmp = GenericArray::<_, U4>::from_slice(&self[4 * c..4 * c + 4]).to_owned();
 
             let i0 = 4 * c;
-            let i1 = 4 * c + 1;
-            let i2 = 4 * c + 2;
-            let i3 = 4 * c + 3;
+            let i1 = i0 + 1;
+            let i2 = i0 + 2;
+            let i3 = i0 + 3;
 
             // ::7
             self[i0] = &tmp[0] * v2 + &tmp[1] * v3 + &tmp[2] + &tmp[3];
@@ -258,21 +259,22 @@ where
             // ::9
             self[i2] = &tmp[2] * v2 + &tmp[3] * v3 + &tmp[0] + &tmp[1];
             // ::10
-            self[i3] = &tmp[0] * v3 + &tmp[3] * v2 + &tmp[1] + &tmp[2];
+            let (tmp0, tmp1, tmp2, tmp3) = tmp.into();
+            self[i3] = tmp0 * v3 + tmp3 * v2 + &tmp1 + &tmp2;
         }
     }
 }
 
-impl<O> BytewiseMixColumns<O> for ByteCommitsRef<'_, OWFField<O>, O::NSTBytes>
+impl<O> BytewiseMixColumns<O> for ByteCommitsRef<'_, OWFField<O>, O::NStBytes>
 where
     O: OWFParameters,
 {
-    type Output = ByteCommits<OWFField<O>, O::NSTBytes>;
+    type Output = ByteCommits<OWFField<O>, O::NStBytes>;
 
     fn bytewise_mix_columns(&self) -> Self::Output {
         let mut o = ByteCommits::default();
 
-        for c in 0..O::NST::USIZE {
+        for c in 0..O::NSt::USIZE {
             for r in 0..4 {
                 // ::4
                 let a_key = self.keys[4 * c + r];
@@ -297,9 +299,9 @@ where
                 for j in 0..2 {
                     let off = (4 + r - j) % 4;
                     o.keys[4 * c + off] ^= b_key;
-                    izip!(
+                    zip(
                         o.tags[32 * c + 8 * off..32 * c + 8 * off + 8].iter_mut(),
-                        b_tags
+                        b_tags,
                     )
                     .for_each(|(o, b)| {
                         *o += b;
@@ -310,9 +312,9 @@ where
                 for j in 1..4 {
                     let off = (r + j) % 4;
                     o.keys[4 * c + off] ^= a_key;
-                    izip!(
+                    zip(
                         o.tags[32 * c + 8 * off..32 * c + 8 * off + 8].iter_mut(),
-                        a_tags
+                        a_tags,
                     )
                     .for_each(|(o, a)| {
                         *o += a;
@@ -341,7 +343,7 @@ where
         let t = sq as usize;
 
         // :: 8-10
-        (0..O::NSTBytes::USIZE)
+        (0..O::NStBytes::USIZE)
             .map(|i| {
                 // :: 9
                 let mut y_i = &self[i * 8 + t % 8] * sigmas[0];

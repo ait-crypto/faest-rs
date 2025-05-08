@@ -18,7 +18,7 @@ pub(crate) struct SecretKey<O>
 where
     O: OWFParameters,
 {
-    pub(crate) owf_key: GenericArray<u8, O::LAMBDABYTES>,
+    pub(crate) owf_key: GenericArray<u8, O::LambdaBytes>,
     #[cfg_attr(feature = "zeroize", zeroize(skip))]
     pub(crate) pk: PublicKey<O>,
 }

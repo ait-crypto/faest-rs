@@ -1,10 +1,9 @@
-use std::ops::Mul;
+use std::{iter::zip, ops::Mul};
 
 use generic_array::{
     ArrayLength, GenericArray,
     typenum::{U4, U8, marker_traits::Unsigned},
 };
-use itertools::izip;
 
 use crate::{
     aes::{
@@ -19,28 +18,30 @@ use crate::{
     verifier::{VoleCommits, VoleCommitsRef},
 };
 
-impl<O> StateToBytes<O> for VoleCommits<'_, OWFField<O>, O::NSTBits>
+impl<O> StateToBytes<O> for VoleCommits<'_, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = GenericArray<OWFField<O>, O::NSTBytes>;
+    type Output = GenericArray<OWFField<O>, O::NStBytes>;
 
     fn state_to_bytes(&self) -> Self::Output {
-        (0..O::NSTBytes::USIZE)
-            .map(|i| OWFField::<O>::byte_combine_slice(&self.scalars[8 * i..8 * i + 8]))
+        self.scalars
+            .chunks_exact(8)
+            .map(OWFField::<O>::byte_combine_slice)
             .collect()
     }
 }
 
-impl<O> StateToBytes<O> for VoleCommitsRef<'_, OWFField<O>, O::NSTBits>
+impl<O> StateToBytes<O> for VoleCommitsRef<'_, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = GenericArray<OWFField<O>, O::NSTBytes>;
+    type Output = GenericArray<OWFField<O>, O::NStBytes>;
 
     fn state_to_bytes(&self) -> Self::Output {
-        (0..O::NSTBytes::USIZE)
-            .map(|i| OWFField::<O>::byte_combine_slice(&self.scalars[8 * i..8 * i + 8]))
+        self.scalars
+            .chunks_exact(8)
+            .map(OWFField::<O>::byte_combine_slice)
             .collect()
     }
 }
@@ -54,7 +55,7 @@ where
 
     fn add_round_key(&self, rhs: Self) -> Self::Output {
         Self::Output {
-            scalars: izip!(self.scalars.iter(), rhs.scalars.iter())
+            scalars: zip(self.scalars.iter(), rhs.scalars.iter())
                 .map(|(x, y)| *x + y)
                 .collect(),
             delta: self.delta,
@@ -71,7 +72,7 @@ where
 
     fn add_round_key(&self, rhs: &VoleCommits<'a, F, L>) -> Self::Output {
         Self::Output {
-            scalars: izip!(self.scalars.iter(), rhs.scalars.iter())
+            scalars: zip(self.scalars, rhs.scalars.iter())
                 .map(|(x, y)| *x + y)
                 .collect(),
             delta: self.delta,
@@ -88,7 +89,7 @@ where
 
     fn add_round_key(&self, rhs: &Self) -> Self::Output {
         Self::Output {
-            scalars: izip!(self.scalars, rhs.scalars)
+            scalars: zip(self.scalars, rhs.scalars)
                 .map(|(x, y)| *x + y)
                 .collect(),
             delta: self.delta,
@@ -105,7 +106,7 @@ where
 
     fn add_round_key(&self, rhs: &GenericArray<F, L>) -> Self::Output {
         Self::Output {
-            scalars: izip!(self.scalars, rhs).map(|(x, y)| *x + y).collect(),
+            scalars: zip(self.scalars, rhs).map(|(x, y)| *x + y).collect(),
             delta: self.delta,
         }
     }
@@ -122,7 +123,7 @@ where
     fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
         let scalars = self
             .scalars
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(i, comm_i)| *comm_i + *self.delta * ((rhs[i / 8] >> (i % 8)) & 1))
             .collect();
@@ -140,7 +141,7 @@ where
     L: ArrayLength,
 {
     fn add_round_key_assign(&mut self, rhs: &Self) {
-        for (x, y) in izip!(self.scalars.iter_mut(), rhs.scalars.iter()) {
+        for (x, y) in zip(self.scalars.iter_mut(), rhs.scalars.iter()) {
             *x += y;
         }
     }
@@ -152,7 +153,7 @@ where
     L: ArrayLength,
 {
     fn add_round_key_assign(&mut self, rhs: &VoleCommitsRef<'_, F, L>) {
-        for (x, y) in izip!(self.scalars.iter_mut(), rhs.scalars) {
+        for (x, y) in zip(self.scalars.iter_mut(), rhs.scalars.iter()) {
             *x += y;
         }
     }
@@ -164,28 +165,28 @@ where
     L: ArrayLength,
 {
     fn add_round_key_assign(&mut self, rhs: &GenericArray<F, L>) {
-        for (x, y) in izip!(self.scalars.iter_mut(), rhs) {
+        for (x, y) in zip(self.scalars.iter_mut(), rhs.iter()) {
             *x += y;
         }
     }
 }
 
-impl<'a, O> InverseShiftRows<O> for VoleCommitsRef<'a, OWFField<O>, O::NSTBits>
+impl<'a, O> InverseShiftRows<O> for VoleCommitsRef<'a, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = VoleCommits<'a, OWFField<O>, O::NSTBits>;
+    type Output = VoleCommits<'a, OWFField<O>, O::NStBits>;
 
     fn inverse_shift_rows(&self) -> Self::Output {
         let mut state_prime = GenericArray::default_boxed();
 
         for r in 0..4 {
-            for c in 0..O::NST::USIZE {
+            for c in 0..O::NSt::USIZE {
                 // :: 3-6
-                let i = if (O::NST::USIZE != 8) || (r <= 1) {
-                    4 * ((O::NST::USIZE + c - r) % O::NST::USIZE) + r
+                let i = if (O::NSt::USIZE != 8) || (r <= 1) {
+                    4 * ((O::NSt::USIZE + c - r) % O::NSt::USIZE) + r
                 } else {
-                    4 * ((O::NST::USIZE + c - r - 1) % O::NST::USIZE) + r
+                    4 * ((O::NSt::USIZE + c - r - 1) % O::NSt::USIZE) + r
                 };
 
                 // :: 7
@@ -201,22 +202,22 @@ where
     }
 }
 
-impl<'a, O> InverseShiftRows<O> for &VoleCommits<'a, OWFField<O>, O::NSTBits>
+impl<'a, O> InverseShiftRows<O> for &VoleCommits<'a, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = VoleCommits<'a, OWFField<O>, O::NSTBits>;
+    type Output = VoleCommits<'a, OWFField<O>, O::NStBits>;
 
     fn inverse_shift_rows(&self) -> Self::Output {
         let mut state_prime = GenericArray::default_boxed();
 
         for r in 0..4 {
-            for c in 0..O::NST::USIZE {
+            for c in 0..O::NSt::USIZE {
                 // :: 3-6
-                let i = if (O::NST::USIZE != 8) || (r <= 1) {
-                    4 * ((O::NST::USIZE + c - r) % O::NST::USIZE) + r
+                let i = if (O::NSt::USIZE != 8) || (r <= 1) {
+                    4 * ((O::NSt::USIZE + c - r) % O::NSt::USIZE) + r
                 } else {
-                    4 * ((O::NST::USIZE + c - r - 1) % O::NST::USIZE) + r
+                    4 * ((O::NSt::USIZE + c - r - 1) % O::NSt::USIZE) + r
                 };
 
                 // :: 7
@@ -232,16 +233,16 @@ where
     }
 }
 
-impl<'a, O> BytewiseMixColumns<O> for VoleCommitsRef<'a, OWFField<O>, O::NSTBits>
+impl<'a, O> BytewiseMixColumns<O> for VoleCommitsRef<'a, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = VoleCommits<'a, OWFField<O>, O::NSTBits>;
+    type Output = VoleCommits<'a, OWFField<O>, O::NStBits>;
 
     fn bytewise_mix_columns(&self) -> Self::Output {
-        let mut o = GenericArray::<_, O::NSTBits>::default_boxed();
+        let mut o = GenericArray::<_, O::NStBits>::default_boxed();
 
-        for c in 0..O::NST::USIZE {
+        for c in 0..O::NSt::USIZE {
             for r in 0..4 {
                 // ::4
                 let a_key = &self.scalars[32 * c + 8 * r..32 * c + 8 * r + 8];
@@ -282,11 +283,11 @@ where
     }
 }
 
-impl<'a, O> SBoxAffine<O> for VoleCommits<'a, OWFField<O>, O::NSTBits>
+impl<'a, O> SBoxAffine<O> for VoleCommits<'a, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = VoleCommits<'a, OWFField<O>, O::NSTBytes>;
+    type Output = VoleCommits<'a, OWFField<O>, O::NStBytes>;
 
     fn s_box_affine(&self, sq: bool) -> Self::Output {
         let sigmas = if sq {
@@ -298,7 +299,7 @@ where
         let t = sq as usize;
 
         // :: 8-10
-        let scalars = (0..O::NSTBytes::USIZE)
+        let scalars = (0..O::NStBytes::USIZE)
             .map(|i| {
                 // :: 9
                 let mut y_i = sigmas[8] * self.delta.square();
@@ -366,7 +367,7 @@ where
     }
 }
 
-impl<O> MixColumns<O> for VoleCommits<'_, OWFField<O>, O::NSTBytes>
+impl<O> MixColumns<O> for VoleCommits<'_, OWFField<O>, O::NStBytes>
 where
     O: OWFParameters,
 {
@@ -383,14 +384,14 @@ where
             )
         };
 
-        for c in 0..O::NST::USIZE {
+        for c in 0..O::NSt::USIZE {
             // Save the 4 state's columns that will be modified in this round
             let tmp = GenericArray::<_, U4>::from_slice(&self.scalars[4 * c..4 * c + 4]).to_owned();
 
             let i0 = 4 * c;
-            let i1 = 4 * c + 1;
-            let i2 = 4 * c + 2;
-            let i3 = 4 * c + 3;
+            let i1 = i0 + 1;
+            let i2 = i0 + 2;
+            let i3 = i0 + 3;
 
             // ::7
             self.scalars[i0] = tmp[0] * v2 + tmp[1] * v3 + tmp[2] + tmp[3];
@@ -399,7 +400,8 @@ where
             // ::9
             self.scalars[i2] = tmp[2] * v2 + tmp[3] * v3 + tmp[0] + tmp[1];
             // ::10
-            self.scalars[i3] = tmp[0] * v3 + tmp[3] * v2 + tmp[1] + tmp[2];
+            let (tmp0, tmp1, tmp2, tmp3) = tmp.into();
+            self.scalars[i3] = tmp0 * v3 + tmp3 * v2 + tmp1 + tmp2;
         }
     }
 }
@@ -411,11 +413,11 @@ where
 {
     fn add_round_key_bytes(&mut self, rhs: &GenericArray<F, L>, sq: bool) {
         if sq {
-            for (st, k) in izip!(self.scalars.iter_mut(), rhs) {
+            for (st, k) in zip(self.scalars.iter_mut(), rhs) {
                 *st += k;
             }
         } else {
-            for (st, k) in izip!(self.scalars.iter_mut(), rhs) {
+            for (st, k) in zip(self.scalars.iter_mut(), rhs) {
                 *st += *k * self.delta;
             }
         }
