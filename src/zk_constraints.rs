@@ -4,12 +4,10 @@ use crate::{
     fields::{Square, SumPoly},
     internal_keys::PublicKey,
     parameter::{BaseParameters, OWFField, OWFParameters, QSProof},
-    prover,
-    prover::byte_commitments::ByteCommitsRef,
+    prover::{self, byte_commitments::ByteCommitsRef},
     universal_hashing::ZKHasherInit,
     utils::get_bit,
-    verifier,
-    verifier::VoleCommitsRef,
+    verifier::{self, VoleCommitsRef},
 };
 
 pub(crate) type CstrntsVal<'a, O> = &'a GenericArray<
