@@ -29,6 +29,24 @@ fn add_tweak(iv: &IV, tweak: Twk) -> GenericArray_0_14<u8, IVSize> {
     iv
 }
 
+fn read_from_stream<S: StreamCipher>(stream: &mut S, dst: &mut [u8]) {
+    /*
+    This is acutally the safe variants of this function. But since we are always reading into destinatinations that are all-0, we can just call apply_keystream
+
+    let mut iter = dst.chunks_exact_mut(16);
+    let buf = [0u8; 16];
+    for chunk in iter.by_ref() {
+        stream.apply_keystream_inout(InOutBuf::new(&buf, chunk).unwrap());
+    }
+
+    let rem = iter.into_remainder();
+    if !rem.is_empty() {
+        stream.apply_keystream_inout(InOutBuf::new(&buf[..rem.len()], rem).unwrap());
+    }
+    */
+    stream.apply_keystream(dst);
+}
+
 /// Interface for the PRG
 pub(crate) trait PseudoRandomGenerator: Sized + Reader {
     /// Size of the PRG key
@@ -54,7 +72,7 @@ impl PseudoRandomGenerator for PRG128 {
 
 impl Reader for PRG128 {
     fn read(&mut self, dst: &mut [u8]) {
-        self.0.apply_keystream(dst);
+        read_from_stream(&mut self.0, dst);
     }
 }
 
@@ -74,7 +92,7 @@ impl PseudoRandomGenerator for PRG192 {
 
 impl Reader for PRG192 {
     fn read(&mut self, dst: &mut [u8]) {
-        self.0.apply_keystream(dst);
+        read_from_stream(&mut self.0, dst);
     }
 }
 
@@ -94,13 +112,12 @@ impl PseudoRandomGenerator for PRG256 {
 
 impl Reader for PRG256 {
     fn read(&mut self, dst: &mut [u8]) {
-        self.0.apply_keystream(dst);
+        read_from_stream(&mut self.0, dst);
     }
 }
 
 #[cfg(test)]
 mod test {
-
     use super::*;
 
     #[test]
