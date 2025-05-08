@@ -30,7 +30,9 @@ zeroize = { version = "1.2", optional = true, default-features = false, features
   "derive",
 ] }
 paste = "1"
-itertools = { version = "0.14", default-features = false }
+itertools = { version = "0.14", default-features = false, features = [
+  "use_std",
+] }
 bit-set = "0.8.0"
 
 [dev-dependencies]
