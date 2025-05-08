@@ -42,21 +42,21 @@ where
 pub struct SmallGF<T>(Wrapping<T>);
 
 impl<T> From<T> for SmallGF<T> {
-    #[inline(always)]
+    #[inline]
     fn from(value: T) -> Self {
         Self(Wrapping(value))
     }
 }
 
 impl From<SmallGF<Self>> for u8 {
-    #[inline(always)]
+    #[inline]
     fn from(value: SmallGF<Self>) -> Self {
         value.0.0
     }
 }
 
 impl From<SmallGF<Self>> for u64 {
-    #[inline(always)]
+    #[inline]
     fn from(value: SmallGF<Self>) -> Self {
         value.0.0
     }
@@ -66,7 +66,7 @@ impl<T> Default for SmallGF<T>
 where
     T: Default,
 {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self(Wrapping::default())
     }
@@ -87,7 +87,7 @@ where
 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: Self) -> Self::Output {
         Self(self.0 ^ rhs.0)
@@ -98,7 +98,7 @@ impl<T> AddAssign for SmallGF<T>
 where
     Wrapping<T>: BitXorAssign,
 {
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: Self) {
         self.0 ^= rhs.0;
@@ -111,7 +111,7 @@ where
 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: Self) -> Self::Output {
         Self(self.0 ^ rhs.0)
@@ -122,7 +122,7 @@ impl<T> SubAssign for SmallGF<T>
 where
     Wrapping<T>: BitXorAssign,
 {
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: Self) {
         self.0 ^= rhs.0;
@@ -132,7 +132,7 @@ where
 impl<T> Neg for SmallGF<T> {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn neg(self) -> Self::Output {
         self
     }
@@ -163,7 +163,7 @@ where
 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         Self(Self::mul_helper(self.0, rhs.0))
     }
@@ -180,7 +180,7 @@ where
         + Shl<usize, Output = Wrapping<T>>
         + Shr<usize, Output = Wrapping<T>>,
 {
-    #[inline(always)]
+    #[inline]
     fn mul_assign(&mut self, rhs: Self) {
         self.0 = Self::mul_helper(self.0, rhs.0);
     }

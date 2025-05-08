@@ -144,7 +144,7 @@ macro_rules! define_impl {
             struct $param;
 
             impl $param {
-                #[inline(always)]
+                #[inline]
                 fn sign(
                     msg: &[u8],
                     sk: &SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
@@ -154,7 +154,7 @@ macro_rules! define_impl {
                     faest_sign::<[<$param Parameters>]>(msg, sk, rho, signature);
                 }
 
-                #[inline(always)]
+                #[inline]
                 fn verify(
                     msg: &[u8],
                     pk: &PublicKey<<[<$param Parameters>] as FAESTParameters>::OWF>,

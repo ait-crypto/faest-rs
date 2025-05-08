@@ -647,17 +647,17 @@ pub(crate) fn rijndael_add_round_key(state: &mut State, rkey: &[u32]) {
     }
 }
 
-#[inline(always)]
+#[inline]
 const fn ror_distance(rows: u32, cols: u32) -> u32 {
     (rows << 3) + (cols << 1)
 }
 
-#[inline(always)]
+#[inline]
 const fn rotate_rows_1(x: u32) -> u32 {
     x.rotate_right(ror_distance(1, 0))
 }
 
-#[inline(always)]
+#[inline]
 const fn rotate_rows_2(x: u32) -> u32 {
     x.rotate_right(ror_distance(2, 0))
 }

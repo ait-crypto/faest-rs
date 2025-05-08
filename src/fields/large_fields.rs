@@ -405,7 +405,7 @@ where
 impl<T, const N: usize, const LENGTH: usize> Neg for BigGF<T, N, LENGTH> {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn neg(self) -> Self::Output {
         self
     }
@@ -780,7 +780,7 @@ impl Modulus<u128> for BigGF<u128, 1, 128> {
 }
 
 impl ClearHighBits for BigGF<u128, 1, 128> {
-    #[inline(always)]
+    #[inline]
     fn clear_high_bits(self) -> Self {
         self
     }
@@ -916,7 +916,7 @@ impl Modulus<u128> for BigGF<u128, 2, 192> {
 }
 
 impl ClearHighBits for BigGF<u128, 2, 192> {
-    #[inline(always)]
+    #[inline]
     fn clear_high_bits(mut self) -> Self {
         self.0[1] &= u64::MAX as u128;
         self
@@ -1172,7 +1172,7 @@ impl Modulus<u128> for BigGF<u128, 2, 256> {
 }
 
 impl ClearHighBits for BigGF<u128, 2, 256> {
-    #[inline(always)]
+    #[inline]
     fn clear_high_bits(self) -> Self {
         self
     }
@@ -1426,7 +1426,7 @@ impl Modulus<u128> for GF384 {
 }
 
 impl ClearHighBits for GF384 {
-    #[inline(always)]
+    #[inline]
     fn clear_high_bits(self) -> Self {
         self
     }
@@ -1504,7 +1504,7 @@ impl Modulus<u128> for GF576 {
 }
 
 impl ClearHighBits for GF576 {
-    #[inline(always)]
+    #[inline]
     fn clear_high_bits(mut self) -> Self {
         self.0[4] &= u64::MAX as u128;
         self
@@ -1595,7 +1595,7 @@ impl Modulus<u128> for GF768 {
 }
 
 impl ClearHighBits for GF768 {
-    #[inline(always)]
+    #[inline]
     fn clear_high_bits(self) -> Self {
         self
     }

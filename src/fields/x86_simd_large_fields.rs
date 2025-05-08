@@ -346,7 +346,7 @@ const fn gfu256_as_m256(v: UnoptimizedGF256) -> __m256i {
 pub(crate) struct GF128(__m128i);
 
 impl Default for GF128 {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self(unsafe { _mm_setzero_si128() })
     }
@@ -374,7 +374,7 @@ impl FromBit for GF128 {
 impl Add for GF128 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         Self(unsafe { _mm_xor_si128(self.0, rhs.0) })
     }
@@ -383,7 +383,7 @@ impl Add for GF128 {
 impl Add<&Self> for GF128 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
         Self(unsafe { _mm_xor_si128(self.0, rhs.0) })
     }
@@ -392,21 +392,21 @@ impl Add<&Self> for GF128 {
 impl Add<GF128> for &GF128 {
     type Output = GF128;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: GF128) -> Self::Output {
         GF128(unsafe { _mm_xor_si128(self.0, rhs.0) })
     }
 }
 
 impl AddAssign for GF128 {
-    #[inline(always)]
+    #[inline]
     fn add_assign(&mut self, rhs: Self) {
         self.0 = unsafe { _mm_xor_si128(self.0, rhs.0) };
     }
 }
 
 impl AddAssign<&Self> for GF128 {
-    #[inline(always)]
+    #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         self.0 = unsafe { _mm_xor_si128(self.0, rhs.0) };
     }
@@ -417,7 +417,7 @@ impl AddAssign<&Self> for GF128 {
 impl Sub for GF128 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
         Self(unsafe { _mm_xor_si128(self.0, rhs.0) })
     }
@@ -426,7 +426,7 @@ impl Sub for GF128 {
 impl Sub<&Self> for GF128 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn sub(self, rhs: &Self) -> Self::Output {
         Self(unsafe { _mm_xor_si128(self.0, rhs.0) })
     }
@@ -435,21 +435,21 @@ impl Sub<&Self> for GF128 {
 impl Sub<GF128> for &GF128 {
     type Output = GF128;
 
-    #[inline(always)]
+    #[inline]
     fn sub(self, rhs: GF128) -> Self::Output {
         GF128(unsafe { _mm_xor_si128(self.0, rhs.0) })
     }
 }
 
 impl SubAssign for GF128 {
-    #[inline(always)]
+    #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         self.0 = unsafe { _mm_xor_si128(self.0, rhs.0) };
     }
 }
 
 impl SubAssign<&Self> for GF128 {
-    #[inline(always)]
+    #[inline]
     fn sub_assign(&mut self, rhs: &Self) {
         self.0 = unsafe { _mm_xor_si128(self.0, rhs.0) };
     }
@@ -460,7 +460,7 @@ impl SubAssign<&Self> for GF128 {
 impl Neg for GF128 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn neg(self) -> Self::Output {
         self
     }
@@ -578,7 +578,7 @@ unsafe fn mul_gf128_u64(lhs: __m128i, rhs: u64) -> __m128i {
 impl Mul for GF128 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         Self(unsafe { mul_gf128(self.0, rhs.0) })
     }
@@ -587,7 +587,7 @@ impl Mul for GF128 {
 impl Mul<&Self> for GF128 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: &Self) -> Self::Output {
         Self(unsafe { mul_gf128(self.0, rhs.0) })
     }
@@ -596,7 +596,7 @@ impl Mul<&Self> for GF128 {
 impl Mul<GF128> for &GF128 {
     type Output = GF128;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: GF128) -> Self::Output {
         GF128(unsafe { mul_gf128(self.0, rhs.0) })
     }
@@ -605,7 +605,7 @@ impl Mul<GF128> for &GF128 {
 impl Mul<GF64> for GF128 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: GF64) -> Self::Output {
         Self(unsafe { mul_gf128_u64(self.0, rhs.into()) })
     }
@@ -614,7 +614,7 @@ impl Mul<GF64> for GF128 {
 impl Mul<u8> for GF128 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: u8) -> Self::Output {
         let mask = -((rhs & 1) as i64);
         Self(unsafe {
@@ -625,14 +625,14 @@ impl Mul<u8> for GF128 {
 }
 
 impl MulAssign for GF128 {
-    #[inline(always)]
+    #[inline]
     fn mul_assign(&mut self, rhs: Self) {
         self.0 = unsafe { mul_gf128(self.0, rhs.0) };
     }
 }
 
 impl MulAssign<&Self> for GF128 {
-    #[inline(always)]
+    #[inline]
     fn mul_assign(&mut self, rhs: &Self) {
         self.0 = unsafe { mul_gf128(self.0, rhs.0) };
     }
@@ -882,7 +882,7 @@ impl FromBit for GF192 {
 impl Add for GF192 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         Self(unsafe { _mm256_xor_si256(self.0, rhs.0) })
     }
@@ -891,7 +891,7 @@ impl Add for GF192 {
 impl Add<&Self> for GF192 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
         Self(unsafe { _mm256_xor_si256(self.0, rhs.0) })
     }
@@ -900,21 +900,21 @@ impl Add<&Self> for GF192 {
 impl Add<GF192> for &GF192 {
     type Output = GF192;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: GF192) -> Self::Output {
         GF192(unsafe { _mm256_xor_si256(self.0, rhs.0) })
     }
 }
 
 impl AddAssign for GF192 {
-    #[inline(always)]
+    #[inline]
     fn add_assign(&mut self, rhs: Self) {
         self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
     }
 }
 
 impl AddAssign<&Self> for GF192 {
-    #[inline(always)]
+    #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
     }
@@ -925,7 +925,7 @@ impl AddAssign<&Self> for GF192 {
 impl Sub for GF192 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
         Self(unsafe { _mm256_xor_si256(self.0, rhs.0) })
     }
@@ -934,7 +934,7 @@ impl Sub for GF192 {
 impl Sub<&Self> for GF192 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn sub(self, rhs: &Self) -> Self::Output {
         Self(unsafe { _mm256_xor_si256(self.0, rhs.0) })
     }
@@ -943,21 +943,21 @@ impl Sub<&Self> for GF192 {
 impl Sub<GF192> for &GF192 {
     type Output = GF192;
 
-    #[inline(always)]
+    #[inline]
     fn sub(self, rhs: GF192) -> Self::Output {
         GF192(unsafe { _mm256_xor_si256(self.0, rhs.0) })
     }
 }
 
 impl SubAssign for GF192 {
-    #[inline(always)]
+    #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
     }
 }
 
 impl SubAssign<&Self> for GF192 {
-    #[inline(always)]
+    #[inline]
     fn sub_assign(&mut self, rhs: &Self) {
         self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
     }
@@ -968,7 +968,7 @@ impl SubAssign<&Self> for GF192 {
 impl Neg for GF192 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn neg(self) -> Self::Output {
         self
     }
@@ -1099,7 +1099,7 @@ unsafe fn mul_gf192_u64(lhs: __m256i, rhs: u64) -> __m256i {
 impl Mul for GF192 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         Self(unsafe { mul_gf192(self.0, rhs.0) })
     }
@@ -1108,7 +1108,7 @@ impl Mul for GF192 {
 impl Mul<&Self> for GF192 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: &Self) -> Self::Output {
         Self(unsafe { mul_gf192(self.0, rhs.0) })
     }
@@ -1117,7 +1117,7 @@ impl Mul<&Self> for GF192 {
 impl Mul<GF192> for &GF192 {
     type Output = GF192;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: GF192) -> Self::Output {
         GF192(unsafe { mul_gf192(self.0, rhs.0) })
     }
@@ -1126,7 +1126,7 @@ impl Mul<GF192> for &GF192 {
 impl Mul<GF64> for GF192 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: GF64) -> Self::Output {
         Self(unsafe { mul_gf192_u64(self.0, rhs.into()) })
     }
@@ -1135,7 +1135,7 @@ impl Mul<GF64> for GF192 {
 impl Mul<u8> for GF192 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: u8) -> Self::Output {
         let mask = -((rhs & 1) as i64);
         Self(unsafe {
@@ -1146,14 +1146,14 @@ impl Mul<u8> for GF192 {
 }
 
 impl MulAssign for GF192 {
-    #[inline(always)]
+    #[inline]
     fn mul_assign(&mut self, rhs: Self) {
         self.0 = unsafe { mul_gf192(self.0, rhs.0) };
     }
 }
 
 impl MulAssign<&Self> for GF192 {
-    #[inline(always)]
+    #[inline]
     fn mul_assign(&mut self, rhs: &Self) {
         self.0 = unsafe { mul_gf192(self.0, rhs.0) };
     }
@@ -1397,7 +1397,7 @@ impl FromBit for GF256 {
 impl Add for GF256 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         Self(unsafe { _mm256_xor_si256(self.0, rhs.0) })
     }
@@ -1406,7 +1406,7 @@ impl Add for GF256 {
 impl Add<&Self> for GF256 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
         Self(unsafe { _mm256_xor_si256(self.0, rhs.0) })
     }
@@ -1415,21 +1415,21 @@ impl Add<&Self> for GF256 {
 impl Add<GF256> for &GF256 {
     type Output = GF256;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: GF256) -> Self::Output {
         GF256(unsafe { _mm256_xor_si256(self.0, rhs.0) })
     }
 }
 
 impl AddAssign for GF256 {
-    #[inline(always)]
+    #[inline]
     fn add_assign(&mut self, rhs: Self) {
         self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
     }
 }
 
 impl AddAssign<&Self> for GF256 {
-    #[inline(always)]
+    #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
     }
@@ -1440,7 +1440,7 @@ impl AddAssign<&Self> for GF256 {
 impl Sub for GF256 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
         Self(unsafe { _mm256_xor_si256(self.0, rhs.0) })
     }
@@ -1449,7 +1449,7 @@ impl Sub for GF256 {
 impl Sub<&Self> for GF256 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn sub(self, rhs: &Self) -> Self::Output {
         Self(unsafe { _mm256_xor_si256(self.0, rhs.0) })
     }
@@ -1458,21 +1458,21 @@ impl Sub<&Self> for GF256 {
 impl Sub<GF256> for &GF256 {
     type Output = GF256;
 
-    #[inline(always)]
+    #[inline]
     fn sub(self, rhs: GF256) -> Self::Output {
         GF256(unsafe { _mm256_xor_si256(self.0, rhs.0) })
     }
 }
 
 impl SubAssign for GF256 {
-    #[inline(always)]
+    #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
     }
 }
 
 impl SubAssign<&Self> for GF256 {
-    #[inline(always)]
+    #[inline]
     fn sub_assign(&mut self, rhs: &Self) {
         self.0 = unsafe { _mm256_xor_si256(self.0, rhs.0) };
     }
@@ -1483,7 +1483,7 @@ impl SubAssign<&Self> for GF256 {
 impl Neg for GF256 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn neg(self) -> Self::Output {
         self
     }
@@ -1590,7 +1590,7 @@ unsafe fn mul_gf256_u64(lhs: __m256i, rhs: u64) -> __m256i {
 impl Mul for GF256 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         Self(unsafe { mul_gf256(self.0, rhs.0) })
     }
@@ -1599,7 +1599,7 @@ impl Mul for GF256 {
 impl Mul<&Self> for GF256 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: &Self) -> Self::Output {
         Self(unsafe { mul_gf256(self.0, rhs.0) })
     }
@@ -1608,7 +1608,7 @@ impl Mul<&Self> for GF256 {
 impl Mul<GF256> for &GF256 {
     type Output = GF256;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: GF256) -> Self::Output {
         GF256(unsafe { mul_gf256(self.0, rhs.0) })
     }
@@ -1617,7 +1617,7 @@ impl Mul<GF256> for &GF256 {
 impl Mul<GF64> for GF256 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: GF64) -> Self::Output {
         Self(unsafe { mul_gf256_u64(self.0, rhs.into()) })
     }
@@ -1626,7 +1626,7 @@ impl Mul<GF64> for GF256 {
 impl Mul<u8> for GF256 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: u8) -> Self::Output {
         let mask = -((rhs & 1) as i64);
         Self(unsafe {
@@ -1637,14 +1637,14 @@ impl Mul<u8> for GF256 {
 }
 
 impl MulAssign for GF256 {
-    #[inline(always)]
+    #[inline]
     fn mul_assign(&mut self, rhs: Self) {
         self.0 = unsafe { mul_gf256(self.0, rhs.0) };
     }
 }
 
 impl MulAssign<&Self> for GF256 {
-    #[inline(always)]
+    #[inline]
     fn mul_assign(&mut self, rhs: &Self) {
         self.0 = unsafe { mul_gf256(self.0, rhs.0) };
     }
@@ -1840,7 +1840,7 @@ impl<'de> serde::Deserialize<'de> for GF256 {
 pub(crate) struct GF384(__m256i, __m128i);
 
 impl Default for GF384 {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         unsafe { Self(_mm256_setzero_si256(), _mm_setzero_si128()) }
     }
@@ -1863,7 +1863,7 @@ impl Eq for GF384 {}
 impl Add for GF384 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         unsafe {
             Self(
@@ -1877,7 +1877,7 @@ impl Add for GF384 {
 impl Add<&Self> for GF384 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
         unsafe {
             Self(
@@ -1891,7 +1891,7 @@ impl Add<&Self> for GF384 {
 impl Add<GF384> for &GF384 {
     type Output = GF384;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: GF384) -> Self::Output {
         unsafe {
             GF384(
@@ -1903,7 +1903,7 @@ impl Add<GF384> for &GF384 {
 }
 
 impl AddAssign for GF384 {
-    #[inline(always)]
+    #[inline]
     fn add_assign(&mut self, rhs: Self) {
         unsafe {
             self.0 = _mm256_xor_si256(self.0, rhs.0);
@@ -1913,7 +1913,7 @@ impl AddAssign for GF384 {
 }
 
 impl AddAssign<&Self> for GF384 {
-    #[inline(always)]
+    #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         unsafe {
             self.0 = _mm256_xor_si256(self.0, rhs.0);
@@ -1927,7 +1927,7 @@ impl AddAssign<&Self> for GF384 {
 impl Sub for GF384 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: Self) -> Self::Output {
         self + rhs
@@ -1937,7 +1937,7 @@ impl Sub for GF384 {
 impl Sub<&Self> for GF384 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: &Self) -> Self::Output {
         self + rhs
@@ -1947,7 +1947,7 @@ impl Sub<&Self> for GF384 {
 impl Sub<GF384> for &GF384 {
     type Output = GF384;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: GF384) -> Self::Output {
         self + rhs
@@ -1955,7 +1955,7 @@ impl Sub<GF384> for &GF384 {
 }
 
 impl SubAssign for GF384 {
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: Self) {
         *self += rhs;
@@ -1963,7 +1963,7 @@ impl SubAssign for GF384 {
 }
 
 impl SubAssign<&Self> for GF384 {
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: &Self) {
         *self += rhs;
@@ -2050,7 +2050,7 @@ fn mul_gf384_gf128(lhs: (__m256i, __m128i), y0: __m128i) -> (__m256i, __m128i) {
 impl Mul<GF128> for GF384 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: GF128) -> Self::Output {
         Self::from(mul_gf384_gf128(self.into(), rhs.0))
     }
@@ -2059,7 +2059,7 @@ impl Mul<GF128> for GF384 {
 impl Mul<&GF128> for GF384 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: &GF128) -> Self::Output {
         Self::from(mul_gf384_gf128(self.into(), rhs.0))
     }
@@ -2086,7 +2086,7 @@ impl ExtensionField for GF384 {
 pub(crate) struct GF576(__m256i, __m256i, u64);
 
 impl Default for GF576 {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self(
             unsafe { _mm256_setzero_si256() },
@@ -2113,7 +2113,7 @@ impl Eq for GF576 {}
 impl Add for GF576 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: Self) -> Self::Output {
         unsafe {
@@ -2129,7 +2129,7 @@ impl Add for GF576 {
 impl Add<&Self> for GF576 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: &Self) -> Self::Output {
         unsafe {
@@ -2145,7 +2145,7 @@ impl Add<&Self> for GF576 {
 impl Add<GF576> for &GF576 {
     type Output = GF576;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: GF576) -> Self::Output {
         unsafe {
@@ -2159,7 +2159,7 @@ impl Add<GF576> for &GF576 {
 }
 
 impl AddAssign for GF576 {
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: Self) {
         unsafe {
@@ -2171,7 +2171,7 @@ impl AddAssign for GF576 {
 }
 
 impl AddAssign<&Self> for GF576 {
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: &Self) {
         unsafe {
@@ -2187,7 +2187,7 @@ impl AddAssign<&Self> for GF576 {
 impl Sub for GF576 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: Self) -> Self::Output {
         self + rhs
@@ -2197,7 +2197,7 @@ impl Sub for GF576 {
 impl Sub<&Self> for GF576 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: &Self) -> Self::Output {
         self + rhs
@@ -2207,7 +2207,7 @@ impl Sub<&Self> for GF576 {
 impl Sub<GF576> for &GF576 {
     type Output = GF576;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: GF576) -> Self::Output {
         self + rhs
@@ -2215,7 +2215,7 @@ impl Sub<GF576> for &GF576 {
 }
 
 impl SubAssign for GF576 {
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: Self) {
         *self += rhs;
@@ -2223,7 +2223,7 @@ impl SubAssign for GF576 {
 }
 
 impl SubAssign<&Self> for GF576 {
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: &Self) {
         *self += rhs;
@@ -2342,7 +2342,7 @@ fn mul_gf576_gf192(lhs: (__m256i, __m256i, u64), rhs: __m256i) -> (__m256i, __m2
 impl Mul<GF192> for GF576 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: GF192) -> Self::Output {
         let res = mul_gf576_gf192((self.0, self.1, self.2), rhs.0);
         Self(res.0, res.1, res.2)
@@ -2352,7 +2352,7 @@ impl Mul<GF192> for GF576 {
 impl Mul<&GF192> for GF576 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: &GF192) -> Self::Output {
         let res = mul_gf576_gf192((self.0, self.1, self.2), rhs.0);
         Self(res.0, res.1, res.2)
@@ -2381,7 +2381,7 @@ impl ExtensionField for GF576 {
 pub(crate) struct GF768(__m256i, __m256i, __m256i);
 
 impl Default for GF768 {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         unsafe {
             Self(
@@ -2414,7 +2414,7 @@ impl Eq for GF768 {}
 impl Add for GF768 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         unsafe {
             Self(
@@ -2429,7 +2429,7 @@ impl Add for GF768 {
 impl Add<&Self> for GF768 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
         unsafe {
             Self(
@@ -2444,7 +2444,7 @@ impl Add<&Self> for GF768 {
 impl Add<GF768> for &GF768 {
     type Output = GF768;
 
-    #[inline(always)]
+    #[inline]
     fn add(self, rhs: GF768) -> Self::Output {
         unsafe {
             GF768(
@@ -2457,7 +2457,7 @@ impl Add<GF768> for &GF768 {
 }
 
 impl AddAssign for GF768 {
-    #[inline(always)]
+    #[inline]
     fn add_assign(&mut self, rhs: Self) {
         unsafe {
             self.0 = _mm256_xor_si256(self.0, rhs.0);
@@ -2468,7 +2468,7 @@ impl AddAssign for GF768 {
 }
 
 impl AddAssign<&Self> for GF768 {
-    #[inline(always)]
+    #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         unsafe {
             self.0 = _mm256_xor_si256(self.0, rhs.0);
@@ -2483,7 +2483,7 @@ impl AddAssign<&Self> for GF768 {
 impl Sub for GF768 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: Self) -> Self::Output {
         self + rhs
@@ -2493,7 +2493,7 @@ impl Sub for GF768 {
 impl Sub<&Self> for GF768 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: &Self) -> Self::Output {
         self + rhs
@@ -2503,7 +2503,7 @@ impl Sub<&Self> for GF768 {
 impl Sub<GF768> for &GF768 {
     type Output = GF768;
 
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, rhs: GF768) -> Self::Output {
         self + rhs
@@ -2511,7 +2511,7 @@ impl Sub<GF768> for &GF768 {
 }
 
 impl SubAssign for GF768 {
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: Self) {
         *self += rhs;
@@ -2519,7 +2519,7 @@ impl SubAssign for GF768 {
 }
 
 impl SubAssign<&Self> for GF768 {
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn sub_assign(&mut self, rhs: &Self) {
         *self += rhs;
@@ -2662,7 +2662,7 @@ fn mul_gf768_gf256(lhs: (__m256i, __m256i, __m256i), rhs: __m256i) -> (__m256i, 
 impl Mul<GF256> for GF768 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: GF256) -> Self::Output {
         Self::from(mul_gf768_gf256(self.into(), rhs.0))
     }
@@ -2671,7 +2671,7 @@ impl Mul<GF256> for GF768 {
 impl Mul<&GF256> for GF768 {
     type Output = Self;
 
-    #[inline(always)]
+    #[inline]
     fn mul(self, rhs: &GF256) -> Self::Output {
         Self::from(mul_gf768_gf256(self.into(), rhs.0))
     }
