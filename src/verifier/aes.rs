@@ -1,10 +1,9 @@
-use std::ops::Mul;
+use std::{iter::zip, ops::Mul};
 
 use generic_array::{
     ArrayLength, GenericArray,
     typenum::{U4, U8, marker_traits::Unsigned},
 };
-use itertools::izip;
 
 use crate::{
     aes::{
@@ -56,7 +55,7 @@ where
 
     fn add_round_key(&self, rhs: Self) -> Self::Output {
         Self::Output {
-            scalars: izip!(self.scalars.iter(), rhs.scalars.iter())
+            scalars: zip(self.scalars.iter(), rhs.scalars.iter())
                 .map(|(x, y)| *x + y)
                 .collect(),
             delta: self.delta,
@@ -73,7 +72,7 @@ where
 
     fn add_round_key(&self, rhs: &VoleCommits<'a, F, L>) -> Self::Output {
         Self::Output {
-            scalars: izip!(self.scalars, rhs.scalars.iter())
+            scalars: zip(self.scalars, rhs.scalars.iter())
                 .map(|(x, y)| *x + y)
                 .collect(),
             delta: self.delta,
@@ -90,7 +89,7 @@ where
 
     fn add_round_key(&self, rhs: &Self) -> Self::Output {
         Self::Output {
-            scalars: izip!(self.scalars, rhs.scalars)
+            scalars: zip(self.scalars, rhs.scalars)
                 .map(|(x, y)| *x + y)
                 .collect(),
             delta: self.delta,
@@ -107,7 +106,7 @@ where
 
     fn add_round_key(&self, rhs: &GenericArray<F, L>) -> Self::Output {
         Self::Output {
-            scalars: izip!(self.scalars, rhs).map(|(x, y)| *x + y).collect(),
+            scalars: zip(self.scalars, rhs).map(|(x, y)| *x + y).collect(),
             delta: self.delta,
         }
     }
@@ -145,7 +144,7 @@ where
     L: ArrayLength,
 {
     fn add_round_key_assign(&mut self, rhs: &Self) {
-        for (x, y) in izip!(self.scalars.iter_mut(), rhs.scalars.iter()) {
+        for (x, y) in zip(self.scalars.iter_mut(), rhs.scalars.iter()) {
             *x += y;
         }
     }
@@ -157,7 +156,7 @@ where
     L: ArrayLength,
 {
     fn add_round_key_assign(&mut self, rhs: &VoleCommitsRef<'_, F, L>) {
-        for (x, y) in izip!(self.scalars.iter_mut(), rhs.scalars.iter()) {
+        for (x, y) in zip(self.scalars.iter_mut(), rhs.scalars.iter()) {
             *x += y;
         }
     }
@@ -169,7 +168,7 @@ where
     L: ArrayLength,
 {
     fn add_round_key_assign(&mut self, rhs: &GenericArray<F, L>) {
-        for (x, y) in izip!(self.scalars.iter_mut(), rhs.iter()) {
+        for (x, y) in zip(self.scalars.iter_mut(), rhs.iter()) {
             *x += y;
         }
     }
@@ -424,7 +423,7 @@ where
 {
     fn add_round_key_bytes(&mut self, rhs: &GenericArray<F, L>, sq: bool) {
         let lift_term = if sq { &F::ONE } else { self.delta };
-        for (st, &k) in izip!(self.scalars.iter_mut(), rhs) {
+        for (st, &k) in zip(self.scalars.iter_mut(), rhs) {
             (*st) += k * lift_term;
         }
     }

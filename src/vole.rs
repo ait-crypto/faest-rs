@@ -1,4 +1,5 @@
 use std::{
+    iter::zip,
     marker::PhantomData,
     mem::swap,
     ops::{Index, IndexMut, Mul},
@@ -280,7 +281,7 @@ where
                 .filter(|(j, _)| delta_i & (1 << j) != 0)
             {
                 // xor column q_{i,j} with correction c_i
-                for (q_ij, c_ij) in izip!(q_ij.iter_mut(), c[i as usize - 1].iter()) {
+                for (q_ij, c_ij) in zip(q_ij.iter_mut(), c[i as usize - 1].iter()) {
                     *q_ij ^= c_ij;
                 }
             }

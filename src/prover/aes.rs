@@ -1,10 +1,12 @@
-use std::ops::{AddAssign, Mul};
+use std::{
+    iter::zip,
+    ops::{AddAssign, Mul},
+};
 
 use generic_array::{
     ArrayLength, GenericArray,
     typenum::{Prod, U4, U8, Unsigned},
 };
-use itertools::izip;
 
 use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use crate::{
@@ -17,7 +19,6 @@ use crate::{
 };
 
 // Helper type aliases
-
 pub(crate) type StateBitsSquaredCommits<O> =
     Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NStBits>>;
 
@@ -39,9 +40,7 @@ where
 
     fn state_to_bytes(&self) -> Self::Output
 where {
-        self.keys
-            .iter()
-            .zip(self.tags.chunks_exact(8))
+        zip(self.keys, self.tags.chunks_exact(8))
             .map(|(&key_i, tags_i)| {
                 FieldCommitDegOne::new(
                     OWFField::<O>::byte_combine_bits(key_i),
@@ -79,7 +78,7 @@ where
 
     fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
         Self::new(
-            self.keys.iter().zip(rhs).map(|(a, b)| a ^ b).collect(),
+            zip(self.keys.iter(), rhs).map(|(a, b)| a ^ b).collect(),
             self.tags.to_owned(),
         )
     }
@@ -95,7 +94,7 @@ where
 
     fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
         ByteCommits {
-            keys: self.keys.iter().zip(rhs).map(|(a, b)| a ^ b).collect(),
+            keys: zip(self.keys, rhs).map(|(a, b)| a ^ b).collect(),
             tags: <Box<GenericArray<F, Prod<L, U8>>>>::from_iter(self.tags.to_owned()),
         }
     }
@@ -111,7 +110,7 @@ where
 
     fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
         ByteCommits {
-            keys: self.iter().zip(rhs.keys).map(|(a, b)| a ^ b).collect(),
+            keys: zip(self.iter(), rhs.keys).map(|(a, b)| a ^ b).collect(),
             tags: <Box<GenericArray<F, Prod<L, U8>>>>::from_iter(
                 rhs.tags[..L::USIZE * 8].to_owned(),
             ),
@@ -129,11 +128,10 @@ where
 
     fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
         Self {
-            keys: self.keys.iter().zip(rhs.keys).map(|(a, b)| a ^ b).collect(),
-            tags: self
-                .tags
-                .iter()
-                .zip(rhs.tags)
+            keys: zip(self.keys.iter(), rhs.keys)
+                .map(|(a, b)| a ^ b)
+                .collect(),
+            tags: zip(self.tags.iter(), rhs.tags)
                 .map(|(&a, b)| a + b)
                 .collect(),
         }
@@ -149,10 +147,9 @@ where
     F: BigGaloisField,
 {
     fn add_round_key_assign(&mut self, rhs: &GenericArray<u8, L>) {
-        self.keys
-            .iter_mut()
-            .zip(rhs.iter())
-            .for_each(|(a, b)| *a ^= b);
+        for (a, b) in zip(self.keys.iter_mut(), rhs) {
+            *a ^= b;
+        }
     }
 }
 
@@ -163,14 +160,13 @@ where
     F: BigGaloisField,
 {
     fn add_round_key_assign(&mut self, rhs: &ByteCommitsRef<'_, F, L>) {
-        self.keys
-            .iter_mut()
-            .zip(rhs.keys.iter())
-            .for_each(|(a, b)| *a ^= b);
-        self.tags
-            .iter_mut()
-            .zip(rhs.tags.iter())
-            .for_each(|(a, b)| *a += b);
+        for (a, b) in zip(self.keys.iter_mut(), rhs.keys) {
+            *a ^= b;
+        }
+
+        for (a, b) in zip(self.tags.iter_mut(), rhs.tags.iter()) {
+            *a += b;
+        }
     }
 }
 
@@ -182,7 +178,6 @@ where
     fn shift_rows(&mut self) {
         // TODO: Copy row by row instead of entire state
         let mut tmp = self.clone();
-
         let nst = L::USIZE / 4;
 
         for r in 0..4 {
@@ -204,7 +199,7 @@ where
     for<'a> FieldCommitDegTwo<F>: AddAssign<&'a T>,
 {
     fn add_round_key_bytes(&mut self, key: &GenericArray<T, L>, _sq: bool) {
-        for (st, k) in izip!(self.iter_mut(), key) {
+        for (st, k) in zip(self.iter_mut(), key) {
             (*st) += k;
         }
     }
