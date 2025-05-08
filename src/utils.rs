@@ -128,6 +128,7 @@ pub(crate) mod test {
     use std::{fs::File, path::Path};
 
     use serde::de::DeserializeOwned;
+    use sha3::digest::{ExtendableOutput, Update, XofReader};
 
     pub(crate) fn read_test_data<T: DeserializeOwned>(path: &str) -> Vec<T> {
         File::open(
@@ -146,14 +147,11 @@ pub(crate) mod test {
     }
 
     pub(crate) fn hash_array(data: &[u8]) -> Vec<u8> {
-        use sha3::digest::{ExtendableOutput, Update, XofReader};
-
         let mut hasher = sha3::Shake256::default();
         hasher.update(data);
         let mut reader = hasher.finalize_xof();
-        let mut ret = [0u8; 64];
-
+        let mut ret = vec![0; 64];
         reader.read(&mut ret);
-        ret.to_vec()
+        ret
     }
 }
