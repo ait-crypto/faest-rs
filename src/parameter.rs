@@ -227,7 +227,7 @@ pub(crate) trait OWFParameters: Sized {
     type LKeMinusLambda: ArrayLength;
 
     /// Returns whether the OWF is used in EM mode
-    fn is_em() -> bool;
+    const IS_EM: bool;
 
     /// Applies the OWF using the secret key `key` to `input` and writes the result in the `output` slice
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]);
@@ -329,9 +329,7 @@ impl OWFParameters for OWF128 {
     type SK = U32;
     type PK = U32;
 
-    fn is_em() -> bool {
-        false
-    }
+    const IS_EM: bool = false;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes128Enc::new(GenericArray_AES::from_slice(key));
@@ -413,9 +411,7 @@ impl OWFParameters for OWF192 {
     type SK = U40;
     type PK = U48;
 
-    fn is_em() -> bool {
-        false
-    }
+    const IS_EM: bool = false;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes192Enc::new(GenericArray_AES::from_slice(key));
@@ -507,9 +503,7 @@ impl OWFParameters for OWF256 {
     type SK = U48;
     type PK = U48;
 
-    fn is_em() -> bool {
-        false
-    }
+    const IS_EM: bool = false;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes256Enc::new(GenericArray_AES::from_slice(key));
@@ -599,9 +593,7 @@ impl OWFParameters for OWF128EM {
     type SK = U32;
     type PK = U32;
 
-    fn is_em() -> bool {
-        true
-    }
+    const IS_EM: bool = true;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Aes128Enc::new(GenericArray_AES::from_slice(input));
@@ -688,9 +680,8 @@ impl OWFParameters for OWF192EM {
     type SK = U48;
     type PK = U48;
 
-    fn is_em() -> bool {
-        true
-    }
+    const IS_EM: bool = true;
+
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Rijndael192::new(GenericArray_AES::from_slice(input));
         aes.encrypt_block_b2b(
@@ -776,9 +767,7 @@ impl OWFParameters for OWF256EM {
     type SK = U64;
     type PK = U64;
 
-    fn is_em() -> bool {
-        true
-    }
+    const IS_EM: bool = true;
 
     fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
         let aes = Rijndael256::new(GenericArray_AES::from_slice(input));

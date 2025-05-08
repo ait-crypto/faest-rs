@@ -39,7 +39,7 @@ pub(crate) fn owf_constraints<O>(
     }
 
     // ::7
-    if O::is_em() {
+    if O::IS_EM {
         // ::8-9
         let ext_key = key_schedule_bytes::<O>(x);
         // ::10

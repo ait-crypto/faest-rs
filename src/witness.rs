@@ -35,7 +35,7 @@ where
     let mut index = 0;
 
     // Step 7
-    if !O::is_em() {
+    if !O::IS_EM {
         save_key_bits::<O>(&mut witness, owf_secret, &mut index);
         // Step 8
         save_non_lin_bits::<O>(&mut witness, &kb, &mut index);
@@ -135,7 +135,7 @@ fn round_with_save<O>(
 
         // Step 19
         if even_round {
-            let to_take = if !O::is_em() { 4 } else { O::NK::USIZE };
+            let to_take = if !O::IS_EM { 4 } else { O::NK::USIZE };
             for i in convert_from_batchblocks(inv_bitslice(&state)).take(to_take) {
                 witness[*index] = store_invnorm_state(i[0], i[1]);
                 *index += 1;

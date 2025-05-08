@@ -33,7 +33,7 @@ pub(crate) fn owf_constraints<O>(
     zk_hasher.mul_and_update(&w.scalars[0], &w.scalars[1]);
 
     // ::7
-    if O::is_em() {
+    if O::IS_EM {
         // ::8-9
         let extended_key = key_schedule_bytes::<O>(x, delta);
         // ::10
