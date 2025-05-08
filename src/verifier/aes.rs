@@ -373,11 +373,14 @@ where
     fn mix_columns(&mut self, sq: bool) {
         let (v2, v3) = if sq {
             (
-                OWFField::<O>::BYTE_COMBINE_SQ_2,
-                OWFField::<O>::BYTE_COMBINE_SQ_3,
+                &OWFField::<O>::BYTE_COMBINE_SQ_2,
+                &OWFField::<O>::BYTE_COMBINE_SQ_3,
             )
         } else {
-            (OWFField::<O>::BYTE_COMBINE_2, OWFField::<O>::BYTE_COMBINE_3)
+            (
+                &OWFField::<O>::BYTE_COMBINE_2,
+                &OWFField::<O>::BYTE_COMBINE_3,
+            )
         };
 
         for c in 0..O::NST::USIZE {
@@ -409,11 +412,11 @@ where
     fn add_round_key_bytes(&mut self, rhs: &GenericArray<F, L>, sq: bool) {
         if sq {
             for (st, k) in izip!(self.scalars.iter_mut(), rhs) {
-                (*st) += k;
+                *st += k;
             }
         } else {
             for (st, k) in izip!(self.scalars.iter_mut(), rhs) {
-                (*st) += *k * self.delta;
+                *st += *k * self.delta;
             }
         }
     }

@@ -13,7 +13,6 @@ use crate::{
     parameter::{OWFField, OWFParameters},
     prover::aes::{StateBitsSquaredCommits, StateBytesSquaredCommits},
     universal_hashing::ZKProofHasher,
-    utils::square_array,
 };
 
 pub(crate) fn enc_cstrnts<O, K, S>(
@@ -46,7 +45,7 @@ pub(crate) fn enc_cstrnts<O, K, S>(
 
         // ::16-17
         let round_key = extended_key[2 * r + 1].state_to_bytes();
-        let round_key_sq = square_array(&round_key);
+        let round_key_sq = (&round_key).square();
 
         // ::18-22
         let st_0 = aes_round::<O, _>(&state_prime, &round_key, false);

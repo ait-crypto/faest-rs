@@ -85,6 +85,44 @@ pub(crate) trait Square {
     fn square(self) -> Self::Output;
 }
 
+// blanket implementation for GenericArray
+
+impl<F, L> Square for GenericArray<F, L>
+where
+    F: Square,
+    L: ArrayLength,
+{
+    type Output = GenericArray<F::Output, L>;
+
+    fn square(self) -> Self::Output {
+        self.into_iter().map(|x| x.square()).collect()
+    }
+}
+
+impl<F, L> Square for &GenericArray<F, L>
+where
+    F: Square + Clone,
+    L: ArrayLength,
+{
+    type Output = GenericArray<F::Output, L>;
+
+    fn square(self) -> Self::Output {
+        self.iter().cloned().map(|x| x.square()).collect()
+    }
+}
+
+impl<F, L> Square for &Box<GenericArray<F, L>>
+where
+    F: Square + Clone,
+    L: ArrayLength,
+{
+    type Output = Box<GenericArray<F::Output, L>>;
+
+    fn square(self) -> Self::Output {
+        self.iter().cloned().map(|x| x.square()).collect()
+    }
+}
+
 /// Trait covering the basic functionality of an extension field
 ///
 /// The implementation in general does not require field elements to be

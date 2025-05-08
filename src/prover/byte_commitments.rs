@@ -43,6 +43,7 @@ where
     pub(crate) keys: Box<GenericArray<u8, L>>,
     pub(crate) tags: Box<GenericArray<F, Prod<L, U8>>>,
 }
+
 impl<F, L> ByteCommits<F, L>
 where
     F: BigGaloisField,

@@ -1,7 +1,7 @@
 use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
 use itertools::izip;
 
-use crate::{fields::Square, parameter::TauParameters};
+use crate::parameter::TauParameters;
 
 /// Reader interface for PRGs and random oracles
 pub(crate) trait Reader {
@@ -108,20 +108,6 @@ pub(crate) const fn get_bit(input: &[u8], index: usize) -> u8 {
     let byte_index = index / 8;
     let bit_offset = index % 8;
     (input[byte_index] >> bit_offset) & 1
-}
-
-/// Squares every the element of the input array.
-///
-/// Returns a new array of squared elements.
-#[inline]
-pub(crate) fn square_array<T, L>(
-    key_bytes: &GenericArray<T, L>,
-) -> GenericArray<<T as Square>::Output, L>
-where
-    T: Clone + Square,
-    L: ArrayLength,
-{
-    key_bytes.iter().cloned().map(|x| x.square()).collect()
 }
 
 #[cfg(test)]
