@@ -81,22 +81,27 @@ where
     O: OWFParameters,
 {
     // ::4
-    let state_conj = f256_f2_conjugates::<O>(state);
-
     let mut state_prime = StateBitsSquaredCommits::<O>::default();
+    let mut state_conj = GenericArray::default();
 
     // ::7
-    for i in 0..O::NStBytes::USIZE {
+    for (i, state_prime) in state_prime.chunks_exact_mut(8).enumerate() {
         // ::9
         let norm = (w.keys[i / 2] >> ((i % 2) * 4)) & 0xf;
         let ys = invnorm_to_conjugates::<O>(norm, &w.tags[4 * i..4 * i + 4]);
 
-        // ::11
-        zk_hasher.inv_norm_constraints(&state_conj[8 * i..8 * i + 8], &ys[0]);
+        // ::4
+        f256_f2_conjugates_2::<O>(&mut state_conj, state, i);
+
+        //::11
+        // Save 1 mul by storing intermediate constraint in state'[0]
+        state_prime[0] = &ys[0] * &state_conj[4];
+        let cnstr = &state_prime[0] * &state_conj[1] + &state_conj[0];
+        zk_hasher.update(&cnstr);
 
         // ::12
-        for j in 0..8 {
-            state_prime[i * 8 + j] = state_conj[8 * i + (j + 4) % 8].clone() * &ys[j % 4];
+        for j in 1..8 {
+            state_prime[j] = &state_conj[(j + 4) % 8] * &ys[j % 4];
         }
     }
 
@@ -178,26 +183,17 @@ where
         .collect()
 }
 
-pub(crate) fn f256_f2_conjugates<O>(
+pub(crate) fn f256_f2_conjugates_2<O>(
+    state_conj: &mut GenericArray<FieldCommitDegOne<OWFField<O>>, U8>,
     state: &ByteCommits<OWFField<O>, O::NStBytes>,
-) -> Box<GenericArray<FieldCommitDegOne<OWFField<O>>, O::NStBits>>
-where
+    round: usize,
+) where
     O: OWFParameters,
 {
-    (0..O::NStBytes::USIZE)
-        .flat_map(|i| {
-            let mut x0 = state.get(i);
-
-            // ::4-8
-            let mut y: GenericArray<FieldCommitDegOne<OWFField<O>>, U8> = GenericArray::default();
-            for j in 0..8 {
-                y[j] = x0.combine();
-
-                if j != 7 {
-                    x0.square_inplace();
-                }
-            }
-            y
-        })
-        .collect()
+    let mut x0 = state.get(round);
+    // ::4-8
+    for st_conj_i in state_conj.iter_mut() {
+        *st_conj_i = x0.combine();
+        x0.square_inplace();
+    }
 }
