@@ -124,6 +124,13 @@ where
         }
     }
 
+    pub(crate) fn get_field_commit(&self, index: usize) -> FieldCommitDegOne<F> {
+        FieldCommitDegOne::new(
+            F::byte_combine_bits(self.keys[index]),
+            F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
+        )
+    }
+
     pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<F, L2>
     where
         L2: ArrayLength + Mul<U8, Output: ArrayLength>,
