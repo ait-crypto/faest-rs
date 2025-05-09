@@ -119,19 +119,10 @@ fn enc_cstrnts_odd<O>(
     s.inverse_affine();
 
     // ::31-37
-    for (si, si_sq, st0_i, st1_i) in
-        zip(st_0.iter(), st_1.iter())
-            .enumerate()
-            .map(|(byte_i, (st0, st1))| {
-                (
-                    s.get_field_commit(byte_i),
-                    s.get_field_commit_sq(byte_i),
-                    st0,
-                    st1,
-                )
-            })
-    {
-        zk_hasher.odd_round_cstrnts(&si, &si_sq, st0_i, st1_i);
+    for (byte_i, (st0, st1)) in zip(st_0.as_ref(), st_1.as_ref()).enumerate() {
+        let si = s.get_field_commit(byte_i);
+        let si_sq = s.get_field_commit_sq(byte_i);
+        zk_hasher.odd_round_cstrnts(&si, &si_sq, st0, st1);
     }
 }
 
