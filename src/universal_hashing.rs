@@ -309,8 +309,8 @@ where
     ) where
         F: BigGaloisField,
     {
-        self.update(&(si_sq.to_owned() * st0_i + si));
-        self.update(&(si.to_owned() * st1_i + st0_i));
+        self.update(&(si_sq * st0_i + si));
+        self.update(&(si * st1_i + st0_i));
     }
 
     pub(crate) fn finalize(self, u: &F, u_plus_v: &F, v: &F) -> (F, F, F) {
