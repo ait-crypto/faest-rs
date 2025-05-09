@@ -1,5 +1,6 @@
 use std::{
     array,
+    iter::zip,
     ops::{Add, Mul},
 };
 
@@ -7,7 +8,7 @@ use generic_array::{
     ArrayLength, GenericArray,
     typenum::{Prod, Quot, Sum, U2, U3, U4, U5, U8, U16, Unsigned},
 };
-use itertools::{chain, izip};
+use itertools::chain;
 
 use crate::{
     fields::{
@@ -119,13 +120,12 @@ where
         let h2 = self.r[0] * h0 + self.r[1] * h1;
         let h3 = self.r[2] * h0 + self.r[3] * h1;
 
-        GenericArray::from_iter(
-            izip!(
-                chain(h2.as_bytes(), h3.as_bytes().into_iter().take(B::USIZE),),
-                x1
-            )
-            .map(|(x1, x2)| x1 ^ x2),
+        zip(
+            chain(h2.as_bytes(), h3.as_bytes().into_iter().take(B::USIZE)),
+            x1,
         )
+        .map(|(x1, x2)| x1 ^ x2)
+        .collect()
     }
 
     fn from_r_s_t(r: [F; 4], s: F, t: GF64) -> Self {
