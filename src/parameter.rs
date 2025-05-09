@@ -1,4 +1,7 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    iter::repeat_n,
+    ops::{Add, Div, Mul, Sub},
+};
 
 use aes::{
     Aes128Enc, Aes192Enc, Aes256Enc,
@@ -838,21 +841,6 @@ pub(crate) trait TauParameters {
     /// Threshold for the maximum opening size of the GGM tree
     type Topen: ArrayLength;
 
-    /// Returns an iterator over the individual bits of the i-th VOLE sub-challenge (i.e., the one associated to the i-th small-vole instance)
-    fn decode_challenge_as_iter(chal: &[u8], i: usize) -> impl Iterator<Item = u8> + '_ {
-        let (lo, hi) = if i < Self::Tau1::USIZE {
-            let lo = Self::tau1_offset_unchecked(i);
-            let hi = lo + Self::K::USIZE - 1;
-            (lo, hi)
-        } else {
-            debug_assert!(i < Self::Tau0::USIZE + Self::Tau1::USIZE);
-            let lo = Self::tau0_offset_unchecked(i);
-            let hi = lo + (Self::K::USIZE - 1) - 1;
-            (lo, hi)
-        };
-        (lo..=hi).map(move |j| (chal[j / 8] >> (j % 8)) & 1)
-    }
-
     #[inline]
     fn tau1_offset_unchecked(i: usize) -> usize {
         Self::K::USIZE * i
@@ -1075,6 +1063,27 @@ pub(crate) trait FAESTParameters {
             // nodes
             <<Self as FAESTParameters>::Tau as TauParameters>::Topen::USIZE
                 * <<Self as FAESTParameters>::OWF as OWFParameters>::LambdaBytes::USIZE
+    }
+
+    /// Returns an iterator over the individual bits of the i-th VOLE sub-challenge (i.e., the one associated to the i-th small-vole instance)
+    fn decode_challenge_as_iter(chal: &[u8], i: usize) -> impl Iterator<Item = u8> + '_ {
+        let (lo, hi) = if i < <Self::Tau as TauParameters>::Tau1::USIZE {
+            let lo = <Self::Tau as TauParameters>::tau1_offset_unchecked(i);
+            let hi = lo + <Self::Tau as TauParameters>::K::USIZE - 1;
+            (lo, hi)
+        } else {
+            debug_assert!(
+                i < <Self::Tau as TauParameters>::Tau0::USIZE
+                    + <Self::Tau as TauParameters>::Tau1::USIZE
+            );
+            let lo = <Self::Tau as TauParameters>::tau0_offset_unchecked(i);
+            let hi = lo + (<Self::Tau as TauParameters>::K::USIZE - 1) - 1;
+            (lo, hi)
+        };
+
+        (lo..=hi)
+            .map(move |j| (chal[j / 8] >> (j % 8)) & 1)
+            .chain(repeat_n(0, Self::WGRIND::USIZE))
     }
 }
 
