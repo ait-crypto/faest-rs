@@ -853,8 +853,6 @@ pub(crate) trait TauParameters {
 
     /// Retuns leaf offset of the i-th small-VOLE instance within the GGM tree
     fn bavc_index_offset(i: usize) -> usize {
-        debug_assert!(i < Self::Tau::USIZE);
-
         if i < Self::Tau1::USIZE {
             return (1 << Self::K::USIZE) * i;
         }
@@ -1066,23 +1064,13 @@ pub(crate) trait FAESTParameters {
     }
 
     /// Returns an iterator over the individual bits of the i-th VOLE sub-challenge (i.e., the one associated to the i-th small-vole instance)
-    fn decode_challenge_as_iter(chal: &[u8], i: usize) -> impl Iterator<Item = u8> + '_ {
-        let (lo, hi) = if i < <Self::Tau as TauParameters>::Tau1::USIZE {
-            let lo = <Self::Tau as TauParameters>::tau1_offset_unchecked(i);
-            let hi = lo + <Self::Tau as TauParameters>::K::USIZE - 1;
-            (lo, hi)
-        } else {
-            debug_assert!(
-                i < <Self::Tau as TauParameters>::Tau0::USIZE
-                    + <Self::Tau as TauParameters>::Tau1::USIZE
-            );
-            let lo = <Self::Tau as TauParameters>::tau0_offset_unchecked(i);
-            let hi = lo + (<Self::Tau as TauParameters>::K::USIZE - 1) - 1;
-            (lo, hi)
-        };
-
-        (lo..=hi)
-            .map(move |j| (chal[j / 8] >> (j % 8)) & 1)
+    fn decode_challenge_as_iter(chal: &[u8]) -> impl Iterator<Item = u8> + '_ {
+        (0..<Self::Tau as TauParameters>::Tau1::USIZE + <Self::Tau as TauParameters>::Tau0::USIZE)
+            .flat_map(|i| {
+                let lo = <Self::Tau as TauParameters>::bavc_index_offset(i);
+                let hi = <Self::Tau as TauParameters>::bavc_index_offset(i + 1);
+                (lo..hi).map(|j| (chal[j / 8] >> (j % 8)) & 1)
+            })
             .chain(repeat_n(0, Self::WGRIND::USIZE))
     }
 }

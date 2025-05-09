@@ -3,7 +3,6 @@ use std::iter::zip;
 use generic_array::{GenericArray, typenum::Unsigned};
 use itertools::izip;
 use rand_core::CryptoRngCore;
-use std::iter::repeat_n;
 
 use crate::{
     Error,
@@ -470,13 +469,7 @@ where
 
     {
         let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
-        for (i, d_i) in zip(
-            0..O::Lambda::USIZE,
-            //TODO: make this more readable
-            (0..<P::Tau as TauParameters>::Tau::USIZE)
-                .flat_map(|i| P::Tau::decode_challenge_as_iter(chall3, i))
-                .chain(repeat_n(0, P::WGRIND::USIZE)),
-        ) {
+        for (i, d_i) in zip(0..O::Lambda::USIZE, P::decode_challenge_as_iter(chall3)) {
             // ::12
             let mut q_tilde = vole_hasher.process(&q[i]);
 
