@@ -91,7 +91,7 @@ where
         let ys = invnorm_to_conjugates::<O>(norm, &w.tags[4 * i..4 * i + 4]);
 
         // ::4
-        f256_f2_conjugates_2::<O>(&mut state_conj, state, i);
+        f256_f2_conjugates::<O>(&mut state_conj, state, i);
 
         //::11
         // Save 1 mul by storing intermediate constraint in state'[0]
@@ -183,7 +183,7 @@ where
         .collect()
 }
 
-pub(crate) fn f256_f2_conjugates_2<O>(
+pub(crate) fn f256_f2_conjugates<O>(
     state_conj: &mut GenericArray<FieldCommitDegOne<OWFField<O>>, U8>,
     state: &ByteCommits<OWFField<O>, O::NStBytes>,
     round: usize,
