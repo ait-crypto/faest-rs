@@ -212,6 +212,25 @@ where
     }
 }
 
+impl<F> Mul<&FieldCommitDegTwo<F>> for &FieldCommitDegOne<F>
+where
+    F: BigGaloisField,
+{
+    type Output = FieldCommitDegThree<F>;
+
+    #[inline]
+    fn mul(self, rhs: &FieldCommitDegTwo<F>) -> Self::Output {
+        FieldCommitDegThree {
+            key: self.key * rhs.key,
+            tag: [
+                self.tag[0] * rhs.tag[0],
+                self.key * rhs.tag[0] + self.tag[0] * rhs.tag[1],
+                self.key * rhs.tag[1] + self.tag[0] * rhs.key,
+            ],
+        }
+    }
+}
+
 impl<F> Mul<&F> for FieldCommitDegOne<F>
 where
     F: BigGaloisField,
