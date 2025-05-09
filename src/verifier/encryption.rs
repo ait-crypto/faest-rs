@@ -1,8 +1,9 @@
+use std::iter::zip;
+
 use generic_array::{
     GenericArray,
     typenum::{Quot, U2, U4, U8, Unsigned},
 };
-use itertools::izip;
 
 use super::vole_commitments::{VoleCommits, VoleCommitsRef};
 use crate::{
@@ -140,18 +141,10 @@ fn enc_cstrnts_odd<'a, O>(
     s.inverse_affine();
 
     // ::31-37
-    for (si, si_sq, st0_i, st1_i) in izip!(st_0.as_ref().iter(), st_1.as_ref().iter())
-        .enumerate()
-        .map(|(byte_i, (st0, st1))| {
-            (
-                s.get_field_commit(byte_i),
-                s.get_field_commit_sq(byte_i),
-                st0,
-                st1,
-            )
-        })
-    {
-        zk_hasher.odd_round_cstrnts(&si, &si_sq, st0_i, st1_i);
+    for (byte_i, (st0, st1)) in zip(st_0.as_ref(), st_1.as_ref()).enumerate() {
+        let si = s.get_field_commit(byte_i);
+        let si_sq = s.get_field_commit_sq(byte_i);
+        zk_hasher.odd_round_cstrnts(&si, &si_sq, st0, st1);
     }
 }
 
