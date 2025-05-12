@@ -168,7 +168,7 @@ where
 /// Internal representation of a secret key, including the zk witness.
 #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
 
-pub(crate) struct SecretKeyUnpacked<O>
+pub(crate) struct UnpackedSecretKey<O>
 where
     O: OWFParameters,
 {
@@ -176,7 +176,7 @@ where
     pub(crate) wit: Witness<O>,
 }
 
-impl<O> Clone for SecretKeyUnpacked<O>
+impl<O> Clone for UnpackedSecretKey<O>
 where
     O: OWFParameters,
 {
@@ -188,7 +188,7 @@ where
     }
 }
 
-impl<O> From<SecretKey<O>> for SecretKeyUnpacked<O>
+impl<O> From<SecretKey<O>> for UnpackedSecretKey<O>
 where
     O: OWFParameters,
 {
@@ -200,7 +200,7 @@ where
     }
 }
 
-impl<O> TryFrom<&[u8]> for SecretKeyUnpacked<O>
+impl<O> TryFrom<&[u8]> for UnpackedSecretKey<O>
 where
     O: OWFParameters,
 {
@@ -215,16 +215,16 @@ where
     }
 }
 
-impl<O> From<SecretKeyUnpacked<O>> for GenericArray<u8, O::SK>
+impl<O> From<UnpackedSecretKey<O>> for GenericArray<u8, O::SK>
 where
     O: OWFParameters,
 {
-    fn from(value: SecretKeyUnpacked<O>) -> Self {
+    fn from(value: UnpackedSecretKey<O>) -> Self {
         value.sk.to_bytes()
     }
 }
 
-impl<O> ByteEncoding for SecretKeyUnpacked<O>
+impl<O> ByteEncoding for UnpackedSecretKey<O>
 where
     O: OWFParameters,
 {
@@ -243,7 +243,7 @@ where
     }
 }
 
-impl<O> SecretKeyUnpacked<O>
+impl<O> UnpackedSecretKey<O>
 where
     O: OWFParameters,
 {
@@ -252,7 +252,7 @@ where
     }
 }
 
-impl<O> Debug for SecretKeyUnpacked<O>
+impl<O> Debug for UnpackedSecretKey<O>
 where
     O: OWFParameters,
 {
@@ -266,7 +266,7 @@ where
     }
 }
 
-impl<O> PartialEq for SecretKeyUnpacked<O>
+impl<O> PartialEq for UnpackedSecretKey<O>
 where
     O: OWFParameters,
 {
@@ -275,10 +275,10 @@ where
     }
 }
 
-impl<O> Eq for SecretKeyUnpacked<O> where O: OWFParameters {}
+impl<O> Eq for UnpackedSecretKey<O> where O: OWFParameters {}
 
 #[cfg(feature = "serde")]
-impl<O> Serialize for SecretKeyUnpacked<O>
+impl<O> Serialize for UnpackedSecretKey<O>
 where
     O: OWFParameters,
 {
@@ -291,7 +291,7 @@ where
 }
 
 #[cfg(feature = "serde")]
-impl<'de, O> Deserialize<'de> for SecretKeyUnpacked<O>
+impl<'de, O> Deserialize<'de> for UnpackedSecretKey<O>
 where
     O: OWFParameters,
 {

@@ -5,7 +5,7 @@ use itertools::izip;
 use rand_core::CryptoRngCore;
 
 use crate::{
-    Error, SecretKeyUnpacked,
+    Error, UnpackedSecretKey,
     bavc::{BatchVectorCommitment, BavcOpenResult},
     fields::Field,
     internal_keys::{PublicKey, SecretKey},
@@ -180,13 +180,13 @@ where
 }
 
 #[inline]
-pub(crate) fn faest_unpacked_keygen<O, R>(rng: R) -> SecretKeyUnpacked<O>
+pub(crate) fn faest_unpacked_keygen<O, R>(rng: R) -> UnpackedSecretKey<O>
 where
     O: OWFParameters,
     R: CryptoRngCore,
 {
     let sk = O::keygen_with_rng(rng);
-    SecretKeyUnpacked::from(sk)
+    UnpackedSecretKey::from(sk)
 }
 
 fn check_challenge_3<P, O>(chall3: &[u8]) -> bool
@@ -298,7 +298,7 @@ pub(crate) fn faest_sign<P>(
 #[inline]
 pub(crate) fn faest_unpacked_sign<P>(
     msg: &[u8],
-    sk_unpacked: &SecretKeyUnpacked<P::OWF>,
+    sk_unpacked: &UnpackedSecretKey<P::OWF>,
     rho: &[u8],
     signature: &mut GenericArray<u8, P::SignatureSize>,
 ) where
