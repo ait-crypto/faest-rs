@@ -61,6 +61,9 @@ pub(crate) type OWFField<O> = <<O as OWFParameters>::BaseParams as BaseParameter
 /// The QuickSilver proof message
 pub(crate) type QSProof<O> = (OWFField<O>, OWFField<O>, OWFField<O>);
 
+/// Witness for the secret key
+pub(crate) type Witness<O> = Box<GenericArray<u8, <O as OWFParameters>::LBytes>>;
+
 pub(crate) trait SecurityParameter:
     ArrayLength
     + Add<Self, Output: ArrayLength>
