@@ -5,11 +5,11 @@ use itertools::izip;
 use rand_core::CryptoRngCore;
 
 use crate::{
-    Error,
+    Error, SecretKeyUnpacked,
     bavc::{BatchVectorCommitment, BavcOpenResult},
     fields::Field,
     internal_keys::{PublicKey, SecretKey},
-    parameter::{BaseParameters, FAESTParameters, OWFField, OWFParameters, TauParameters},
+    parameter::{BaseParameters, FAESTParameters, OWFField, OWFParameters, TauParameters, Witness},
     prg::{IV, IVSize},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
@@ -180,15 +180,13 @@ where
 }
 
 #[inline]
-pub(crate) fn faest_sign<P>(
-    msg: &[u8],
-    sk: &SecretKey<P::OWF>,
-    rho: &[u8],
-    signature: &mut GenericArray<u8, P::SignatureSize>,
-) where
-    P: FAESTParameters,
+pub(crate) fn faest_unpacked_keygen<O, R>(rng: R) -> SecretKeyUnpacked<O>
+where
+    O: OWFParameters,
+    R: CryptoRngCore,
 {
-    sign::<P, P::OWF>(msg, sk, rho, signature);
+    let sk = O::keygen_with_rng(rng);
+    SecretKeyUnpacked::from(sk)
 }
 
 fn check_challenge_3<P, O>(chall3: &[u8]) -> bool
@@ -282,9 +280,37 @@ fn mask_witness(d: &mut [u8], w: &[u8], u: &[u8]) {
     }
 }
 
+#[inline]
+pub(crate) fn faest_sign<P>(
+    msg: &[u8],
+    sk: &SecretKey<P::OWF>,
+    rho: &[u8],
+    signature: &mut GenericArray<u8, P::SignatureSize>,
+) where
+    P: FAESTParameters,
+{
+    // ::12
+    let w = P::OWF::witness(sk);
+
+    sign::<P, P::OWF>(msg, sk, &w, rho, signature);
+}
+
+#[inline]
+pub(crate) fn faest_unpacked_sign<P>(
+    msg: &[u8],
+    sk_unpacked: &SecretKeyUnpacked<P::OWF>,
+    rho: &[u8],
+    signature: &mut GenericArray<u8, P::SignatureSize>,
+) where
+    P: FAESTParameters,
+{
+    sign::<P, P::OWF>(msg, &sk_unpacked.sk, &sk_unpacked.wit, rho, signature);
+}
+
 fn sign<P, O>(
     msg: &[u8],
     sk: &SecretKey<O>,
+    witness: &Witness<O>,
     rho: &[u8],
     signature: &mut GenericArray<u8, P::SignatureSize>,
 ) where
@@ -340,14 +366,10 @@ fn sign<P, O>(
         }
     }
 
-    // ::12
-    // TODO: compute once and store in SecretKey
-    let w = P::OWF::witness(sk);
-
     // ::13
     // compute and write masked witness 'd' in signature
     let (d, signature) = signature.split_at_mut(O::LBytes::USIZE);
-    mask_witness(d, &w, &u[..<O as OWFParameters>::LBytes::USIZE]);
+    mask_witness(d, witness, &u[..<O as OWFParameters>::LBytes::USIZE]);
 
     // ::14
     let mut chall2 = GenericArray::default();
@@ -355,7 +377,7 @@ fn sign<P, O>(
 
     // ::18
     let (a0_tilde, a1_tilde, a2_tilde) = P::OWF::prove(
-        &w,
+        witness,
         // ::16
         GenericArray::from_slice(
             &u[O::LBytes::USIZE..O::LBytes::USIZE + O::LambdaBytesTimes2::USIZE],
@@ -671,7 +693,7 @@ mod test {
                 hashed_sig: &[u8],
             ) -> Box<GenericArray<u8, P::SignatureSize>> {
                 let mut signature = GenericArray::default_boxed();
-                sign::<P, O>(&MSG, sk, &RHO, &mut signature);
+                faest_sign::<P>(&MSG, sk, &RHO, &mut signature);
                 assert_eq!(hashed_sig, hash_array(signature.as_slice()).as_slice());
                 signature
             }
