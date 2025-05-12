@@ -175,10 +175,9 @@ pub(crate) fn f256_f2_conjugates<O>(
 where
     O: OWFParameters,
 {
-    (0..O::NStBytes::USIZE)
-        .flat_map(|i| {
-            let mut x0 = state.get(i);
-
+    state
+        .iter()
+        .flat_map(|mut x0| {
             // ::4-8
             let mut y: GenericArray<FieldCommitDegOne<OWFField<O>>, U8> = GenericArray::default();
             for j in 0..8 {

@@ -167,22 +167,19 @@ pub(crate) fn f256_f2_conjugates<O>(
 where
     O: OWFParameters,
 {
-    (0..O::NStBytes::USIZE)
-        .flat_map(|i| {
-            let mut x0: GenericArray<OWFField<O>, U8> =
-                GenericArray::from_slice(&state[8 * i..8 * i + 8]).to_owned();
+    state
+        .chunks_exact(8)
+        .flat_map(|x| {
+            let mut x0 = *GenericArray::<_, U8>::from_slice(x);
 
             // ::4-8
             let mut y: GenericArray<OWFField<O>, U8> = GenericArray::default();
-
             for j in 0..7 {
                 y[j] = OWFField::<O>::byte_combine_slice(&x0);
 
                 OWFField::<O>::square_byte_inplace(&mut x0);
             }
-
             y[7] = OWFField::<O>::byte_combine_slice(&x0);
-
             y
         })
         .collect()
