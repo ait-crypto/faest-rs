@@ -8,7 +8,7 @@ use generic_array::{
 use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use crate::{
     aes::*,
-    fields::{Betas, FromBit, Square},
+    fields::{BigGaloisField, Square},
     parameter::{OWFField, OWFParameters},
     prover::aes::{StateBitsSquaredCommits, StateBytesSquaredCommits},
     universal_hashing::ZKProofHasher,
@@ -89,7 +89,7 @@ where
     for i in 0..O::NStBytes::USIZE {
         // ::9
         let norm = (w.keys[i / 2] >> ((i % 2) * 4)) & 0xf;
-        let ys = invnorm_to_conjugates::<O>(norm, &w.tags[4 * i..4 * i + 4]);
+        let ys = invnorm_to_conjugates(norm, &w.tags[4 * i..4 * i + 4]);
 
         // ::11
         zk_hasher.inv_norm_constraints(&state_conj[8 * i..8 * i + 8], &ys[0]);
@@ -145,24 +145,20 @@ where
     st
 }
 
-fn invnorm_to_conjugates<O>(
-    x_val: u8,
-    x_tag: &[OWFField<O>],
-) -> GenericArray<FieldCommitDegOne<OWFField<O>>, U4>
+fn invnorm_to_conjugates<F>(x_val: u8, x_tag: &[F]) -> GenericArray<FieldCommitDegOne<F>, U4>
 where
-    O: OWFParameters,
+    F: BigGaloisField,
 {
     (0..4)
         .map(|j| {
-            let key = OWFField::<O>::from_bit(x_val & 1)
-                + OWFField::<O>::BETA_SQUARES[j] * ((x_val >> 1) & 1)
-                + OWFField::<O>::BETA_SQUARES[j + 1] * ((x_val >> 2) & 1)
-                + OWFField::<O>::BETA_CUBES[j] * ((x_val >> 3) & 1);
-
+            let key = F::from_bit(x_val & 1)
+                + F::BETA_SQUARES[j] * ((x_val >> 1) & 1)
+                + F::BETA_SQUARES[j + 1] * ((x_val >> 2) & 1)
+                + F::BETA_CUBES[j] * ((x_val >> 3) & 1);
             let tag = x_tag[0]
-                + OWFField::<O>::BETA_SQUARES[j] * x_tag[1]
-                + OWFField::<O>::BETA_SQUARES[j + 1] * x_tag[2]
-                + OWFField::<O>::BETA_CUBES[j] * x_tag[3];
+                + F::BETA_SQUARES[j] * x_tag[1]
+                + F::BETA_SQUARES[j + 1] * x_tag[2]
+                + F::BETA_CUBES[j] * x_tag[3];
 
             FieldCommitDegOne::new(key, tag)
         })
@@ -179,7 +175,7 @@ where
         .iter()
         .flat_map(|mut x0| {
             // ::4-8
-            let mut y: GenericArray<FieldCommitDegOne<OWFField<O>>, U8> = GenericArray::default();
+            let mut y = GenericArray::<_, U8>::default();
             for j in 0..8 {
                 y[j] = x0.combine();
 

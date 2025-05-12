@@ -1,7 +1,7 @@
 use std::iter::zip;
 
 use generic_array::{
-    GenericArray,
+    ArrayLength, GenericArray,
     typenum::{Quot, U2, U4, U8, Unsigned},
 };
 
@@ -11,10 +11,7 @@ use crate::{
         AddRoundKey, AddRoundKeyAssign, AddRoundKeyBytes, BytewiseMixColumns, InverseAffine,
         InverseShiftRows, MixColumns, SBoxAffine, ShiftRows, StateToBytes,
     },
-    fields::{
-        ByteCombine, Square,
-        large_fields::{Betas, SquareBytes},
-    },
+    fields::{BigGaloisField, Square},
     parameter::{OWFField, OWFParameters},
     universal_hashing::ZKVerifyHasher,
 };
@@ -104,14 +101,14 @@ where
     O: OWFParameters,
 {
     // ::4
-    let state_conj = f256_f2_conjugates::<O>(&state.scalars);
+    let state_conj = f256_f2_conjugates(&state.scalars);
 
     let mut state_prime = GenericArray::default_boxed();
 
     // ::7
     for i in 0..O::NStBytes::USIZE {
         // ::9
-        let ys = invnorm_to_conjugates::<O>(&w[4 * i..4 * i + 4]);
+        let ys = invnorm_to_conjugates(&w[4 * i..4 * i + 4]);
 
         // ::11
         zk_hasher.inv_norm_constraints(&state_conj[8 * i..8 * i + 8], &ys[0]);
@@ -148,24 +145,23 @@ fn enc_cstrnts_odd<'a, O>(
     }
 }
 
-fn invnorm_to_conjugates<O>(x: &[OWFField<O>]) -> GenericArray<OWFField<O>, U4>
+fn invnorm_to_conjugates<F>(x: &[F]) -> GenericArray<F, U4>
 where
-    O: OWFParameters,
+    F: BigGaloisField,
 {
     (0..4)
         .map(|j| {
-            x[0] + OWFField::<O>::BETA_SQUARES[j] * x[1]
-                + OWFField::<O>::BETA_SQUARES[j + 1] * x[2]
-                + OWFField::<O>::BETA_CUBES[j] * x[3]
+            x[0] + F::BETA_SQUARES[j] * x[1]
+                + F::BETA_SQUARES[j + 1] * x[2]
+                + F::BETA_CUBES[j] * x[3]
         })
         .collect()
 }
 
-pub(crate) fn f256_f2_conjugates<O>(
-    state: &GenericArray<OWFField<O>, O::NStBits>,
-) -> GenericArray<OWFField<O>, O::NStBits>
+pub(crate) fn f256_f2_conjugates<F, L>(state: &GenericArray<F, L>) -> GenericArray<F, L>
 where
-    O: OWFParameters,
+    F: BigGaloisField,
+    L: ArrayLength,
 {
     state
         .chunks_exact(8)
@@ -173,13 +169,13 @@ where
             let mut x0 = *GenericArray::<_, U8>::from_slice(x);
 
             // ::4-8
-            let mut y: GenericArray<OWFField<O>, U8> = GenericArray::default();
+            let mut y: GenericArray<_, U8> = GenericArray::default();
             for j in 0..7 {
-                y[j] = OWFField::<O>::byte_combine_slice(&x0);
+                y[j] = F::byte_combine_slice(&x0);
 
-                OWFField::<O>::square_byte_inplace(&mut x0);
+                F::square_byte_inplace(&mut x0);
             }
-            y[7] = OWFField::<O>::byte_combine_slice(&x0);
+            y[7] = F::byte_combine_slice(&x0);
             y
         })
         .collect()
