@@ -155,7 +155,7 @@ where
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Init part
 pub(crate) trait ZKHasherInit<F>
 where
-    F: BigGaloisField + PartialEq + std::fmt::Debug,
+    F: BigGaloisField + std::fmt::Debug,
 {
     type SDLength: ArrayLength;
 

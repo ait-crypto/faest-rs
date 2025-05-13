@@ -46,6 +46,8 @@ pub(crate) trait Field:
     + Neg<Output = Self>
     + Mul<Self, Output = Self>
     + MulAssign
+    + PartialEq
+    + Eq
 {
     /// Representation of `0`
     const ZERO: Self;
