@@ -278,6 +278,22 @@ macro_rules! define_impl {
                 }
             }
 
+            impl ByteEncoding for [<$param UnpackedSigningKey>] {
+                type Repr = [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE];
+
+                fn to_bytes(&self) -> Self::Repr {
+                    self.0.to_bytes().into_array()
+                }
+
+                fn to_vec(&self) -> Vec<u8> {
+                    self.0.to_vec()
+                }
+
+                fn encoded_len(&self) -> usize {
+                    self.0.encoded_len()
+                }
+            }
+
             #[doc = "Verification key for " $param]
             #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -350,23 +366,6 @@ macro_rules! define_impl {
                     R: CryptoRngCore,
                 {
                     Self(faest_unpacked_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng))
-                }
-            }
-
-
-            impl ByteEncoding for [<$param UnpackedSigningKey>] {
-                type Repr = [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE];
-
-                fn to_bytes(&self) -> Self::Repr {
-                    self.0.to_bytes().into_array()
-                }
-
-                fn to_vec(&self) -> Vec<u8> {
-                    self.0.to_vec()
-                }
-
-                fn encoded_len(&self) -> usize {
-                    self.0.encoded_len()
                 }
             }
 
@@ -453,13 +452,13 @@ macro_rules! define_impl {
 
             impl Verifier<[<$param Signature>]> for [<$param UnpackedSigningKey>] {
                 fn verify(&self, msg: &[u8], signature: &[<$param Signature>]) -> Result<(), Error> {
-                    $param::verify(msg, &self.0.sk.pk, &signature.0)
+                    $param::verify(msg, &self.verifying_key().0, &signature.0)
                 }
             }
 
             impl Verifier<Box<[<$param Signature>]>> for [<$param UnpackedSigningKey>] {
                 fn verify(&self, msg: &[u8], signature: &Box<[<$param Signature>]>) -> Result<(), Error> {
-                    $param::verify(msg, &self.0.sk.pk, &signature.0)
+                    $param::verify(msg, &self.verifying_key().0, &signature.0)
                 }
             }
 
@@ -467,7 +466,7 @@ macro_rules! define_impl {
                 fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
                     GenericArray::try_from_slice(signature.0)
                         .map_err(|_| Error::new())
-                        .and_then(|sig| $param::verify(msg, &self.0.sk.pk, sig))
+                        .and_then(|sig| $param::verify(msg, &self.verifying_key().0, sig))
                 }
             }
 

@@ -220,7 +220,7 @@ where
     O: OWFParameters,
 {
     fn from(value: UnpackedSecretKey<O>) -> Self {
-        value.sk.to_bytes()
+        value.to_bytes()
     }
 }
 
@@ -261,7 +261,7 @@ where
             .field("owf_key", &"redacted")
             .field("owf_input", &self.sk.pk.owf_input.as_slice())
             .field("owf_output", &self.sk.pk.owf_output.as_slice())
-            .field("witmess", &"redacted")
+            .field("owf_key_witness", &"redacted")
             .finish()
     }
 }
