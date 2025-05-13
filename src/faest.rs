@@ -79,7 +79,7 @@ where
     }
 }
 
-impl<'a, P, O> SignatureRefMut<'a, P, O>
+impl<P, O> SignatureRefMut<'_, P, O>
 where
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
