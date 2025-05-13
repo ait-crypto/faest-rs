@@ -5,7 +5,10 @@ use generic_array::{
     typenum::{Quot, U2, U4, U8, Unsigned},
 };
 
-use super::{byte_commitments::ByteCommitment, ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
+use super::{
+    ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo,
+    byte_commitments::ByteCommitment,
+};
 use crate::{
     aes::*,
     fields::{BigGaloisField, Square},
@@ -85,7 +88,9 @@ where
     let mut state_conj = GenericArray::default();
 
     // ::7
-    for (i, (state_prime, mut commit_i)) in zip(state_prime.chunks_exact_mut(8), state.iter()).enumerate() {
+    for (i, (state_prime, mut commit_i)) in
+        zip(state_prime.chunks_exact_mut(8), state.iter()).enumerate()
+    {
         // ::9
         let norm = (w.keys[i / 2] >> ((i % 2) * 4)) & 0xf;
         let ys = invnorm_to_conjugates(norm, &w.tags[4 * i..4 * i + 4]);
