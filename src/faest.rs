@@ -173,25 +173,13 @@ where
     O: OWFParameters,
 {
     fn parse_decom(&self) -> BavcOpenResult<'a> {
-        let (n_nodes, node_size) = (
-            <P::Tau as TauParameters>::Topen::USIZE,
-            O::LambdaBytes::USIZE,
-        );
-
-        let (n_coms, com_size) = (
-            <P::Tau as TauParameters>::Tau::USIZE,
-            O::NLeafCommit::USIZE * O::LambdaBytes::USIZE,
-        );
+        let node_size = O::LambdaBytes::USIZE;
+        let n_coms = <P::Tau as TauParameters>::Tau::USIZE;
+        let com_size = O::NLeafCommit::USIZE * O::LambdaBytes::USIZE;
 
         let (commits, nodes) = self.decom_i.split_at(n_coms * com_size);
-
-        let coms: Vec<_> = (0..n_coms)
-            .map(|i| &commits[i * com_size..(i + 1) * com_size])
-            .collect();
-
-        let nodes: Vec<_> = (0..n_nodes)
-            .map(|i| &nodes[i * node_size..(i + 1) * node_size])
-            .collect();
+        let coms = commits.chunks_exact(com_size).collect();
+        let nodes: Vec<_> = nodes.chunks_exact(node_size).collect();
 
         BavcOpenResult { coms, nodes }
     }
@@ -370,7 +358,6 @@ where
 
     // Discard all bits before position "lambda - w_grind"
     let start_byte_0s = chall3[start_byte] >> ((O::Lambda::USIZE - P::WGRIND::USIZE) % 8);
-
     if start_byte_0s != 0 {
         return false;
     }
@@ -461,11 +448,9 @@ fn sign<P, O>(
 
     // ::11
     let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), signature.u_tilde);
-    {
-        for i in 0..O::Lambda::USIZE {
-            // Hash column-wise
-            h2_hasher.update(vole_haher_v.process(&v[i]).as_slice());
-        }
+    for i in 0..O::Lambda::USIZE {
+        // Hash column-wise
+        h2_hasher.update(vole_haher_v.process(&v[i]).as_slice());
     }
 
     // ::13

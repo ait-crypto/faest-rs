@@ -675,7 +675,7 @@ mod tests {
     #[test]
     fn serde_serialization<KP, S>()
     where
-        KP: KeypairGenerator + Serialize + DeserializeOwned + Eq + Debug,
+        KP: KeypairGenerator + Signer<S> + Serialize + DeserializeOwned + Eq + Debug,
     {
         let mut out = vec![];
         let mut ser = serde_json::Serializer::new(&mut out);
