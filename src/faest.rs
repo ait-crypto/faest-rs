@@ -25,6 +25,9 @@ type RO<P> =
 type VoleHasher<P> =
     <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::VoleHasher;
 
+/// Wraps the prover's signature.
+///
+/// It is used by [`sign`] to write the signature into a byte-array.
 struct SignatureRefMut<'a, P, O>
 where
     P: FAESTParameters<OWF = O>,
@@ -43,22 +46,22 @@ where
     ctr: &'a mut [u8],
 }
 
-impl<'a, P, O> SignatureRefMut<'a, P, O>
+impl<'a, P, O> From<&'a mut GenericArray<u8, P::SignatureSize>> for SignatureRefMut<'a, P, O>
 where
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
-    fn from_mut_array(signature: &'a mut GenericArray<u8, P::SignatureSize>) -> Self {
-        let (cs, signature) = signature
-            .split_at_mut(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
-        let (u_tilde, signature) = signature
-            .split_at_mut(<O::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE);
-        let (d, signature) = signature.split_at_mut(O::LBytes::USIZE);
-        let (a1_tilde, signature) = signature.split_at_mut(O::LambdaBytes::USIZE);
-        let (a2_tilde, signature) = signature.split_at_mut(O::LambdaBytes::USIZE);
-        let (decom_i, signature) = signature.split_at_mut(P::get_decom_size());
-        let (chall3, signature) = signature.split_at_mut(O::LambdaBytes::USIZE);
-        let (iv_pre, ctr) = signature.split_at_mut(IVSize::USIZE);
+    fn from(value: &'a mut GenericArray<u8, P::SignatureSize>) -> Self {
+        let (cs, value) =
+            value.split_at_mut(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
+        let (u_tilde, value) =
+            value.split_at_mut(<O::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE);
+        let (d, value) = value.split_at_mut(O::LBytes::USIZE);
+        let (a1_tilde, value) = value.split_at_mut(O::LambdaBytes::USIZE);
+        let (a2_tilde, value) = value.split_at_mut(O::LambdaBytes::USIZE);
+        let (decom_i, value) = value.split_at_mut(P::get_decom_size());
+        let (chall3, value) = value.split_at_mut(O::LambdaBytes::USIZE);
+        let (iv_pre, ctr) = value.split_at_mut(IVSize::USIZE);
 
         Self {
             _marker_faest: PhantomData::<P>,
@@ -74,7 +77,13 @@ where
             ctr,
         }
     }
+}
 
+impl<'a, P, O> SignatureRefMut<'a, P, O>
+where
+    P: FAESTParameters<OWF = O>,
+    O: OWFParameters,
+{
     fn save_zk_constraints(&mut self, a1_tilde: &[u8], a2_tilde: &[u8]) {
         self.a1_tilde.copy_from_slice(a1_tilde);
         self.a2_tilde.copy_from_slice(a2_tilde);
@@ -101,6 +110,9 @@ where
     }
 }
 
+/// Wraps the signature received by the verifier.
+///
+/// It is used by [`verify`] to verify the byte array containing the prover's signature.
 struct SignatureRef<'a, P, O>
 where
     P: FAESTParameters<OWF = O>,
@@ -391,7 +403,7 @@ pub(crate) fn faest_sign<P>(
     P: FAESTParameters,
 {
     // ::0
-    let signature = SignatureRefMut::<P, P::OWF>::from_mut_array(signature);
+    let signature = SignatureRefMut::<P, P::OWF>::from(signature);
 
     // ::12
     let w = P::OWF::witness(sk);
@@ -409,7 +421,7 @@ pub(crate) fn faest_unpacked_sign<P>(
     P: FAESTParameters,
 {
     // ::0
-    let signature = SignatureRefMut::<P, P::OWF>::from_mut_array(signature);
+    let signature = SignatureRefMut::<P, P::OWF>::from(signature);
 
     sign::<P, P::OWF>(msg, &sk_unpacked.sk, &sk_unpacked.wit, rho, signature);
 }
