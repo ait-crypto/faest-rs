@@ -33,8 +33,6 @@ where
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
-    _marker_faest: PhantomData<P>,
-    _marker_owf: PhantomData<O>,
     cs: &'a mut [u8],
     u_tilde: &'a mut [u8],
     d: &'a mut [u8],
@@ -44,6 +42,7 @@ where
     chall3: &'a mut [u8],
     iv_pre: &'a mut [u8],
     ctr: &'a mut [u8],
+    pd: PhantomData<(P, O)>,
 }
 
 impl<'a, P, O> From<&'a mut GenericArray<u8, P::SignatureSize>> for SignatureRefMut<'a, P, O>
@@ -64,8 +63,6 @@ where
         let (iv_pre, ctr) = value.split_at_mut(IVSize::USIZE);
 
         Self {
-            _marker_faest: PhantomData::<P>,
-            _marker_owf: PhantomData::<O>,
             cs,
             u_tilde,
             d,
@@ -75,6 +72,7 @@ where
             chall3,
             iv_pre,
             ctr,
+            pd: PhantomData,
         }
     }
 }
@@ -100,7 +98,7 @@ where
 
         // Save decom_i
         let mut offset = 0;
-        for slice in coms.iter().chain(nodes.iter()) {
+        for slice in coms.iter().chain(nodes) {
             self.decom_i[offset..offset + slice.len()].copy_from_slice(slice);
             offset += slice.len();
         }
@@ -118,8 +116,6 @@ where
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
-    _marker_faest: PhantomData<P>,
-    _marker_owf: PhantomData<O>,
     cs: &'a [u8],
     u_tilde: &'a [u8],
     d: &'a [u8],
@@ -129,6 +125,7 @@ where
     chall3: &'a [u8],
     iv_pre: &'a [u8],
     ctr: &'a [u8],
+    pd: PhantomData<(P, O)>,
 }
 
 impl<'a, P, O> TryFrom<&'a GenericArray<u8, P::SignatureSize>> for SignatureRef<'a, P, O>
@@ -156,8 +153,6 @@ where
         }
 
         Ok(Self {
-            _marker_faest: PhantomData::<P>,
-            _marker_owf: PhantomData::<O>,
             cs,
             u_tilde,
             d,
@@ -167,6 +162,7 @@ where
             chall3,
             iv_pre,
             ctr,
+            pd: PhantomData,
         })
     }
 }
