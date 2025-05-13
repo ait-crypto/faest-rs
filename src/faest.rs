@@ -13,7 +13,7 @@ use crate::{
     prg::{IV, IVSize},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
-    utils::{Reader, decode_all_chall_3},
+    utils::{Reader, decode_all_chall_3, xor_arrays_inplace},
     vole::{
         VoleCommitResult, VoleCommitmentCRef, VoleCommitmentCRefMut, VoleReconstructResult,
         volecommit, volereconstruct,
@@ -568,7 +568,7 @@ where
             let mut q_tilde = vole_hasher.process(&q[i]);
             // ::14
             if d_i == 1 {
-                crate::utils::xor_arrays_inplace(&mut q_tilde, signature.u_tilde);
+                xor_arrays_inplace(&mut q_tilde, signature.u_tilde);
             }
             // ::15
             h2_hasher.update(&q_tilde);
