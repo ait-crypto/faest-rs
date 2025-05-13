@@ -213,7 +213,6 @@ trait FaestHash: RandomOracle {
     fn hash_challenge_1(chall1: &mut [u8], mu: &[u8], hcom: &[u8], c: &[u8], iv: &[u8]);
     /// Generate second challenge in an init-update-finalize style
     fn hash_challenge_2_init(chall1: &[u8], u_t: &[u8]) -> <Self as RandomOracle>::Hasher<10>;
-    fn hash_challenge_2_update(hasher: &mut <Self as RandomOracle>::Hasher<10>, v_row: &[u8]);
     fn hash_challenge_2_finalize(
         hasher: <Self as RandomOracle>::Hasher<10>,
         chall2: &mut [u8],
@@ -292,9 +291,6 @@ where
         h2_hasher
     }
 
-    fn hash_challenge_2_update(hasher: &mut <Self as RandomOracle>::Hasher<10>, v_col: &[u8]) {
-        hasher.update(v_col);
-    }
     fn hash_challenge_2_finalize(
         mut hasher: <Self as RandomOracle>::Hasher<10>,
         chall2: &mut [u8],
@@ -468,10 +464,7 @@ fn sign<P, O>(
     {
         for i in 0..O::Lambda::USIZE {
             // Hash column-wise
-            RO::<P>::hash_challenge_2_update(
-                &mut h2_hasher,
-                vole_haher_v.process(&v[i]).as_slice(),
-            );
+            h2_hasher.update(vole_haher_v.process(&v[i]).as_slice());
         }
     }
 
@@ -578,7 +571,7 @@ where
                 crate::utils::xor_arrays_inplace(&mut q_tilde, signature.u_tilde);
             }
             // ::15
-            RO::<P>::hash_challenge_2_update(&mut h2_hasher, &q_tilde);
+            h2_hasher.update(&q_tilde);
         }
     }
 
