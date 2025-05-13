@@ -265,8 +265,8 @@ pub(crate) trait OWFParameters: Sized {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self>;
 
     /// Generates the prover's secret key using the input generator
@@ -371,8 +371,8 @@ impl OWFParameters for OWF128 {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
@@ -461,8 +461,8 @@ impl OWFParameters for OWF192 {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
@@ -553,8 +553,8 @@ impl OWFParameters for OWF256 {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
@@ -638,8 +638,8 @@ impl OWFParameters for OWF128EM {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
@@ -725,8 +725,8 @@ impl OWFParameters for OWF192EM {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
@@ -812,8 +812,8 @@ impl OWFParameters for OWF256EM {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
