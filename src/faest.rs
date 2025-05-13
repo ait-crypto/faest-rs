@@ -1,4 +1,4 @@
-use std::iter::zip;
+use std::{iter::zip, marker::PhantomData};
 
 use generic_array::{GenericArray, typenum::Unsigned};
 use itertools::izip;
@@ -24,6 +24,82 @@ type RO<P> =
     <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle;
 type VoleHasher<P> =
     <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::VoleHasher;
+
+struct SignatureRefMut<'a, P, O>
+where
+    P: FAESTParameters<OWF = O>,
+    O: OWFParameters,
+{
+    _marker_faest: PhantomData<P>,
+    _marker_owf: PhantomData<O>,
+    cs: &'a mut [u8],
+    u_tilde: &'a mut [u8],
+    d: &'a mut [u8],
+    a1_tilde: &'a mut [u8],
+    a2_tilde: &'a mut [u8],
+    decom_i: &'a mut [u8],
+    chall3: &'a mut [u8],
+    iv_pre: &'a mut [u8],
+    ctr: &'a mut [u8],
+}
+
+impl<'a, P, O> SignatureRefMut<'a, P, O>
+where
+    P: FAESTParameters<OWF = O>,
+    O: OWFParameters,
+{
+    fn from_mut_array(signature: &'a mut GenericArray<u8, P::SignatureSize>) -> Self {
+        let (cs, signature) = signature
+            .split_at_mut(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
+        let (u_tilde, signature) = signature
+            .split_at_mut(<O::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE);
+        let (d, signature) = signature.split_at_mut(O::LBytes::USIZE);
+        let (a1_tilde, signature) = signature.split_at_mut(O::LambdaBytes::USIZE);
+        let (a2_tilde, signature) = signature.split_at_mut(O::LambdaBytes::USIZE);
+        let (decom_i, signature) = signature.split_at_mut(P::get_decom_size());
+        let (chall3, signature) = signature.split_at_mut(O::LambdaBytes::USIZE);
+        let (iv_pre, ctr) = signature.split_at_mut(IVSize::USIZE);
+
+        Self {
+            _marker_faest: PhantomData::<P>,
+            _marker_owf: PhantomData::<O>,
+            cs,
+            u_tilde,
+            d,
+            a1_tilde,
+            a2_tilde,
+            decom_i,
+            chall3,
+            iv_pre,
+            ctr,
+        }
+    }
+
+    fn save_zk_constraints(&mut self, a1_tilde: &[u8], a2_tilde: &[u8]) {
+        self.a1_tilde.copy_from_slice(a1_tilde);
+        self.a2_tilde.copy_from_slice(a2_tilde);
+    }
+
+    fn mask_witness(&mut self, w: &[u8], u: &[u8]) {
+        for (dj, wj, uj) in izip!(self.d.iter_mut(), w, u) {
+            *dj = wj ^ *uj;
+        }
+    }
+
+    fn save_decom_and_ctr(&mut self, decom_i: &BavcOpenResult, ctr: u32) {
+        let BavcOpenResult { coms, nodes } = decom_i;
+
+        // Save decom_i
+        let mut offset = 0;
+        for slice in coms.iter().chain(nodes.iter()) {
+            self.decom_i[offset..offset + slice.len()].copy_from_slice(slice);
+            offset += slice.len();
+        }
+
+        // Save ctr
+        self.ctr.copy_from_slice(&ctr.to_le_bytes());
+    }
+}
 
 /// Hashes required for FAEST implementation
 trait FaestHash: RandomOracle {
@@ -213,25 +289,6 @@ where
     true
 }
 
-fn save_decom_and_ctr(
-    decom_sig: &mut [u8],
-    ctr_sig: &mut [u8],
-    decom_i: &BavcOpenResult,
-    ctr: u32,
-) {
-    let BavcOpenResult { coms, nodes } = decom_i;
-
-    // Save decom_i
-    let mut offset = 0;
-    for slice in coms.iter().chain(nodes.iter()) {
-        decom_sig[offset..offset + slice.len()].copy_from_slice(slice);
-        offset += slice.len();
-    }
-
-    // Save ctr
-    ctr_sig.copy_from_slice(&ctr.to_le_bytes());
-}
-
 fn parse_decom<O, P>(sigma: &[u8]) -> (&[u8], Vec<Vec<u8>>, Vec<Vec<u8>>)
 where
     O: OWFParameters,
@@ -260,26 +317,6 @@ where
     (sigma, commits, nodes)
 }
 
-fn save_zk_constraints<'a>(
-    signature: &'a mut [u8],
-    a1_tilde: &[u8],
-    a2_tilde: &[u8],
-) -> &'a mut [u8] {
-    let (a1, signature) = signature.split_at_mut(a1_tilde.len());
-    let (a2, signature) = signature.split_at_mut(a2_tilde.len());
-
-    a1.copy_from_slice(a1_tilde);
-    a2.copy_from_slice(a2_tilde);
-
-    signature
-}
-
-fn mask_witness(d: &mut [u8], w: &[u8], u: &[u8]) {
-    for (dj, wj, uj) in izip!(d, w, u) {
-        *dj = wj ^ *uj;
-    }
-}
-
 #[inline]
 pub(crate) fn faest_sign<P>(
     msg: &[u8],
@@ -289,6 +326,9 @@ pub(crate) fn faest_sign<P>(
 ) where
     P: FAESTParameters,
 {
+    // ::0
+    let signature = SignatureRefMut::<P, P::OWF>::from_mut_array(signature);
+
     // ::12
     let w = P::OWF::witness(sk);
 
@@ -304,6 +344,9 @@ pub(crate) fn faest_unpacked_sign<P>(
 ) where
     P: FAESTParameters,
 {
+    // ::0
+    let signature = SignatureRefMut::<P, P::OWF>::from_mut_array(signature);
+
     sign::<P, P::OWF>(msg, &sk_unpacked.sk, &sk_unpacked.wit, rho, signature);
 }
 
@@ -312,22 +355,18 @@ fn sign<P, O>(
     sk: &SecretKey<O>,
     witness: &Witness<O>,
     rho: &[u8],
-    signature: &mut GenericArray<u8, P::SignatureSize>,
+    mut signature: SignatureRefMut<P, O>,
 ) where
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
-    // ::1
-    let (signature, ctr_s) = signature.split_at_mut(P::SignatureSize::USIZE - size_of::<u32>());
-
     // ::3
     let mut mu = GenericArray::<u8, O::LambdaBytesTimes2>::default();
     RO::<P>::hash_mu(&mut mu, &sk.pk.owf_input, &sk.pk.owf_output, msg);
 
     // ::4
     let mut r = GenericArray::<u8, O::LambdaBytes>::default();
-    let (signature, iv) = signature.split_at_mut(signature.len() - IVSize::USIZE);
-    let iv_pre = GenericArray::from_mut_slice(iv);
+    let iv_pre = GenericArray::from_mut_slice(signature.iv_pre);
     RO::<P>::hash_r_iv(&mut r, iv_pre, &sk.owf_key, &mu, rho);
 
     // ::5
@@ -335,27 +374,25 @@ fn sign<P, O>(
     RO::<P>::hash_iv(&mut iv);
 
     // ::7
-    let (volecommit_cs, signature) =
-        signature.split_at_mut(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
     let VoleCommitResult { com, decom, u, v } =
-        volecommit::<P::BAVC, O::LHatBytes>(VoleCommitmentCRefMut::new(volecommit_cs), &r, &iv);
+        volecommit::<P::BAVC, O::LHatBytes>(VoleCommitmentCRefMut::new(signature.cs), &r, &iv);
 
     // ::8
     //Contrarly to specification, faest-ref uses iv instead of iv_pre
     let mut chall1 = GenericArray::default();
-    RO::<P>::hash_challenge_1(&mut chall1, &mu, &com, volecommit_cs, iv.as_slice());
+    RO::<P>::hash_challenge_1(&mut chall1, &mu, &com, signature.cs, iv.as_slice());
 
     // ::10
     let vole_hasher_u = VoleHasher::<P>::new_vole_hasher(&chall1);
     let vole_haher_v = vole_hasher_u.clone();
-    // write u_t to signature
-    let (u_t, signature) = signature.split_at_mut(
-        <<O as OWFParameters>::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE,
-    );
-    u_t.copy_from_slice(vole_hasher_u.process(&u).as_slice());
+
+    // write u_tilde to signature
+    signature
+        .u_tilde
+        .copy_from_slice(vole_hasher_u.process(&u).as_slice());
 
     // ::11
-    let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), u_t);
+    let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), signature.u_tilde);
     {
         for i in 0..O::Lambda::USIZE {
             // Hash column-wise
@@ -368,12 +405,11 @@ fn sign<P, O>(
 
     // ::13
     // compute and write masked witness 'd' in signature
-    let (d, signature) = signature.split_at_mut(O::LBytes::USIZE);
-    mask_witness(d, witness, &u[..<O as OWFParameters>::LBytes::USIZE]);
+    signature.mask_witness(witness, &u[..<O as OWFParameters>::LBytes::USIZE]);
 
     // ::14
     let mut chall2 = GenericArray::default();
-    RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, d);
+    RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, signature.d);
 
     // ::18
     let (a0_tilde, a1_tilde, a2_tilde) = P::OWF::prove(
@@ -389,10 +425,9 @@ fn sign<P, O>(
     );
 
     // Save a1_tilde, a2_tilde in signature
-    let signature = save_zk_constraints(signature, &a1_tilde.as_bytes(), &a2_tilde.as_bytes());
+    signature.save_zk_constraints(&a1_tilde.as_bytes(), &a2_tilde.as_bytes());
 
     // ::19
-    let (decom_i_sig, chall3) = signature.split_at_mut(P::get_decom_size());
     let hasher = RO::<P>::hash_challenge_3_init(
         &chall2,
         &a0_tilde.as_bytes(),
@@ -402,16 +437,16 @@ fn sign<P, O>(
 
     for ctr in 0u32.. {
         // ::20
-        RO::<P>::hash_challenge_3_finalize(&hasher, chall3, ctr);
+        RO::<P>::hash_challenge_3_finalize(&hasher, signature.chall3, ctr);
         // ::21
-        if check_challenge_3::<P, O>(chall3) {
+        if check_challenge_3::<P, O>(signature.chall3) {
             // ::24
-            let i_delta = decode_all_chall_3::<P::Tau>(chall3);
+            let i_delta = decode_all_chall_3::<P::Tau>(signature.chall3);
 
             // ::26
             if let Some(decom_i) = <P as FAESTParameters>::BAVC::open(&decom, &i_delta) {
                 // Save decom_i and ctr bits
-                save_decom_and_ctr(decom_i_sig, ctr_s, &decom_i, ctr);
+                signature.save_decom_and_ctr(&decom_i, ctr);
                 break;
             }
         }
