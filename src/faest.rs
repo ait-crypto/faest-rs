@@ -9,7 +9,7 @@ use crate::{
     bavc::{BatchVectorCommitment, BavcOpenResult},
     fields::Field,
     internal_keys::{PublicKey, SecretKey},
-    parameter::{BaseParameters, FAESTParameters, OWFField, OWFParameters, TauParameters, Witness},
+    parameter::{BaseParameters, FAESTParameters, OWFParameters, TauParameters, Witness},
     prg::{IV, IVSize},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
@@ -98,6 +98,98 @@ where
 
         // Save ctr
         self.ctr.copy_from_slice(&ctr.to_le_bytes());
+    }
+}
+
+struct SignatureRef<'a, P, O>
+where
+    P: FAESTParameters<OWF = O>,
+    O: OWFParameters,
+{
+    _marker_faest: PhantomData<P>,
+    _marker_owf: PhantomData<O>,
+    cs: &'a [u8],
+    u_tilde: &'a [u8],
+    d: &'a [u8],
+    a1_tilde: &'a [u8],
+    a2_tilde: &'a [u8],
+    decom_i: &'a [u8],
+    chall3: &'a [u8],
+    iv_pre: &'a [u8],
+    ctr: &'a [u8],
+}
+
+impl<'a, P, O> TryFrom<&'a GenericArray<u8, P::SignatureSize>> for SignatureRef<'a, P, O>
+where
+    P: FAESTParameters<OWF = O>,
+    O: OWFParameters,
+{
+    type Error = Error;
+
+    fn try_from(value: &'a GenericArray<u8, P::SignatureSize>) -> Result<Self, Self::Error> {
+        let (cs, value) =
+            value.split_at(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
+        let (u_tilde, value) =
+            value.split_at(<O::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE);
+        let (d, value) = value.split_at(O::LBytes::USIZE);
+        let (a1_tilde, value) = value.split_at(O::LambdaBytes::USIZE);
+        let (a2_tilde, value) = value.split_at(O::LambdaBytes::USIZE);
+        let (decom_i, value) = value.split_at(P::get_decom_size());
+        let (chall3, value) = value.split_at(O::LambdaBytes::USIZE);
+        let (iv_pre, ctr) = value.split_at(IVSize::USIZE);
+
+        // ::4
+        if !check_challenge_3::<P, O>(chall3) {
+            return Err(Error::new());
+        }
+
+        Ok(Self {
+            _marker_faest: PhantomData::<P>,
+            _marker_owf: PhantomData::<O>,
+            cs,
+            u_tilde,
+            d,
+            a1_tilde,
+            a2_tilde,
+            decom_i,
+            chall3,
+            iv_pre,
+            ctr,
+        })
+    }
+}
+
+impl<'a, P, O> SignatureRef<'a, P, O>
+where
+    P: FAESTParameters<OWF = O>,
+    O: OWFParameters,
+{
+    fn parse_decom(&self) -> BavcOpenResult<'a> {
+        let (n_nodes, node_size) = (
+            <P::Tau as TauParameters>::Topen::USIZE,
+            O::LambdaBytes::USIZE,
+        );
+
+        let (n_coms, com_size) = (
+            <P::Tau as TauParameters>::Tau::USIZE,
+            O::NLeafCommit::USIZE * O::LambdaBytes::USIZE,
+        );
+
+        let (commits, nodes) = self.decom_i.split_at(n_coms * com_size);
+
+        let coms: Vec<_> = (0..n_coms)
+            .map(|i| &commits[i * com_size..(i + 1) * com_size])
+            .collect();
+
+        let nodes: Vec<_> = (0..n_nodes)
+            .map(|i| &nodes[i * node_size..(i + 1) * node_size])
+            .collect();
+
+        BavcOpenResult { coms, nodes }
+    }
+
+    fn parse_ctr(&self) -> u32 {
+        u32::from_le_bytes(self.ctr.try_into().unwrap())
     }
 }
 
@@ -289,34 +381,6 @@ where
     true
 }
 
-fn parse_decom<O, P>(sigma: &[u8]) -> (&[u8], Vec<Vec<u8>>, Vec<Vec<u8>>)
-where
-    O: OWFParameters,
-    P: FAESTParameters,
-{
-    let (n_nodes, node_size) = (
-        <P::Tau as TauParameters>::Topen::USIZE,
-        O::LambdaBytes::USIZE,
-    );
-    let (n_coms, com_size) = (
-        <P::Tau as TauParameters>::Tau::USIZE,
-        O::NLeafCommit::USIZE * O::LambdaBytes::USIZE,
-    );
-
-    let (sigma, nodes) = sigma.split_at(sigma.len() - n_nodes * node_size);
-    let (sigma, commits) = sigma.split_at(sigma.len() - n_coms * com_size);
-
-    let commits: Vec<_> = (0..n_coms)
-        .map(|i| commits[i * com_size..(i + 1) * com_size].to_vec())
-        .collect();
-
-    let nodes: Vec<_> = (0..n_nodes)
-        .map(|i| nodes[i * node_size..(i + 1) * node_size].to_vec())
-        .collect();
-
-    (sigma, commits, nodes)
-}
-
 #[inline]
 pub(crate) fn faest_sign<P>(
     msg: &[u8],
@@ -457,118 +521,86 @@ fn sign<P, O>(
 pub(crate) fn faest_verify<P>(
     msg: &[u8],
     pk: &PublicKey<P::OWF>,
-    sigma: &GenericArray<u8, P::SignatureSize>,
+    signature: &GenericArray<u8, P::SignatureSize>,
 ) -> Result<(), Error>
 where
     P: FAESTParameters,
 {
-    verify::<P, P::OWF>(msg, pk, sigma)
+    //::1-4
+    let signature = SignatureRef::<P, P::OWF>::try_from(signature)?;
+
+    verify::<P, P::OWF>(msg, pk, signature)
 }
 
-fn verify<P, O>(
-    msg: &[u8],
-    pk: &PublicKey<O>,
-    sigma: &GenericArray<u8, P::SignatureSize>,
-) -> Result<(), Error>
+fn verify<P, O>(msg: &[u8], pk: &PublicKey<O>, signature: SignatureRef<P, O>) -> Result<(), Error>
 where
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
-    let (sigma, ctr) = sigma.split_at(sigma.len() - size_of::<u32>());
-    let ctr = u32::from_le_bytes(ctr.try_into().unwrap());
-
-    let (sigma, iv) = sigma.split_at(sigma.len() - IVSize::USIZE);
-    let mut iv = GenericArray::from_slice(iv).to_owned();
-    // ::3
-    RO::<P>::hash_iv(&mut iv);
-
-    let (sigma, chall3) = sigma.split_at(sigma.len() - O::LambdaBytes::USIZE);
-    let chall3: &GenericArray<u8, O::LambdaBytes> = GenericArray::from_slice(chall3);
+    let ctr = signature.parse_ctr();
 
     // ::2
     let mut mu = GenericArray::<u8, O::LambdaBytesTimes2>::default();
     RO::<P>::hash_mu(&mut mu, &pk.owf_input, &pk.owf_output, msg);
 
-    // ::4
-    if !check_challenge_3::<P, O>(chall3) {
-        return Err(Error::new());
-    }
+    // ::3
+    let mut iv = GenericArray::from_slice(signature.iv_pre).to_owned();
+    RO::<P>::hash_iv(&mut iv);
 
-    let (c, sigma) =
-        sigma.split_at(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
-    let c = VoleCommitmentCRef::<O::LHatBytes>::new(c);
-
-    let (sigma, coms, nodes) = parse_decom::<O, P>(sigma);
-
-    let decom_i = BavcOpenResult {
-        coms: coms.iter().map(|com_i| com_i.as_slice()).collect(),
-        nodes: nodes.iter().map(|node_i| node_i.as_slice()).collect(),
-    };
-
-    // ::7
-    let res = volereconstruct::<P::BAVC, O::LHatBytes>(chall3, &decom_i, c, &iv);
-
-    // ::8
-    if res.is_none() {
-        return Err(Error::new());
-    }
-    let VoleReconstructResult { com, q } = res.unwrap();
+    // ::7-8
+    let chall3: &GenericArray<u8, O::LambdaBytes> = GenericArray::from_slice(signature.chall3);
+    let decom_i = signature.parse_decom();
+    let c = VoleCommitmentCRef::<O::LHatBytes>::new(signature.cs);
+    let VoleReconstructResult { com, q } =
+        volereconstruct::<P::BAVC, O::LHatBytes>(chall3, &decom_i, c, &iv).ok_or(Error::new())?;
 
     // ::10
     let mut chall1 = GenericArray::default();
     RO::<P>::hash_challenge_1(&mut chall1, &mu, com.as_slice(), c.as_slice(), &iv);
 
-    let (u_tilde, sigma) = sigma.split_at(
-        <<O as OWFParameters>::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE,
-    );
-
-    let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), u_tilde);
+    let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), signature.u_tilde);
 
     {
         let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
         for (i, d_i) in zip(0..O::Lambda::USIZE, P::decode_challenge_as_iter(chall3)) {
             // ::12
             let mut q_tilde = vole_hasher.process(&q[i]);
-
             // ::14
             if d_i == 1 {
-                crate::utils::xor_arrays_inplace(&mut q_tilde, u_tilde);
+                crate::utils::xor_arrays_inplace(&mut q_tilde, signature.u_tilde);
             }
-
             // ::15
             RO::<P>::hash_challenge_2_update(&mut h2_hasher, &q_tilde);
         }
     }
 
-    let (d, sigma) = sigma.split_at(O::LBytes::USIZE);
-
     // ::15
     let mut chall2 = GenericArray::default();
-    RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, d);
-
-    let (a1_tilde, a2_tilde) = sigma.split_at(O::LambdaBytes::USIZE);
+    RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, signature.d);
 
     // ::17
     let a0_tilde = P::OWF::verify(
-        GenericArray::from_slice(&q),
-        GenericArray::from_slice(d),
+        &q,
+        GenericArray::from_slice(signature.d),
         pk,
         &chall2,
         chall3,
-        &OWFField::<O>::from(a1_tilde),
-        &OWFField::<O>::from(a2_tilde),
+        GenericArray::from_slice(signature.a1_tilde),
+        GenericArray::from_slice(signature.a2_tilde),
     );
 
+    // ::18
     let mut chall3_prime = GenericArray::default();
     RO::<P>::hash_challenge_3(
         &mut chall3_prime,
         &chall2,
         a0_tilde.as_bytes().as_slice(),
-        a1_tilde,
-        a2_tilde,
+        signature.a1_tilde,
+        signature.a2_tilde,
         ctr,
     );
 
+    // ::19
     if *chall3 == chall3_prime {
         Ok(())
     } else {
@@ -746,8 +778,7 @@ mod test {
                         );
                         println!("FAEST-EM-128s - testing FAEST.verify ..");
                         assert!(
-                            verify::<FAESTEM128sParameters, OWF128EM>(&MSG, &pk, &signature)
-                                .is_ok()
+                            faest_verify::<FAESTEM128sParameters>(&MSG, &pk, &signature).is_ok()
                         );
 
                         println!("FAEST-EM-128f - testing FAEST.sign..");
@@ -757,8 +788,7 @@ mod test {
                         );
                         println!("FAEST-EM-128f - testing FAEST.verify ..");
                         assert!(
-                            verify::<FAESTEM128fParameters, OWF128EM>(&MSG, &pk, &signature)
-                                .is_ok()
+                            faest_verify::<FAESTEM128fParameters>(&MSG, &pk, &signature).is_ok()
                         );
                     }
 
@@ -773,8 +803,7 @@ mod test {
                         );
                         println!("FAEST-EM-192s - testing FAEST.verify..");
                         assert!(
-                            verify::<FAESTEM192sParameters, OWF192EM>(&MSG, &pk, &signature)
-                                .is_ok()
+                            faest_verify::<FAESTEM192sParameters>(&MSG, &pk, &signature).is_ok()
                         );
 
                         println!("FAEST-EM-192f - testing FAEST.sign..");
@@ -784,8 +813,7 @@ mod test {
                         );
                         println!("FAEST-EM-192f - testing FAEST.verify..");
                         assert!(
-                            verify::<FAESTEM192fParameters, OWF192EM>(&MSG, &pk, &signature)
-                                .is_ok()
+                            faest_verify::<FAESTEM192fParameters>(&MSG, &pk, &signature).is_ok()
                         );
                     }
 
@@ -799,8 +827,7 @@ mod test {
                             &self.hashed_sig_s,
                         );
                         assert!(
-                            verify::<FAESTEM256sParameters, OWF256EM>(&MSG, &pk, &signature)
-                                .is_ok()
+                            faest_verify::<FAESTEM256sParameters>(&MSG, &pk, &signature).is_ok()
                         );
 
                         println!("FAEST-EM-256f - testing FAEST.verify..");
@@ -809,8 +836,7 @@ mod test {
                             &self.hashed_sig_f,
                         );
                         assert!(
-                            verify::<FAESTEM256fParameters, OWF256EM>(&MSG, &pk, &signature)
-                                .is_ok()
+                            faest_verify::<FAESTEM256fParameters>(&MSG, &pk, &signature).is_ok()
                         );
                     }
                 }
@@ -826,18 +852,14 @@ mod test {
                             &sk,
                             &self.hashed_sig_s,
                         );
-                        assert!(
-                            verify::<FAEST128sParameters, OWF128>(&MSG, &pk, &signature).is_ok()
-                        );
+                        assert!(faest_verify::<FAEST128sParameters>(&MSG, &pk, &signature).is_ok());
 
                         println!("FAEST-128f - testing FAEST.sign..");
                         let signature = Self::try_signing::<FAEST128fParameters, OWF128>(
                             &sk,
                             &self.hashed_sig_f,
                         );
-                        assert!(
-                            verify::<FAEST128fParameters, OWF128>(&MSG, &pk, &signature).is_ok()
-                        );
+                        assert!(faest_verify::<FAEST128fParameters>(&MSG, &pk, &signature).is_ok());
                     }
 
                     192 => {
@@ -849,18 +871,14 @@ mod test {
                             &sk,
                             &self.hashed_sig_s,
                         );
-                        assert!(
-                            verify::<FAEST192sParameters, OWF192>(&MSG, &pk, &signature).is_ok()
-                        );
+                        assert!(faest_verify::<FAEST192sParameters>(&MSG, &pk, &signature).is_ok());
 
                         println!("FAEST-192f - testing FAEST.sign..");
                         let signature = Self::try_signing::<FAEST192fParameters, OWF192>(
                             &sk,
                             &self.hashed_sig_f,
                         );
-                        assert!(
-                            verify::<FAEST192fParameters, OWF192>(&MSG, &pk, &signature).is_ok()
-                        );
+                        assert!(faest_verify::<FAEST192fParameters>(&MSG, &pk, &signature).is_ok());
                     }
 
                     _ => {
@@ -872,18 +890,14 @@ mod test {
                             &sk,
                             &self.hashed_sig_s,
                         );
-                        assert!(
-                            verify::<FAEST256sParameters, OWF256>(&MSG, &pk, &signature).is_ok()
-                        );
+                        assert!(faest_verify::<FAEST256sParameters>(&MSG, &pk, &signature).is_ok());
 
                         println!("FAEST-256f - testing FAEST.sign..");
                         let signature = Self::try_signing::<FAEST256fParameters, OWF256>(
                             &sk,
                             &self.hashed_sig_f,
                         );
-                        assert!(
-                            verify::<FAEST256fParameters, OWF256>(&MSG, &pk, &signature).is_ok()
-                        );
+                        assert!(faest_verify::<FAEST256fParameters>(&MSG, &pk, &signature).is_ok());
                     }
                 }
             }
