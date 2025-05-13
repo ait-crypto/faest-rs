@@ -1,4 +1,7 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    iter::repeat_n,
+    ops::{Add, Div, Mul, Sub},
+};
 
 use aes::{
     Aes128Enc, Aes192Enc, Aes256Enc,
@@ -57,6 +60,9 @@ pub(crate) type OWFField<O> = <<O as OWFParameters>::BaseParams as BaseParameter
 
 /// The QuickSilver proof message
 pub(crate) type QSProof<O> = (OWFField<O>, OWFField<O>, OWFField<O>);
+
+/// Witness for the secret key
+pub(crate) type Witness<O> = Box<GenericArray<u8, <O as OWFParameters>::LBytes>>;
 
 pub(crate) trait SecurityParameter:
     ArrayLength
@@ -259,8 +265,8 @@ pub(crate) trait OWFParameters: Sized {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self>;
 
     /// Generates the prover's secret key using the input generator
@@ -365,8 +371,8 @@ impl OWFParameters for OWF128 {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
@@ -455,8 +461,8 @@ impl OWFParameters for OWF192 {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
@@ -547,8 +553,8 @@ impl OWFParameters for OWF256 {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
@@ -632,8 +638,8 @@ impl OWFParameters for OWF128EM {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
@@ -719,8 +725,8 @@ impl OWFParameters for OWF192EM {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
@@ -806,8 +812,8 @@ impl OWFParameters for OWF256EM {
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &OWFField<Self>,
-        a2_tilde: &OWFField<Self>,
+        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
@@ -827,21 +833,6 @@ pub(crate) trait TauParameters {
     /// Threshold for the maximum opening size of the GGM tree
     type Topen: ArrayLength;
 
-    /// Returns an iterator over the individual bits of the i-th VOLE sub-challenge (i.e., the one associated to the i-th small-vole instance)
-    fn decode_challenge_as_iter(chal: &[u8], i: usize) -> impl Iterator<Item = u8> + '_ {
-        let (lo, hi) = if i < Self::Tau1::USIZE {
-            let lo = Self::tau1_offset_unchecked(i);
-            let hi = lo + Self::K::USIZE - 1;
-            (lo, hi)
-        } else {
-            debug_assert!(i < Self::Tau0::USIZE + Self::Tau1::USIZE);
-            let lo = Self::tau0_offset_unchecked(i);
-            let hi = lo + (Self::K::USIZE - 1) - 1;
-            (lo, hi)
-        };
-        (lo..=hi).map(move |j| (chal[j / 8] >> (j % 8)) & 1)
-    }
-
     #[inline]
     fn tau1_offset_unchecked(i: usize) -> usize {
         Self::K::USIZE * i
@@ -854,8 +845,6 @@ pub(crate) trait TauParameters {
 
     /// Retuns leaf offset of the i-th small-VOLE instance within the GGM tree
     fn bavc_index_offset(i: usize) -> usize {
-        debug_assert!(i < Self::Tau::USIZE);
-
         if i < Self::Tau1::USIZE {
             return (1 << Self::K::USIZE) * i;
         }
@@ -1064,6 +1053,17 @@ pub(crate) trait FAESTParameters {
             // nodes
             <<Self as FAESTParameters>::Tau as TauParameters>::Topen::USIZE
                 * <<Self as FAESTParameters>::OWF as OWFParameters>::LambdaBytes::USIZE
+    }
+
+    /// Returns an iterator over the individual bits of the i-th VOLE sub-challenge (i.e., the one associated to the i-th small-vole instance)
+    fn decode_challenge_as_iter(chal: &[u8]) -> impl Iterator<Item = u8> + '_ {
+        (0..<Self::Tau as TauParameters>::Tau1::USIZE + <Self::Tau as TauParameters>::Tau0::USIZE)
+            .flat_map(|i| {
+                let lo = <Self::Tau as TauParameters>::bavc_index_offset(i);
+                let hi = <Self::Tau as TauParameters>::bavc_index_offset(i + 1);
+                (lo..hi).map(|j| (chal[j / 8] >> (j % 8)) & 1)
+            })
+            .chain(repeat_n(0, Self::WGRIND::USIZE))
     }
 }
 

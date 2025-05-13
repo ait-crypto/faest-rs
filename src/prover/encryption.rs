@@ -5,7 +5,10 @@ use generic_array::{
     typenum::{Quot, U2, U4, U8, Unsigned},
 };
 
-use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
+use super::{
+    ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo,
+    byte_commitments::ByteCommitment,
+};
 use crate::{
     aes::*,
     fields::{BigGaloisField, Square},
@@ -81,22 +84,29 @@ where
     O: OWFParameters,
 {
     // ::4
-    let state_conj = f256_f2_conjugates::<O>(state);
-
     let mut state_prime = StateBitsSquaredCommits::<O>::default();
+    let mut state_conj = GenericArray::default();
 
     // ::7
-    for i in 0..O::NStBytes::USIZE {
+    for (i, (state_prime, mut commit_i)) in
+        zip(state_prime.chunks_exact_mut(8), state.iter()).enumerate()
+    {
         // ::9
         let norm = (w.keys[i / 2] >> ((i % 2) * 4)) & 0xf;
         let ys = invnorm_to_conjugates(norm, &w.tags[4 * i..4 * i + 4]);
 
-        // ::11
-        zk_hasher.inv_norm_constraints(&state_conj[8 * i..8 * i + 8], &ys[0]);
+        // ::4
+        f256_f2_conjugates(&mut state_conj, &mut commit_i);
+
+        //::11
+        // Save 1 mul by storing intermediate constraint in state'[0]
+        state_prime[0] = &ys[0] * &state_conj[4];
+        let cnstr = &state_prime[0] * &state_conj[1] + &state_conj[0];
+        zk_hasher.update(&cnstr);
 
         // ::12
-        for j in 0..8 {
-            state_prime[i * 8 + j] = state_conj[8 * i + (j + 4) % 8].clone() * &ys[j % 4];
+        for j in 1..8 {
+            state_prime[j] = &state_conj[(j + 4) % 8] * &ys[j % 4];
         }
     }
 
@@ -165,25 +175,15 @@ where
         .collect()
 }
 
-pub(crate) fn f256_f2_conjugates<O>(
-    state: &ByteCommits<OWFField<O>, O::NStBytes>,
-) -> Box<GenericArray<FieldCommitDegOne<OWFField<O>>, O::NStBits>>
-where
-    O: OWFParameters,
+pub(crate) fn f256_f2_conjugates<F>(
+    state_conj: &mut GenericArray<FieldCommitDegOne<F>, U8>,
+    commit: &mut ByteCommitment<F>,
+) where
+    F: BigGaloisField,
 {
-    state
-        .iter()
-        .flat_map(|mut x0| {
-            // ::4-8
-            let mut y = GenericArray::<_, U8>::default();
-            for j in 0..8 {
-                y[j] = x0.combine();
-
-                if j != 7 {
-                    x0.square_inplace();
-                }
-            }
-            y
-        })
-        .collect()
+    // ::4-8
+    for st_conj_i in state_conj.iter_mut() {
+        *st_conj_i = commit.combine();
+        commit.square_inplace();
+    }
 }

@@ -1,16 +1,15 @@
-use std::iter::zip;
+use std::{iter::zip, marker::PhantomData};
 
 use generic_array::{GenericArray, typenum::Unsigned};
 use itertools::izip;
 use rand_core::CryptoRngCore;
-use std::iter::repeat_n;
 
 use crate::{
-    Error,
+    Error, UnpackedSecretKey,
     bavc::{BatchVectorCommitment, BavcOpenResult},
     fields::Field,
     internal_keys::{PublicKey, SecretKey},
-    parameter::{BaseParameters, FAESTParameters, OWFField, OWFParameters, TauParameters},
+    parameter::{BaseParameters, FAESTParameters, OWFParameters, TauParameters, Witness},
     prg::{IV, IVSize},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
@@ -25,6 +24,186 @@ type RO<P> =
     <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle;
 type VoleHasher<P> =
     <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::VoleHasher;
+
+/// Wraps the prover's signature.
+///
+/// It is used by [`sign`] to write the signature into a byte-array.
+struct SignatureRefMut<'a, P, O>
+where
+    P: FAESTParameters<OWF = O>,
+    O: OWFParameters,
+{
+    _marker_faest: PhantomData<P>,
+    _marker_owf: PhantomData<O>,
+    cs: &'a mut [u8],
+    u_tilde: &'a mut [u8],
+    d: &'a mut [u8],
+    a1_tilde: &'a mut [u8],
+    a2_tilde: &'a mut [u8],
+    decom_i: &'a mut [u8],
+    chall3: &'a mut [u8],
+    iv_pre: &'a mut [u8],
+    ctr: &'a mut [u8],
+}
+
+impl<'a, P, O> From<&'a mut GenericArray<u8, P::SignatureSize>> for SignatureRefMut<'a, P, O>
+where
+    P: FAESTParameters<OWF = O>,
+    O: OWFParameters,
+{
+    fn from(value: &'a mut GenericArray<u8, P::SignatureSize>) -> Self {
+        let (cs, value) =
+            value.split_at_mut(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
+        let (u_tilde, value) =
+            value.split_at_mut(<O::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE);
+        let (d, value) = value.split_at_mut(O::LBytes::USIZE);
+        let (a1_tilde, value) = value.split_at_mut(O::LambdaBytes::USIZE);
+        let (a2_tilde, value) = value.split_at_mut(O::LambdaBytes::USIZE);
+        let (decom_i, value) = value.split_at_mut(P::get_decom_size());
+        let (chall3, value) = value.split_at_mut(O::LambdaBytes::USIZE);
+        let (iv_pre, ctr) = value.split_at_mut(IVSize::USIZE);
+
+        Self {
+            _marker_faest: PhantomData::<P>,
+            _marker_owf: PhantomData::<O>,
+            cs,
+            u_tilde,
+            d,
+            a1_tilde,
+            a2_tilde,
+            decom_i,
+            chall3,
+            iv_pre,
+            ctr,
+        }
+    }
+}
+
+impl<P, O> SignatureRefMut<'_, P, O>
+where
+    P: FAESTParameters<OWF = O>,
+    O: OWFParameters,
+{
+    fn save_zk_constraints(&mut self, a1_tilde: &[u8], a2_tilde: &[u8]) {
+        self.a1_tilde.copy_from_slice(a1_tilde);
+        self.a2_tilde.copy_from_slice(a2_tilde);
+    }
+
+    fn mask_witness(&mut self, w: &[u8], u: &[u8]) {
+        for (dj, wj, uj) in izip!(self.d.iter_mut(), w, u) {
+            *dj = wj ^ *uj;
+        }
+    }
+
+    fn save_decom_and_ctr(&mut self, decom_i: &BavcOpenResult, ctr: u32) {
+        let BavcOpenResult { coms, nodes } = decom_i;
+
+        // Save decom_i
+        let mut offset = 0;
+        for slice in coms.iter().chain(nodes.iter()) {
+            self.decom_i[offset..offset + slice.len()].copy_from_slice(slice);
+            offset += slice.len();
+        }
+
+        // Save ctr
+        self.ctr.copy_from_slice(&ctr.to_le_bytes());
+    }
+}
+
+/// Wraps the signature received by the verifier.
+///
+/// It is used by [`verify`] to verify the byte array containing the prover's signature.
+struct SignatureRef<'a, P, O>
+where
+    P: FAESTParameters<OWF = O>,
+    O: OWFParameters,
+{
+    _marker_faest: PhantomData<P>,
+    _marker_owf: PhantomData<O>,
+    cs: &'a [u8],
+    u_tilde: &'a [u8],
+    d: &'a [u8],
+    a1_tilde: &'a [u8],
+    a2_tilde: &'a [u8],
+    decom_i: &'a [u8],
+    chall3: &'a [u8],
+    iv_pre: &'a [u8],
+    ctr: &'a [u8],
+}
+
+impl<'a, P, O> TryFrom<&'a GenericArray<u8, P::SignatureSize>> for SignatureRef<'a, P, O>
+where
+    P: FAESTParameters<OWF = O>,
+    O: OWFParameters,
+{
+    type Error = Error;
+
+    fn try_from(value: &'a GenericArray<u8, P::SignatureSize>) -> Result<Self, Self::Error> {
+        let (cs, value) =
+            value.split_at(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
+        let (u_tilde, value) =
+            value.split_at(<O::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE);
+        let (d, value) = value.split_at(O::LBytes::USIZE);
+        let (a1_tilde, value) = value.split_at(O::LambdaBytes::USIZE);
+        let (a2_tilde, value) = value.split_at(O::LambdaBytes::USIZE);
+        let (decom_i, value) = value.split_at(P::get_decom_size());
+        let (chall3, value) = value.split_at(O::LambdaBytes::USIZE);
+        let (iv_pre, ctr) = value.split_at(IVSize::USIZE);
+
+        // ::4
+        if !check_challenge_3::<P, O>(chall3) {
+            return Err(Error::new());
+        }
+
+        Ok(Self {
+            _marker_faest: PhantomData::<P>,
+            _marker_owf: PhantomData::<O>,
+            cs,
+            u_tilde,
+            d,
+            a1_tilde,
+            a2_tilde,
+            decom_i,
+            chall3,
+            iv_pre,
+            ctr,
+        })
+    }
+}
+
+impl<'a, P, O> SignatureRef<'a, P, O>
+where
+    P: FAESTParameters<OWF = O>,
+    O: OWFParameters,
+{
+    fn parse_decom(&self) -> BavcOpenResult<'a> {
+        let (n_nodes, node_size) = (
+            <P::Tau as TauParameters>::Topen::USIZE,
+            O::LambdaBytes::USIZE,
+        );
+
+        let (n_coms, com_size) = (
+            <P::Tau as TauParameters>::Tau::USIZE,
+            O::NLeafCommit::USIZE * O::LambdaBytes::USIZE,
+        );
+
+        let (commits, nodes) = self.decom_i.split_at(n_coms * com_size);
+
+        let coms: Vec<_> = (0..n_coms)
+            .map(|i| &commits[i * com_size..(i + 1) * com_size])
+            .collect();
+
+        let nodes: Vec<_> = (0..n_nodes)
+            .map(|i| &nodes[i * node_size..(i + 1) * node_size])
+            .collect();
+
+        BavcOpenResult { coms, nodes }
+    }
+
+    fn parse_ctr(&self) -> u32 {
+        u32::from_le_bytes(self.ctr.try_into().unwrap())
+    }
+}
 
 /// Hashes required for FAEST implementation
 trait FaestHash: RandomOracle {
@@ -181,15 +360,13 @@ where
 }
 
 #[inline]
-pub(crate) fn faest_sign<P>(
-    msg: &[u8],
-    sk: &SecretKey<P::OWF>,
-    rho: &[u8],
-    signature: &mut GenericArray<u8, P::SignatureSize>,
-) where
-    P: FAESTParameters,
+pub(crate) fn faest_unpacked_keygen<O, R>(rng: R) -> UnpackedSecretKey<O>
+where
+    O: OWFParameters,
+    R: CryptoRngCore,
 {
-    sign::<P, P::OWF>(msg, sk, rho, signature);
+    let sk = O::keygen_with_rng(rng);
+    UnpackedSecretKey::from(sk)
 }
 
 fn check_challenge_3<P, O>(chall3: &[u8]) -> bool
@@ -216,93 +393,56 @@ where
     true
 }
 
-fn save_decom_and_ctr(
-    decom_sig: &mut [u8],
-    ctr_sig: &mut [u8],
-    decom_i: &BavcOpenResult,
-    ctr: u32,
-) {
-    let BavcOpenResult { coms, nodes } = decom_i;
-
-    // Save decom_i
-    let mut offset = 0;
-    for slice in coms.iter().chain(nodes.iter()) {
-        decom_sig[offset..offset + slice.len()].copy_from_slice(slice);
-        offset += slice.len();
-    }
-
-    // Save ctr
-    ctr_sig.copy_from_slice(&ctr.to_le_bytes());
-}
-
-fn parse_decom<O, P>(sigma: &[u8]) -> (&[u8], Vec<Vec<u8>>, Vec<Vec<u8>>)
-where
-    O: OWFParameters,
+#[inline]
+pub(crate) fn faest_sign<P>(
+    msg: &[u8],
+    sk: &SecretKey<P::OWF>,
+    rho: &[u8],
+    signature: &mut GenericArray<u8, P::SignatureSize>,
+) where
     P: FAESTParameters,
 {
-    let (n_nodes, node_size) = (
-        <P::Tau as TauParameters>::Topen::USIZE,
-        O::LambdaBytes::USIZE,
-    );
-    let (n_coms, com_size) = (
-        <P::Tau as TauParameters>::Tau::USIZE,
-        O::NLeafCommit::USIZE * O::LambdaBytes::USIZE,
-    );
+    // ::0
+    let signature = SignatureRefMut::<P, P::OWF>::from(signature);
 
-    let (sigma, nodes) = sigma.split_at(sigma.len() - n_nodes * node_size);
-    let (sigma, commits) = sigma.split_at(sigma.len() - n_coms * com_size);
+    // ::12
+    let w = P::OWF::witness(sk);
 
-    let commits: Vec<_> = (0..n_coms)
-        .map(|i| commits[i * com_size..(i + 1) * com_size].to_vec())
-        .collect();
-
-    let nodes: Vec<_> = (0..n_nodes)
-        .map(|i| nodes[i * node_size..(i + 1) * node_size].to_vec())
-        .collect();
-
-    (sigma, commits, nodes)
+    sign::<P, P::OWF>(msg, sk, &w, rho, signature);
 }
 
-fn save_zk_constraints<'a>(
-    signature: &'a mut [u8],
-    a1_tilde: &[u8],
-    a2_tilde: &[u8],
-) -> &'a mut [u8] {
-    let (a1, signature) = signature.split_at_mut(a1_tilde.len());
-    let (a2, signature) = signature.split_at_mut(a2_tilde.len());
+#[inline]
+pub(crate) fn faest_unpacked_sign<P>(
+    msg: &[u8],
+    sk_unpacked: &UnpackedSecretKey<P::OWF>,
+    rho: &[u8],
+    signature: &mut GenericArray<u8, P::SignatureSize>,
+) where
+    P: FAESTParameters,
+{
+    // ::0
+    let signature = SignatureRefMut::<P, P::OWF>::from(signature);
 
-    a1.copy_from_slice(a1_tilde);
-    a2.copy_from_slice(a2_tilde);
-
-    signature
-}
-
-fn mask_witness(d: &mut [u8], w: &[u8], u: &[u8]) {
-    for (dj, wj, uj) in izip!(d, w, u) {
-        *dj = wj ^ *uj;
-    }
+    sign::<P, P::OWF>(msg, &sk_unpacked.sk, &sk_unpacked.wit, rho, signature);
 }
 
 fn sign<P, O>(
     msg: &[u8],
     sk: &SecretKey<O>,
+    witness: &Witness<O>,
     rho: &[u8],
-    signature: &mut GenericArray<u8, P::SignatureSize>,
+    mut signature: SignatureRefMut<P, O>,
 ) where
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
-    // ::1
-    let (signature, ctr_s) = signature.split_at_mut(P::SignatureSize::USIZE - size_of::<u32>());
-
     // ::3
     let mut mu = GenericArray::<u8, O::LambdaBytesTimes2>::default();
     RO::<P>::hash_mu(&mut mu, &sk.pk.owf_input, &sk.pk.owf_output, msg);
 
     // ::4
     let mut r = GenericArray::<u8, O::LambdaBytes>::default();
-    let (signature, iv) = signature.split_at_mut(signature.len() - IVSize::USIZE);
-    let iv_pre = GenericArray::from_mut_slice(iv);
+    let iv_pre = GenericArray::from_mut_slice(signature.iv_pre);
     RO::<P>::hash_r_iv(&mut r, iv_pre, &sk.owf_key, &mu, rho);
 
     // ::5
@@ -310,27 +450,25 @@ fn sign<P, O>(
     RO::<P>::hash_iv(&mut iv);
 
     // ::7
-    let (volecommit_cs, signature) =
-        signature.split_at_mut(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
     let VoleCommitResult { com, decom, u, v } =
-        volecommit::<P::BAVC, O::LHatBytes>(VoleCommitmentCRefMut::new(volecommit_cs), &r, &iv);
+        volecommit::<P::BAVC, O::LHatBytes>(VoleCommitmentCRefMut::new(signature.cs), &r, &iv);
 
     // ::8
     //Contrarly to specification, faest-ref uses iv instead of iv_pre
     let mut chall1 = GenericArray::default();
-    RO::<P>::hash_challenge_1(&mut chall1, &mu, &com, volecommit_cs, iv.as_slice());
+    RO::<P>::hash_challenge_1(&mut chall1, &mu, &com, signature.cs, iv.as_slice());
 
     // ::10
     let vole_hasher_u = VoleHasher::<P>::new_vole_hasher(&chall1);
     let vole_haher_v = vole_hasher_u.clone();
-    // write u_t to signature
-    let (u_t, signature) = signature.split_at_mut(
-        <<O as OWFParameters>::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE,
-    );
-    u_t.copy_from_slice(vole_hasher_u.process(&u).as_slice());
+
+    // write u_tilde to signature
+    signature
+        .u_tilde
+        .copy_from_slice(vole_hasher_u.process(&u).as_slice());
 
     // ::11
-    let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), u_t);
+    let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), signature.u_tilde);
     {
         for i in 0..O::Lambda::USIZE {
             // Hash column-wise
@@ -341,22 +479,17 @@ fn sign<P, O>(
         }
     }
 
-    // ::12
-    // TODO: compute once and store in SecretKey
-    let w = P::OWF::witness(sk);
-
     // ::13
     // compute and write masked witness 'd' in signature
-    let (d, signature) = signature.split_at_mut(O::LBytes::USIZE);
-    mask_witness(d, &w, &u[..<O as OWFParameters>::LBytes::USIZE]);
+    signature.mask_witness(witness, &u[..<O as OWFParameters>::LBytes::USIZE]);
 
     // ::14
     let mut chall2 = GenericArray::default();
-    RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, d);
+    RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, signature.d);
 
     // ::18
     let (a0_tilde, a1_tilde, a2_tilde) = P::OWF::prove(
-        &w,
+        witness,
         // ::16
         GenericArray::from_slice(
             &u[O::LBytes::USIZE..O::LBytes::USIZE + O::LambdaBytesTimes2::USIZE],
@@ -368,10 +501,9 @@ fn sign<P, O>(
     );
 
     // Save a1_tilde, a2_tilde in signature
-    let signature = save_zk_constraints(signature, &a1_tilde.as_bytes(), &a2_tilde.as_bytes());
+    signature.save_zk_constraints(&a1_tilde.as_bytes(), &a2_tilde.as_bytes());
 
     // ::19
-    let (decom_i_sig, chall3) = signature.split_at_mut(P::get_decom_size());
     let hasher = RO::<P>::hash_challenge_3_init(
         &chall2,
         &a0_tilde.as_bytes(),
@@ -381,16 +513,16 @@ fn sign<P, O>(
 
     for ctr in 0u32.. {
         // ::20
-        RO::<P>::hash_challenge_3_finalize(&hasher, chall3, ctr);
+        RO::<P>::hash_challenge_3_finalize(&hasher, signature.chall3, ctr);
         // ::21
-        if check_challenge_3::<P, O>(chall3) {
+        if check_challenge_3::<P, O>(signature.chall3) {
             // ::24
-            let i_delta = decode_all_chall_3::<P::Tau>(chall3);
+            let i_delta = decode_all_chall_3::<P::Tau>(signature.chall3);
 
             // ::26
             if let Some(decom_i) = <P as FAESTParameters>::BAVC::open(&decom, &i_delta) {
                 // Save decom_i and ctr bits
-                save_decom_and_ctr(decom_i_sig, ctr_s, &decom_i, ctr);
+                signature.save_decom_and_ctr(&decom_i, ctr);
                 break;
             }
         }
@@ -401,124 +533,86 @@ fn sign<P, O>(
 pub(crate) fn faest_verify<P>(
     msg: &[u8],
     pk: &PublicKey<P::OWF>,
-    sigma: &GenericArray<u8, P::SignatureSize>,
+    signature: &GenericArray<u8, P::SignatureSize>,
 ) -> Result<(), Error>
 where
     P: FAESTParameters,
 {
-    verify::<P, P::OWF>(msg, pk, sigma)
+    //::1-4
+    let signature = SignatureRef::<P, P::OWF>::try_from(signature)?;
+
+    verify::<P, P::OWF>(msg, pk, signature)
 }
 
-fn verify<P, O>(
-    msg: &[u8],
-    pk: &PublicKey<O>,
-    sigma: &GenericArray<u8, P::SignatureSize>,
-) -> Result<(), Error>
+fn verify<P, O>(msg: &[u8], pk: &PublicKey<O>, signature: SignatureRef<P, O>) -> Result<(), Error>
 where
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
-    let (sigma, ctr) = sigma.split_at(sigma.len() - size_of::<u32>());
-    let ctr = u32::from_le_bytes(ctr.try_into().unwrap());
-
-    let (sigma, iv) = sigma.split_at(sigma.len() - IVSize::USIZE);
-    let mut iv = GenericArray::from_slice(iv).to_owned();
-    // ::3
-    RO::<P>::hash_iv(&mut iv);
-
-    let (sigma, chall3) = sigma.split_at(sigma.len() - O::LambdaBytes::USIZE);
-    let chall3: &GenericArray<u8, O::LambdaBytes> = GenericArray::from_slice(chall3);
+    let ctr = signature.parse_ctr();
 
     // ::2
     let mut mu = GenericArray::<u8, O::LambdaBytesTimes2>::default();
     RO::<P>::hash_mu(&mut mu, &pk.owf_input, &pk.owf_output, msg);
 
-    // ::4
-    if !check_challenge_3::<P, O>(chall3) {
-        return Err(Error::new());
-    }
+    // ::3
+    let mut iv = GenericArray::from_slice(signature.iv_pre).to_owned();
+    RO::<P>::hash_iv(&mut iv);
 
-    let (c, sigma) =
-        sigma.split_at(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
-    let c = VoleCommitmentCRef::<O::LHatBytes>::new(c);
-
-    let (sigma, coms, nodes) = parse_decom::<O, P>(sigma);
-
-    let decom_i = BavcOpenResult {
-        coms: coms.iter().map(|com_i| com_i.as_slice()).collect(),
-        nodes: nodes.iter().map(|node_i| node_i.as_slice()).collect(),
-    };
-
-    // ::7
-    let res = volereconstruct::<P::BAVC, O::LHatBytes>(chall3, &decom_i, c, &iv);
-
-    // ::8
-    if res.is_none() {
-        return Err(Error::new());
-    }
-    let VoleReconstructResult { com, q } = res.unwrap();
+    // ::7-8
+    let chall3: &GenericArray<u8, O::LambdaBytes> = GenericArray::from_slice(signature.chall3);
+    let decom_i = signature.parse_decom();
+    let c = VoleCommitmentCRef::<O::LHatBytes>::new(signature.cs);
+    let VoleReconstructResult { com, q } =
+        volereconstruct::<P::BAVC, O::LHatBytes>(chall3, &decom_i, c, &iv).ok_or(Error::new())?;
 
     // ::10
     let mut chall1 = GenericArray::default();
     RO::<P>::hash_challenge_1(&mut chall1, &mu, com.as_slice(), c.as_slice(), &iv);
 
-    let (u_tilde, sigma) = sigma.split_at(
-        <<O as OWFParameters>::BaseParams as BaseParameters>::VoleHasherOutputLength::USIZE,
-    );
-
-    let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), u_tilde);
+    let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), signature.u_tilde);
 
     {
         let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
-        for (i, d_i) in zip(
-            0..O::Lambda::USIZE,
-            //TODO: make this more readable
-            (0..<P::Tau as TauParameters>::Tau::USIZE)
-                .flat_map(|i| P::Tau::decode_challenge_as_iter(chall3, i))
-                .chain(repeat_n(0, P::WGRIND::USIZE)),
-        ) {
+        for (i, d_i) in zip(0..O::Lambda::USIZE, P::decode_challenge_as_iter(chall3)) {
             // ::12
             let mut q_tilde = vole_hasher.process(&q[i]);
-
             // ::14
             if d_i == 1 {
-                crate::utils::xor_arrays_inplace(&mut q_tilde, u_tilde);
+                crate::utils::xor_arrays_inplace(&mut q_tilde, signature.u_tilde);
             }
-
             // ::15
             RO::<P>::hash_challenge_2_update(&mut h2_hasher, &q_tilde);
         }
     }
 
-    let (d, sigma) = sigma.split_at(O::LBytes::USIZE);
-
     // ::15
     let mut chall2 = GenericArray::default();
-    RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, d);
-
-    let (a1_tilde, a2_tilde) = sigma.split_at(O::LambdaBytes::USIZE);
+    RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, signature.d);
 
     // ::17
     let a0_tilde = P::OWF::verify(
-        GenericArray::from_slice(&q),
-        GenericArray::from_slice(d),
+        &q,
+        GenericArray::from_slice(signature.d),
         pk,
         &chall2,
         chall3,
-        &OWFField::<O>::from(a1_tilde),
-        &OWFField::<O>::from(a2_tilde),
+        GenericArray::from_slice(signature.a1_tilde),
+        GenericArray::from_slice(signature.a2_tilde),
     );
 
+    // ::18
     let mut chall3_prime = GenericArray::default();
     RO::<P>::hash_challenge_3(
         &mut chall3_prime,
         &chall2,
         a0_tilde.as_bytes().as_slice(),
-        a1_tilde,
-        a2_tilde,
+        signature.a1_tilde,
+        signature.a2_tilde,
         ctr,
     );
 
+    // ::19
     if *chall3 == chall3_prime {
         Ok(())
     } else {
@@ -678,7 +772,7 @@ mod test {
                 hashed_sig: &[u8],
             ) -> Box<GenericArray<u8, P::SignatureSize>> {
                 let mut signature = GenericArray::default_boxed();
-                sign::<P, O>(&MSG, sk, &RHO, &mut signature);
+                faest_sign::<P>(&MSG, sk, &RHO, &mut signature);
                 assert_eq!(hashed_sig, hash_array(signature.as_slice()).as_slice());
                 signature
             }
@@ -696,8 +790,7 @@ mod test {
                         );
                         println!("FAEST-EM-128s - testing FAEST.verify ..");
                         assert!(
-                            verify::<FAESTEM128sParameters, OWF128EM>(&MSG, &pk, &signature)
-                                .is_ok()
+                            faest_verify::<FAESTEM128sParameters>(&MSG, &pk, &signature).is_ok()
                         );
 
                         println!("FAEST-EM-128f - testing FAEST.sign..");
@@ -707,8 +800,7 @@ mod test {
                         );
                         println!("FAEST-EM-128f - testing FAEST.verify ..");
                         assert!(
-                            verify::<FAESTEM128fParameters, OWF128EM>(&MSG, &pk, &signature)
-                                .is_ok()
+                            faest_verify::<FAESTEM128fParameters>(&MSG, &pk, &signature).is_ok()
                         );
                     }
 
@@ -723,8 +815,7 @@ mod test {
                         );
                         println!("FAEST-EM-192s - testing FAEST.verify..");
                         assert!(
-                            verify::<FAESTEM192sParameters, OWF192EM>(&MSG, &pk, &signature)
-                                .is_ok()
+                            faest_verify::<FAESTEM192sParameters>(&MSG, &pk, &signature).is_ok()
                         );
 
                         println!("FAEST-EM-192f - testing FAEST.sign..");
@@ -734,8 +825,7 @@ mod test {
                         );
                         println!("FAEST-EM-192f - testing FAEST.verify..");
                         assert!(
-                            verify::<FAESTEM192fParameters, OWF192EM>(&MSG, &pk, &signature)
-                                .is_ok()
+                            faest_verify::<FAESTEM192fParameters>(&MSG, &pk, &signature).is_ok()
                         );
                     }
 
@@ -749,8 +839,7 @@ mod test {
                             &self.hashed_sig_s,
                         );
                         assert!(
-                            verify::<FAESTEM256sParameters, OWF256EM>(&MSG, &pk, &signature)
-                                .is_ok()
+                            faest_verify::<FAESTEM256sParameters>(&MSG, &pk, &signature).is_ok()
                         );
 
                         println!("FAEST-EM-256f - testing FAEST.verify..");
@@ -759,8 +848,7 @@ mod test {
                             &self.hashed_sig_f,
                         );
                         assert!(
-                            verify::<FAESTEM256fParameters, OWF256EM>(&MSG, &pk, &signature)
-                                .is_ok()
+                            faest_verify::<FAESTEM256fParameters>(&MSG, &pk, &signature).is_ok()
                         );
                     }
                 }
@@ -776,18 +864,14 @@ mod test {
                             &sk,
                             &self.hashed_sig_s,
                         );
-                        assert!(
-                            verify::<FAEST128sParameters, OWF128>(&MSG, &pk, &signature).is_ok()
-                        );
+                        assert!(faest_verify::<FAEST128sParameters>(&MSG, &pk, &signature).is_ok());
 
                         println!("FAEST-128f - testing FAEST.sign..");
                         let signature = Self::try_signing::<FAEST128fParameters, OWF128>(
                             &sk,
                             &self.hashed_sig_f,
                         );
-                        assert!(
-                            verify::<FAEST128fParameters, OWF128>(&MSG, &pk, &signature).is_ok()
-                        );
+                        assert!(faest_verify::<FAEST128fParameters>(&MSG, &pk, &signature).is_ok());
                     }
 
                     192 => {
@@ -799,18 +883,14 @@ mod test {
                             &sk,
                             &self.hashed_sig_s,
                         );
-                        assert!(
-                            verify::<FAEST192sParameters, OWF192>(&MSG, &pk, &signature).is_ok()
-                        );
+                        assert!(faest_verify::<FAEST192sParameters>(&MSG, &pk, &signature).is_ok());
 
                         println!("FAEST-192f - testing FAEST.sign..");
                         let signature = Self::try_signing::<FAEST192fParameters, OWF192>(
                             &sk,
                             &self.hashed_sig_f,
                         );
-                        assert!(
-                            verify::<FAEST192fParameters, OWF192>(&MSG, &pk, &signature).is_ok()
-                        );
+                        assert!(faest_verify::<FAEST192fParameters>(&MSG, &pk, &signature).is_ok());
                     }
 
                     _ => {
@@ -822,18 +902,14 @@ mod test {
                             &sk,
                             &self.hashed_sig_s,
                         );
-                        assert!(
-                            verify::<FAEST256sParameters, OWF256>(&MSG, &pk, &signature).is_ok()
-                        );
+                        assert!(faest_verify::<FAEST256sParameters>(&MSG, &pk, &signature).is_ok());
 
                         println!("FAEST-256f - testing FAEST.sign..");
                         let signature = Self::try_signing::<FAEST256fParameters, OWF256>(
                             &sk,
                             &self.hashed_sig_f,
                         );
-                        assert!(
-                            verify::<FAEST256fParameters, OWF256>(&MSG, &pk, &signature).is_ok()
-                        );
+                        assert!(faest_verify::<FAEST256fParameters>(&MSG, &pk, &signature).is_ok());
                     }
                 }
             }

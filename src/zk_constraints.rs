@@ -76,8 +76,8 @@ pub(crate) fn aes_verify<O>(
     pk: &PublicKey<O>,
     chall_2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
     chall_3: &GenericArray<u8, O::LambdaBytes>,
-    a1_tilde: &OWFField<O>,
-    a2_tilde: &OWFField<O>,
+    a1_tilde: &GenericArray<u8, O::LambdaBytes>,
+    a2_tilde: &GenericArray<u8, O::LambdaBytes>,
 ) -> OWFField<O>
 where
     O: OWFParameters,
@@ -119,5 +119,5 @@ where
     // ::14
     let q_tilde = zk_hasher.finalize(&q_star);
 
-    q_tilde - delta * a1_tilde - delta.square() * a2_tilde
+    q_tilde - delta * OWFField::<O>::from(a1_tilde) - delta.square() * OWFField::<O>::from(a2_tilde)
 }

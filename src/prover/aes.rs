@@ -39,15 +39,9 @@ where
 {
     type Output = StateBytesCommits<O>;
 
-    fn state_to_bytes(&self) -> Self::Output {
-        zip(self.keys, self.tags.chunks_exact(8))
-            .map(|(&key_i, tags_i)| {
-                FieldCommitDegOne::new(
-                    OWFField::<O>::byte_combine_bits(key_i),
-                    OWFField::<O>::byte_combine_slice(tags_i),
-                )
-            })
-            .collect()
+    fn state_to_bytes(&self) -> Self::Output
+where {
+        (0..L::USIZE).map(|i| self.get_field_commit(i)).collect()
     }
 }
 
@@ -94,8 +88,8 @@ where
 
     fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
         ByteCommits {
-            keys: self.keys.iter().zip(rhs).map(|(a, b)| a ^ b).collect(),
-            tags: <Box<GenericArray<_, _>>>::from_iter(self.tags.iter().cloned()),
+            keys: zip(self.keys, rhs).map(|(a, b)| a ^ b).collect(),
+            tags: Box::new(self.tags.to_owned()),
         }
     }
 }
@@ -111,7 +105,7 @@ where
     fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
         ByteCommits {
             keys: zip(self.iter(), rhs.keys).map(|(a, b)| a ^ b).collect(),
-            tags: <Box<GenericArray<_, _>>>::from_iter(rhs.tags[..L::USIZE * 8].iter().cloned()),
+            tags: Box::new(GenericArray::from_slice(&rhs.tags[..L::USIZE * 8]).to_owned()),
         }
     }
 }

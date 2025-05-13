@@ -120,13 +120,12 @@ where
         let h2 = self.r[0] * h0 + self.r[1] * h1;
         let h3 = self.r[2] * h0 + self.r[3] * h1;
 
-        GenericArray::from_iter(
-            zip(
-                chain(h2.as_bytes(), h3.as_bytes().into_iter().take(B::USIZE)),
-                x1,
-            )
-            .map(|(x1, x2)| x1 ^ x2),
+        zip(
+            chain(h2.as_bytes(), h3.as_bytes().into_iter().take(B::USIZE)),
+            x1,
         )
+        .map(|(x1, x2)| x1 ^ x2)
+        .collect()
     }
 
     fn from_r_s_t(r: [F; 4], s: F, t: GF64) -> Self {
@@ -305,18 +304,11 @@ where
         si_sq: &FieldCommitDegOne<F>,
         st0_i: &FieldCommitDegTwo<F>,
         st1_i: &FieldCommitDegTwo<F>,
-    ) {
-        self.update(&(si_sq.to_owned() * st0_i + si));
-        self.update(&(si.to_owned() * st1_i + st0_i));
-    }
-
-    pub(crate) fn inv_norm_constraints(
-        &mut self,
-        conjugates: &[FieldCommitDegOne<F>],
-        y: &FieldCommitDegOne<F>,
-    ) {
-        let cnstr = y.to_owned() * &conjugates[1] * &conjugates[4] + &conjugates[0];
-        self.update(&cnstr);
+    ) where
+        F: BigGaloisField,
+    {
+        self.update(&(si_sq * st0_i + si));
+        self.update(&(si * st1_i + st0_i));
     }
 
     pub(crate) fn finalize(self, u: &F, u_plus_v: &F, v: &F) -> (F, F, F) {
