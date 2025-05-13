@@ -58,7 +58,6 @@ pub(crate) trait LeafCommit {
     type LambdaBytes: ArrayLength;
     type LambdaBytesTimes2: ArrayLength;
     type LambdaBytesTimes3: ArrayLength;
-    type LambdaBytesTimes4: ArrayLength;
     type PRG: PseudoRandomGenerator;
 
     fn commit(
@@ -92,9 +91,8 @@ where
     LH: LeafHasher,
 {
     type LambdaBytes = LH::LambdaBytes;
-    type LambdaBytesTimes2 = LH::LambdaBytesTimes2;
-    type LambdaBytesTimes3 = LH::LambdaBytesTimes3;
-    type LambdaBytesTimes4 = LH::LambdaBytesTimes4;
+    type LambdaBytesTimes2 = Prod<LH::LambdaBytes, U2>;
+    type LambdaBytesTimes3 = Prod<LH::LambdaBytes, U3>;
     type PRG = PRG;
 
     fn commit(
@@ -316,8 +314,8 @@ where
     type RO = RO;
     type Lambda = LH::Lambda;
     type LambdaBytes = LH::LambdaBytes;
-    type LambdaBytesTimes2 = LH::LambdaBytesTimes2;
-    type LambdaBytesTimes3 = LH::LambdaBytesTimes3;
+    type LambdaBytesTimes2 = Prod<LH::LambdaBytes, U2>;
+    type LambdaBytesTimes3 = Prod<LH::LambdaBytes, U3>;
     type LC = LeafCommitment<PRG, LH>;
     type TAU = TAU;
     type Tau = TAU::Tau;
@@ -484,8 +482,8 @@ where
 
     type Lambda = LH::Lambda;
     type LambdaBytes = LH::LambdaBytes;
-    type LambdaBytesTimes2 = LH::LambdaBytesTimes2;
-    type LambdaBytesTimes3 = LH::LambdaBytesTimes3;
+    type LambdaBytesTimes2 = Prod<LH::LambdaBytes, U2>;
+    type LambdaBytesTimes3 = Prod<LH::LambdaBytes, U3>;
     type Tau = TAU::Tau;
     type L = TAU::L;
     type Topen = TAU::Topen;

@@ -91,11 +91,15 @@ where
         }
     }
 
-    pub(crate) fn get(&self, idx: usize) -> ByteCommitment<F> {
+    fn get(&self, idx: usize) -> ByteCommitment<F> {
         ByteCommitment {
             key: self.keys[idx],
             tags: GenericArray::from_slice(&self.tags[idx * 8..idx * 8 + 8]).to_owned(),
         }
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = ByteCommitment<F>> {
+        (0..L::USIZE).map(|idx| self.get(idx))
     }
 }
 

@@ -5,10 +5,10 @@ use generic_array::{
     typenum::{Quot, U2, U4, U8, Unsigned},
 };
 
-use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
+use super::{byte_commitments::ByteCommitment, ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
 use crate::{
     aes::*,
-    fields::{Betas, FromBit, Square},
+    fields::{BigGaloisField, Square},
     parameter::{OWFField, OWFParameters},
     prover::aes::{StateBitsSquaredCommits, StateBytesSquaredCommits},
     universal_hashing::ZKProofHasher,
@@ -85,13 +85,13 @@ where
     let mut state_conj = GenericArray::default();
 
     // ::7
-    for (i, state_prime) in state_prime.chunks_exact_mut(8).enumerate() {
+    for (i, (state_prime, mut commit_i)) in zip(state_prime.chunks_exact_mut(8), state.iter()).enumerate() {
         // ::9
         let norm = (w.keys[i / 2] >> ((i % 2) * 4)) & 0xf;
-        let ys = invnorm_to_conjugates::<O>(norm, &w.tags[4 * i..4 * i + 4]);
+        let ys = invnorm_to_conjugates(norm, &w.tags[4 * i..4 * i + 4]);
 
         // ::4
-        f256_f2_conjugates::<O>(&mut state_conj, state, i);
+        f256_f2_conjugates(&mut state_conj, &mut commit_i);
 
         //::11
         // Save 1 mul by storing intermediate constraint in state'[0]
@@ -124,10 +124,10 @@ fn enc_cstrnts_odd<O>(
     s.inverse_affine();
 
     // ::31-37
-    for (byte_i, (st0_i, st1_i)) in zip(st_0.iter(), st_1.iter()).enumerate() {
+    for (byte_i, (st0, st1)) in zip(st_0.as_ref(), st_1.as_ref()).enumerate() {
         let si = s.get_field_commit(byte_i);
         let si_sq = s.get_field_commit_sq(byte_i);
-        zk_hasher.odd_round_cstrnts(&si, &si_sq, st0_i, st1_i);
+        zk_hasher.odd_round_cstrnts(&si, &si_sq, st0, st1);
     }
 }
 
@@ -150,41 +150,35 @@ where
     st
 }
 
-fn invnorm_to_conjugates<O>(
-    x_val: u8,
-    x_tag: &[OWFField<O>],
-) -> GenericArray<FieldCommitDegOne<OWFField<O>>, U4>
+fn invnorm_to_conjugates<F>(x_val: u8, x_tag: &[F]) -> GenericArray<FieldCommitDegOne<F>, U4>
 where
-    O: OWFParameters,
+    F: BigGaloisField,
 {
     (0..4)
         .map(|j| {
-            let key = OWFField::<O>::from_bit(x_val & 1)
-                + OWFField::<O>::BETA_SQUARES[j] * ((x_val >> 1) & 1)
-                + OWFField::<O>::BETA_SQUARES[j + 1] * ((x_val >> 2) & 1)
-                + OWFField::<O>::BETA_CUBES[j] * ((x_val >> 3) & 1);
-
+            let key = F::from_bit(x_val & 1)
+                + F::BETA_SQUARES[j] * ((x_val >> 1) & 1)
+                + F::BETA_SQUARES[j + 1] * ((x_val >> 2) & 1)
+                + F::BETA_CUBES[j] * ((x_val >> 3) & 1);
             let tag = x_tag[0]
-                + OWFField::<O>::BETA_SQUARES[j] * x_tag[1]
-                + OWFField::<O>::BETA_SQUARES[j + 1] * x_tag[2]
-                + OWFField::<O>::BETA_CUBES[j] * x_tag[3];
+                + F::BETA_SQUARES[j] * x_tag[1]
+                + F::BETA_SQUARES[j + 1] * x_tag[2]
+                + F::BETA_CUBES[j] * x_tag[3];
 
             FieldCommitDegOne::new(key, tag)
         })
         .collect()
 }
 
-pub(crate) fn f256_f2_conjugates<O>(
-    state_conj: &mut GenericArray<FieldCommitDegOne<OWFField<O>>, U8>,
-    state: &ByteCommits<OWFField<O>, O::NStBytes>,
-    round: usize,
+pub(crate) fn f256_f2_conjugates<F>(
+    state_conj: &mut GenericArray<FieldCommitDegOne<F>, U8>,
+    commit: &mut ByteCommitment<F>,
 ) where
-    O: OWFParameters,
+    F: BigGaloisField,
 {
-    let mut x0 = state.get(round);
     // ::4-8
     for st_conj_i in state_conj.iter_mut() {
-        *st_conj_i = x0.combine();
-        x0.square_inplace();
+        *st_conj_i = commit.combine();
+        commit.square_inplace();
     }
 }

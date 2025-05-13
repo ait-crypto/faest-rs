@@ -14,7 +14,7 @@ pub(crate) mod small_fields;
 pub(crate) mod x86_simd_large_fields;
 
 pub(crate) use large_fields::{
-    Betas, BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquaredConstants, FromBit,
+    BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquaredConstants, FromBit,
     Sigmas, SumPoly,
 };
 #[cfg(not(all(
@@ -46,6 +46,8 @@ pub(crate) trait Field:
     + Neg<Output = Self>
     + Mul<Self, Output = Self>
     + MulAssign
+    + PartialEq
+    + Eq
 {
     /// Representation of `0`
     const ZERO: Self;

@@ -154,7 +154,7 @@ where
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Init part
 pub(crate) trait ZKHasherInit<F>
 where
-    F: BigGaloisField + PartialEq + std::fmt::Debug,
+    F: BigGaloisField + std::fmt::Debug,
 {
     type SDLength: ArrayLength;
 
@@ -280,9 +280,7 @@ where
         a_sq: &FieldCommitDegOne<F>,
         b: &FieldCommitDegOne<F>,
         b_sq: &FieldCommitDegOne<F>,
-    ) where
-        F: BigGaloisField,
-    {
+    ) {
         // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
 
         // Degree 1
@@ -356,18 +354,12 @@ where
         self.b_hasher.update(&cnstr);
     }
 
-    pub(crate) fn odd_round_cstrnts(&mut self, si: &F, si_sq: &F, st0_i: &F, st1_i: &F)
-    where
-        F: BigGaloisField,
-    {
+    pub(crate) fn odd_round_cstrnts(&mut self, si: &F, si_sq: &F, st0_i: &F, st1_i: &F) {
         self.update(&(self.delta_squared * si + *si_sq * st0_i));
         self.update(&(self.delta * st0_i + *si * st1_i));
     }
 
-    pub(crate) fn lift_and_process(&mut self, a: &F, a_sq: &F, b: &F, b_sq: &F)
-    where
-        F: BigGaloisField,
-    {
+    pub(crate) fn lift_and_process(&mut self, a: &F, a_sq: &F, b: &F, b_sq: &F) {
         // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
 
         // Raise to degree 3 and update
@@ -382,10 +374,9 @@ where
 
 pub(crate) trait LeafHasher
 where
-    Self::LambdaBytes: Add<Self::LambdaBytes, Output = Self::LambdaBytesTimes2>
-        + Mul<U2, Output = Self::LambdaBytesTimes2>
-        + Mul<U3, Output = Self::LambdaBytesTimes3>
-        + Mul<U4, Output = Self::LambdaBytesTimes4>
+    Self::LambdaBytes: Mul<U2, Output: ArrayLength>
+        + Mul<U3, Output: ArrayLength>
+        + Mul<U4, Output: ArrayLength>
         + Mul<U8, Output = Self::Lambda>
         + PartialEq,
     Self::ExtensionField: for<'a> From<&'a [u8]>
@@ -394,17 +385,14 @@ where
         + Mul<Self::F, Output = Self::ExtensionField>,
 {
     type F: Field + for<'a> From<&'a [u8]>;
-    type ExtensionField: ExtensionField<Length = Self::LambdaBytesTimes3, BaseField = Self::F>;
+    type ExtensionField: ExtensionField<Length = Prod<Self::LambdaBytes, U3>, BaseField = Self::F>;
     type Lambda: ArrayLength;
     type LambdaBytes: ArrayLength;
-    type LambdaBytesTimes2: ArrayLength;
-    type LambdaBytesTimes3: ArrayLength;
-    type LambdaBytesTimes4: ArrayLength;
 
     fn hash(
-        uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
-        x: &GenericArray<u8, Self::LambdaBytesTimes4>,
-    ) -> GenericArray<u8, Self::LambdaBytesTimes3> {
+        uhash: &GenericArray<u8, Prod<Self::LambdaBytes, U3>>,
+        x: &GenericArray<u8, Prod<Self::LambdaBytes, U4>>,
+    ) -> GenericArray<u8, Prod<Self::LambdaBytes, U3>> {
         let u = <Self as LeafHasher>::ExtensionField::from(uhash.as_slice());
         let x0 =
             <Self as LeafHasher>::F::from(&x[..<<Self as LeafHasher>::F as Field>::Length::USIZE]);
@@ -421,9 +409,6 @@ impl LeafHasher for LeafHasher128 {
     type F = GF128;
     type ExtensionField = GF384;
     type LambdaBytes = <GF128 as Field>::Length;
-    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
-    type LambdaBytesTimes3 = Prod<Self::LambdaBytes, U3>;
-    type LambdaBytesTimes4 = Prod<Self::LambdaBytes, U4>;
     type Lambda = Prod<Self::LambdaBytes, U8>;
 }
 
@@ -432,9 +417,6 @@ impl LeafHasher for LeafHasher192 {
     type F = GF192;
     type ExtensionField = GF576;
     type LambdaBytes = <GF192 as Field>::Length;
-    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
-    type LambdaBytesTimes3 = Prod<Self::LambdaBytes, U3>;
-    type LambdaBytesTimes4 = Prod<Self::LambdaBytes, U4>;
     type Lambda = Prod<Self::LambdaBytes, U8>;
 }
 
@@ -443,9 +425,6 @@ impl LeafHasher for LeafHasher256 {
     type F = GF256;
     type ExtensionField = GF768;
     type LambdaBytes = <GF256 as Field>::Length;
-    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
-    type LambdaBytesTimes3 = Prod<Self::LambdaBytes, U3>;
-    type LambdaBytesTimes4 = Prod<Self::LambdaBytes, U4>;
     type Lambda = Prod<Self::LambdaBytes, U8>;
 }
 
