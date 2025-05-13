@@ -124,7 +124,7 @@ where
         // ::7
         let mut x_tilde = x.keys[j] ^ xk.keys[iwd / 8 + (j % 4)];
 
-        let xt_0: GenericArray<OWFField<O>, U8> = (0..8)
+        let xt_0: GenericArray<_, U8> = (0..8)
             .map(|i| x.tags[8 * j + i] + xk.tags[iwd + 8 * (j % 4) + i])
             .collect();
 
@@ -133,7 +133,7 @@ where
             x_tilde ^= RCON_TABLE[j / rcon_evry];
         }
 
-        inverse_affine_byte::<O>(
+        inverse_affine_byte(
             x_tilde,
             &xt_0,
             &mut y.keys[j],
@@ -153,13 +153,9 @@ where
     y
 }
 
-fn inverse_affine_byte<O>(
-    x: u8,
-    x_0: &GenericArray<OWFField<O>, U8>,
-    y: &mut u8,
-    y_0: &mut [OWFField<O>],
-) where
-    O: OWFParameters,
+fn inverse_affine_byte<F>(x: u8, x_0: &GenericArray<F, U8>, y: &mut u8, y_0: &mut [F])
+where
+    F: BigGaloisField,
 {
     *y = x.rotate_right(7) ^ x.rotate_right(5) ^ x.rotate_right(2) ^ 0x5;
 
