@@ -281,9 +281,7 @@ where
         a_sq: &FieldCommitDegOne<F>,
         b: &FieldCommitDegOne<F>,
         b_sq: &FieldCommitDegOne<F>,
-    ) where
-        F: BigGaloisField,
-    {
+    ) {
         // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
 
         // Degree 1
@@ -307,9 +305,7 @@ where
         si_sq: &FieldCommitDegOne<F>,
         st0_i: &FieldCommitDegTwo<F>,
         st1_i: &FieldCommitDegTwo<F>,
-    ) where
-        F: BigGaloisField,
-    {
+    ) {
         self.update(&(si_sq.to_owned() * st0_i + si));
         self.update(&(si.to_owned() * st1_i + st0_i));
     }
@@ -318,9 +314,7 @@ where
         &mut self,
         conjugates: &[FieldCommitDegOne<F>],
         y: &FieldCommitDegOne<F>,
-    ) where
-        F: Field,
-    {
+    ) {
         let cnstr = y.to_owned() * &conjugates[1] * &conjugates[4] + &conjugates[0];
         self.update(&cnstr);
     }
@@ -368,18 +362,12 @@ where
         self.b_hasher.update(&cnstr);
     }
 
-    pub(crate) fn odd_round_cstrnts(&mut self, si: &F, si_sq: &F, st0_i: &F, st1_i: &F)
-    where
-        F: BigGaloisField,
-    {
+    pub(crate) fn odd_round_cstrnts(&mut self, si: &F, si_sq: &F, st0_i: &F, st1_i: &F) {
         self.update(&(self.delta_squared * si + *si_sq * st0_i));
         self.update(&(self.delta * st0_i + *si * st1_i));
     }
 
-    pub(crate) fn lift_and_process(&mut self, a: &F, a_sq: &F, b: &F, b_sq: &F)
-    where
-        F: BigGaloisField,
-    {
+    pub(crate) fn lift_and_process(&mut self, a: &F, a_sq: &F, b: &F, b_sq: &F) {
         // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
 
         // Raise to degree 3 and update
