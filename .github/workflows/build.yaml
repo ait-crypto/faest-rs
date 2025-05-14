@@ -29,6 +29,23 @@ jobs:
       - name: Test with all features
         run: cargo nextest run -r --all-features --workspace
 
+  test-native:
+    needs: test
+    runs-on: ubuntu-latest
+    name: Test with target-cpu=native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-nextest
+        run: cargo install cargo-nextest
+      - name: Test with all features
+        run: cargo nextest run -r --all-features --workspace
+    env:
+      RUSTFLAGS: "-C target-cpu=native"
+
   build-cross:
     needs: test
     runs-on: ubuntu-latest
