@@ -26,6 +26,10 @@ where
         let message = random_message(&mut rng);
         b.iter(|| black_box(kp.sign(&message)));
     });
+    c.bench_function("sign (randomized)", |b| {
+        let message = random_message(&mut rng);
+        b.iter(|| black_box(kp.sign_with_rng(&mut rng, &message)));
+    });
     let vk = kp.verifying_key();
     c.bench_function("verify", |b| {
         let message = random_message(&mut rng);
