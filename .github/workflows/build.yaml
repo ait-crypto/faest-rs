@@ -7,13 +7,16 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         toolchain:
           - stable
           - "1.85"
-    name: Test with Rust ${{matrix.toolchain}} toolchain
+        runner:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+    runs-on: ${{matrix.runner}}
+    name: Test with Rust ${{matrix.toolchain}} toolchain on ${{matrix.runner}}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -53,7 +56,6 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - aarch64-unknown-linux-gnu
           - i686-unknown-linux-gnu
           - s390x-unknown-linux-gnu
     name: Cross test for ${{matrix.target}}
