@@ -15,7 +15,7 @@ use crate::{
     bavc::{BatchVectorCommitment, BavcCommitResult, BavcDecommitment, BavcOpenResult},
     parameter::TauParameters,
     prg::{IV, PseudoRandomGenerator},
-    utils::{Reader, decode_all_chall_3},
+    utils::{Reader, decode_all_chall_3, xor_arrays_inplace, xor_arrays_into},
 };
 
 /// Initial tweak value as by FEAST specification
@@ -143,19 +143,14 @@ where
     // ::6..9
     for (j, vj) in v.enumerate() {
         for i in 0..(ni >> (j + 1)) {
-            // Join steps 8 and 9
-            for (v_dst, r_dst, r_src, r_src1) in izip!(
-                vj.iter_mut(),
-                rj1[i].iter_mut(),
-                rj[2 * i].iter(),
-                rj[2 * i + 1].iter()
-            ) {
-                // ::8
-                *v_dst ^= r_src1;
-
-                // ::9
-                *r_dst = r_src ^ r_src1;
-            }
+            // ::8
+            xor_arrays_inplace(vj.as_mut_slice(), rj[2 * i + 1].as_slice());
+            // ::9
+            xor_arrays_into(
+                rj1[i].as_mut_slice(),
+                rj[2 * i].as_slice(),
+                rj[2 * i + 1].as_slice(),
+            );
         }
 
         swap(&mut rj, &mut rj1); // At next iteration we want to have last row in rj
