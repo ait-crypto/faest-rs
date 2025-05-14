@@ -481,8 +481,8 @@ fn sign<P, O>(
     let hasher = RO::<P>::hash_challenge_3_init(
         &chall2,
         &a0_tilde.as_bytes(),
-        &a1_tilde.as_bytes(),
-        &a2_tilde.as_bytes(),
+        signature.a1_tilde,
+        signature.a2_tilde,
     );
 
     for ctr in 0u32.. {
