@@ -51,6 +51,26 @@
 //! verification_key.verify(msg, &signature).expect("Verification failed");
 //! # }
 //! ```
+//!
+//! As parts of the FAEST signing process relay on a message-independant
+//! witness, "unpacked" secret keys store the pre-computed witness. These keys
+//! provide a memory/runtime trade-off if the same secret key is used to sign
+//! multiple messages. "Unpacked" keys support the same interfaces and keys can
+//! be converted back and forth:
+//! ```
+//! use faest::{FAEST128fSigningKey, FAEST128fUnpackedSigningKey, FAEST128fSignature, ByteEncoding};
+//! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
+//!
+//! let sk = FAEST128fSigningKey::generate(rand::thread_rng());
+//! let unpacked_sk = FAEST128fUnpackedSigningKey::from(&sk);
+//! assert_eq!(sk.to_bytes(), unpacked_sk.to_bytes());
+//!
+//! let msg = "some message".as_bytes();
+//! let signature: FAEST128fSignature = unpacked_sk.sign(msg);
+//!
+//! let verification_key = unpacked_sk.verifying_key();
+//! verification_key.verify(msg, &signature).expect("Verification failed");
+//! ```
 
 #![warn(missing_docs)]
 // TODO: fix this
