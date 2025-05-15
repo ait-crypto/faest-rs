@@ -378,7 +378,8 @@ pub(crate) fn faest_sign<P>(
     sk: &SecretKey<P::OWF>,
     rho: &[u8],
     signature: &mut GenericArray<u8, P::SignatureSize>,
-) where
+) -> Result<(), Error>
+where
     P: FAESTParameters,
 {
     // ::0
@@ -387,7 +388,7 @@ pub(crate) fn faest_sign<P>(
     // ::12
     let w = P::OWF::witness(sk);
 
-    sign::<P, P::OWF>(msg, sk, &w, rho, signature);
+    sign::<P, P::OWF>(msg, sk, &w, rho, signature)
 }
 
 #[inline]
@@ -396,13 +397,14 @@ pub(crate) fn faest_unpacked_sign<P>(
     sk_unpacked: &UnpackedSecretKey<P::OWF>,
     rho: &[u8],
     signature: &mut GenericArray<u8, P::SignatureSize>,
-) where
+) -> Result<(), Error>
+where
     P: FAESTParameters,
 {
     // ::0
     let signature = SignatureRefMut::<P, P::OWF>::from(signature);
 
-    sign::<P, P::OWF>(msg, &sk_unpacked.sk, &sk_unpacked.wit, rho, signature);
+    sign::<P, P::OWF>(msg, &sk_unpacked.sk, &sk_unpacked.wit, rho, signature)
 }
 
 fn sign<P, O>(
@@ -411,7 +413,8 @@ fn sign<P, O>(
     witness: &Witness<O>,
     rho: &[u8],
     mut signature: SignatureRefMut<P, O>,
-) where
+) -> Result<(), Error>
+where
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
@@ -497,10 +500,12 @@ fn sign<P, O>(
             if let Some(decom_i) = <P as FAESTParameters>::BAVC::open(&decom, &i_delta) {
                 // Save decom_i and ctr bits
                 signature.save_decom_and_ctr(&decom_i, ctr);
-                break;
+                return Ok(());
             }
         }
     }
+
+    Err(Error::new())
 }
 
 #[inline]
@@ -630,7 +635,7 @@ mod test {
             let sk = P::OWF::keygen_with_rng(&mut rng);
             let msg = random_message(&mut rng);
             let mut sigma = GenericArray::default_boxed();
-            faest_sign::<P>(&msg, &sk, &[], &mut sigma);
+            assert!(faest_sign::<P>(&msg, &sk, &[], &mut sigma).is_ok());
             let pk = sk.as_public_key();
             let res = faest_verify::<P>(&msg, &pk, &sigma);
             assert!(res.is_ok());
@@ -740,13 +745,14 @@ mod test {
             hashed_sig_s: Vec<u8>,
             hashed_sig_f: Vec<u8>,
         }
+
         impl FaestProveData {
             fn try_signing<P: FAESTParameters<OWF = O>, O: OWFParameters>(
                 sk: &SecretKey<O>,
                 hashed_sig: &[u8],
             ) -> Box<GenericArray<u8, P::SignatureSize>> {
                 let mut signature = GenericArray::default_boxed();
-                faest_sign::<P>(&MSG, sk, &RHO, &mut signature);
+                assert!(faest_sign::<P>(&MSG, sk, &RHO, &mut signature).is_ok());
                 assert_eq!(hashed_sig, hash_array(signature.as_slice()).as_slice());
                 signature
             }

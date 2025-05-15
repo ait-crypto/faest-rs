@@ -73,8 +73,6 @@
 //! ```
 
 #![warn(missing_docs)]
-// TODO: fix this
-#![allow(clippy::type_complexity)]
 #![warn(clippy::use_self)]
 
 use generic_array::{GenericArray, typenum::Unsigned};
@@ -170,8 +168,8 @@ macro_rules! define_impl {
                     sk: &SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
                     rho: &[u8],
                     signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
-                ) {
-                    faest_sign::<[<$param Parameters>]>(msg, sk, rho, signature);
+                ) -> Result<(), Error> {
+                    faest_sign::<[<$param Parameters>]>(msg, sk, rho, signature)
                 }
 
                 #[inline]
@@ -180,8 +178,8 @@ macro_rules! define_impl {
                     sk: &UnpackedSecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
                     rho: &[u8],
                     signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
-                ) {
-                    faest_unpacked_sign::<[<$param Parameters>]>(msg, sk, rho, signature);
+                ) -> Result<(), Error>  {
+                    faest_unpacked_sign::<[<$param Parameters>]>(msg, sk, rho, signature)
                 }
 
                 #[inline]
@@ -396,37 +394,22 @@ macro_rules! define_impl {
 
             impl Signer<[<$param Signature>]> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
-                    Ok(self.sign(msg))
-                }
-
-                fn sign(&self, msg: &[u8]) -> [<$param Signature>] {
                     let mut signature = GenericArray::default();
-                    $param::sign(msg, &self.0, &[], &mut signature);
-                    [<$param Signature>](signature)
+                    $param::sign(msg, &self.0, &[], &mut signature).map(|_| [<$param Signature>](signature))
                 }
             }
 
             impl Signer<Box<[<$param Signature>]>> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<Box<[<$param Signature>]>, Error> {
-                    Ok(self.sign(msg))
-                }
-
-                fn sign(&self, msg: &[u8]) -> Box<[<$param Signature>]> {
                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));
-                    $param::sign(msg, &self.0, &[], &mut signature.0);
-                    signature
+                    $param::sign(msg, &self.0, &[], &mut signature.0).map(|_| signature)
                 }
             }
 
             impl Signer<[<$param Signature>]> for [<$param UnpackedSigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
-                    Ok(self.sign(msg))
-                }
-
-                fn sign(&self, msg: &[u8]) -> [<$param Signature>] {
                     let mut signature = GenericArray::default();
-                    $param::unpacked_sign(msg, &self.0, &[], &mut signature);
-                    [<$param Signature>](signature)
+                    $param::unpacked_sign(msg, &self.0, &[], &mut signature).map(|_| [<$param Signature>](signature))
                 }
             }
 
@@ -503,8 +486,7 @@ macro_rules! define_impl {
                     >::default();
                     rng.fill_bytes(&mut rho);
                     let mut signature = GenericArray::default();
-                    $param::sign(msg, &self.0, &rho, &mut signature);
-                    Ok([<$param Signature>](signature))
+                    $param::sign(msg, &self.0, &rho, &mut signature).map(|_| [<$param Signature>](signature))
                 }
             }
 
@@ -521,8 +503,7 @@ macro_rules! define_impl {
                     >::default();
                     rng.fill_bytes(&mut rho);
                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));
-                    $param::sign(msg, &self.0, &rho, &mut signature.0);
-                    Ok(signature)
+                    $param::sign(msg, &self.0, &rho, &mut signature.0).map(|_| signature)
                 }
             }
 
@@ -539,8 +520,7 @@ macro_rules! define_impl {
                     >::default();
                     rng.fill_bytes(&mut rho);
                     let mut signature = GenericArray::default();
-                    $param::unpacked_sign(msg, &self.0, &rho, &mut signature);
-                    Ok([<$param Signature>](signature))
+                    $param::unpacked_sign(msg, &self.0, &rho, &mut signature).map(|_| [<$param Signature>](signature))
                 }
             }
 
