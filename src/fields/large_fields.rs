@@ -1686,7 +1686,7 @@ mod test {
         use std::iter::zip;
 
         use generic_array::typenum::Unsigned;
-        use rand::{RngCore, SeedableRng, rngs::SmallRng};
+        use rand::RngCore;
 
         #[test]
         fn from_bit<F: BigGaloisField + Debug + Eq>() {
@@ -1701,7 +1701,7 @@ mod test {
         where
             Standard: Distribution<F>,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             for _ in 0..RUNS {
                 let mut random_1: F = rng.r#gen();
@@ -1731,7 +1731,7 @@ mod test {
         where
             Standard: Distribution<F>,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             for _ in 0..RUNS {
                 let lhs: F = rng.r#gen();
@@ -1750,7 +1750,7 @@ mod test {
         where
             Standard: Distribution<F>,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             for _ in 0..RUNS {
                 let anything: F = rng.r#gen();
@@ -1818,7 +1818,7 @@ mod test {
         where
             Standard: Distribution<F>,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             let elements = array::from_fn(|_| rng.r#gen());
             assert_eq!(F::byte_combine(&elements), F::byte_combine_slice(&elements));
@@ -1829,7 +1829,7 @@ mod test {
         where
             Standard: Distribution<F>,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             let element = rng.r#gen();
             let bytes = element.as_bytes();
@@ -1842,7 +1842,7 @@ mod test {
         where
             Standard: Distribution<F>,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             let element = rng.r#gen();
             assert_eq!(element * element, element.square());
