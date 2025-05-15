@@ -2131,21 +2131,19 @@ mod test {
         byte_combine_bits::<GF256>(&database);
     }
 
-    fn byte_combine<F: BigGaloisField + Debug + Eq>(
-        test_data: &[(&str, &str, &str, &str, &str, &str, &str, &str, &str)],
-    ) {
+    fn byte_combine<F: BigGaloisField + Debug + Eq>(test_data: &[[&str; 9]]) {
         for data in test_data {
             let tab = [
-                F::from(hex::decode(data.0).unwrap().as_slice()),
-                F::from(hex::decode(data.1).unwrap().as_slice()),
-                F::from(hex::decode(data.2).unwrap().as_slice()),
-                F::from(hex::decode(data.3).unwrap().as_slice()),
-                F::from(hex::decode(data.4).unwrap().as_slice()),
-                F::from(hex::decode(data.5).unwrap().as_slice()),
-                F::from(hex::decode(data.6).unwrap().as_slice()),
-                F::from(hex::decode(data.7).unwrap().as_slice()),
+                F::from(hex::decode(data[0]).unwrap().as_slice()),
+                F::from(hex::decode(data[1]).unwrap().as_slice()),
+                F::from(hex::decode(data[2]).unwrap().as_slice()),
+                F::from(hex::decode(data[3]).unwrap().as_slice()),
+                F::from(hex::decode(data[4]).unwrap().as_slice()),
+                F::from(hex::decode(data[5]).unwrap().as_slice()),
+                F::from(hex::decode(data[6]).unwrap().as_slice()),
+                F::from(hex::decode(data[7]).unwrap().as_slice()),
             ];
-            let result = F::from(hex::decode(data.8).unwrap().as_slice());
+            let result = F::from(hex::decode(data[8]).unwrap().as_slice());
             assert_eq!(F::byte_combine(&tab), result);
         }
     }
@@ -2153,7 +2151,7 @@ mod test {
     #[test]
     fn gf128_byte_combine() {
         let database = [
-            (
+            [
                 "aa6a6f1713d27a71fe989e93dc79d27d",
                 "714f4c855dc34eafbaa6d0c9a6cb67ef",
                 "594cbc985a239f97859c0f5dbc9c65ee",
@@ -2163,8 +2161,8 @@ mod test {
                 "56be29a614665b84abb8808565ca3059",
                 "8d143b6e793799fde7617b4a734f4973",
                 "334dbbe5004d3dbbe3ac3a2e86ddb72a",
-            ),
-            (
+            ],
+            [
                 "a4108259c36d3300a3452de6cc6819ac",
                 "f74513a1922de3721a29e974d16a6d52",
                 "1a313de17135292c281f35f36d642221",
@@ -2174,8 +2172,8 @@ mod test {
                 "0e96f9872bbc1a87ddeb27c7f189b826",
                 "fb1b26d476b3f87607f4a9742a1a26e3",
                 "4d38054fc9df94561220860e9ebf72a2",
-            ),
-            (
+            ],
+            [
                 "263e276e9d619c4fe6b9b40d1f5ae81b",
                 "78ffd6d19573db9fa408e8cb29f82e27",
                 "96e08f0df9f18a1d67d5ec2214923217",
@@ -2185,7 +2183,7 @@ mod test {
                 "b3aa6455426c8f62c47bd85c3a96afa1",
                 "7f456dad4831aa46f018ed4dd3a4d8cd",
                 "7f088260d013e0b497e0bf44dea3b5bc",
-            ),
+            ],
         ];
         byte_combine::<GF128>(&database);
     }
@@ -2193,7 +2191,7 @@ mod test {
     #[test]
     fn gf192_byte_combine() {
         let database = [
-            (
+            [
                 "97435430defb19efaf7e3a6e9fc365b419633d4221d07ea7",
                 "6d4949bf79ddbbbd17c1a4761f2169e44bbcc6d998468635",
                 "8a13ceeabe8aee808b1d39eba3da8313fa6080cff2f4df8c",
@@ -2203,8 +2201,8 @@ mod test {
                 "c524bad21ff3c079745cf027bbf461cd823e8ec20b86838d",
                 "104261f32b5213d7ad09c34d5042bfbec74d051430914b76",
                 "3c3aeab72cb94f341f526028551479e4335a9e7e29c769ab",
-            ),
-            (
+            ],
+            [
                 "e90ba7d98495ec8f34ffc33cd4fec49900e86d7f5ded63d5",
                 "a458f5c02b6cbf5884b1fc51568a4b6cace0914b113da05b",
                 "80016f8597da72e83ab2af373bd406858f18293f7bf19fca",
@@ -2214,8 +2212,8 @@ mod test {
                 "146ce9152843cc89b66f956b20f5c5ad4967b891f7797c84",
                 "027f4a31fcf61149b791fe06744cd9c4a96990d393dbc729",
                 "9247127d401126a9e217b3a3a6e9e02fa3094d1dc280777c",
-            ),
-            (
+            ],
+            [
                 "4f30c4b472dc4eaff3b409206897a65db6f0ac03dbb8e4a1",
                 "85ee56ffce3aa7d81035717812eb918467823c44c27665e5",
                 "96643a20b33012458f6bf54dd07b5e424a90213452f65471",
@@ -2225,7 +2223,7 @@ mod test {
                 "5b0843fe01ad4b62298fd67f12a606a43871626d2fa9866c",
                 "5b02e930dc80f9bdc6f7fda2210bc46e7180f67a4f56e2a5",
                 "8c5fc7d9e4aae7a23b4a60cfa972f1570383fac4850080ef",
-            ),
+            ],
         ];
         byte_combine::<GF192>(&database);
     }
@@ -2233,7 +2231,7 @@ mod test {
     #[test]
     fn gf256_byte_combine() {
         let database = [
-            (
+            [
                 "c2f6c29d90d5f0aceafd8751f1880efc9ab70c2b8a2ae54976ac9e0efbc88cd6",
                 "7d798407e8db5017aae4cbe8f249342f0c524ce4442b0af0cb903f64c8185778",
                 "95315e58d485508458286b521c541fcdbb106f389275987da6e8936065954d3c",
@@ -2243,8 +2241,8 @@ mod test {
                 "71198fcb06a47c624ec560dc1235f2e0eec7f634e9680e6ffa22a3a41f57c263",
                 "1586cb264022ce18b6793cfe01bed1187693b9537bd4e940c5b46b019dfd4971",
                 "c56b311c313ee2d49000d298bc532e663c8170974ba202289662c032237a005c",
-            ),
-            (
+            ],
+            [
                 "4fb3716fa0d84561336cefb4840a371878e4cec3832744554694739703ab7a29",
                 "0f429ca77f674b13c1bc7b9f87ba635e7939f9756b83c6c7f4db0e7f722c785f",
                 "7aec71702cf0a8b08005f568daafccc3a95a3a3b121f1f966552b1a9fd9fe068",
@@ -2254,8 +2252,8 @@ mod test {
                 "c9989982817be71fd981fe62c604e575eedda4cb98252a04f4e9a2d354d1b0cc",
                 "b875a162992e5b51cd5b05a17c69a274054a92aedcc56f8d187afb0008302f46",
                 "e732850e177e5f2dd3e8765ccd91a25438c3c6b841e0ab2e3da0dc648d9faca9",
-            ),
-            (
+            ],
+            [
                 "45f19ae41aed2508f08fe519f53c68ea4425e83f1f44c25a1e4d67c010ca2ca4",
                 "4b2c6726f26fb5b8a37e3c697b9604e19960864152e74e0d8003ff07936ab1fc",
                 "dfc86e485b1c0d4aa7236d7e2fcfbbb17969124934f5b295d85b6758cdcda4ba",
@@ -2265,7 +2263,7 @@ mod test {
                 "bc18c65f0a7902731ec09bb67b55a09cae445c5d5fd7167d1991ab98bf6830ae",
                 "a10852ecf84c45ef352dd1af830c8bc64b70d16f6a92a0a7e2b781f3b683d004",
                 "2f7d52efccba230fe92554d1c30bb9fbaaa4672f474b8c56141bdc6a80115d44",
-            ),
+            ],
         ];
         byte_combine::<GF256>(&database);
     }
