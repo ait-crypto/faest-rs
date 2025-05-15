@@ -105,7 +105,7 @@ mod witness;
 mod zk_constraints;
 
 use crate::{
-    faest::{faest_keygen, faest_sign, faest_unpacked_keygen, faest_unpacked_sign, faest_verify},
+    faest::{faest_keygen, faest_sign, faest_unpacked_sign, faest_verify},
     internal_keys::{PublicKey, SecretKey, UnpackedSecretKey},
     parameter::{
         FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
@@ -383,7 +383,7 @@ macro_rules! define_impl {
                 where
                     R: CryptoRngCore,
                 {
-                    Self(faest_unpacked_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng))
+                    Self(faest_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng).into())
                 }
             }
 

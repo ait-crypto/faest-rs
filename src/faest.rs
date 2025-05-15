@@ -339,16 +339,6 @@ where
     O::keygen_with_rng(rng)
 }
 
-#[inline]
-pub(crate) fn faest_unpacked_keygen<O, R>(rng: R) -> UnpackedSecretKey<O>
-where
-    O: OWFParameters,
-    R: CryptoRngCore,
-{
-    let sk = O::keygen_with_rng(rng);
-    UnpackedSecretKey::from(sk)
-}
-
 fn check_challenge_3<P, O>(chall3: &[u8]) -> bool
 where
     P: FAESTParameters,
