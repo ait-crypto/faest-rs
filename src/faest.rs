@@ -374,11 +374,10 @@ where
 {
     // ::0
     let signature = SignatureRefMut::<P, P::OWF>::from(signature);
-
     // ::12
     let w = P::OWF::witness(sk);
 
-    sign::<P, P::OWF>(msg, sk, &w, rho, signature)
+    sign(msg, sk, &w, rho, signature)
 }
 
 #[inline]
@@ -393,8 +392,7 @@ where
 {
     // ::0
     let signature = SignatureRefMut::<P, P::OWF>::from(signature);
-
-    sign::<P, P::OWF>(msg, &sk_unpacked.sk, &sk_unpacked.wit, rho, signature)
+    sign(msg, &sk_unpacked.sk, &sk_unpacked.wit, rho, signature)
 }
 
 fn sign<P, O>(
