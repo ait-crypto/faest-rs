@@ -67,6 +67,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install cross
         run: cargo install cross
+      - name: Remove large test vector files
+        run: rm -rvf tests/data/PQCsignKAT*
       - name: Test with all features
         run: cross test -r --all-features --workspace --target ${{matrix.target}}
 
