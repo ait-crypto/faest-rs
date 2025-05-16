@@ -49,7 +49,7 @@ jobs:
     env:
       RUSTFLAGS: "-C target-cpu=native"
 
-  build-cross:
+  test-cross:
     needs: test
     runs-on: ubuntu-latest
     strategy:
