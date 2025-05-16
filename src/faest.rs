@@ -1,7 +1,6 @@
 use std::{iter::zip, marker::PhantomData};
 
 use generic_array::{GenericArray, typenum::Unsigned};
-use itertools::izip;
 use rand_core::CryptoRngCore;
 
 use crate::{
@@ -13,7 +12,7 @@ use crate::{
     prg::{IV, IVSize},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
-    utils::{Reader, decode_all_chall_3, xor_arrays_inplace},
+    utils::{Reader, decode_all_chall_3, xor_arrays_inplace, xor_arrays_into},
     vole::{
         VoleCommitResult, VoleCommitmentCRef, VoleCommitmentCRefMut, VoleReconstructResult,
         volecommit, volereconstruct,
@@ -88,9 +87,7 @@ where
     }
 
     fn mask_witness(&mut self, w: &[u8], u: &[u8]) {
-        for (dj, wj, uj) in izip!(self.d.iter_mut(), w, u) {
-            *dj = wj ^ *uj;
-        }
+        xor_arrays_into(self.d, w, u);
     }
 
     fn save_decom_and_ctr(&mut self, decom_i: &BavcOpenResult, ctr: u32) {
@@ -179,7 +176,7 @@ where
 
         let (commits, nodes) = self.decom_i.split_at(n_coms * com_size);
         let coms = commits.chunks_exact(com_size).collect();
-        let nodes: Vec<_> = nodes.chunks_exact(node_size).collect();
+        let nodes = nodes.chunks_exact(node_size).collect();
 
         BavcOpenResult { coms, nodes }
     }
@@ -353,13 +350,7 @@ where
     }
 
     // Check that all the following bytes are 0s
-    for byte in chall3.iter().skip(start_byte + 1) {
-        if *byte != 0 {
-            return false;
-        }
-    }
-
-    true
+    chall3.iter().skip(start_byte + 1).all(|b| *b == 0)
 }
 
 #[inline]
