@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 (2025-05-16)
+
+* Add unpacked secret keys with pre-computed witnesses.
+  For repeated signing with the same secret key, unpacked secret keys provide a
+  runtime/memory trade-off.
+* Internal refactoring.
+
 ## 0.2.0 (2025-05-03)
 
 * Implement version 2 of the FAEST specification.
