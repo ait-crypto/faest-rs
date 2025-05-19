@@ -319,7 +319,10 @@ pub(crate) struct OWF128<F = GF128>(PhantomData<F>);
 
 impl<F> OWFParameters for OWF128<F>
 where
-    F: BigGaloisField<Length = U16> + std::fmt::Debug + std::cmp::PartialEq + std::convert::From<SimdGF128>
+    F: BigGaloisField<Length = U16>
+        + std::fmt::Debug
+        + std::cmp::PartialEq
+        + std::convert::From<SimdGF128>,
 {
     type BaseParams = BaseParams128<F>;
     type InputSize = U16;
@@ -415,7 +418,10 @@ pub(crate) struct OWF192<F = GF192>(PhantomData<F>);
 
 impl<F> OWFParameters for OWF192<F>
 where
-    F: BigGaloisField<Length = U24> + std::fmt::Debug + std::cmp::PartialEq + std::convert::From<SimdGF192>,
+    F: BigGaloisField<Length = U24>
+        + std::fmt::Debug
+        + std::cmp::PartialEq
+        + std::convert::From<SimdGF192>,
 {
     type BaseParams = BaseParams192<F>;
     type InputSize = U16;
@@ -519,7 +525,10 @@ pub(crate) struct OWF256<F = GF256>(PhantomData<F>);
 
 impl<F> OWFParameters for OWF256<F>
 where
-    F: BigGaloisField<Length = U32> + std::fmt::Debug + std::cmp::PartialEq + std::convert::From<SimdGF256>,
+    F: BigGaloisField<Length = U32>
+        + std::fmt::Debug
+        + std::cmp::PartialEq
+        + std::convert::From<SimdGF256>,
 {
     type BaseParams = BaseParams256<F>;
     type InputSize = U16;
@@ -623,7 +632,10 @@ pub(crate) struct OWF128EM<F = GF128>(PhantomData<F>);
 
 impl<F> OWFParameters for OWF128EM<F>
 where
-    F: BigGaloisField<Length = U16> + std::fmt::Debug + std::cmp::PartialEq + std::convert::From<SimdGF128>,
+    F: BigGaloisField<Length = U16>
+        + std::fmt::Debug
+        + std::cmp::PartialEq
+        + std::convert::From<SimdGF128>,
 {
     type BaseParams = BaseParams128<F>;
     type InputSize = U16;
@@ -726,7 +738,10 @@ type U1536 = Sum<U1024, U512>;
 
 impl<F> OWFParameters for OWF192EM<F>
 where
-    F: BigGaloisField<Length = U24> + std::fmt::Debug + std::cmp::PartialEq + std::convert::From<SimdGF192>,
+    F: BigGaloisField<Length = U24>
+        + std::fmt::Debug
+        + std::cmp::PartialEq
+        + std::convert::From<SimdGF192>,
 {
     type BaseParams = BaseParams192<F>;
     type InputSize = U24;

@@ -743,7 +743,7 @@ impl From<UnoptimizedGF128> for GF128 {
 
 impl From<GF128> for UnoptimizedGF128 {
     fn from(value: GF128) -> Self {
-        Self([m128_as_u128(value.0)])   
+        Self([m128_as_u128(value.0)])
     }
 }
 
@@ -1270,7 +1270,7 @@ impl From<UnoptimizedGF192> for GF192 {
 
 impl From<GF192> for UnoptimizedGF192 {
     fn from(value: GF192) -> Self {
-        Self::from(value.as_bytes().as_slice())   
+        Self::from(value.as_bytes().as_slice())
     }
 }
 
@@ -1754,10 +1754,9 @@ impl From<UnoptimizedGF256> for GF256 {
 
 impl From<GF256> for UnoptimizedGF256 {
     fn from(value: GF256) -> Self {
-        Self::from(value.as_bytes().as_slice())   
+        Self::from(value.as_bytes().as_slice())
     }
 }
-
 
 // implementation of ByteCombine
 
