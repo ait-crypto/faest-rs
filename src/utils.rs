@@ -1,6 +1,7 @@
 use std::iter::zip;
 
 use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
+use itertools::izip;
 
 use crate::parameter::TauParameters;
 
@@ -110,6 +111,13 @@ pub(crate) fn xor_arrays<'a>(lhs: &'a [u8], rhs: &'a [u8]) -> impl Iterator<Item
 pub(crate) fn xor_arrays_inplace(lhs: &mut [u8], rhs: &[u8]) {
     for (lhs, rhs) in zip(lhs.iter_mut(), rhs) {
         *lhs ^= rhs;
+    }
+}
+
+/// Xors the input slices into the output slice
+pub(crate) fn xor_arrays_into(dst: &mut [u8], lhs: &[u8], rhs: &[u8]) {
+    for (dst, lhs, rhs) in izip!(dst.iter_mut(), lhs, rhs) {
+        *dst = lhs ^ rhs;
     }
 }
 

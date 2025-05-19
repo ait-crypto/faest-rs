@@ -7,13 +7,16 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         toolchain:
           - stable
           - "1.85"
-    name: Test with Rust ${{matrix.toolchain}} toolchain
+        runner:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+    runs-on: ${{matrix.runner}}
+    name: Test with Rust ${{matrix.toolchain}} toolchain on ${{matrix.runner}}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -21,7 +24,7 @@ jobs:
           toolchain: ${{matrix.toolchain}}
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-nextest
-        run: cargo install cargo-nextest --version 0.9.85
+        run: cargo install cargo-nextest
       - name: Test without default features
         run: cargo nextest run -r --no-default-features --workspace
       - name: Test with default features
@@ -29,19 +32,32 @@ jobs:
       - name: Test with all features
         run: cargo nextest run -r --all-features --workspace
 
-  build-cross:
+  test-native:
+    needs: test
+    runs-on: ubuntu-latest
+    name: Test with target-cpu=native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-nextest
+        run: cargo install cargo-nextest
+      - name: Test with all features
+        run: cargo nextest run -r --all-features --workspace
+    env:
+      RUSTFLAGS: "-C target-cpu=native"
+
+  test-cross:
     needs: test
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         target:
-          # - aarch64-unknown-linux-gnu
-          # - armv7-unknown-linux-gnueabihf
           - i686-unknown-linux-gnu
-          # - powerpc64le-unknown-linux-gnu
-          # - riscv64gc-unknown-linux-gnu
-          # - s390x-unknown-linux-gnu
+          - s390x-unknown-linux-gnu
     name: Cross test for ${{matrix.target}}
     steps:
       - uses: actions/checkout@v4
@@ -51,6 +67,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install cross
         run: cargo install cross
+      - name: Remove large test vector files
+        run: rm -rvf tests/data/PQCsignKAT*
       - name: Test with all features
         run: cross test -r --all-features --workspace --target ${{matrix.target}}
 

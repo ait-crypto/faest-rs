@@ -2759,9 +2759,8 @@ mod test {
         use std::fmt::Debug;
 
         use rand::{
-            Rng, RngCore, SeedableRng,
+            Rng, RngCore,
             distributions::{Distribution, Standard},
-            rngs::SmallRng,
         };
 
         #[test]
@@ -2770,7 +2769,7 @@ mod test {
             Standard: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             for _ in 0..RUNS {
                 let r1: Fu = rng.r#gen();
@@ -2798,7 +2797,7 @@ mod test {
             Standard: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             for _ in 0..RUNS {
                 let r1: Fu = rng.r#gen();
@@ -2829,7 +2828,7 @@ mod test {
             Standard: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             let v: Fu = rng.r#gen();
             let v = F::from(v.as_bytes().as_slice());
@@ -2855,7 +2854,7 @@ mod test {
             Standard: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             for _ in 0..RUNS {
                 let r1: Fu = rng.r#gen();
@@ -2877,7 +2876,7 @@ mod test {
             Standard: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             for _ in 0..RUNS {
                 let r1: Fu = rng.r#gen();
@@ -2909,9 +2908,8 @@ mod test {
         use std::{fmt::Debug, iter::zip};
 
         use rand::{
-            Rng, SeedableRng,
+            Rng,
             distributions::{Distribution, Standard},
-            rngs::SmallRng,
         };
 
         #[test]
@@ -2920,7 +2918,7 @@ mod test {
             Standard: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             for _ in 0..RUNS {
                 let byte1: [Fu; 8] = std::array::from_fn(|_| rng.r#gen());
@@ -2989,9 +2987,8 @@ mod test {
         use std::fmt::Debug;
 
         use rand::{
-            Rng, SeedableRng,
+            Rng,
             distributions::{Distribution, Standard},
-            rngs::SmallRng,
         };
 
         #[test]
@@ -3001,7 +2998,7 @@ mod test {
             Fu: ExtensionField + Debug + Eq + Copy,
             for<'a> F: ExtensionField<Length = Fu::Length> + Debug + Eq + From<&'a [u8]> + Copy,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             for _ in 0..RUNS {
                 let mut lhs1: Fu = rng.r#gen();
@@ -3031,7 +3028,7 @@ mod test {
                 + From<&'a [u8]>
                 + Copy,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             for _ in 0..RUNS {
                 let lhs1: Fu = rng.r#gen();
@@ -3057,7 +3054,7 @@ mod test {
                 + From<&'a [u8]>
                 + Copy,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
             for _ in 0..RUNS {
                 let bytes: Fu = rng.r#gen();
 
@@ -3083,7 +3080,7 @@ mod test {
                 + From<&'a [u8]>
                 + Copy,
         {
-            let mut rng = SmallRng::from_entropy();
+            let mut rng = rand::thread_rng();
 
             let lhs_bytes: Fu = rng.r#gen();
             let lhs = F::from(lhs_bytes.as_bytes().as_slice());

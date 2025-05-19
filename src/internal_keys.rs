@@ -167,7 +167,6 @@ where
 
 /// Internal representation of a secret key, including the zk witness.
 #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
-
 pub(crate) struct UnpackedSecretKey<O>
 where
     O: OWFParameters,
@@ -207,8 +206,7 @@ where
     type Error = Error;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let sk = SecretKey::<O>::try_from(value)?;
-        Ok(Self {
+        SecretKey::try_from(value).map(|sk| Self {
             wit: O::witness(&sk),
             sk,
         })

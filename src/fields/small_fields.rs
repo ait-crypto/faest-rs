@@ -255,13 +255,13 @@ impl From<&[u8]> for GF64 {
 
 #[cfg(test)]
 mod test {
-    use rand::{Rng, SeedableRng, rngs::SmallRng};
+    use rand::Rng;
 
     use super::*;
 
     #[test]
     fn gf64_test_mul() {
-        let mut rng = SmallRng::from_entropy();
+        let mut rng = rand::thread_rng();
 
         let anything: u64 = rng.r#gen();
         let pol_anything = GF64::from(anything);

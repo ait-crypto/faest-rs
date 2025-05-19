@@ -51,10 +51,28 @@
 //! verification_key.verify(msg, &signature).expect("Verification failed");
 //! # }
 //! ```
+//!
+//! As parts of the FAEST signing process relay on a message-independant
+//! witness, "unpacked" secret keys store the pre-computed witness. These keys
+//! provide a memory/runtime trade-off if the same secret key is used to sign
+//! multiple messages. "Unpacked" keys support the same interfaces and keys can
+//! be converted back and forth:
+//! ```
+//! use faest::{FAEST128fSigningKey, FAEST128fUnpackedSigningKey, FAEST128fSignature, ByteEncoding};
+//! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
+//!
+//! let sk = FAEST128fSigningKey::generate(rand::thread_rng());
+//! let unpacked_sk = FAEST128fUnpackedSigningKey::from(&sk);
+//! assert_eq!(sk.to_bytes(), unpacked_sk.to_bytes());
+//!
+//! let msg = "some message".as_bytes();
+//! let signature: FAEST128fSignature = unpacked_sk.sign(msg);
+//!
+//! let verification_key = unpacked_sk.verifying_key();
+//! verification_key.verify(msg, &signature).expect("Verification failed");
+//! ```
 
 #![warn(missing_docs)]
-// TODO: fix this
-#![allow(clippy::type_complexity)]
 #![warn(clippy::use_self)]
 
 use generic_array::{GenericArray, typenum::Unsigned};
@@ -87,7 +105,7 @@ mod witness;
 mod zk_constraints;
 
 use crate::{
-    faest::{faest_keygen, faest_sign, faest_unpacked_keygen, faest_unpacked_sign, faest_verify},
+    faest::{faest_keygen, faest_sign, faest_unpacked_sign, faest_verify},
     internal_keys::{PublicKey, SecretKey, UnpackedSecretKey},
     parameter::{
         FAEST128fParameters, FAEST128sParameters, FAEST192fParameters, FAEST192sParameters,
@@ -150,8 +168,8 @@ macro_rules! define_impl {
                     sk: &SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
                     rho: &[u8],
                     signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
-                ) {
-                    faest_sign::<[<$param Parameters>]>(msg, sk, rho, signature);
+                ) -> Result<(), Error> {
+                    faest_sign::<[<$param Parameters>]>(msg, sk, rho, signature)
                 }
 
                 #[inline]
@@ -160,8 +178,8 @@ macro_rules! define_impl {
                     sk: &UnpackedSecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
                     rho: &[u8],
                     signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
-                ) {
-                    faest_unpacked_sign::<[<$param Parameters>]>(msg, sk, rho, signature);
+                ) -> Result<(), Error>  {
+                    faest_unpacked_sign::<[<$param Parameters>]>(msg, sk, rho, signature)
                 }
 
                 #[inline]
@@ -365,7 +383,7 @@ macro_rules! define_impl {
                 where
                     R: CryptoRngCore,
                 {
-                    Self(faest_unpacked_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng))
+                    Self(faest_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng).into())
                 }
             }
 
@@ -376,37 +394,22 @@ macro_rules! define_impl {
 
             impl Signer<[<$param Signature>]> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
-                    Ok(self.sign(msg))
-                }
-
-                fn sign(&self, msg: &[u8]) -> [<$param Signature>] {
                     let mut signature = GenericArray::default();
-                    $param::sign(msg, &self.0, &[], &mut signature);
-                    [<$param Signature>](signature)
+                    $param::sign(msg, &self.0, &[], &mut signature).map(|_| [<$param Signature>](signature))
                 }
             }
 
             impl Signer<Box<[<$param Signature>]>> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<Box<[<$param Signature>]>, Error> {
-                    Ok(self.sign(msg))
-                }
-
-                fn sign(&self, msg: &[u8]) -> Box<[<$param Signature>]> {
                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));
-                    $param::sign(msg, &self.0, &[], &mut signature.0);
-                    signature
+                    $param::sign(msg, &self.0, &[], &mut signature.0).map(|_| signature)
                 }
             }
 
             impl Signer<[<$param Signature>]> for [<$param UnpackedSigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
-                    Ok(self.sign(msg))
-                }
-
-                fn sign(&self, msg: &[u8]) -> [<$param Signature>] {
                     let mut signature = GenericArray::default();
-                    $param::unpacked_sign(msg, &self.0, &[], &mut signature);
-                    [<$param Signature>](signature)
+                    $param::unpacked_sign(msg, &self.0, &[], &mut signature).map(|_| [<$param Signature>](signature))
                 }
             }
 
@@ -483,8 +486,7 @@ macro_rules! define_impl {
                     >::default();
                     rng.fill_bytes(&mut rho);
                     let mut signature = GenericArray::default();
-                    $param::sign(msg, &self.0, &rho, &mut signature);
-                    Ok([<$param Signature>](signature))
+                    $param::sign(msg, &self.0, &rho, &mut signature).map(|_| [<$param Signature>](signature))
                 }
             }
 
@@ -501,8 +503,7 @@ macro_rules! define_impl {
                     >::default();
                     rng.fill_bytes(&mut rho);
                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));
-                    $param::sign(msg, &self.0, &rho, &mut signature.0);
-                    Ok(signature)
+                    $param::sign(msg, &self.0, &rho, &mut signature.0).map(|_| signature)
                 }
             }
 
@@ -519,8 +520,7 @@ macro_rules! define_impl {
                     >::default();
                     rng.fill_bytes(&mut rho);
                     let mut signature = GenericArray::default();
-                    $param::unpacked_sign(msg, &self.0, &rho, &mut signature);
-                    Ok([<$param Signature>](signature))
+                    $param::unpacked_sign(msg, &self.0, &rho, &mut signature).map(|_| [<$param Signature>](signature))
                 }
             }
 
@@ -675,7 +675,7 @@ mod tests {
     #[test]
     fn serde_serialization<KP, S>()
     where
-        KP: KeypairGenerator + Serialize + DeserializeOwned + Eq + Debug,
+        KP: KeypairGenerator + Signer<S> + Serialize + DeserializeOwned + Eq + Debug,
     {
         let mut out = vec![];
         let mut ser = serde_json::Serializer::new(&mut out);
