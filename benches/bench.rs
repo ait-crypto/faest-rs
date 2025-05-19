@@ -1,4 +1,6 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use std::hint::black_box;
+
+use criterion::{Criterion, criterion_group, criterion_main};
 use faest::*;
 use nist_pqc_seeded_rng::{NistPqcAes256CtrRng, Seed};
 use rand::{RngCore, SeedableRng};
