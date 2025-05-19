@@ -14,6 +14,7 @@ use crate::{
     fields::{
         BigGaloisField, ExtensionField, Field, GF64, GF128, GF192, GF256, GF384, GF576, GF768,
     },
+    parameter::SecurityParameter,
     prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo},
 };
 
@@ -77,21 +78,14 @@ where
     t: GF64,
 }
 
-impl VoleHasherInit<GF128> for VoleHasher<GF128> {
-    type SDLength = Sum<Prod<<GF128 as Field>::Length, U5>, <GF64 as Field>::Length>;
-    type OutputLength = Sum<<GF128 as Field>::Length, B>;
-    type Hasher = Self;
-}
-
-impl VoleHasherInit<GF192> for VoleHasher<GF192> {
-    type SDLength = Sum<Prod<<GF192 as Field>::Length, U5>, <GF64 as Field>::Length>;
-    type OutputLength = Sum<<GF192 as Field>::Length, B>;
-    type Hasher = Self;
-}
-
-impl VoleHasherInit<GF256> for VoleHasher<GF256> {
-    type SDLength = Sum<Prod<<GF256 as Field>::Length, U5>, <GF64 as Field>::Length>;
-    type OutputLength = Sum<<GF256 as Field>::Length, B>;
+impl<F> VoleHasherInit<F> for VoleHasher<F>
+where
+    F: BigGaloisField<Length: SecurityParameter>,
+    <F as Field>::Length:
+        Mul<U5, Output: ArrayLength + Add<U8, Output: ArrayLength>> + Add<U2, Output: ArrayLength>,
+{
+    type SDLength = Sum<Prod<<F as Field>::Length, U5>, <GF64 as Field>::Length>;
+    type OutputLength = Sum<<F as Field>::Length, B>;
     type Hasher = Self;
 }
 
@@ -210,16 +204,13 @@ where
     r1: F,
 }
 
-impl ZKHasherInit<GF128> for ZKHasher<GF128> {
-    type SDLength = Sum<Prod<<GF128 as Field>::Length, U3>, <GF64 as Field>::Length>;
-}
-
-impl ZKHasherInit<GF192> for ZKHasher<GF192> {
-    type SDLength = Sum<Prod<<GF192 as Field>::Length, U3>, <GF64 as Field>::Length>;
-}
-
-impl ZKHasherInit<GF256> for ZKHasher<GF256> {
-    type SDLength = Sum<Prod<<GF256 as Field>::Length, U3>, <GF64 as Field>::Length>;
+impl<F> ZKHasherInit<F> for ZKHasher<F>
+where
+    F: BigGaloisField<Length: SecurityParameter>,
+    <F as Field>::Length:
+        Mul<U3, Output: ArrayLength + Add<U8, Output: ArrayLength>> + Add<U2, Output: ArrayLength>,
+{
+    type SDLength = Sum<Prod<<F as Field>::Length, U3>, <GF64 as Field>::Length>;
 }
 
 impl<F> ZKHasherProcess<F> for ZKHasher<F>
