@@ -4,13 +4,6 @@ use generic_array::{ArrayLength, GenericArray};
 
 pub(crate) mod large_fields;
 pub(crate) mod small_fields;
-
-#[cfg(all(
-    feature = "opt-simd",
-    target_arch = "x86_64",
-    target_feature = "avx2",
-    target_feature = "pclmulqdq"
-))]
 pub(crate) mod x86_simd_large_fields;
 
 pub(crate) use large_fields::{

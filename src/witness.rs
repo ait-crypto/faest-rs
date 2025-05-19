@@ -172,6 +172,7 @@ mod test {
     #![allow(clippy::needless_range_loop)]
 
     use crate::{
+        fields::{GF128, GF192, GF256},
         parameter::{OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM, OWFParameters},
         utils::test::read_test_data,
     };
@@ -200,7 +201,7 @@ mod test {
             match self.lambda {
                 128 => {
                     println!("AES-128 - testing witness extension..");
-                    let wit = OWF128::extendwitness(
+                    let wit = OWF128::<GF128>::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
                     );
@@ -208,7 +209,7 @@ mod test {
                 }
                 192 => {
                     println!("AES-192 - testing witness extension..");
-                    let wit = OWF192::extendwitness(
+                    let wit = OWF192::<GF192>::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
                     );
@@ -216,7 +217,7 @@ mod test {
                 }
                 _ => {
                     println!("AES-256 - testing witness extension..");
-                    let wit = OWF256::extendwitness(
+                    let wit = OWF256::<GF256>::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
                     );
@@ -229,7 +230,7 @@ mod test {
             match self.lambda {
                 128 => {
                     println!("AES-EM-128 - testing witness extension..");
-                    let wit = OWF128EM::extendwitness(
+                    let wit = OWF128EM::<GF128>::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
                     );
@@ -237,7 +238,7 @@ mod test {
                 }
                 192 => {
                     println!("AES-EM-192 - testing witness extension..");
-                    let wit = OWF192EM::extendwitness(
+                    let wit = OWF192EM::<GF192>::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
                     );
@@ -245,7 +246,7 @@ mod test {
                 }
                 _ => {
                     println!("AES-EM-256 - testing witness extension..");
-                    let wit = OWF256EM::extendwitness(
+                    let wit = OWF256EM::<GF256>::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
                     );
