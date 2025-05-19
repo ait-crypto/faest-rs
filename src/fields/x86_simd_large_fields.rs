@@ -313,6 +313,10 @@ const fn u128_as_m128(v: u128) -> __m128i {
     unsafe { GF128ConstHelper { b: v }.a }
 }
 
+const fn m128_as_u128(v: __m128i) -> u128 {
+    unsafe { GF128ConstHelper { a: v }.b }
+}
+
 const fn gfu128_as_m128(v: UnoptimizedGF128) -> __m128i {
     u128_as_m128(v.0[0])
 }
@@ -727,6 +731,19 @@ impl From<&[u8]> for GF128 {
     fn from(value: &[u8]) -> Self {
         debug_assert_eq!(value.len(), <Self as Field>::Length::USIZE);
         Self(unsafe { _mm_loadu_si128(value.as_ptr().cast()) })
+    }
+}
+
+impl From<UnoptimizedGF128> for GF128 {
+    fn from(value: UnoptimizedGF128) -> Self {
+        let inner = value.0[0];
+        Self(u128_as_m128(inner))
+    }
+}
+
+impl From<GF128> for UnoptimizedGF128 {
+    fn from(value: GF128) -> Self {
+        Self([m128_as_u128(value.0)])   
     }
 }
 
@@ -1245,6 +1262,18 @@ impl From<&[u8]> for GF192 {
     }
 }
 
+impl From<UnoptimizedGF192> for GF192 {
+    fn from(value: UnoptimizedGF192) -> Self {
+        Self::from(value.as_bytes().as_slice())
+    }
+}
+
+impl From<GF192> for UnoptimizedGF192 {
+    fn from(value: GF192) -> Self {
+        Self::from(value.as_bytes().as_slice())   
+    }
+}
+
 // implementation of ByteCombine
 
 impl Alphas for GF192 {
@@ -1716,6 +1745,19 @@ impl From<&[u8]> for GF256 {
         Self(unsafe { _mm256_loadu_si256(value.as_ptr().cast()) })
     }
 }
+
+impl From<UnoptimizedGF256> for GF256 {
+    fn from(value: UnoptimizedGF256) -> Self {
+        Self::from(value.as_bytes().as_slice())
+    }
+}
+
+impl From<GF256> for UnoptimizedGF256 {
+    fn from(value: GF256) -> Self {
+        Self::from(value.as_bytes().as_slice())   
+    }
+}
+
 
 // implementation of ByteCombine
 
