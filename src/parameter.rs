@@ -2,6 +2,7 @@ use std::{
     iter::repeat_n,
     marker::PhantomData,
     ops::{Add, Div, Mul, Sub},
+    sync::LazyLock,
 };
 
 use aes::{
@@ -37,10 +38,19 @@ use crate::{
     zk_constraints::{CstrntsVal, aes_prove, aes_verify},
 };
 
-#[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
+#[cfg(all(
+    feature = "opt-simd",
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+))]
 use crate::fields::x86_simd_large_fields::{
     GF128 as SimdGF128, GF192 as SimdGF192, GF256 as SimdGF256,
 };
+
+/// Weather AVX2 support is detected at runtime
+#[allow(unused)]
+static DYNAMIC_AVX2_SUPPORT_AVAILABLE: LazyLock<bool> =
+    LazyLock::new(|| is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq"));
 
 // FAEST signature sizes
 type U4506 = Sum<Prod<U4, U1000>, U506>;
@@ -377,11 +387,6 @@ where
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    #[cfg(all(
-        feature = "opt-simd", // using simd optimization feature
-        any(target_arch = "x86", target_arch = "x86_64"), // we're on x86/x86_64
-        not(all(target_feature = "avx2", target_feature = "pclmulqdq")) // simd support can't be statically detected
-    ))]
     #[inline]
     fn prove(
         w: &GenericArray<u8, Self::LBytes>,
@@ -390,64 +395,23 @@ where
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self> {
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
             let pk: &PublicKey<OWF128<SimdGF128>> = unsafe { std::mem::transmute(pk) };
             let qs_proof = aes_prove::<OWF128<SimdGF128>>(w, u, v, pk, chall_2);
-            (
+            return (
                 OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
-            )
-        } else {
-            aes_prove::<Self>(w, u, v, pk, chall_2)
+            );
         }
-    }
-
-    #[cfg(all(
-        feature = "opt-simd", // using simd optimization feature
-        any(target_arch = "x86", target_arch = "x86_64"), // we're on x86/x86_64
-        not(all(target_feature = "avx2", target_feature = "pclmulqdq")) // simd support can't be statically detected
-    ))]
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
-            let pk: &PublicKey<OWF128<SimdGF128>> = unsafe { std::mem::transmute(pk) };
-            let chall3 =
-                aes_verify::<OWF128<SimdGF128>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
-            OWFField::<Self>::from(chall3.as_bytes().as_slice())
-        } else {
-            aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-        }
-    }
-
-    #[cfg(any(
-        not(feature = "opt-simd"),
-        not(any(target_arch = "x86", target_arch = "x86_64")),
-        all(target_feature = "avx2", target_feature = "pclmulqdq")
-    ))]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
         aes_prove::<Self>(w, u, v, pk, chall_2)
     }
 
-    #[cfg(any(
-        not(feature = "opt-simd"),
-        not(any(target_arch = "x86", target_arch = "x86_64")),
-        all(target_feature = "avx2", target_feature = "pclmulqdq")
-    ))]
     #[inline]
     fn verify(
         q: CstrntsVal<Self>,
@@ -458,6 +422,17 @@ where
         a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
         a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
+            let pk: &PublicKey<OWF128<SimdGF128>> = unsafe { std::mem::transmute(pk) };
+            let chall3 =
+                aes_verify::<OWF128<SimdGF128>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
+            return OWFField::<Self>::from(chall3.as_bytes().as_slice());
+        }
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
 }
@@ -530,11 +505,6 @@ where
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    #[cfg(all(
-        feature = "opt-simd", // using simd optimization feature
-        any(target_arch = "x86", target_arch = "x86_64"), // we're on x86/x86_64
-        not(all(target_feature = "avx2", target_feature = "pclmulqdq")) // simd support can't be statically detected
-    ))]
     #[inline]
     fn prove(
         w: &GenericArray<u8, Self::LBytes>,
@@ -543,64 +513,24 @@ where
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self> {
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
             let pk: &PublicKey<OWF192<SimdGF192>> = unsafe { std::mem::transmute(pk) };
             let qs_proof = aes_prove::<OWF192<SimdGF192>>(w, u, v, pk, chall_2);
-            (
+            return (
                 OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
-            )
-        } else {
-            aes_prove::<Self>(w, u, v, pk, chall_2)
+            );
         }
-    }
 
-    #[cfg(all(
-        feature = "opt-simd", // using simd optimization feature
-        any(target_arch = "x86", target_arch = "x86_64"), // we're on x86/x86_64
-        not(all(target_feature = "avx2", target_feature = "pclmulqdq")) // simd support can't be statically detected
-    ))]
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
-            let pk: &PublicKey<OWF192<SimdGF192>> = unsafe { std::mem::transmute(pk) };
-            let chall3 =
-                aes_verify::<OWF192<SimdGF192>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
-            OWFField::<Self>::from(chall3.as_bytes().as_slice())
-        } else {
-            aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-        }
-    }
-
-    #[cfg(any(
-        not(feature = "opt-simd"),
-        not(any(target_arch = "x86", target_arch = "x86_64")),
-        all(target_feature = "avx2", target_feature = "pclmulqdq")
-    ))]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
         aes_prove::<Self>(w, u, v, pk, chall_2)
     }
 
-    #[cfg(any(
-        not(feature = "opt-simd"),
-        not(any(target_arch = "x86", target_arch = "x86_64")),
-        all(target_feature = "avx2", target_feature = "pclmulqdq")
-    ))]
     #[inline]
     fn verify(
         q: CstrntsVal<Self>,
@@ -611,6 +541,18 @@ where
         a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
         a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
+            let pk: &PublicKey<OWF192<SimdGF192>> = unsafe { std::mem::transmute(pk) };
+            let chall3 =
+                aes_verify::<OWF192<SimdGF192>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
+            return OWFField::<Self>::from(chall3.as_bytes().as_slice());
+        }
+
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
 }
@@ -683,11 +625,6 @@ where
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    #[cfg(all(
-        feature = "opt-simd", // using simd optimization feature
-        any(target_arch = "x86", target_arch = "x86_64"), // we're on x86/x86_64
-        not(all(target_feature = "avx2", target_feature = "pclmulqdq")) // simd support can't be statically detected
-    ))]
     #[inline]
     fn prove(
         w: &GenericArray<u8, Self::LBytes>,
@@ -696,64 +633,23 @@ where
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self> {
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
             let pk: &PublicKey<OWF256<SimdGF256>> = unsafe { std::mem::transmute(pk) };
             let qs_proof = aes_prove::<OWF256<SimdGF256>>(w, u, v, pk, chall_2);
-            (
+            return (
                 OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
-            )
-        } else {
-            aes_prove::<Self>(w, u, v, pk, chall_2)
+            );
         }
-    }
-
-    #[cfg(all(
-        feature = "opt-simd", // using simd optimization feature
-        any(target_arch = "x86", target_arch = "x86_64"), // we're on x86/x86_64
-        not(all(target_feature = "avx2", target_feature = "pclmulqdq")) // simd support can't be statically detected
-    ))]
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
-            let pk: &PublicKey<OWF256<SimdGF256>> = unsafe { std::mem::transmute(pk) };
-            let chall3 =
-                aes_verify::<OWF256<SimdGF256>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
-            OWFField::<Self>::from(chall3.as_bytes().as_slice())
-        } else {
-            aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-        }
-    }
-
-    #[cfg(any(
-        not(feature = "opt-simd"),
-        not(any(target_arch = "x86", target_arch = "x86_64")),
-        all(target_feature = "avx2", target_feature = "pclmulqdq")
-    ))]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
         aes_prove::<Self>(w, u, v, pk, chall_2)
     }
 
-    #[cfg(any(
-        not(feature = "opt-simd"),
-        not(any(target_arch = "x86", target_arch = "x86_64")),
-        all(target_feature = "avx2", target_feature = "pclmulqdq")
-    ))]
     #[inline]
     fn verify(
         q: CstrntsVal<Self>,
@@ -764,6 +660,17 @@ where
         a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
         a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
+            let pk: &PublicKey<OWF256<SimdGF256>> = unsafe { std::mem::transmute(pk) };
+            let chall3 =
+                aes_verify::<OWF256<SimdGF256>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
+            return OWFField::<Self>::from(chall3.as_bytes().as_slice());
+        }
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
 }
@@ -831,11 +738,6 @@ where
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    #[cfg(all(
-        feature = "opt-simd", // using simd optimization feature
-        any(target_arch = "x86", target_arch = "x86_64"), // we're on x86/x86_64
-        not(all(target_feature = "avx2", target_feature = "pclmulqdq")) // simd support can't be statically detected
-    ))]
     #[inline]
     fn prove(
         w: &GenericArray<u8, Self::LBytes>,
@@ -844,64 +746,23 @@ where
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self> {
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
             let pk: &PublicKey<OWF128EM<SimdGF128>> = unsafe { std::mem::transmute(pk) };
             let qs_proof = aes_prove::<OWF128EM<SimdGF128>>(w, u, v, pk, chall_2);
-            (
+            return (
                 OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
-            )
-        } else {
-            aes_prove::<Self>(w, u, v, pk, chall_2)
+            );
         }
-    }
-
-    #[cfg(all(
-        feature = "opt-simd", // using simd optimization feature
-        any(target_arch = "x86", target_arch = "x86_64"), // we're on x86/x86_64
-        not(all(target_feature = "avx2", target_feature = "pclmulqdq")) // simd support can't be statically detected
-    ))]
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
-            let pk: &PublicKey<OWF128EM<SimdGF128>> = unsafe { std::mem::transmute(pk) };
-            let chall3 =
-                aes_verify::<OWF128EM<SimdGF128>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
-            OWFField::<Self>::from(chall3.as_bytes().as_slice())
-        } else {
-            aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-        }
-    }
-
-    #[cfg(any(
-        not(feature = "opt-simd"),
-        not(any(target_arch = "x86", target_arch = "x86_64")),
-        all(target_feature = "avx2", target_feature = "pclmulqdq")
-    ))]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
         aes_prove::<Self>(w, u, v, pk, chall_2)
     }
 
-    #[cfg(any(
-        not(feature = "opt-simd"),
-        not(any(target_arch = "x86", target_arch = "x86_64")),
-        all(target_feature = "avx2", target_feature = "pclmulqdq")
-    ))]
     #[inline]
     fn verify(
         q: CstrntsVal<Self>,
@@ -912,6 +773,17 @@ where
         a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
         a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
+            let pk: &PublicKey<OWF128EM<SimdGF128>> = unsafe { std::mem::transmute(pk) };
+            let chall3 =
+                aes_verify::<OWF128EM<SimdGF128>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
+            return OWFField::<Self>::from(chall3.as_bytes().as_slice());
+        }
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
 }
@@ -983,11 +855,6 @@ where
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    #[cfg(all(
-        feature = "opt-simd", // using simd optimization feature
-        any(target_arch = "x86", target_arch = "x86_64"), // we're on x86/x86_64
-        not(all(target_feature = "avx2", target_feature = "pclmulqdq")) // simd support can't be statically detected
-    ))]
     #[inline]
     fn prove(
         w: &GenericArray<u8, Self::LBytes>,
@@ -996,40 +863,23 @@ where
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self> {
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
             let pk: &PublicKey<OWF192EM<SimdGF192>> = unsafe { std::mem::transmute(pk) };
             let qs_proof = aes_prove::<OWF192EM<SimdGF192>>(w, u, v, pk, chall_2);
-            (
+            return (
                 OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
-            )
-        } else {
-            aes_prove::<Self>(w, u, v, pk, chall_2)
+            );
         }
-    }
-
-    #[cfg(any(
-        not(feature = "opt-simd"),
-        not(any(target_arch = "x86", target_arch = "x86_64")),
-        all(target_feature = "avx2", target_feature = "pclmulqdq")
-    ))]
-    #[inline]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
         aes_prove::<Self>(w, u, v, pk, chall_2)
     }
 
-    #[cfg(all(
-        feature = "opt-simd", // using simd optimization feature
-        any(target_arch = "x86", target_arch = "x86_64"), // we're on x86/x86_64
-        not(all(target_feature = "avx2", target_feature = "pclmulqdq")) // simd support can't be statically detected
-    ))]
     #[inline]
     fn verify(
         q: CstrntsVal<Self>,
@@ -1041,31 +891,17 @@ where
         a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
         // Dynamic feature detection
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
             let pk: &PublicKey<OWF192EM<SimdGF192>> = unsafe { std::mem::transmute(pk) };
             let chall3 =
                 aes_verify::<OWF192EM<SimdGF192>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
-            OWFField::<Self>::from(chall3.as_bytes().as_slice())
-        } else {
-            aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
+            return OWFField::<Self>::from(chall3.as_bytes().as_slice());
         }
-    }
-
-    #[cfg(any(
-        not(feature = "opt-simd"),
-        not(any(target_arch = "x86", target_arch = "x86_64")),
-        all(target_feature = "avx2", target_feature = "pclmulqdq")
-    ))]
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
 }
@@ -1135,11 +971,6 @@ where
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    #[cfg(all(
-        feature = "opt-simd", // using simd optimization feature
-        any(target_arch = "x86", target_arch = "x86_64"), // we're on x86/x86_64
-        not(all(target_feature = "avx2", target_feature = "pclmulqdq")) // simd support can't be statically detected
-    ))]
     #[inline]
     fn prove(
         w: &GenericArray<u8, Self::LBytes>,
@@ -1148,71 +979,23 @@ where
         pk: &PublicKey<Self>,
         chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
     ) -> QSProof<Self> {
-        use crate::fields::Field;
-
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
             let pk: &PublicKey<OWF256EM<SimdGF256>> = unsafe { std::mem::transmute(pk) };
-            let (a1_t, a2_t, a3_t) = aes_prove::<OWF256EM<SimdGF256>>(w, u, v, pk, chall_2);
-            (
-                OWFField::<Self>::from(a1_t.as_bytes().as_slice()),
-                OWFField::<Self>::from(a2_t.as_bytes().as_slice()),
-                OWFField::<Self>::from(a3_t.as_bytes().as_slice()),
-            )
-        } else {
-            aes_prove::<Self>(w, u, v, pk, chall_2)
+            let qs_proof = aes_prove::<OWF256EM<SimdGF256>>(w, u, v, pk, chall_2);
+            return (
+                OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
+                OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
+                OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
+            );
         }
-    }
-
-    #[cfg(all(
-        feature = "opt-simd", // using simd optimization feature
-        any(target_arch = "x86", target_arch = "x86_64"), // we're on x86/x86_64
-        not(all(target_feature = "avx2", target_feature = "pclmulqdq")) // simd support can't be statically detected
-    ))]
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        use crate::fields::Field;
-
-        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq") {
-            let pk: &PublicKey<OWF256EM<SimdGF256>> = unsafe { std::mem::transmute(pk) };
-            OWFField::<Self>::from(
-                aes_verify::<OWF256EM<SimdGF256>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-                    .as_bytes()
-                    .as_slice(),
-            )
-        } else {
-            let chall3 = aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
-            OWFField::<Self>::from(chall3.as_bytes().as_slice())
-        }
-    }
-
-    #[cfg(any(
-        not(feature = "opt-simd"),
-        not(any(target_arch = "x86", target_arch = "x86_64")),
-        all(target_feature = "avx2", target_feature = "pclmulqdq")
-    ))]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
         aes_prove::<Self>(w, u, v, pk, chall_2)
     }
 
-    #[cfg(any(
-        not(feature = "opt-simd"),
-        not(any(target_arch = "x86", target_arch = "x86_64")),
-        all(target_feature = "avx2", target_feature = "pclmulqdq")
-    ))]
     #[inline]
     fn verify(
         q: CstrntsVal<Self>,
@@ -1223,6 +1006,17 @@ where
         a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
         a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
     ) -> OWFField<Self> {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
+            let pk: &PublicKey<OWF256EM<SimdGF256>> = unsafe { std::mem::transmute(pk) };
+            let chall3 =
+                aes_verify::<OWF256EM<SimdGF256>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
+            return OWFField::<Self>::from(chall3.as_bytes().as_slice());
+        }
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
     }
 }
