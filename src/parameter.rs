@@ -2,7 +2,6 @@ use std::{
     iter::repeat_n,
     marker::PhantomData,
     ops::{Add, Div, Mul, Sub},
-    sync::LazyLock,
 };
 
 use aes::{
@@ -21,14 +20,13 @@ use generic_array::{
 };
 use rand_core::RngCore;
 
-#[allow(unused_imports)]
 use crate::{
     bavc::{
         BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast, BAVC192FastEM,
         BAVC192Small, BAVC192SmallEM, BAVC256Fast, BAVC256FastEM, BAVC256Small, BAVC256SmallEM,
         BatchVectorCommitment,
     },
-    fields::{BigGaloisField, Field, GF128, GF192, GF256},
+    fields::{BigGaloisField, GF128, GF192, GF256},
     internal_keys::{PublicKey, SecretKey},
     prg::{PRG128, PRG192, PRG256, PseudoRandomGenerator},
     random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake256},
@@ -43,14 +41,21 @@ use crate::{
     any(target_arch = "x86", target_arch = "x86_64"),
     not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
 ))]
-use crate::fields::x86_simd_large_fields::{
-    GF128 as SimdGF128, GF192 as SimdGF192, GF256 as SimdGF256,
+use crate::fields::{
+    Field,
+    x86_simd_large_fields::{GF128 as SimdGF128, GF192 as SimdGF192, GF256 as SimdGF256},
 };
 
+#[cfg(all(
+    feature = "opt-simd",
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+))]
 /// Weather AVX2 support is detected at runtime
-#[allow(unused)]
-static DYNAMIC_AVX2_SUPPORT_AVAILABLE: LazyLock<bool> =
-    LazyLock::new(|| is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq"));
+pub(crate) static DYNAMIC_AVX2_SUPPORT_AVAILABLE: std::sync::LazyLock<bool> =
+    std::sync::LazyLock::new(|| {
+        is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq")
+    });
 
 // FAEST signature sizes
 type U4506 = Sum<Prod<U4, U1000>, U506>;
