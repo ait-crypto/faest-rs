@@ -6,6 +6,7 @@ pub(crate) mod large_fields;
 pub(crate) mod small_fields;
 
 #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
+#[allow(unused_unsafe)]
 pub(crate) mod x86_simd_large_fields;
 
 pub(crate) use large_fields::{
