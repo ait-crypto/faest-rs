@@ -285,7 +285,7 @@ unsafe fn combine_poly128s_7(v: [__m128i; 7]) -> [__m128i; 4] {
 
 #[inline]
 #[target_feature(enable = "avx2")]
-fn combine_poly128s_13(v: [__m128i; 13]) -> [__m128i; 6] {
+unsafe fn combine_poly128s_13(v: [__m128i; 13]) -> [__m128i; 6] {
     unsafe {
         [
             _mm_xor_si128(v[0], _mm_slli_si128(v[1], 8)),
