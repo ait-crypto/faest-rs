@@ -639,11 +639,11 @@ where
             GenericArray_AES::from_mut_slice(&mut output[..16]),
         );
 
-        let mut input: [u8; 16] = (*input).try_into().expect("Invalid input length");
+        let mut input = GenericArray_AES::from_slice(input).to_owned();
         input[0] ^= 1;
 
         aes.encrypt_block_b2b(
-            GenericArray_AES::from_slice(&input),
+            &input,
             GenericArray_AES::from_mut_slice(&mut output[16..]),
         );
     }
@@ -762,11 +762,11 @@ where
             GenericArray_AES::from_mut_slice(&mut output[..16]),
         );
 
-        let mut input: [u8; 16] = (*input).try_into().expect("Invalid input length");
+        let mut input = GenericArray_AES::from_slice(input).to_owned();
         input[0] ^= 1;
 
         aes.encrypt_block_b2b(
-            GenericArray_AES::from_slice(&input),
+            &input,
             GenericArray_AES::from_mut_slice(&mut output[16..]),
         );
     }
