@@ -112,7 +112,7 @@ fn hash_v_matrix<BP>(
 ) where
     BP: BaseParameters,
 {
-    let vole_hasher_v = BP::VoleHasher::new_vole_hasher(&chall1);
+    let vole_hasher_v = BP::VoleHasher::new_vole_hasher(chall1);
 
     for vi in v {
         // Hash column-wise
@@ -128,8 +128,8 @@ fn hash_u_vector<BP>(
 ) where
     BP: BaseParameters,
 {
-    let vole_hasher_u = BP::VoleHasher::new_vole_hasher(&chall1);
-    signature_u.copy_from_slice(vole_hasher_u.process(&u).as_slice());
+    let vole_hasher_u = BP::VoleHasher::new_vole_hasher(chall1);
+    signature_u.copy_from_slice(vole_hasher_u.process(u).as_slice());
 }
 
 /// Base parameters per security level
