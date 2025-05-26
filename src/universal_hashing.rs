@@ -23,7 +23,7 @@ use crate::{
     any(target_arch = "x86", target_arch = "x86_64"),
     not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
 ))]
-use crate::parameter::DYNAMIC_AVX2_SUPPORT_AVAILABLE;
+use crate::parameter::AVX2_DYNAMIC_DISPATCH_AVAILABLE;
 
 #[cfg(all(
     feature = "opt-simd",
@@ -35,8 +35,9 @@ use crate::fields::x86_simd_large_fields::{
     GF576 as SimdGF576, GF768 as SimdGF768,
 };
 
+/// Additional bits returned by VOLE hash
 type BBits = U16;
-// Additional bytes returned by VOLE hash
+/// Additional bytes returned by VOLE hash
 pub(crate) type B = Quot<BBits, U8>;
 
 /// Interface to instantiate a VOLE hasher
@@ -415,7 +416,7 @@ impl LeafHasher for LeafHasher128 {
             any(target_arch = "x86", target_arch = "x86_64"),
             not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
         ))]
-        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             let u = SimdGF384::from(uhash.as_slice());
             let x0 = SimdGF128::from(&x[..<SimdGF128 as Field>::Length::USIZE]);
             let x1 = SimdGF384::from(&x[<<Self as LeafHasher>::F as Field>::Length::USIZE..]);
@@ -452,7 +453,7 @@ impl LeafHasher for LeafHasher192 {
             any(target_arch = "x86", target_arch = "x86_64"),
             not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
         ))]
-        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             let u = SimdGF576::from(uhash.as_slice());
             let x0 = SimdGF192::from(&x[..<SimdGF192 as Field>::Length::USIZE]);
             let x1 = SimdGF576::from(&x[<<Self as LeafHasher>::F as Field>::Length::USIZE..]);
@@ -489,7 +490,7 @@ impl LeafHasher for LeafHasher256 {
             any(target_arch = "x86", target_arch = "x86_64"),
             not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
         ))]
-        if *DYNAMIC_AVX2_SUPPORT_AVAILABLE {
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             let u = SimdGF768::from(uhash.as_slice());
             let x0 = SimdGF256::from(&x[..<SimdGF256 as Field>::Length::USIZE]);
             let x1 = SimdGF768::from(&x[<<Self as LeafHasher>::F as Field>::Length::USIZE..]);

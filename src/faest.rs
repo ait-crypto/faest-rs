@@ -420,20 +420,13 @@ where
     RO::<P>::hash_challenge_1(&mut chall1, &mu, &com, signature.cs, iv.as_slice());
 
     // ::10
-    let vole_hasher_u = VoleHasher::<P>::new_vole_hasher(&chall1);
-    let vole_haher_v = vole_hasher_u.clone();
-
-    // write u_tilde to signature
-    signature
-        .u_tilde
-        .copy_from_slice(vole_hasher_u.process(&u).as_slice());
+    // hash u and write the result (i.e., u_tilde) into signature
+    O::BaseParams::hash_u_vector(signature.u_tilde, &u, &chall1);
 
     // ::11
+    // hash v row by row and update h2_hasher with the row hashes
     let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), signature.u_tilde);
-    for i in 0..O::Lambda::USIZE {
-        // Hash column-wise
-        h2_hasher.update(vole_haher_v.process(&v[i]).as_slice());
-    }
+    O::BaseParams::hash_v_matrix(&mut h2_hasher, v.as_slice(), &chall1);
 
     // ::13
     // compute and write masked witness 'd' in signature
