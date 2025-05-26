@@ -4,10 +4,7 @@
 use std::arch::x86 as x86_64;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64;
-use std::{
-    arch::x86_64::_mm256_set_m128i,
-    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
-};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use x86_64::{
     __m128i, __m256i, _mm_alignr_epi8, _mm_and_si128, _mm_andnot_si128, _mm_bslli_si128,
     _mm_clmulepi64_si128, _mm_cmpeq_epi32, _mm_loadu_si128, _mm_or_si128, _mm_set_epi8,
@@ -16,10 +13,10 @@ use x86_64::{
     _mm_storeu_si128, _mm_test_all_zeros, _mm_xor_si128, _mm256_and_si256, _mm256_blend_epi32,
     _mm256_blendv_epi8, _mm256_cmpeq_epi32, _mm256_extracti128_si256, _mm256_loadu_si256,
     _mm256_maskload_epi64, _mm256_maskstore_epi64, _mm256_or_si256, _mm256_permute4x64_epi64,
-    _mm256_permutevar8x32_epi32, _mm256_set1_epi64x, _mm256_setr_epi64x, _mm256_setr_m128i,
-    _mm256_setzero_si256, _mm256_slli_epi32, _mm256_slli_epi64, _mm256_srai_epi32,
-    _mm256_srli_epi32, _mm256_srli_epi64, _mm256_storeu_si256, _mm256_testz_si256,
-    _mm256_xor_si256,
+    _mm256_permutevar8x32_epi32, _mm256_set_m128i, _mm256_set1_epi64x, _mm256_setr_epi64x,
+    _mm256_setr_m128i, _mm256_setzero_si256, _mm256_slli_epi32, _mm256_slli_epi64,
+    _mm256_srai_epi32, _mm256_srli_epi32, _mm256_srli_epi64, _mm256_storeu_si256,
+    _mm256_testz_si256, _mm256_xor_si256,
 };
 
 use generic_array::{
