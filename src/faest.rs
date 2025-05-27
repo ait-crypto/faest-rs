@@ -1,4 +1,4 @@
-use std::{iter::zip, marker::PhantomData};
+use std::marker::PhantomData;
 
 use generic_array::{GenericArray, typenum::Unsigned};
 use rand_core::CryptoRngCore;
@@ -11,8 +11,7 @@ use crate::{
     parameter::{BaseParameters, FAESTParameters, OWFParameters, TauParameters, Witness},
     prg::{IV, IVSize},
     random_oracles::{Hasher, RandomOracle},
-    universal_hashing::{VoleHasherInit, VoleHasherProcess},
-    utils::{Reader, decode_all_chall_3, xor_arrays_inplace, xor_arrays_into},
+    utils::{Reader, decode_all_chall_3, xor_arrays_into},
     vole::{
         VoleCommitResult, VoleCommitmentCRef, VoleCommitmentCRefMut, VoleReconstructResult,
         volecommit, volereconstruct,
@@ -21,8 +20,6 @@ use crate::{
 
 type RO<P> =
     <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle;
-type VoleHasher<P> =
-    <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::VoleHasher;
 
 /// Wraps the prover's signature.
 ///
@@ -435,7 +432,6 @@ where
     // ::14
     let mut chall2 = GenericArray::default();
     RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, signature.d);
-
     // ::18
     let (a0_tilde, a1_tilde, a2_tilde) = P::OWF::prove(
         witness,
@@ -443,8 +439,7 @@ where
         GenericArray::from_slice(
             &u[O::LBytes::USIZE..O::LBytes::USIZE + O::LambdaBytesTimes2::USIZE],
         ),
-        // ::17
-        GenericArray::from_slice(&v),
+        &v,
         &sk.pk,
         &chall2,
     );
@@ -523,19 +518,14 @@ where
 
     let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), signature.u_tilde);
 
-    {
-        let vole_hasher = VoleHasher::<P>::new_vole_hasher(&chall1);
-        for (i, d_i) in zip(0..O::Lambda::USIZE, P::decode_challenge_as_iter(chall3)) {
-            // ::12
-            let mut q_tilde = vole_hasher.process(&q[i]);
-            // ::14
-            if d_i == 1 {
-                xor_arrays_inplace(&mut q_tilde, signature.u_tilde);
-            }
-            // ::15
-            h2_hasher.update(&q_tilde);
-        }
-    }
+    // ::12-14
+    O::BaseParams::hash_q_matrix(
+        &mut h2_hasher,
+        q.as_slice(),
+        signature.u_tilde,
+        &chall1,
+        P::decode_challenge_as_iter(chall3),
+    );
 
     // ::15
     let mut chall2 = GenericArray::default();

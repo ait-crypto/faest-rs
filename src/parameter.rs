@@ -1,5 +1,5 @@
 use std::{
-    iter::repeat_n,
+    iter::{repeat_n, zip},
     marker::PhantomData,
     ops::{Add, Div, Mul, Sub},
 };
@@ -8,6 +8,9 @@ use aes::{
     Aes128Enc, Aes192Enc, Aes256Enc,
     cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray as GenericArray_AES},
 };
+
+use cfg_if::cfg_if;
+
 use generic_array::{
     ArrayLength, GenericArray,
     typenum::{
@@ -18,6 +21,7 @@ use generic_array::{
         U984, U1000, U1024, U2048, U4096, Unsigned,
     },
 };
+
 use rand_core::RngCore;
 
 use crate::{
@@ -32,30 +36,44 @@ use crate::{
     random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256},
     rijndael_32::{Rijndael192, Rijndael256},
     universal_hashing::{B, VoleHasher, VoleHasherInit, VoleHasherProcess, ZKHasher, ZKHasherInit},
+    utils::xor_arrays_inplace,
     witness::aes_extendedwitness,
     zk_constraints::{CstrntsVal, aes_prove, aes_verify},
 };
 
-#[cfg(all(
-    feature = "opt-simd",
-    any(target_arch = "x86", target_arch = "x86_64"),
-    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-))]
-use crate::fields::{
-    Field,
-    x86_simd_large_fields::{GF128 as SimdGF128, GF192 as SimdGF192, GF256 as SimdGF256},
-};
 
-#[cfg(all(
+
+cfg_if!(
+    if #[cfg(all(
     feature = "opt-simd",
     any(target_arch = "x86", target_arch = "x86_64"),
     not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-))]
-/// Weather AVX2 support is detected at runtime
-pub(crate) static AVX2_DYNAMIC_DISPATCH_AVAILABLE: std::sync::LazyLock<bool> =
+))]{
+    use crate::fields::{
+        Field,
+        // AVX2-optimized field implementatons
+        x86_simd_large_fields::{GF128 as SimdGF128, GF192 as SimdGF192, GF256 as SimdGF256},
+    };
+
+    /// Weather AVX2 support is detected at runtime
+    pub(crate) static AVX2_DYNAMIC_DISPATCH_AVAILABLE: std::sync::LazyLock<bool> =
     std::sync::LazyLock::new(|| {
         is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq")
     });
+
+    // BaseParameters with optimized field implementation
+    type SimdBaseParams128 = BaseParams128<SimdGF128>;
+    type SimdBaseParams192 = BaseParams192<SimdGF192>;
+    type SimdBaseParams256 = BaseParams256<SimdGF256>;
+
+    // OWFParameters with optimized field implementation
+    type SimdOWF128 = OWF128<SimdGF128>;
+    type SimdOWF192 = OWF192<SimdGF192>;
+    type SimdOWF256 = OWF256<SimdGF256>;
+    type SimdOWF128EM = OWF128EM<SimdGF128>;
+    type SimdOWF192EM = OWF192EM<SimdGF192>;
+    type SimdOWF256EM = OWF256EM<SimdGF256>;
+});
 
 // FAEST signature sizes
 type U4506 = Sum<Prod<U4, U1000>, U506>;
@@ -112,24 +130,47 @@ fn hash_v_matrix<BP>(
 ) where
     BP: BaseParameters,
 {
-    let vole_hasher_v = BP::VoleHasher::new_vole_hasher(chall1);
+    let vole_hasher = BP::VoleHasher::new_vole_hasher(chall1);
 
     for vi in v {
         // Hash column-wise
-        h2_hasher.update(VoleHasherProcess::process(&vole_hasher_v, vi).as_slice());
+        h2_hasher.update(VoleHasherProcess::process(&vole_hasher, vi).as_slice());
     }
 }
 
 #[inline]
 fn hash_u_vector<BP>(
-    signature_u: &mut [u8],
+    u_tilde_sig: &mut [u8],
     u: &GenericArray<u8, impl ArrayLength>,
     chall1: &GenericArray<u8, BP::Chall1>,
 ) where
     BP: BaseParameters,
 {
     let vole_hasher_u = BP::VoleHasher::new_vole_hasher(chall1);
-    signature_u.copy_from_slice(vole_hasher_u.process(u).as_slice());
+    u_tilde_sig.copy_from_slice(vole_hasher_u.process(u).as_slice());
+}
+
+#[inline]
+fn hash_q_matrix<BP>(
+    h2_hasher: &mut impl Hasher,
+    q: &[GenericArray<u8, impl ArrayLength>],
+    u_tilde_sig: &[u8],
+    chall1: &GenericArray<u8, BP::Chall1>,
+    decoded_chall3_iter: impl Iterator<Item = u8>,
+) where
+    BP: BaseParameters,
+{
+    let vole_hasher = BP::VoleHasher::new_vole_hasher(chall1);
+    for (q_i, d_i) in zip(q, decoded_chall3_iter) {
+        // ::12
+        let mut q_tilde = vole_hasher.process(q_i);
+        // ::14
+        if d_i == 1 {
+            xor_arrays_inplace(&mut q_tilde, u_tilde_sig);
+        }
+        // ::15
+        h2_hasher.update(&q_tilde);
+    }
 }
 
 /// Base parameters per security level
@@ -169,6 +210,14 @@ pub(crate) trait BaseParameters {
         u: &GenericArray<u8, impl ArrayLength>,
         chall1: &GenericArray<u8, Self::Chall1>,
     );
+    /// Hash `q` row by row using [`Self::ZKHasher`] and update `h2_hasher` with the results
+    fn hash_q_matrix(
+        h2_hasher: &mut impl Hasher,
+        q: &[GenericArray<u8, impl ArrayLength>],
+        u_tilde_sig: &[u8],
+        chall1: &GenericArray<u8, Self::Chall1>,
+        decoded_chall3_iter: impl Iterator<Item = u8>,
+    );
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -205,7 +254,7 @@ where
             not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
         ))]
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_v_matrix::<BaseParams128<SimdGF128>>(h2_hasher, v, chall1);
+            hash_v_matrix::<SimdBaseParams128>(h2_hasher, v, chall1);
             return;
         }
         hash_v_matrix::<Self>(h2_hasher, v, chall1);
@@ -222,10 +271,35 @@ where
             not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
         ))]
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_u_vector::<BaseParams128<SimdGF128>>(signature_u, u, chall1);
+            hash_u_vector::<SimdBaseParams128>(signature_u, u, chall1);
             return;
         }
         hash_u_vector::<Self>(signature_u, u, chall1);
+    }
+
+    fn hash_q_matrix(
+        h2_hasher: &mut impl Hasher,
+        q: &[GenericArray<u8, impl ArrayLength>],
+        u_tilde_sig: &[u8],
+        chall1: &GenericArray<u8, Self::Chall1>,
+        decoded_chall3_iter: impl Iterator<Item = u8>,
+    ) {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            hash_q_matrix::<SimdBaseParams128>(
+                h2_hasher,
+                q,
+                u_tilde_sig,
+                chall1,
+                decoded_chall3_iter,
+            );
+            return;
+        }
+        hash_q_matrix::<Self>(h2_hasher, q, u_tilde_sig, chall1, decoded_chall3_iter);
     }
 }
 
@@ -261,7 +335,7 @@ where
             not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
         ))]
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_v_matrix::<BaseParams192<SimdGF192>>(h2_hasher, v, chall1);
+            hash_v_matrix::<SimdBaseParams192>(h2_hasher, v, chall1);
             return;
         }
         hash_v_matrix::<Self>(h2_hasher, v, chall1);
@@ -278,10 +352,35 @@ where
             not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
         ))]
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_u_vector::<BaseParams192<SimdGF192>>(signature_u, u, chall1);
+            hash_u_vector::<SimdBaseParams192>(signature_u, u, chall1);
             return;
         }
         hash_u_vector::<Self>(signature_u, u, chall1);
+    }
+
+    fn hash_q_matrix(
+        h2_hasher: &mut impl Hasher,
+        q: &[GenericArray<u8, impl ArrayLength>],
+        u_tilde_sig: &[u8],
+        chall1: &GenericArray<u8, Self::Chall1>,
+        decoded_chall3_iter: impl Iterator<Item = u8>,
+    ) {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            hash_q_matrix::<SimdBaseParams192>(
+                h2_hasher,
+                q,
+                u_tilde_sig,
+                chall1,
+                decoded_chall3_iter,
+            );
+            return;
+        }
+        hash_q_matrix::<Self>(h2_hasher, q, u_tilde_sig, chall1, decoded_chall3_iter);
     }
 }
 
@@ -317,7 +416,7 @@ where
             not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
         ))]
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_v_matrix::<BaseParams256<SimdGF256>>(h2_hasher, v, chall1);
+            hash_v_matrix::<SimdBaseParams256>(h2_hasher, v, chall1);
             return;
         }
         hash_v_matrix::<Self>(h2_hasher, v, chall1);
@@ -334,10 +433,35 @@ where
             not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
         ))]
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_u_vector::<BaseParams256<SimdGF256>>(signature_u, u, chall1);
+            hash_u_vector::<SimdBaseParams256>(signature_u, u, chall1);
             return;
         }
         hash_u_vector::<Self>(signature_u, u, chall1);
+    }
+
+    fn hash_q_matrix(
+        h2_hasher: &mut impl Hasher,
+        q: &[GenericArray<u8, impl ArrayLength>],
+        u_tilde_sig: &[u8],
+        chall1: &GenericArray<u8, Self::Chall1>,
+        decoded_chall3_iter: impl Iterator<Item = u8>,
+    ) {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            hash_q_matrix::<SimdBaseParams256>(
+                h2_hasher,
+                q,
+                u_tilde_sig,
+                chall1,
+                decoded_chall3_iter,
+            );
+            return;
+        }
+        hash_q_matrix::<Self>(h2_hasher, q, u_tilde_sig, chall1, decoded_chall3_iter);
     }
 }
 
@@ -550,8 +674,8 @@ where
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
             // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<OWF128<SimdGF128>> = unsafe { std::mem::transmute(pk) };
-            let qs_proof = aes_prove::<OWF128<SimdGF128>>(w, u, v, pk, chall_2);
+            let pk: &PublicKey<SimdOWF128> = unsafe { std::mem::transmute(pk) };
+            let qs_proof = aes_prove::<SimdOWF128>(w, u, v, pk, chall_2);
             return (
                 OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
@@ -579,9 +703,8 @@ where
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
             // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<OWF128<SimdGF128>> = unsafe { std::mem::transmute(pk) };
-            let chall3 =
-                aes_verify::<OWF128<SimdGF128>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
+            let pk: &PublicKey<SimdOWF128> = unsafe { std::mem::transmute(pk) };
+            let chall3 = aes_verify::<SimdOWF128>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
             return OWFField::<Self>::from(chall3.as_bytes().as_slice());
         }
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
@@ -642,10 +765,7 @@ where
         let mut input = GenericArray_AES::from_slice(input).to_owned();
         input[0] ^= 1;
 
-        aes.encrypt_block_b2b(
-            &input,
-            GenericArray_AES::from_mut_slice(&mut output[16..]),
-        );
+        aes.encrypt_block_b2b(&input, GenericArray_AES::from_mut_slice(&mut output[16..]));
     }
 
     #[inline]
@@ -672,8 +792,8 @@ where
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
             // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<OWF192<SimdGF192>> = unsafe { std::mem::transmute(pk) };
-            let qs_proof = aes_prove::<OWF192<SimdGF192>>(w, u, v, pk, chall_2);
+            let pk: &PublicKey<SimdOWF192> = unsafe { std::mem::transmute(pk) };
+            let qs_proof = aes_prove::<SimdOWF192>(w, u, v, pk, chall_2);
             return (
                 OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
@@ -701,9 +821,8 @@ where
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
             // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<OWF192<SimdGF192>> = unsafe { std::mem::transmute(pk) };
-            let chall3 =
-                aes_verify::<OWF192<SimdGF192>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
+            let pk: &PublicKey<SimdOWF192> = unsafe { std::mem::transmute(pk) };
+            let chall3 = aes_verify::<SimdOWF192>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
             return OWFField::<Self>::from(chall3.as_bytes().as_slice());
         }
 
@@ -765,10 +884,7 @@ where
         let mut input = GenericArray_AES::from_slice(input).to_owned();
         input[0] ^= 1;
 
-        aes.encrypt_block_b2b(
-            &input,
-            GenericArray_AES::from_mut_slice(&mut output[16..]),
-        );
+        aes.encrypt_block_b2b(&input, GenericArray_AES::from_mut_slice(&mut output[16..]));
     }
 
     #[inline]
@@ -795,8 +911,8 @@ where
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
             // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<OWF256<SimdGF256>> = unsafe { std::mem::transmute(pk) };
-            let qs_proof = aes_prove::<OWF256<SimdGF256>>(w, u, v, pk, chall_2);
+            let pk: &PublicKey<SimdOWF256> = unsafe { std::mem::transmute(pk) };
+            let qs_proof = aes_prove::<SimdOWF256>(w, u, v, pk, chall_2);
             return (
                 OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
@@ -824,9 +940,8 @@ where
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
             // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<OWF256<SimdGF256>> = unsafe { std::mem::transmute(pk) };
-            let chall3 =
-                aes_verify::<OWF256<SimdGF256>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
+            let pk: &PublicKey<SimdOWF256> = unsafe { std::mem::transmute(pk) };
+            let chall3 = aes_verify::<SimdOWF256>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
             return OWFField::<Self>::from(chall3.as_bytes().as_slice());
         }
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
@@ -912,8 +1027,8 @@ where
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
             // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<OWF128EM<SimdGF128>> = unsafe { std::mem::transmute(pk) };
-            let qs_proof = aes_prove::<OWF128EM<SimdGF128>>(w, u, v, pk, chall_2);
+            let pk: &PublicKey<SimdOWF128EM> = unsafe { std::mem::transmute(pk) };
+            let qs_proof = aes_prove::<SimdOWF128EM>(w, u, v, pk, chall_2);
             return (
                 OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
@@ -941,9 +1056,8 @@ where
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
             // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<OWF128EM<SimdGF128>> = unsafe { std::mem::transmute(pk) };
-            let chall3 =
-                aes_verify::<OWF128EM<SimdGF128>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
+            let pk: &PublicKey<SimdOWF128EM> = unsafe { std::mem::transmute(pk) };
+            let chall3 = aes_verify::<SimdOWF128EM>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
             return OWFField::<Self>::from(chall3.as_bytes().as_slice());
         }
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
@@ -1033,8 +1147,8 @@ where
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
             // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<OWF192EM<SimdGF192>> = unsafe { std::mem::transmute(pk) };
-            let qs_proof = aes_prove::<OWF192EM<SimdGF192>>(w, u, v, pk, chall_2);
+            let pk: &PublicKey<SimdOWF192EM> = unsafe { std::mem::transmute(pk) };
+            let qs_proof = aes_prove::<SimdOWF192EM>(w, u, v, pk, chall_2);
             return (
                 OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
@@ -1063,9 +1177,8 @@ where
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
             // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<OWF192EM<SimdGF192>> = unsafe { std::mem::transmute(pk) };
-            let chall3 =
-                aes_verify::<OWF192EM<SimdGF192>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
+            let pk: &PublicKey<SimdOWF192EM> = unsafe { std::mem::transmute(pk) };
+            let chall3 = aes_verify::<SimdOWF192EM>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
             return OWFField::<Self>::from(chall3.as_bytes().as_slice());
         }
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
@@ -1153,8 +1266,8 @@ where
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
             // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<OWF256EM<SimdGF256>> = unsafe { std::mem::transmute(pk) };
-            let qs_proof = aes_prove::<OWF256EM<SimdGF256>>(w, u, v, pk, chall_2);
+            let pk: &PublicKey<SimdOWF256EM> = unsafe { std::mem::transmute(pk) };
+            let qs_proof = aes_prove::<SimdOWF256EM>(w, u, v, pk, chall_2);
             return (
                 OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
                 OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
@@ -1182,9 +1295,8 @@ where
         if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
             // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
             // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<OWF256EM<SimdGF256>> = unsafe { std::mem::transmute(pk) };
-            let chall3 =
-                aes_verify::<OWF256EM<SimdGF256>>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
+            let pk: &PublicKey<SimdOWF256EM> = unsafe { std::mem::transmute(pk) };
+            let chall3 = aes_verify::<SimdOWF256EM>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
             return OWFField::<Self>::from(chall3.as_bytes().as_slice());
         }
         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
