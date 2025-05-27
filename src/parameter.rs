@@ -41,8 +41,6 @@ use crate::{
     zk_constraints::{CstrntsVal, aes_prove, aes_verify},
 };
 
-
-
 cfg_if!(
     if #[cfg(all(
     feature = "opt-simd",
