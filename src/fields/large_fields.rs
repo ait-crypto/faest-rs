@@ -293,7 +293,6 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: Self) -> Self::Output {
         Self(array::from_fn(|idx| self.0[idx] ^ rhs.0[idx]))
     }
@@ -306,7 +305,6 @@ where
     type Output = Self;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: &Self) -> Self::Output {
         Self(array::from_fn(|idx| self.0[idx] ^ rhs.0[idx]))
     }
@@ -319,7 +317,6 @@ where
     type Output = BigGF<T, N, LENGTH>;
 
     #[inline]
-    #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, rhs: Self) -> Self::Output {
         BigGF(array::from_fn(|idx| self.0[idx] ^ rhs.0[idx]))
     }
