@@ -22,6 +22,210 @@ use rand::{
 
 use super::{Double, ExtensionField, Field, GF8, GF64, Square};
 
+/// U128_LOWER_MASK = 0xFFFFFFFFFFFFFFFF
+const U128_LOWER_MASK: u128 = u64::MAX as u128;
+
+#[inline]
+fn allignr_8(x: u128, y: u128) -> u128 {
+    ((x & U128_LOWER_MASK) << 64) ^ y >> 64
+}
+
+#[inline]
+fn combine_poly128s_4(x: [u128; 4]) -> [u128; 3] {
+    [
+        x[0] ^ x[1] << 64,
+        x[1] >> 64 ^ x[2] ^ x[3] << 64,
+        x[3] >> 64,
+    ]
+}
+
+#[inline]
+fn combine_poly128s_7(x: [u128; 7]) -> [u128; 4] {
+    [
+        x[0] ^ x[1] << 64,
+        x[1] >> 64 ^ x[2] ^ x[3] << 64,
+        x[3] >> 64 ^ x[4] ^ x[5] << 64,
+        x[5] >> 64 ^ x[6],
+    ]
+}
+
+#[inline]
+fn combine_poly128s_13(x: [u128; 13]) -> [u128; 6] {
+    [
+        x[0] ^ x[1] << 64,
+        x[1] >> 64 ^ x[2] ^ x[3] << 64,
+        x[3] >> 64 ^ x[4] ^ x[5] << 64,
+        x[5] >> 64 ^ x[6] ^ x[7] << 64,
+        x[7] >> 64 ^ x[8] ^ x[9] << 64,
+        x[11] >> 64 ^ x[10] ^ x[12],
+    ]
+}
+
+#[inline]
+fn combine_polys128s_14(x: [u128; 15]) -> [u128; 8] {
+    [
+        x[0] ^ x[1] << 64,
+        x[1] >> 64 ^ x[2] ^ x[3] << 64,
+        x[3] >> 64 ^ x[4] ^ x[5] << 64,
+        x[5] >> 64 ^ x[6] ^ x[7] << 64,
+        x[7] >> 64 ^ x[8] ^ x[9] << 64,
+        x[9] >> 64 ^ x[10] ^ x[11] << 64,
+        x[11] >> 64 ^ x[12] ^ x[13] << 64,
+        x[13] >> 64 ^ x[14],
+    ]
+}
+
+#[inline]
+fn poly384_reduce192(x: [u128; 3]) -> [u128; 2] {
+    let xmod = [
+        u128_clmul_ll(GF192::MODULUS, x[2]),
+        u128_clmul_64_lh(GF192::MODULUS, x[2]),
+    ];
+
+    let mut combined = [x[0] ^ xmod[0] << 64, x[1] ^ xmod[1]];
+
+    combined[0] ^= u128_clmul_64_lh(GF192::MODULUS, combined[1]);
+    combined[1] ^= xmod[0] >> 64;
+    combined[1] &= U128_LOWER_MASK;
+
+    combined
+}
+
+/// Reduces a 512-bit polynomial `x` over the finite field GF(2) modulo the 576-bit irreducible polynomial [`GF384::MODULUS`].
+#[inline]
+fn poly512_reduce384(mut x: [u128; 4]) -> [u128; 3] {
+    let xmod = [
+        u128_clmul_ll(GF384::MODULUS, x[3]),
+        u128_clmul_64_lh(GF384::MODULUS, x[3]),
+    ];
+
+    let xmod_combined = [xmod[0] ^ xmod[1] << 64, xmod[1] >> 64];
+
+    x[0] ^= xmod_combined[0];
+    x[1] ^= xmod_combined[1];
+
+    [x[0], x[1], x[2]]
+}
+
+/// Reduces a 768-bit polynomial `x` over the finite field GF(2) modulo the 576-bit irreducible polynomial [`GF576::MODULUS`].
+#[inline]
+fn poly768_reduce576(x: [u128; 6]) -> [u128; 5] {
+    let xmod = [
+        u128_clmul_64_lh(GF576::MODULUS, x[4]),
+        u128_clmul_ll(GF576::MODULUS, x[5]),    //2^64
+        u128_clmul_64_lh(GF576::MODULUS, x[5]), //2^128
+    ];
+
+    let xmod_combined = [xmod[0] ^ xmod[1] << 64, xmod[2] ^ xmod[1] >> 64];
+
+    [
+        x[0] ^ xmod_combined[0],
+        x[1] ^ xmod_combined[1],
+        x[2],
+        x[3],
+        x[4],
+    ]
+}
+
+/// Reduces a 1024-bit polynomial `x` over the finite field GF(2) modulo the 768-bit irreducible polynomial [`GF768::MODULUS`].
+#[inline]
+fn poly1024_reduce768(x: [u128; 8]) -> [u128; 6] {
+    let xmod = [
+        u128_clmul_ll(GF768::MODULUS, x[6]),
+        u128_clmul_64_lh(GF768::MODULUS, x[6]),
+        u128_clmul_ll(GF768::MODULUS, x[7]),
+        u128_clmul_64_lh(GF768::MODULUS, x[7]),
+    ];
+
+    let xmod_combined = [
+        xmod[0] ^ xmod[1] << 64,
+        xmod[1] >> 64 ^ xmod[2] ^ xmod[3] << 64,
+        xmod[3] >> 64,
+    ];
+
+    [
+        x[0] ^ xmod_combined[0],
+        x[1] ^ xmod_combined[1],
+        x[2] ^ xmod_combined[2],
+        x[3],
+        x[4],
+        x[5],
+    ]
+}
+
+/// Perform a carry-less multiplication of two 64-bit polynomials over the finite field GF(2).
+///
+/// This function takes the lower halves of both lhs and rhs.
+fn u128_clmul_ll(lhs: u128, rhs: u128) -> u128 {
+    // Select lower 64 bits from lhs and rhs
+    let (lhs, rhs) = (lhs & U128_LOWER_MASK, rhs & U128_LOWER_MASK);
+
+    u128_clmul_64(lhs, rhs)
+}
+
+/// Perform a carry-less multiplication of two 64-bit polynomials over the finite field GF(2).
+///
+/// This function takes the upper halves of both lhs and rhs.
+fn u128_clmul_hh(lhs: u128, rhs: u128) -> u128 {
+    // Select upper 64 bits from lhs and rhs
+    let (lhs, rhs) = (lhs >> 64, rhs >> 64);
+
+    u128_clmul_64(lhs, rhs)
+}
+
+/// Perform a carry-less multiplication of two 64-bit polynomials over the finite field GF(2).
+///
+/// This function takes the upper half of lhs and the lower half of rhs.
+fn u128_clmul_64_lh(lhs: u128, rhs: u128) -> u128 {
+    // Select lower 64 bits from lhs and rhs
+    let (lhs, rhs) = (lhs & U128_LOWER_MASK, rhs >> 64);
+
+    u128_clmul_64(lhs, rhs)
+}
+
+#[inline]
+fn u128_clmul_64(mut lhs: u128, mut rhs: u128) -> u128 {
+    let mut res = lhs & (-Wrapping(rhs & 1)).0;
+    for _ in 1..64 {
+        lhs <<= 1;
+        rhs >>= 1;
+        res ^= lhs & (-Wrapping(rhs & 1)).0;
+    }
+    res
+}
+
+/// Splits `lhs` and `rhs` into four 64-bit polynomials over GF(2) and uses [`u128_clmul_64`] to perform karatsuba multiplication.
+///
+/// Returns the uncombined result of the multiplication (i.e., `lhs` * `rhs` = `lo` + 2^64 * `mid` + 2^128 * `hi`).
+#[inline]
+fn karatsuba_mul_128_uncombined(lhs: u128, rhs: u128) -> [u128; 3] {
+    let lo = u128_clmul_ll(lhs, rhs);
+    let hi = u128_clmul_hh(lhs, rhs);
+
+    let lhs_sum = (lhs >> 64) ^ lhs & U128_LOWER_MASK;
+    let rhs_sum = (rhs >> 64) ^ rhs & U128_LOWER_MASK;
+    let mid = u128_clmul_ll(lhs_sum, rhs_sum) ^ lo ^ hi;
+
+    [lo, mid, hi]
+}
+
+#[inline]
+fn karatsuba_mul_128_uninterpolated_other_sum(
+    x: u128,
+    y: u128,
+    x_for_sum: u128,
+    y_for_sum: u128,
+) -> [u128; 3] {
+    let x0y0 = u128_clmul_ll(x, y);
+    let x1y1 = u128_clmul_hh(x, y);
+    let x1_cat_y0 = allignr_8(y_for_sum, x_for_sum);
+    let xsum = x_for_sum ^ x1_cat_y0;
+    let ysum = y_for_sum ^ x1_cat_y0;
+    let xsum_ysum = u128_clmul_64_lh(xsum, ysum);
+
+    [x0y0, xsum_ysum, x1y1]
+}
+
 /// Helper trait that define "alphas" for calculating embedings as part of [`ByteCombine`]
 pub(crate) trait Alphas: Sized {
     const ALPHA: [Self; 7];
@@ -484,21 +688,60 @@ where
     }
 }
 
-impl<T, const N: usize, const LENGTH: usize> Mul for BigGF<T, N, LENGTH>
-where
-    Self: Modulus<T>,
-    Self: ToMask<T>,
-    Self: ApplyMask<T, Output = Self>,
-    Self: AddAssign,
-    Self: ShiftLeft1<Output = Self>,
-    T: BitAnd<Output = T>,
-    T: BitXorAssign,
-{
+impl Mul for GF576 {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        gf_mul_naive(self, &rhs)
+    }
+}
+
+fn mul_gf768_gf256(mut lhs: GF768, rhs: GF256) -> GF768 {
+    let y_sum = rhs.0[0] ^ rhs.0[1];
+
+    let x0y0 = karatsuba_mul_128_uncombined(lhs.0[0], rhs.0[0]);
+    let xsum_low_ysum = karatsuba_mul_128_uncombined(lhs.0[0] ^ lhs.0[1], y_sum);
+    let x1y1 = karatsuba_mul_128_uncombined(lhs.0[1], rhs.0[1]);
+    let x0y0_2_plus_x1y1_0 = x0y0[2] ^ x1y1[0];
+
+    let x2y0 = karatsuba_mul_128_uncombined(lhs.0[2], rhs.0[0]);
+    let xsum_mid_ysum = karatsuba_mul_128_uncombined(lhs.0[2] ^ lhs.0[3], y_sum);
+    let x3y1 = karatsuba_mul_128_uncombined(lhs.0[3], rhs.0[1]);
+    let x2y0_2_plus_x3y1_0 = x2y0[2] ^ x3y1[0];
+
+    let x4y0 = karatsuba_mul_128_uncombined(lhs.0[4], rhs.0[0]);
+    let xsum_high_ysum = karatsuba_mul_128_uncombined(lhs.0[4] ^ lhs.0[5], y_sum);
+    let x5y1 = karatsuba_mul_128_uncombined(lhs.0[5], rhs.0[1]);
+    let x4y0_2_plus_x5y1_0 = x4y0[2] ^ x5y1[0];
+
+    let combined = combine_polys128s_14([
+        x0y0[0],
+        x0y0[1],
+        xsum_low_ysum[0] ^ x0y0[0] ^ x0y0_2_plus_x1y1_0,
+        xsum_low_ysum[1] ^ x0y0[1] ^ x1y1[1],
+        xsum_low_ysum[2] ^ x2y0[0] ^ x0y0_2_plus_x1y1_0 ^ x1y1[2],
+        x1y1[1] ^ x2y0[1],
+        xsum_mid_ysum[0] ^ x1y1[2] ^ x2y0[0] ^ x2y0_2_plus_x3y1_0,
+        xsum_mid_ysum[1] ^ x2y0[1] ^ x3y1[1],
+        xsum_mid_ysum[2] ^ x4y0[0] ^ x2y0_2_plus_x3y1_0 ^ x3y1[2],
+        x3y1[1] ^ x4y0[1],
+        xsum_high_ysum[0] ^ x3y1[2] ^ x4y0[0] ^ x4y0_2_plus_x5y1_0,
+        xsum_high_ysum[1] ^ x5y1[1] ^ x4y0[1],
+        xsum_high_ysum[2] ^ x5y1[2] ^ x4y0_2_plus_x5y1_0,
+        x5y1[1],
+        x5y1[2],
+    ]);
+
+    lhs.0 = poly1024_reduce768(combined);
+    lhs
+}
+
+impl Mul for GF768 {
     type Output = Self;
 
     fn mul(mut self, rhs: Self) -> Self::Output {
         let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
-        for idx in 1..LENGTH {
+        for idx in 1..768 {
             let mask = self.to_mask();
             self = self.shift_left_1();
             self.0[0] ^= mask & Self::MODULUS;
@@ -509,29 +752,28 @@ where
     }
 }
 
-impl<T, const N: usize, const LENGTH: usize> Mul<&Self> for BigGF<T, N, LENGTH>
+fn gf_mul_naive<T, const N: usize, const LENGTH: usize>(
+    mut lhs: BigGF<T, N, LENGTH>,
+    rhs: &BigGF<T, N, LENGTH>,
+) -> BigGF<T, N, LENGTH>
 where
-    Self: Modulus<T>,
-    Self: ToMask<T>,
-    Self: ApplyMask<T, Output = Self>,
-    Self: AddAssign,
-    Self: ShiftLeft1<Output = Self>,
     T: BitAnd<Output = T>,
     T: BitXorAssign,
+    BigGF<T, N, LENGTH>: Modulus<T>,
+    BigGF<T, N, LENGTH>: ToMask<T>,
+    BigGF<T, N, LENGTH>: ApplyMask<T, Output = BigGF<T, N, LENGTH>>,
+    BigGF<T, N, LENGTH>: AddAssign,
+    BigGF<T, N, LENGTH>: ShiftLeft1<Output = BigGF<T, N, LENGTH>>,
 {
-    type Output = Self;
+    let mut result = lhs.copy_apply_mask(rhs.to_mask_bit(0));
+    for idx in 1..LENGTH {
+        let mask = lhs.to_mask();
+        lhs = lhs.shift_left_1();
+        lhs.0[0] ^= mask & BigGF::<T, N, LENGTH>::MODULUS;
 
-    fn mul(mut self, rhs: &Self) -> Self::Output {
-        let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
-        for idx in 1..LENGTH {
-            let mask = self.to_mask();
-            self = self.shift_left_1();
-            self.0[0] ^= mask & Self::MODULUS;
-
-            result += self.copy_apply_mask(rhs.to_mask_bit(idx));
-        }
-        result
+        result += lhs.copy_apply_mask(rhs.to_mask_bit(idx));
     }
+    result
 }
 
 impl<T, const N: usize, const LENGTH: usize> Mul<Self> for &BigGF<T, N, LENGTH>
@@ -594,54 +836,6 @@ where
 
     fn mul(self, rhs: GF64) -> Self::Output {
         *self * rhs
-    }
-}
-
-impl<T, const N: usize, const LENGTH: usize> MulAssign for BigGF<T, N, LENGTH>
-where
-    Self: Copy,
-    Self: Modulus<T>,
-    Self: ToMask<T>,
-    Self: ApplyMask<T, Output = Self>,
-    Self: AddAssign,
-    Self: ShiftLeft1<Output = Self>,
-    T: BitAnd<Output = T>,
-    T: BitXorAssign,
-{
-    fn mul_assign(&mut self, rhs: Self) {
-        let mut lhs = *self;
-        *self = self.copy_apply_mask(rhs.to_mask_bit(0));
-        for idx in 1..LENGTH {
-            let mask = lhs.to_mask();
-            lhs = lhs.shift_left_1();
-            lhs.0[0] ^= mask & Self::MODULUS;
-
-            *self += lhs.copy_apply_mask(rhs.to_mask_bit(idx));
-        }
-    }
-}
-
-impl<T, const N: usize, const LENGTH: usize> MulAssign<&Self> for BigGF<T, N, LENGTH>
-where
-    Self: Copy,
-    Self: Modulus<T>,
-    Self: ToMask<T>,
-    Self: ApplyMask<T, Output = Self>,
-    Self: AddAssign,
-    Self: ShiftLeft1<Output = Self>,
-    T: BitAnd<Output = T>,
-    T: BitXorAssign,
-{
-    fn mul_assign(&mut self, rhs: &Self) {
-        let mut lhs = *self;
-        *self = self.copy_apply_mask(rhs.to_mask_bit(0));
-        for idx in 1..LENGTH {
-            let mask = lhs.to_mask();
-            lhs = lhs.shift_left_1();
-            lhs.0[0] ^= mask & Self::MODULUS;
-
-            *self += lhs.copy_apply_mask(rhs.to_mask_bit(idx));
-        }
     }
 }
 
@@ -784,6 +978,66 @@ impl ClearHighBits for BigGF<u128, 1, 128> {
     }
 }
 
+fn gf128_mul(lhs: u128, rhs: u128) -> u128 {
+    let [mut lo, mid, mut hi] = karatsuba_mul_128_uncombined(lhs, rhs);
+    lo ^= mid << 64;
+    hi ^= mid >> 64;
+
+    // Reduction modulo x^128 + x^7 + x^2 + x + 1 as by page 16/17
+    // of <https://cdrdv2-public.intel.com/836172/clmul-wp-rev-2-02-2014-04-20.pdf>
+
+    // Step 1
+    let x2 = (hi as u64) as u128;
+    let x3 = hi >> 64;
+
+    let a = x3 >> 63;
+    let b = x3 >> 62;
+    let c = x3 >> 57;
+
+    // Step 2
+    let x3_d = (x3 << 64) ^ x2 ^ a ^ b ^ c;
+
+    // Step 3
+    let e1_e0 = x3_d << 1;
+    let f1_f0 = x3_d << 2;
+    let g1_g0 = x3_d << 7;
+
+    // Step 4
+    let h1_h0 = x3_d ^ e1_e0 ^ f1_f0 ^ g1_g0;
+
+    lo ^ h1_h0
+}
+
+impl Mul for GF128 {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Self) -> Self::Output {
+        self.0[0] = gf128_mul(self.0[0], rhs.0[0]);
+        self
+    }
+}
+
+impl Mul<&Self> for GF128 {
+    type Output = Self;
+
+    fn mul(mut self, rhs: &Self) -> Self::Output {
+        self.0[0] = gf128_mul(self.0[0], rhs.0[0]);
+        self
+    }
+}
+
+impl MulAssign for GF128 {
+    fn mul_assign(&mut self, rhs: Self) {
+        self.0[0] = gf128_mul(self.0[0], rhs.0[0])
+    }
+}
+
+impl MulAssign<&Self> for GF128 {
+    fn mul_assign(&mut self, rhs: &Self) {
+        self.0[0] = gf128_mul(self.0[0], rhs.0[0])
+    }
+}
+
 impl Field for BigGF<u128, 1, 128> {
     const ZERO: Self = Self([0]);
     const ONE: Self = Self([1]);
@@ -918,6 +1172,63 @@ impl ClearHighBits for BigGF<u128, 2, 192> {
     fn clear_high_bits(mut self) -> Self {
         self.0[1] &= u64::MAX as u128;
         self
+    }
+}
+
+fn gf192_mul(x: &mut [u128; 2], y: &[u128; 2]) {
+    let xlow_ylow = u128_clmul_ll(x[0], y[0]);
+    let xhigh_yhigh = u128_clmul_ll(x[1], y[1]);
+
+    let x1_cat_y0_plus_y2 = allignr_8(y[0] ^ y[1], x[0]);
+    let xsum = x[0] ^ x[1] ^ x1_cat_y0_plus_y2; // Result in low.
+    let ysum = y[0] ^ x1_cat_y0_plus_y2; // Result in high.
+    let xsum_ysum = u128_clmul_64_lh(xsum, ysum);
+
+    let xa = x[0] ^ (x[1] ^ (x[1] & U128_LOWER_MASK) << 64);
+    let ya = y[0] ^ (y[1] ^ (y[1] & U128_LOWER_MASK) << 64);
+
+    let karatsuba_out = karatsuba_mul_128_uninterpolated_other_sum(xa, ya, x[0], y[0]);
+    let xya0 = karatsuba_out[0] ^ karatsuba_out[2];
+    let xya1 = karatsuba_out[0] ^ karatsuba_out[1];
+
+    let xya0_plus_xsum_ysum = xya0 ^ xsum_ysum;
+    let combined = [
+        xlow_ylow,
+        xya0_plus_xsum_ysum ^ xhigh_yhigh,
+        xya0_plus_xsum_ysum ^ xya1,
+        xlow_ylow ^ xsum_ysum ^ xya1,
+        xhigh_yhigh,
+    ];
+    *x = poly384_reduce192(combine_poly128s_5(combined))
+}
+
+impl Mul for GF192 {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Self) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+
+impl Mul<&Self> for GF192 {
+    type Output = Self;
+
+    fn mul(mut self, rhs: &Self) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+
+impl MulAssign for GF192 {
+    fn mul_assign(&mut self, rhs: Self) {
+        gf192_mul(&mut self.0, &rhs.0);
+    }
+}
+
+impl MulAssign<&Self> for GF192 {
+    fn mul_assign(&mut self, rhs: &Self) {
+        gf192_mul(&mut self.0, &rhs.0);
     }
 }
 
@@ -1152,6 +1463,14 @@ impl<'de> serde::Deserialize<'de> for BigGF<u128, 2, 192> {
     }
 }
 
+fn combine_poly128s_5(x: [u128; 5]) -> [u128; 3] {
+    [
+        x[0] ^ x[1] << 64,
+        x[1] >> 64 ^ x[2] ^ x[3] << 64,
+        x[3] >> 64 ^ x[4],
+    ]
+}
+
 /// Type representing binary Galois field of size `2^192`
 pub type GF192 = BigGF<u128, 2, 192>;
 
@@ -1162,6 +1481,71 @@ impl Distribution<GF192> for Standard {
             let v: u64 = rng.sample(self);
             v as u128
         }])
+    }
+}
+
+fn gf256_mul(x: &mut [u128; 2], y: &[u128; 2]) {
+    let x0y0 = karatsuba_mul_128_uncombined(x[0], y[0]);
+    let x1y1 = karatsuba_mul_128_uncombined(x[1], y[1]);
+    let xsum_ysum = karatsuba_mul_128_uncombined(x[0] ^ x[1], y[0] ^ y[1]);
+
+    let x0y0_2_plus_x1y1_0 = x0y0[2] ^ x1y1[0];
+
+    let combined = combine_poly128s_7([
+        x0y0[0],
+        x0y0[1],
+        xsum_ysum[0] ^ x0y0[0] ^ x0y0_2_plus_x1y1_0,
+        xsum_ysum[1] ^ x0y0[1] ^ x1y1[1],
+        xsum_ysum[2] ^ x1y1[2] ^ x0y0_2_plus_x1y1_0,
+        x1y1[1],
+        x1y1[2],
+    ]);
+
+    let xmod = [
+        0,
+        u128_clmul_64_lh(GF256::MODULUS, combined[2]),
+        u128_clmul_ll(GF256::MODULUS, combined[3]),
+        u128_clmul_64_lh(GF256::MODULUS, combined[3]),
+    ];
+
+    let mut xmod_combined = combine_poly128s_4(xmod);
+
+    xmod_combined[0] ^= combined[0];
+    xmod_combined[1] ^= combined[1];
+    xmod_combined[2] ^= combined[2];
+    xmod_combined[0] ^= u128_clmul_ll(GF256::MODULUS, xmod_combined[2]);
+
+    x[0] = xmod_combined[0];
+    x[1] = xmod_combined[1];
+}
+
+impl Mul for GF256 {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Self) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+
+impl Mul<&Self> for GF256 {
+    type Output = Self;
+
+    fn mul(mut self, rhs: &Self) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+
+impl MulAssign for GF256 {
+    fn mul_assign(&mut self, rhs: Self) {
+        gf256_mul(&mut self.0, &rhs.0);
+    }
+}
+
+impl MulAssign<&Self> for GF256 {
+    fn mul_assign(&mut self, rhs: &Self) {
+        gf256_mul(&mut self.0, &rhs.0);
     }
 }
 
@@ -1459,31 +1843,44 @@ impl From<&[u8]> for GF384 {
     }
 }
 
+fn mul_gf384_gf128(mut lhs: GF384, rhs: GF128) -> GF384 {
+    let x0y0 = karatsuba_mul_128_uncombined(lhs.0[0], rhs.0[0]);
+    let x1y0 = karatsuba_mul_128_uncombined(lhs.0[1], rhs.0[0]);
+    let x2y0 = karatsuba_mul_128_uncombined(lhs.0[2], rhs.0[0]);
+
+    let tmp1 = x0y0[1] >> 64 ^ x0y0[2] ^ x1y0[1] << 64;
+    let tmp2 = x1y0[1] >> 64 ^ x1y0[2] ^ x2y0[1] << 64;
+
+    let combined = [
+        x0y0[0] ^ x0y0[1] << 64,
+        x1y0[0] ^ tmp1,
+        x2y0[0] ^ tmp2,
+        x2y0[2] ^ x2y0[1] >> 64,
+    ];
+
+    lhs.0 = poly512_reduce384(combined);
+    lhs
+}
+
 impl Mul<GF128> for GF384 {
     type Output = Self;
-    fn mul(mut self, rhs: GF128) -> Self::Output {
-        let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
-        for idx in 1..128 {
-            let mask = self.to_mask();
-            self = self.shift_left_1();
-            self.0[0] ^= mask & Self::MODULUS;
-            result += self.copy_apply_mask(rhs.to_mask_bit(idx));
-        }
-        result
+    fn mul(self, rhs: GF128) -> Self::Output {
+        mul_gf384_gf128(self, rhs)
     }
 }
 
 impl Mul<&GF128> for GF384 {
     type Output = Self;
-    fn mul(mut self, rhs: &GF128) -> Self::Output {
-        let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
-        for idx in 1..128 {
-            let mask = self.to_mask();
-            self = self.shift_left_1();
-            self.0[0] ^= mask & Self::MODULUS;
-            result += self.copy_apply_mask(rhs.to_mask_bit(idx));
-        }
-        result
+    fn mul(self, rhs: &GF128) -> Self::Output {
+        mul_gf384_gf128(self, *rhs)
+    }
+}
+
+impl Mul for GF384 {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        gf_mul_naive(self, &rhs)
     }
 }
 
@@ -1528,31 +1925,62 @@ impl ExtensionField for GF576 {
     }
 }
 
+fn mul_gf576_gf192(x: [u128; 5], y: [u128; 2]) -> [u128; 5] {
+    let ysum = y[0] ^ y[1];
+
+    let x0y0 = karatsuba_mul_128_uncombined(x[0], y[0]);
+    let xsum_low_ysum = karatsuba_mul_128_uncombined(x[0] ^ x[1], ysum);
+    let x1y1 = [u128_clmul_ll(y[1], x[1]), u128_clmul_64_lh(y[1], x[1])];
+    let x0y0_2_plus_x1y1_0 = x0y0[2] ^ x1y1[0];
+
+    let x2y0 = karatsuba_mul_128_uncombined(x[2], y[0]);
+    let xsum_high_ysum = karatsuba_mul_128_uncombined(x[2] ^ x[3], ysum);
+    let x3y1 = [u128_clmul_ll(y[1], x[3]), u128_clmul_64_lh(y[1], x[3])];
+    let x2y0_2_plus_x3y1_0 = x2y0[2] ^ x3y1[0];
+
+    let tmp = u128_clmul_64_lh(x[4], y[0]);
+    let x4y0 = [u128_clmul_ll(x[4], y[0]) ^ tmp << 64, tmp >> 64];
+
+    let x4y1 = u128_clmul_ll(x[4], y[1]);
+
+    let combined = [
+        x0y0[0],
+        x0y0[1],
+        //128
+        xsum_low_ysum[0] ^ x0y0[0] ^ x0y0_2_plus_x1y1_0,
+        xsum_low_ysum[1] ^ x0y0[1] ^ x1y1[1],
+        //256
+        xsum_low_ysum[2] ^ x2y0[0] ^ x0y0_2_plus_x1y1_0,
+        x1y1[1] ^ x2y0[1],
+        //384
+        xsum_high_ysum[0] ^ x2y0[0] ^ x2y0_2_plus_x3y1_0,
+        xsum_high_ysum[1] ^ x2y0[1] ^ x3y1[1],
+        //512
+        xsum_high_ysum[2] ^ x4y0[0] ^ x2y0_2_plus_x3y1_0,
+        x3y1[1],
+        //640
+        x4y0[1],
+        x3y1[1],
+        //768
+        x4y1,
+    ];
+
+    poly768_reduce576(combine_poly128s_13(combined))
+}
+
 impl Mul<GF192> for GF576 {
     type Output = Self;
     fn mul(mut self, rhs: GF192) -> Self::Output {
-        let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
-        for idx in 1..192 {
-            let mask = self.to_mask();
-            self = self.shift_left_1();
-            self.0[0] ^= mask & Self::MODULUS;
-            result += self.copy_apply_mask(rhs.to_mask_bit(idx));
-        }
-        result
+        self.0 = mul_gf576_gf192(self.0, rhs.0);
+        self
     }
 }
 
 impl Mul<&GF192> for GF576 {
     type Output = Self;
     fn mul(mut self, rhs: &GF192) -> Self::Output {
-        let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
-        for idx in 1..192 {
-            let mask = self.to_mask();
-            self = self.shift_left_1();
-            self.0[0] ^= mask & Self::MODULUS;
-            result += self.copy_apply_mask(rhs.to_mask_bit(idx));
-        }
-        result
+        self.0 = mul_gf576_gf192(self.0, rhs.0);
+        self
     }
 }
 
@@ -1628,29 +2056,15 @@ impl From<&[u8]> for GF768 {
 
 impl Mul<GF256> for GF768 {
     type Output = Self;
-    fn mul(mut self, rhs: GF256) -> Self::Output {
-        let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
-        for idx in 1..256 {
-            let mask = self.to_mask();
-            self = self.shift_left_1();
-            self.0[0] ^= mask & Self::MODULUS;
-            result += self.copy_apply_mask(rhs.to_mask_bit(idx));
-        }
-        result
+    fn mul(self, rhs: GF256) -> Self::Output {
+        mul_gf768_gf256(self, rhs)
     }
 }
 
 impl Mul<&GF256> for GF768 {
     type Output = Self;
-    fn mul(mut self, rhs: &GF256) -> Self::Output {
-        let mut result = self.copy_apply_mask(rhs.to_mask_bit(0));
-        for idx in 1..256 {
-            let mask = self.to_mask();
-            self = self.shift_left_1();
-            self.0[0] ^= mask & Self::MODULUS;
-            result += self.copy_apply_mask(rhs.to_mask_bit(idx));
-        }
-        result
+    fn mul(self, rhs: &GF256) -> Self::Output {
+        mul_gf768_gf256(self, *rhs)
     }
 }
 
@@ -1670,6 +2084,7 @@ impl Distribution<GF768> for Standard {
 
 #[cfg(test)]
 mod test {
+
     use super::*;
 
     use std::fmt::Debug;
