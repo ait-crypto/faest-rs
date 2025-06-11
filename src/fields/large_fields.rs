@@ -8,7 +8,6 @@ use std::{
         Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitXor, BitXorAssign, Mul, MulAssign, Neg,
         Shl, Shr, Sub, SubAssign,
     },
-    u128,
 };
 
 use generic_array::{
@@ -26,17 +25,29 @@ use super::{Double, ExtensionField, Field, GF8, GF64, Square};
 /// U128_LOWER_MASK = 0xFFFFFFFFFFFFFFFF
 const U128_LOWER_MASK: u128 = u64::MAX as u128;
 
+/// Takes two 128-bit integers `x = x_l + 2^64 * x_h` and `y = y_l + 2^64 y_h`.
+///
+/// Returns `y_h + 2^64 x_l`.
 #[inline]
-const fn allignr_8(x: u128, y: u128) -> u128 {
+const fn allignr_8bytes(x: u128, y: u128) -> u128 {
     x << 64 ^ y >> 64
+}
+
+#[inline]
+const fn combine_poly128s_5(x: [u128; 5]) -> [u128; 3] {
+    [
+        x[0] ^ x[1] << 64,
+        x[1] >> 64 ^ x[2] ^ x[3] << 64,
+        x[3] >> 64 ^ x[4],
+    ]
 }
 
 #[inline]
 const fn combine_poly128s_7(x: [u128; 7]) -> [u128; 4] {
     [
         x[0] ^ x[1] << 64,
-        x[2] ^ allignr_8(x[3], x[1]),
-        x[4] ^ allignr_8(x[5], x[3]),
+        x[2] ^ allignr_8bytes(x[3], x[1]),
+        x[4] ^ allignr_8bytes(x[5], x[3]),
         x[5] >> 64 ^ x[6],
     ]
 }
@@ -44,6 +55,7 @@ const fn combine_poly128s_7(x: [u128; 7]) -> [u128; 4] {
 /// Perform a carry-less multiplication of two 64-bit polynomials over the finite field GF(2).
 ///
 /// This function takes the lower halves of both lhs and rhs.
+#[inline]
 fn u128_clmul_ll(lhs: u128, rhs: u128) -> u128 {
     // Select lower 64 bits from lhs and rhs
     let (lhs, rhs) = (lhs & U128_LOWER_MASK, rhs & U128_LOWER_MASK);
@@ -54,6 +66,7 @@ fn u128_clmul_ll(lhs: u128, rhs: u128) -> u128 {
 /// Perform a carry-less multiplication of two 64-bit polynomials over the finite field GF(2).
 ///
 /// This function takes the upper halves of both lhs and rhs.
+#[inline]
 fn u128_clmul_hh(lhs: u128, rhs: u128) -> u128 {
     // Select upper 64 bits from lhs and rhs
     let (lhs, rhs) = (lhs >> 64, rhs >> 64);
@@ -64,6 +77,7 @@ fn u128_clmul_hh(lhs: u128, rhs: u128) -> u128 {
 /// Perform a carry-less multiplication of two 64-bit polynomials over the finite field GF(2).
 ///
 /// This function takes the upper half of lhs and the lower half of rhs.
+#[inline]
 fn u128_clmul_lh(lhs: u128, rhs: u128) -> u128 {
     // Select lower 64 bits from lhs and rhs
     let (lhs, rhs) = (lhs & U128_LOWER_MASK, rhs >> 64);
@@ -121,9 +135,9 @@ fn karatsuba_mul_128_uninterpolated_other_sum(
 ) -> [u128; 3] {
     let x0y0 = u128_clmul_ll(x, y);
     let x1y1 = u128_clmul_hh(x, y);
-    let x1_cat_y0 = allignr_8(y_for_sum, x_for_sum);
-    let xsum = x_for_sum ^ x1_cat_y0;
-    let ysum = y_for_sum ^ x1_cat_y0;
+    let x1_cat_y0 = allignr_8bytes(y_for_sum, x_for_sum);
+    let xsum = x_for_sum ^ x1_cat_y0; // Reult in low 64 bits
+    let ysum = y_for_sum ^ x1_cat_y0; // Reult in high 64 bits
     let xsum_ysum = u128_clmul_lh(xsum, ysum);
 
     [x0y0, xsum_ysum, x1y1]
@@ -1011,11 +1025,11 @@ pub type GF192 = BigGF<u128, 2, 192>;
 
 /// Multiplies two 192-bit polynomials 'x', 'y' over the finite field GF(2). Stores the result in 'x'.
 fn gf192_mul(x: &mut [u128; 2], y: &[u128; 2]) {
-    // Carry-less multiplication of x by y
+    // Carry-less multiplication of x times y
     let xlow_ylow = u128_clmul_ll(x[0], y[0]);
     let xhigh_yhigh = u128_clmul_ll(x[1], y[1]);
 
-    let x1_cat_y0_plus_y2 = allignr_8(y[0] ^ y[1], x[0]);
+    let x1_cat_y0_plus_y2 = allignr_8bytes(y[0] ^ y[1], x[0]);
     let xsum = x[0] ^ x[1] ^ x1_cat_y0_plus_y2; // Result in low.
     let ysum = y[0] ^ x1_cat_y0_plus_y2; // Result in high.
     let xsum_ysum = u128_clmul_lh(xsum, ysum);
@@ -1315,14 +1329,6 @@ impl<'de> serde::Deserialize<'de> for BigGF<u128, 2, 192> {
     {
         <[u8; 24]>::deserialize(deserializer).map(|buffer| Self::from(buffer.as_slice()))
     }
-}
-
-fn combine_poly128s_5(x: [u128; 5]) -> [u128; 3] {
-    [
-        x[0] ^ x[1] << 64,
-        x[1] >> 64 ^ x[2] ^ x[3] << 64,
-        x[3] >> 64 ^ x[4],
-    ]
 }
 
 /// Type representing binary Galois field of size `2^256`
