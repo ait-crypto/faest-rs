@@ -8,6 +8,7 @@ use std::{
         Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitXor, BitXorAssign, Mul, MulAssign, Neg,
         Shl, Shr, Sub, SubAssign,
     },
+    u128,
 };
 
 use generic_array::{
@@ -83,7 +84,7 @@ fn u128_clmul_64(mut lhs: u128, mut rhs: u128) -> u128 {
 
 /// Splits `lhs` and `rhs` into four 64-bit polynomials over GF(2) and uses [`u128_clmul_64`] to perform karatsuba multiplication.
 ///
-/// Returns the uncombined result of the multiplication (i.e., `lhs` * `rhs` = `lo` + 2^64 * `mid` + 2^128 * `hi`).
+/// Returns the resulting 256-bit polynomial `res` in uncombined form (i.e., `lhs * rhs = res[0] + 2^64 * res[1] + 2^128 * res[2]`).
 #[inline]
 fn karatsuba_mul_128_uncombined(lhs: u128, rhs: u128) -> [u128; 3] {
     let lo = u128_clmul_ll(lhs, rhs);
@@ -98,7 +99,7 @@ fn karatsuba_mul_128_uncombined(lhs: u128, rhs: u128) -> [u128; 3] {
 
 /// Splits `lhs` and `rhs` into four 64-bit polynomials over GF(2) and uses [`u128_clmul_64`] to perform karatsuba multiplication.
 ///
-/// Returns the uncombined result of the multiplication (i.e., `lhs` * `rhs` = `lo` + 2^64 * `mid` + 2^128 * `hi`).
+/// Returns the resulting 256-bit polynomial `res` (i.e., `lhs * rhs = res[0] + 2^128 * res[1]`).
 #[inline]
 fn karatsuba_mul_128(lhs: u128, rhs: u128) -> [u128; 2] {
     let lo = u128_clmul_ll(lhs, rhs);
@@ -816,6 +817,7 @@ impl ClearHighBits for BigGF<u128, 1, 128> {
     }
 }
 
+/// Multiplies two 128-bit polynomials 'x', 'y' over the finite field GF(2). Stores the result in 'x'.
 fn gf128_mul(x: &mut u128, y: u128) {
     // Carry-less multiplication of lhs by rhs
     let [lo, hi] = karatsuba_mul_128(*x, y);
@@ -1007,6 +1009,7 @@ impl ClearHighBits for BigGF<u128, 2, 192> {
 /// Type representing binary Galois field of size `2^192`
 pub type GF192 = BigGF<u128, 2, 192>;
 
+/// Multiplies two 192-bit polynomials 'x', 'y' over the finite field GF(2). Stores the result in 'x'.
 fn gf192_mul(x: &mut [u128; 2], y: &[u128; 2]) {
     // Carry-less multiplication of x by y
     let xlow_ylow = u128_clmul_ll(x[0], y[0]);
@@ -1033,12 +1036,13 @@ fn gf192_mul(x: &mut [u128; 2], y: &[u128; 2]) {
         xhigh_yhigh,
     ]);
 
-    // Modular reduction
+    // Reduction modulo x^192 + x^7 + x^2 + x^1 + 1 adapted from page 16/17
+    // of <https://cdrdv2-public.intel.com/836172/clmul-wp-rev-2-02-2014-04-20.pdf>
 
+    // Step 1
     let x2 = combined[1] >> 64 ^ combined[2] << 64;
     let x3 = combined[2] >> 64;
 
-    // Step 1
     let a = x3 >> 63;
     let b = x3 >> 62;
     let c = x3 >> 57;
@@ -1334,13 +1338,15 @@ impl Distribution<GF192> for Standard {
     }
 }
 
+/// Multiplies two polynomials 'x' and 'y' in the finite field GF256, storing the result in x.
 fn gf256_mul(x: &mut [u128; 2], y: &[u128; 2]) {
+    // Karatsuba multiplication of x * y
     let x0y0 = karatsuba_mul_128_uncombined(x[0], y[0]);
     let x1y1 = karatsuba_mul_128_uncombined(x[1], y[1]);
     let xsum_ysum = karatsuba_mul_128_uncombined(x[0] ^ x[1], y[0] ^ y[1]);
 
+    // Combine the result into a single poly of degree 510
     let x0y0_2_plus_x1y1_0 = x0y0[2] ^ x1y1[0];
-
     let combined = combine_poly128s_7([
         x0y0[0],
         x0y0[1],
@@ -1351,10 +1357,13 @@ fn gf256_mul(x: &mut [u128; 2], y: &[u128; 2]) {
         x1y1[2],
     ]);
 
+    // Reduction modulo x^256 + x^10 + x^5 + x^2 + 1 adapted from page 16/17
+    // of <https://cdrdv2-public.intel.com/836172/clmul-wp-rev-2-02-2014-04-20.pdf>
+
+    // Step 1
     let x2 = combined[2];
     let x3 = combined[3];
 
-    // Step 1
     let a = x3 >> 126;
     let b = x3 >> 123;
     let c = x3 >> 118;
