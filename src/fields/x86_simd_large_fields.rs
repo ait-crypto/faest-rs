@@ -2028,15 +2028,16 @@ impl From<GF384> for (__m256i, __m128i) {
 }
 
 #[inline]
-fn _mm_shl_si128(x: __m128i, other: i32) -> __m128i {
+const fn _mm_shl_si128(x: __m128i, other: i32) -> __m128i {
     u128_as_m128(m128_as_u128(x) << other)
 }
 
 #[inline]
-fn _mm_shr_si128(x: __m128i, other: i32) -> __m128i {
+const fn _mm_shr_si128(x: __m128i, other: i32) -> __m128i {
     u128_as_m128(m128_as_u128(x) >> other)
 }
 
+#[inline]
 unsafe fn poly512_reduce384(mut x: [__m128i; 4]) -> (__m256i, __m128i) {
     unsafe {
         let mut tmp = _mm_xor_si128(x[3], _mm_shl_si128(x[3], 2));
@@ -2052,6 +2053,7 @@ unsafe fn poly512_reduce384(mut x: [__m128i; 4]) -> (__m256i, __m128i) {
     }
 }
 
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 fn mul_gf384_gf128(lhs: (__m256i, __m128i), y0: __m128i) -> (__m256i, __m128i) {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs.0, 0);
@@ -2081,7 +2083,7 @@ impl Mul<GF128> for GF384 {
 
     #[inline]
     fn mul(self, rhs: GF128) -> Self::Output {
-        Self::from(mul_gf384_gf128(self.into(), rhs.0))
+        Self::from(unsafe { mul_gf384_gf128(self.into(), rhs.0) })
     }
 }
 
@@ -2090,7 +2092,7 @@ impl Mul<&GF128> for GF384 {
 
     #[inline]
     fn mul(self, rhs: &GF128) -> Self::Output {
-        Self::from(mul_gf384_gf128(self.into(), rhs.0))
+        Self::from(unsafe { mul_gf384_gf128(self.into(), rhs.0) })
     }
 }
 
@@ -2306,6 +2308,7 @@ unsafe fn poly768_reduce576(x: [__m128i; 6]) -> (__m256i, __m256i, u64) {
     }
 }
 
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 fn mul_gf576_gf192(lhs: (__m256i, __m256i, u64), rhs: __m256i) -> (__m256i, __m256i, u64) {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs.0, 0);
@@ -2373,7 +2376,7 @@ impl Mul<GF192> for GF576 {
 
     #[inline]
     fn mul(self, rhs: GF192) -> Self::Output {
-        let res = mul_gf576_gf192((self.0, self.1, self.2), rhs.0);
+        let res = unsafe { mul_gf576_gf192((self.0, self.1, self.2), rhs.0) };
         Self(res.0, res.1, res.2)
     }
 }
@@ -2383,7 +2386,7 @@ impl Mul<&GF192> for GF576 {
 
     #[inline]
     fn mul(self, rhs: &GF192) -> Self::Output {
-        let res = mul_gf576_gf192((self.0, self.1, self.2), rhs.0);
+        let res = unsafe { mul_gf576_gf192((self.0, self.1, self.2), rhs.0) };
         Self(res.0, res.1, res.2)
     }
 }
@@ -2622,6 +2625,7 @@ unsafe fn poly1024_reduce768(x: [__m128i; 8]) -> (__m256i, __m256i, __m256i) {
     }
 }
 
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 fn mul_gf768_gf256(lhs: (__m256i, __m256i, __m256i), rhs: __m256i) -> (__m256i, __m256i, __m256i) {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs.0, 0);
@@ -2699,7 +2703,7 @@ impl Mul<GF256> for GF768 {
 
     #[inline]
     fn mul(self, rhs: GF256) -> Self::Output {
-        Self::from(mul_gf768_gf256(self.into(), rhs.0))
+        Self::from(unsafe { mul_gf768_gf256(self.into(), rhs.0) })
     }
 }
 
@@ -2708,7 +2712,7 @@ impl Mul<&GF256> for GF768 {
 
     #[inline]
     fn mul(self, rhs: &GF256) -> Self::Output {
-        Self::from(mul_gf768_gf256(self.into(), rhs.0))
+        Self::from(unsafe { mul_gf768_gf256(self.into(), rhs.0) })
     }
 }
 
