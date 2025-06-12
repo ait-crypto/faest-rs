@@ -3,6 +3,7 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use generic_array::{ArrayLength, GenericArray};
 
 pub(crate) mod large_fields;
+pub(crate) mod large_fields_constants;
 pub(crate) mod small_fields;
 
 #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]

@@ -713,7 +713,6 @@ impl Field for GF128 {
         unsafe { _mm_storeu_si128(ret.as_mut_ptr().cast(), self.0) };
         ret
     }
-
 }
 
 impl From<&[u8]> for GF128 {
@@ -1704,7 +1703,6 @@ impl Field for GF256 {
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
         ret
     }
-
 }
 
 impl From<&[u8]> for GF256 {
