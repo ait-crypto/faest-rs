@@ -1791,38 +1791,21 @@ mod test {
         byte_combine_bits::<GF256>(&database);
     }
 
-    fn byte_combine<F: BigGaloisField + Debug + Eq>(test_data: &[[&str; 9]]) {
-        for data in test_data {
-            let tab = [
-                F::from(hex::decode(data[0]).unwrap().as_slice()),
-                F::from(hex::decode(data[1]).unwrap().as_slice()),
-                F::from(hex::decode(data[2]).unwrap().as_slice()),
-                F::from(hex::decode(data[3]).unwrap().as_slice()),
-                F::from(hex::decode(data[4]).unwrap().as_slice()),
-                F::from(hex::decode(data[5]).unwrap().as_slice()),
-                F::from(hex::decode(data[6]).unwrap().as_slice()),
-                F::from(hex::decode(data[7]).unwrap().as_slice()),
-            ];
-            let result = F::from(hex::decode(data[8]).unwrap().as_slice());
-            assert_eq!(F::byte_combine(&tab), result);
-        }
-    }
-
     #[generic_tests::define]
     mod extended_field_ops {
         use super::*;
         use crate::utils::test::read_test_data;
+        use generic_array::typenum::Unsigned;
 
         #[test]
-        fn mul<F, const LAMBDA: usize>()
+        fn mul<F>()
         where
             F: ExtensionField<BaseField: for<'a> From<&'a [u8]>> + Copy + Debug + Eq,
         {
-            let test_data: Vec<DataMul> = read_test_data("ExtendedFields.json");
-            let test_data = test_data
+            let test_data = read_test_data("ExtendedFields.json")
                 .into_iter()
-                .find(|data| data.lambda == LAMBDA)
-                .expect(&format!("No test data for GF{LAMBDA}"));
+                .find(|data: &DataMul| data.lambda == F::Length::USIZE * 8)
+                .expect(&format!("No test data for GF{}", F::Length::USIZE * 8));
 
             for [lhs, rhs, res] in test_data.database {
                 let lhs = F::from(hex::decode(lhs.as_str()).unwrap().as_slice());
@@ -1833,7 +1816,7 @@ mod test {
         }
 
         #[test]
-        fn byte_conversions<F: ExtensionField + Debug + Eq, const LAMBDA: usize>()
+        fn byte_conversions<F: ExtensionField + Debug + Eq>()
         where
             Standard: Distribution<F>,
         {
@@ -1845,13 +1828,13 @@ mod test {
             assert_eq!(element, F::from(bytes.as_slice()));
         }
 
-        #[instantiate_tests(<GF384, 384>)]
+        #[instantiate_tests(<GF384>)]
         mod gf384 {}
 
-        #[instantiate_tests(<GF576, 576>)]
+        #[instantiate_tests(<GF576>)]
         mod gf576 {}
 
-        #[instantiate_tests(<GF768, 768>)]
+        #[instantiate_tests(<GF768>)]
         mod gf768 {}
     }
 }
