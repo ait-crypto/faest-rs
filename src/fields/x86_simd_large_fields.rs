@@ -2054,7 +2054,7 @@ unsafe fn poly512_reduce384(mut x: [__m128i; 4]) -> (__m256i, __m128i) {
 }
 
 #[target_feature(enable = "avx2", enable = "pclmulqdq")]
-fn mul_gf384_gf128(lhs: (__m256i, __m128i), y0: __m128i) -> (__m256i, __m128i) {
+unsafe fn mul_gf384_gf128(lhs: (__m256i, __m128i), y0: __m128i) -> (__m256i, __m128i) {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs.0, 0);
         let x1 = _mm256_extracti128_si256(lhs.0, 1);
@@ -2309,7 +2309,7 @@ unsafe fn poly768_reduce576(x: [__m128i; 6]) -> (__m256i, __m256i, u64) {
 }
 
 #[target_feature(enable = "avx2", enable = "pclmulqdq")]
-fn mul_gf576_gf192(lhs: (__m256i, __m256i, u64), rhs: __m256i) -> (__m256i, __m256i, u64) {
+unsafe fn mul_gf576_gf192(lhs: (__m256i, __m256i, u64), rhs: __m256i) -> (__m256i, __m256i, u64) {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs.0, 0);
         let x1 = _mm256_extracti128_si256(lhs.0, 1);
@@ -2626,7 +2626,10 @@ unsafe fn poly1024_reduce768(x: [__m128i; 8]) -> (__m256i, __m256i, __m256i) {
 }
 
 #[target_feature(enable = "avx2", enable = "pclmulqdq")]
-fn mul_gf768_gf256(lhs: (__m256i, __m256i, __m256i), rhs: __m256i) -> (__m256i, __m256i, __m256i) {
+unsafe fn mul_gf768_gf256(
+    lhs: (__m256i, __m256i, __m256i),
+    rhs: __m256i,
+) -> (__m256i, __m256i, __m256i) {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs.0, 0);
         let x1 = _mm256_extracti128_si256(lhs.0, 1);
