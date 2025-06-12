@@ -1503,20 +1503,6 @@ mod test {
 
     const RUNS: usize = 10;
 
-    #[test]
-    fn test_gf384() {
-        let mut rng = rand::thread_rng();
-
-        for _ in 0..RUNS {
-            let random_1: GF384 = rng.r#gen();
-            let random_2: GF128 = rng.r#gen();
-
-            let res = std::hint::black_box(random_1) * std::hint::black_box(random_2);
-            let res2 = std::hint::black_box(random_1) * &std::hint::black_box(random_2);
-            assert_eq!(res, res2)
-        }
-    }
-
     #[generic_tests::define]
     mod field_ops {
         use super::*;
@@ -1804,125 +1790,6 @@ mod test {
         mul::<GF256>(&database);
     }
 
-    #[test]
-    fn gf384_mul() {
-        let database = [
-            (
-                "8bc36869535dc1e4459f471841d8e4720b5959e5d16da9a97ecce7309c764e66ce2ff02ee646bc6f27aa93d953fd1b48",
-                "8bb881cb82ab7d5d36a475f559cbb58e22f6093694528c60e711f114abf53332ee96cf332b84871b00a5ffdc3795a965",
-                "a08b1c65be1e5af36df08e961936a5b395f3127bb85a6c779b6be97202840d106d9673e8cae45b82c5d074c31eb57ab8",
-            ),
-            (
-                "5f4d57279dd4a67f99f7f6558d0a3ec920a3511311e6bb49a4eb0492db61af332c004bcd73a459f0a8af5a6cdee992ae",
-                "618dd5723aad16339ec6d007d93fc03611d95dd7a7d22020ddbc1952ee3a862c8a115179a7ef9d2f8ad25260134049ef",
-                "5f8afefcd24460c805595374874ffde89f5f7e525a8ac94e082ab96766bbf7f2c7828f2c4b37b5a86d0e8d6e4f0e7a61",
-            ),
-            (
-                "14e07338a12964adce31eeced329f5d60ded45bf7a26905bc6835b7c610cde174af2d7b9d01c4e2cf89609c19d0625fc",
-                "b02287838374385690f33df07838f3952f8828cd2669dc3274bfbcb36089968c3195b7af1233a6898054b3cea1a31066",
-                "da504788dc6fcb8ab47e38fbaf7978a6f216261d8345e3a9b627623dbe2c7c8df6b200f10ea5554b3317fd227ecf83ed",
-            ),
-            (
-                "2e2f2432f9f7a852e815cbb84109a5b76efb39e111c9a312e33e6f80926fc07299681632a7ebdd23b0a10c6adbadf274",
-                "fbba3a11375b4def60471e5bb63004ab584b5e5b1c1646759abb8b5cd33cc75264ec3fb3c13d4f22f73a2c5c29a5013b",
-                "4820f64859d97ab6a4543d37b50c83eedf694920e8ffb5281546e4efec7cfe832423faa58dd7e2202231399aa7e1b0e8",
-            ),
-            (
-                "708ecc2abc3db4581331221bd9fb6c5e20aa741c7d37e685d31041a3281f7d110dbc8dd1376f454c2b27693b1ac82e95",
-                "87217ba77eec051f5f7cba31acdfc7dfc136722752dcdd543836fea47ae566708c10602238e9747ef0faba824ca7a88d",
-                "f9312081b0773d5457b1a6359e3643473af6d9ee9dcd91655a4b58c04edfe79b4562eab928628c9a4037f94b254a52da",
-            ),
-        ];
-
-        for (x, y, z) in database {
-            let x = GF384::from(hex::decode(x).unwrap().as_slice());
-            let y = GF384::from(hex::decode(y).unwrap().as_slice());
-            let z = GF384::from(hex::decode(z).unwrap().as_slice());
-
-            assert_eq!(x * y, z);
-            assert_eq!(y * x, z);
-        }
-    }
-
-    #[test]
-    fn gf576_mul() {
-        let database = [
-            (
-                "54a6c2c69b06b8b0694b794571683eeb5413c8b465da06bcdfc37e4807d1072722abefddb8d58c5140c9c7c77717c106baa3f4ae81903a40035d682bbe15504339c941fbb4fdbdb8",
-                "a805b0090170d28ff11062b44e2c13ba6d07f5cd264c1bcd37b80b0f5facb2dd387619550167b75b81d2659b56d29b7a852c14d2cb0a3b64700cf74d4b1e7a9dfc8e57cfcb07db23",
-                "45d69adbeab2cf4bc0da73f932b250f06097dddb71e2cc7a31db5efb502e0fe18496f1706c4bb7fec3603de9fc03b57817c0cfb7b908c6a223448cabf22f365c4dedbf45439d0cf6",
-            ),
-            (
-                "103e10d7da92c942d286243373736c63473420980ef675a73975eb73b8f27a351b9eb1df691d8c34c4483414cda159a3a6f278fdac20528f16d4f1e5e4671a06733029f3d99ab1cc",
-                "eb37d5c76143733e78221b0516537daba5819f8322ec6c10e22fbf129448850635c871d838cb102467b96a9e5a84efbbba99106ab96bc9f1771c9478246dff9e3ac3070facc152ec",
-                "935704b1c84251002d136197d2acd29995c46c82f67c3a012dcf86deba1d3f227c24a65fc211bbee796572b0a05a97f9cd0f970218f1e5f82359ffc6adbf4b5f2b1f345e50fdab4e",
-            ),
-            (
-                "b7104ed362a60f0378de88e68f0eaa4fc64643373aef5eff9f91cc02bcd9a6023181d79136d00540ac33c9f50068d59c9a39b2925d1ec4808b398d45ac6cd23a8ae91e0179e3ffd6",
-                "9896cf92ff31c5bf96b495d54a42017353060cacadfe4c7606a87ed8b68ff0a2307a1b5278bfc303f67b874eb698ace6ef2953c1499504663b90e73fcfd25131761c30a4b3733f1e",
-                "7941079d84692d18834e6639af77ac1d1ab207182e9c19360ed6ad134ce3e706a701849d3aaed9abdc3eb0dba4e2598b19230aab42bee2bee2fa80b7bcaacad9cfd861db4945f9aa",
-            ),
-            (
-                "35000d536a13d9b3a7e89c4b0ded4d1ded48cff5312906abac051ffc627fbc98d4a681f051a643d290b0dfc3939ba372fd02f039bff23a798b48f107aaa3ab73da05856937b5c486",
-                "948f26373610d74ac2260cbbeda6514621db803d2b0ce01d65b312eb84e20dd7b4c5bc6fd581cf2ebbbb903663b588ba92c0c3c73512a7078a2145f3d2a75293a747d2c870bcb17b",
-                "1ad4663ba7260c79de00c10dc8cc97853987461e8acbad07cc8a69d2bdc804fa3dff2c38de2ba545acd6ee3b218a05c774f294f85b180966e913dabff521f85169ed37a29bd4a7a0",
-            ),
-            (
-                "9374272e5613048b2e59da5a4a20e44f8b94b3754cfe31d63a6d482d5fe910b1c82663592935fba5837c39ed5928cabee7cbbeb37f9520cd4d6acabd41fc146062572b825d9e1ba5",
-                "b3f0b8f10b242f41b7e2abbbc13ea7e6f85f5dd682e91e089d1a8b6963706db320b8b67948594d79d9e69ee8fd3583d3576aa6cf3eed0ce27218a24f0d3b97139607fa01f9025979",
-                "66a6134efdce64b4ea3a2e957bacf2967adbf944ff9240d42c2afdbb169f4931eafc39167a6b7084844136f614a349f1419c634e10e31679262e0183698d35a1ecf3878b43a89bc8",
-            ),
-        ];
-        for (x, y, z) in database {
-            let x = GF576::from(hex::decode(x).unwrap().as_slice());
-            let y = GF576::from(hex::decode(y).unwrap().as_slice());
-            let z = GF576::from(hex::decode(z).unwrap().as_slice());
-
-            assert_eq!(x * y, z);
-            assert_eq!(y * x, z);
-        }
-    }
-
-    #[test]
-    fn gf768_mul() {
-        let database = [
-            (
-                "07391d1e06f0174a7619bf8d8b1d6a21f00b8b8b42d24f491d2eb24e84bc73e3dc6f8930ff98ac2fb5f3a835115f3bdbaf85a79c5b15493af6b7221689394ccf22e5574ff9e475eb5b96544160a9f9e088ea8e1d813c92e39034de49ea9a93ec",
-                "fb2dc09ec0b20da0d9d3fd0e38ea443bae0ee401b91aeb5ba13a91dca0161bc0606f1202c73470a1dafad38ac283368cbb2d667033f78b29c12ad80ab6003fcdf32233365868ca513a1d0717200b41a99211b0ee15ab451fd4d68237a7a150df",
-                "97bd25456a588ff10153b95e41c088652e9a40eed80a41aa5756c9fcb361c3fbbc4a8ffc0b066b0fadd126e146e6201bd4b2d61bf0ac4a758ae66aa79a8dfc62fe5440d3c7292e789d6c758e8a3df9aa0abbd068f4ed79400ef37169dac33138",
-            ),
-            (
-                "1efc5c4ccb67d817e7b966bf9486d24379c38eb96481e7089a455056ae94b7d39613cbf0b73812073cb18431947e5afdbab5e1d341f5d93f79ffe6e2ddf0751de8632eb36ae15e005a9c75155b5b809bebb0a6eef74fe265c45f2cdb1366748e",
-                "f4808c409dd8975a724ba0fe9bc50d7d407d051394c3eec774758a12ae42d1b33fcaaf8c8d6fd2e5e192ddf3a163cb4b8c270ead0488ec0cac0c3eaf03915a3971bfd09586cbd407eff09702d555835e7b06f93afbdf9d3701f63537c2372259",
-                "3f3572cb1035da03f2f34ec643ee3346469bc7c3cb8a010948b782ba3ea03cd7149a845059ad8873e5216f0a6963b59721bd7e614e764f6b60916723ecb6d2d1ef52bfdb765fd4899382cd7752f00531ffbb8eed00a4cec957750ec3bb43ca18",
-            ),
-            (
-                "262ea85c390665c150543ddbe931dbeab03ab03c28a08410ee811a5f22da85ab7b70847882deec8f1446384e89277aa533e38b16dcd8a772023c51ff595e81c85e9e50503c9a2bf83e365afe98d919eda7aa5092c5ab9ab938e40c2a348a6906",
-                "ab5d5bbbd2e8591db331953ead12f638af331083fb3bc40c18e634c7cb82d290e8aa65f9e96d8e67ef197d96b01bcae3568c55637ed81b76eece7782d113271546c035c8b368e856d9d9ec039beb764a2f0bef687b1a8b2b79e49bebd9c1df82",
-                "d1a69edb339c5b6ef70366841d1946149a3b7df826d39ea602b45d8d130bd03a0af7bc4aeb60d5606c2d8bafa8b866db034a88812dd7d0670115653333ecd6c90419b1133610c2c899afc2cb98e2b10d45919790464b684840145002d0042c0f",
-            ),
-            (
-                "eb7b42ef2203e1c158bed2a6ab09d8f065f85eb4036d1073afc98fcbff6dd2d8ed82a920a9e2d8c7ee715c26c1cccda3edd4e675d933a3e3308a193151f5c5c09a601442c8d2eff2041ff11066d4f486589b3df321fc26aa3e14a182611e8091",
-                "57ece743145f1401fd11a813bde08e83f7c2b0dc799f7070e02a26c64f1eb9f6990174a1b0b0f095468f96e154d1dc912e26af8c0100459c461604bfa133deea56a21ee767c271ead9500266c2dff09b3030bbfaf047667ad3504941e6ff286a",
-                "076f2f051d18c008ccf5c6ddc4fc4e7497961bb95e6f5e46e3e103638c9e62747b3795cb10de8194dd15e3ce768906e4d59638a678d81eddc1473ae6f390fc72e78276736ce68bf52a95524b329680891139bde172b12085496192d5b53e0a47",
-            ),
-            (
-                "aded86c99c004d9bd850252b716d6b8b62a6fb8786f4d2b7ee43914158a2fe7d7c60879736dc1ad4e5d6b2d39de01d18358e8cf1e229bda961df49ef4221a9b2ef79918d5decc26dcc462c9f32928ef30655871c8637cc4f54550e55fae6108a",
-                "a1540b67567bbd621022be49b04f1f43034c71d0195f905575141c0e1d902be92db81123ee6478b4c5056e0d14f29d396fef2597fa687ded94eb1f8758b73e117460b2f0d93e58ca0b2ee6ccd453852fc47c7ab5d4bbbaff27324ec4404af06b",
-                "3faf6d2f7d3c15697143c95ff67dd534a666b9dbae767890c71d848f39f03e4e0269abfece50ce736095b09942eb8cb8a861d8b472d43f51b7461737e23bc3b5416f447b72af35bc35b7a5200284a563e5ccf58840e3c69776b9c2bab425ba12",
-            ),
-        ];
-
-        for (x, y, z) in database {
-            let x = GF768::from(hex::decode(x).unwrap().as_slice());
-            let y = GF768::from(hex::decode(y).unwrap().as_slice());
-            let z = GF768::from(hex::decode(z).unwrap().as_slice());
-
-            assert_eq!(x * y, z);
-            assert_eq!(y * x, z);
-            assert_eq!((y * x).as_bytes(), z.as_bytes());
-        }
-    }
     fn byte_combine_bits<F: BigGaloisField + Debug + Eq>(test_data: &[(u8, &str)]) {
         for (x, data) in test_data {
             let result = F::from(hex::decode(*data).unwrap().as_slice());
@@ -2104,5 +1971,60 @@ mod test {
             ],
         ];
         byte_combine::<GF256>(&database);
+    }
+
+    #[generic_tests::define]
+    mod extended_field_ops {
+        use super::*;
+        use crate::utils::test::read_test_data;
+        use serde::Deserialize;
+
+        #[derive(Debug, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct DataMul {
+            lambda: usize,
+            database: Vec<[String; 3]>,
+        }
+
+        #[test]
+        fn mul<F, const LAMBDA: usize>()
+        where
+            F: ExtensionField<BaseField: for<'a> From<&'a [u8]>> + Copy + Debug + Eq,
+        {
+            let test_data: Vec<DataMul> = read_test_data("ExtendedFields.json");
+            let test_data = test_data
+                .into_iter()
+                .find(|data| data.lambda == LAMBDA)
+                .expect(&format!("No test data for GF{LAMBDA}"));
+
+            for [lhs, rhs, res] in test_data.database {
+                let lhs = F::from(hex::decode(lhs.as_str()).unwrap().as_slice());
+                let rhs = <F::BaseField>::from(hex::decode(rhs.as_str()).unwrap().as_slice());
+                let res = F::from(hex::decode(res.as_str()).unwrap().as_slice());
+                assert_eq!(lhs * rhs, res);
+            }
+        }
+
+        #[test]
+        fn byte_conversions<F: ExtensionField + Debug + Eq, const LAMBDA: usize>()
+        where
+            Standard: Distribution<F>,
+        {
+            let mut rng = rand::thread_rng();
+
+            let element = rng.r#gen();
+            let bytes = element.as_bytes();
+            assert_eq!(element, F::from(&bytes));
+            assert_eq!(element, F::from(bytes.as_slice()));
+        }
+
+        #[instantiate_tests(<GF384, 384>)]
+        mod gf384 {}
+
+        #[instantiate_tests(<GF576, 576>)]
+        mod gf576 {}
+
+        #[instantiate_tests(<GF768, 768>)]
+        mod gf768 {}
     }
 }
