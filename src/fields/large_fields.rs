@@ -1498,10 +1498,19 @@ impl Distribution<GF768> for Standard {
 mod test {
 
     use super::*;
-
+    use crate::utils::test::read_test_data;
     use std::fmt::Debug;
 
+    use serde::Deserialize;
+
     const RUNS: usize = 10;
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct DataMul {
+        lambda: usize,
+        database: Vec<[String; 3]>,
+    }
 
     #[generic_tests::define]
     mod field_ops {
@@ -1662,6 +1671,27 @@ mod test {
         }
 
         #[test]
+        fn mul<F: BigGaloisField + Debug + Eq>() {
+            let test_data = read_test_data("LargeFieldMul.json")
+                .into_iter()
+                .find(|data: &DataMul| data.lambda == <F as Field>::Length::USIZE * 8)
+                .expect(&format!(
+                    "No test data for GF{}",
+                    <F as Field>::Length::USIZE * 8
+                ));
+
+            for [lhs, rhs, expected] in test_data.database {
+                let mut lhs = F::from(hex::decode(lhs.as_str()).unwrap().as_slice());
+                let rhs = F::from(hex::decode(rhs.as_str()).unwrap().as_slice());
+                let expected = F::from(hex::decode(expected.as_str()).unwrap().as_slice());
+                assert_eq!(lhs * rhs, expected);
+                assert_eq!(rhs * lhs, expected);
+                lhs *= rhs;
+                assert_eq!(lhs, expected);
+            }
+        }
+
+        #[test]
         fn square<F: BigGaloisField + Debug + Eq>()
         where
             Standard: Distribution<F>,
@@ -1680,114 +1710,6 @@ mod test {
 
         #[instantiate_tests(<GF256>)]
         mod gf256 {}
-    }
-
-    fn mul<F: BigGaloisField + Debug + Eq>(test_data: &[(&str, &str, &str)]) {
-        for (lhs, rhs, expected) in test_data {
-            let mut lhs = F::from(hex::decode(*lhs).unwrap().as_slice());
-            let rhs = F::from(hex::decode(*rhs).unwrap().as_slice());
-            let expected = F::from(hex::decode(*expected).unwrap().as_slice());
-            assert_eq!(lhs * rhs, expected);
-            assert_eq!(rhs * lhs, expected);
-            lhs *= rhs;
-            assert_eq!(lhs, expected);
-        }
-    }
-
-    #[test]
-    fn gf128_mul() {
-        let database = [
-            (
-                "27ec1e89b0b5850162ffbb02a5ff1d26",
-                "059feb9834e99d50dec63ed3ef4bfaa3",
-                "150ac741911e13e9ea77141a1841dfe6",
-            ),
-            (
-                "25eb38901e62e7fa75ecc365a5ef1033",
-                "c428558a2d0fd83160c068527316c0f1",
-                "acd7ed7097ccb7819a03678338e15a01",
-            ),
-            (
-                "1d29dd6299a660502fd86cc95c5b418a",
-                "679d3d12e03bd0e906993d0ecbfd8e90",
-                "825275df2d791802e6d72a5600efbad6",
-            ),
-            (
-                "ed68f7c9a621faf7beabf86bfb2ebc52",
-                "77f498ddae22bc852e298f5d44dfc0b6",
-                "f934a28e7d13fc89e40f0cb629ec9bbb",
-            ),
-            (
-                "2750098402c56181576e74ba6d764764",
-                "7c83159e9f3f60499300150879b5aa03",
-                "2212f95b84ec8fddc46b1373d7badd33",
-            ),
-        ];
-        mul::<GF128>(&database);
-    }
-
-    #[test]
-    fn gf192_mul() {
-        let database = [
-            (
-                "67669059b507187a2352e4056bd9612c5e5533a597cc9280",
-                "7a65986fc4410b3950214bb622bef74ede5669de1f352600",
-                "4204a19c90ddf5969197e140a3d28e926fa118bcd57b65df",
-            ),
-            (
-                "a7500fd672632e78a148b6bcca55bf9ab851ebc6f98cd20c",
-                "1f06b7fb7eaa4febfca3690aec9830104ba72cdd50ad4577",
-                "bca1159014f0c0f10619bb32ea29a881219c7deeb829e11b",
-            ),
-            (
-                "ec982502f5b5d0182525ed1384cee4db16d41fc99f1dc6e7",
-                "c30f691b3800498049ae9fb7a0f0ebaea941409b4c206617",
-                "bcf1bef999b7085d1cf6826e186a9de31b54eb0ba55bf268",
-            ),
-            (
-                "97ff3a808ed72737fd55f6c19fcb376cccaf5b88d2bb201b",
-                "fb46dfca7e6b2051dfaa0b0ef71cc59359276a82a467dd9f",
-                "d02dd8595fd39d11f49f39de8f533b209c3e354000124890",
-            ),
-            (
-                "cb448f65f634d5c69de8201f38202a62bc327f856df86eb7",
-                "02b4176343f425bbba8e270c297081c06185de8260fd3648",
-                "db68a51a539649fb5b183841d8effb21a35df7f15e2a74f0",
-            ),
-        ];
-        mul::<GF192>(&database);
-    }
-
-    #[test]
-    fn gf256_mul() {
-        let database = [
-            (
-                "8a2a2fd1a69dd46353f9badc5b90aeb8c28c36c9d9b17efe844d3bc1fa49e36a",
-                "7f13975ef2e4877731e671d8214041988e082ef1a0757917173a3a6079aff741",
-                "79502482a1d215cd731ab67453148708de5c8a567d75fbd497b35ff77d65848f",
-            ),
-            (
-                "c21ce5e3f6ca570603159c10736372a00642d8ef975d00820a225371ef487af0",
-                "9b495ebc5f0189cde768f1776227e1c775ce93ee3e7c629de1b18827eeb7c67f",
-                "4c4e76d784273d1ca5ce4d601d1f1c7c81f21e9c9fc7a348fa4374ba99193d51",
-            ),
-            (
-                "dadf8c4cc33bde49690c2751d9ac39c566a925012dfac190e57f25cdcd377d81",
-                "aa96ea13a62685394c3dce8c19bcb8f03e046523dc47f6dfab8131135dcc8796",
-                "733a43e5587bb3c0f36a80d896dc1f4ad6806b4200f71fa6d93a7cbebc156ab3",
-            ),
-            (
-                "aba9b03603ac8741bea87e7fbbd62579e126e34adbc85052deb9fca265a99280",
-                "045d0bb80935bafbe1d6d43d9b530100f50d19f387e962a8b54feb5e6d255988",
-                "5e58597debdca0923c5d9e370cdf2e531effd8f9f069aaccba84efa91f516a4a",
-            ),
-            (
-                "7d3e3e134f80d8884334ac93c449155df5c326da691163f210158d0b7eb50f89",
-                "99005059eaa1418c4bd68edc851667ec05b3b1d1a10f2c233240c899c7d3b0ec",
-                "387f086fca73b66e39c0ee94bf5a394d1e9b4e0cfbc53ece53f7fbf175fa208f",
-            ),
-        ];
-        mul::<GF256>(&database);
     }
 
     fn byte_combine_bits<F: BigGaloisField + Debug + Eq>(test_data: &[(u8, &str)]) {
@@ -1977,14 +1899,6 @@ mod test {
     mod extended_field_ops {
         use super::*;
         use crate::utils::test::read_test_data;
-        use serde::Deserialize;
-
-        #[derive(Debug, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct DataMul {
-            lambda: usize,
-            database: Vec<[String; 3]>,
-        }
 
         #[test]
         fn mul<F, const LAMBDA: usize>()
