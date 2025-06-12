@@ -1,0 +1,53 @@
+[
+    {
+        "lambda": 128,
+        "database": [
+            [
+                193,
+                "9f0617c47b7c51bd9590bb237294d1df"
+            ],
+            [
+                163,
+                "04b54dcf1f2f6efe59cba8fcaea4f558"
+            ],
+            [
+                192,
+                "9e0617c47b7c51bd9590bb237294d1df"
+            ]
+        ]
+    },
+    {
+        "lambda": 192,
+        "database": [
+            [
+                191,
+                "001416b404cbf712ac8abf1b7c18fb0d04051236e0e14eb3"
+            ],
+            [
+                38,
+                "20ec0299a9ce2ea6483cd324c2448595139d5c9158ebe53d"
+            ],
+            [
+                82,
+                "8481c63cdf4be7868c4fe1c96962da6f70cebbf3d724415d"
+            ]
+        ]
+    },
+    {
+        "lambda": 256,
+        "database": [
+            [
+                155,
+                "a546773740880fa7cbcdf4cc6192b78e00f8b8e9e69cd6213e5dc5cdcbeea020"
+            ],
+            [
+                126,
+                "5370a9666291a1b2d78e0ee3282f0c4050eb80fe50964600780a5823e975cad7"
+            ],
+            [
+                98,
+                "5aa9103cd2d22090596547862a30ff0995572177eeb49d003c3e64808d94d3e6"
+            ]
+        ]
+    }
+]

@@ -1519,6 +1519,13 @@ mod test {
         database: Vec<[String; 9]>,
     }
 
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct DataByteCombineBit {
+        lambda: usize,
+        database: Vec<(u8, String)>,
+    }
+
     #[generic_tests::define]
     mod field_ops {
         use super::*;
@@ -1735,6 +1742,23 @@ mod test {
             assert_eq!(element * element, element.square());
         }
 
+        #[test]
+        fn byte_combine_bits<F: BigGaloisField + Debug + Eq>() {
+            let test_data = read_test_data("LargeFieldByteCombineBits.json")
+                .into_iter()
+                .find(|data: &DataByteCombineBit| data.lambda == <F as Field>::Length::USIZE * 8)
+                .expect(&format!(
+                    "No test data for GF{}",
+                    <F as Field>::Length::USIZE * 8
+                ))
+                .database;
+
+            for (x, data) in test_data.into_iter() {
+                let result = F::from(hex::decode(&data).unwrap().as_slice());
+                assert_eq!(F::byte_combine_bits(x), result);
+            }
+        }
+
         #[instantiate_tests(<GF128>)]
         mod gf128 {}
 
@@ -1743,52 +1767,6 @@ mod test {
 
         #[instantiate_tests(<GF256>)]
         mod gf256 {}
-    }
-
-    fn byte_combine_bits<F: BigGaloisField + Debug + Eq>(test_data: &[(u8, &str)]) {
-        for (x, data) in test_data {
-            let result = F::from(hex::decode(*data).unwrap().as_slice());
-            assert_eq!(F::byte_combine_bits(*x), result);
-        }
-    }
-
-    #[test]
-    fn gf128_byte_combine_bits() {
-        let database = [
-            (0xc1, "9f0617c47b7c51bd9590bb237294d1df"),
-            (0xa3, "04b54dcf1f2f6efe59cba8fcaea4f558"),
-            (0xc0, "9e0617c47b7c51bd9590bb237294d1df"),
-        ];
-        byte_combine_bits::<GF128>(&database);
-    }
-
-    #[test]
-    fn gf192_byte_combine_bits() {
-        let database = [
-            (0xbf, "001416b404cbf712ac8abf1b7c18fb0d04051236e0e14eb3"),
-            (0x26, "20ec0299a9ce2ea6483cd324c2448595139d5c9158ebe53d"),
-            (0x52, "8481c63cdf4be7868c4fe1c96962da6f70cebbf3d724415d"),
-        ];
-        byte_combine_bits::<GF192>(&database);
-    }
-
-    #[test]
-    fn gf256_test_byte_combine_bits() {
-        let database = [
-            (
-                0x9b,
-                "a546773740880fa7cbcdf4cc6192b78e00f8b8e9e69cd6213e5dc5cdcbeea020",
-            ),
-            (
-                0x7e,
-                "5370a9666291a1b2d78e0ee3282f0c4050eb80fe50964600780a5823e975cad7",
-            ),
-            (
-                0x62,
-                "5aa9103cd2d22090596547862a30ff0995572177eeb49d003c3e64808d94d3e6",
-            ),
-        ];
-        byte_combine_bits::<GF256>(&database);
     }
 
     #[generic_tests::define]
