@@ -1420,7 +1420,7 @@ impl Distribution<GF576> for Standard {
             rng.sample(self),
             rng.sample(self),
             rng.sample(self),
-            rng.sample(self),
+            rng.sample::<u64, _>(self) as u128,
         ])
     }
 }
