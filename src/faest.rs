@@ -301,7 +301,7 @@ where
         chall3: &mut [u8],
         ctr: u32,
     ) {
-        let mut hasher = (*hasher).clone();
+        let mut hasher = hasher.to_owned();
         hasher.update(&ctr.to_le_bytes());
         hasher.finish().read(chall3);
     }

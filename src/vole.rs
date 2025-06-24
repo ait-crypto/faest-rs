@@ -132,8 +132,8 @@ where
     let mut rj1: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
 
     // ::3,4
-    let offset = (sd.len() != ni) as usize;
-    if offset != 0 {
+    let offset = sd.len() != ni;
+    if offset {
         rj.push(GenericArray::default_boxed());
     }
     for sdi in sd {
