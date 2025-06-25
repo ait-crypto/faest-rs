@@ -104,7 +104,6 @@ pub(crate) type QSProof<O> = (OWFField<O>, OWFField<O>, OWFField<O>);
 
 /// Witness for the secret key
 pub(crate) type Witness<O> = Box<GenericArray<u8, <O as OWFParameters>::LBytes>>;
-
 pub(crate) trait SecurityParameter:
     ArrayLength
     + Add<Self, Output: ArrayLength>
@@ -119,6 +118,72 @@ pub(crate) trait SecurityParameter:
 impl SecurityParameter for U16 {}
 impl SecurityParameter for U24 {}
 impl SecurityParameter for U32 {}
+
+/// Generates an implementation of [`OWFParameters::prove`] dinamically dispatching the AVX2 optimizations on the underlying galois field
+macro_rules! define_owf_proof {
+    (
+        opt_owf = $opt_owf:ty
+    ) => {
+        #[inline]
+        fn prove(
+            w: &GenericArray<u8, Self::LBytes>,
+            u: &GenericArray<u8, Self::LambdaBytesTimes2>,
+            v: CstrntsVal<Self>,
+            pk: &PublicKey<Self>,
+            chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        ) -> QSProof<Self> {
+            #[cfg(all(
+                feature = "opt-simd",
+                any(target_arch = "x86", target_arch = "x86_64"),
+                not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+            ))]
+            if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+                // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
+                // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
+                let pk: &PublicKey<$opt_owf> = unsafe { std::mem::transmute(pk) };
+                let qs_proof = aes_prove::<$opt_owf>(w, u, v, pk, chall_2);
+                return (
+                    OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
+                    OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
+                    OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
+                );
+            }
+            aes_prove::<Self>(w, u, v, pk, chall_2)
+        }
+    };
+}
+
+/// Generates an implementation of [`OWFParameters::verify`] dinamically dispatching the AVX2 optimizations on the underlying galois field
+macro_rules! define_owf_verify {
+    (
+        opt_owf = $opt_owf:ty
+    ) => {
+        #[inline]
+        fn verify(
+            q: CstrntsVal<Self>,
+            d: &GenericArray<u8, Self::LBytes>,
+            pk: &PublicKey<Self>,
+            chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+            chall_3: &GenericArray<u8, Self::LambdaBytes>,
+            a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+            a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        ) -> OWFField<Self> {
+            #[cfg(all(
+                feature = "opt-simd",
+                any(target_arch = "x86", target_arch = "x86_64"),
+                not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+            ))]
+            if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+                // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
+                // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
+                let pk: &PublicKey<$opt_owf> = unsafe { std::mem::transmute(pk) };
+                let chall3 = aes_verify::<$opt_owf>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
+                return OWFField::<Self>::from(chall3.as_bytes().as_slice());
+            }
+            aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
+        }
+    };
+}
 
 #[inline]
 fn hash_v_matrix<BP>(
@@ -656,57 +721,8 @@ where
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    #[inline]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
-            // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<SimdOWF128> = unsafe { std::mem::transmute(pk) };
-            let qs_proof = aes_prove::<SimdOWF128>(w, u, v, pk, chall_2);
-            return (
-                OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
-                OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
-                OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
-            );
-        }
-        aes_prove::<Self>(w, u, v, pk, chall_2)
-    }
-
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
-            // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<SimdOWF128> = unsafe { std::mem::transmute(pk) };
-            let chall3 = aes_verify::<SimdOWF128>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
-            return OWFField::<Self>::from(chall3.as_bytes().as_slice());
-        }
-        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-    }
+    define_owf_proof!(opt_owf = SimdOWF128);
+    define_owf_verify!(opt_owf = SimdOWF128);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -774,58 +790,9 @@ where
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    #[inline]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
-            // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<SimdOWF192> = unsafe { std::mem::transmute(pk) };
-            let qs_proof = aes_prove::<SimdOWF192>(w, u, v, pk, chall_2);
-            return (
-                OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
-                OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
-                OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
-            );
-        }
-        aes_prove::<Self>(w, u, v, pk, chall_2)
-    }
+    define_owf_proof!(opt_owf = SimdOWF192);
 
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
-            // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<SimdOWF192> = unsafe { std::mem::transmute(pk) };
-            let chall3 = aes_verify::<SimdOWF192>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
-            return OWFField::<Self>::from(chall3.as_bytes().as_slice());
-        }
-
-        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-    }
+    define_owf_verify!(opt_owf = SimdOWF192);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -893,57 +860,8 @@ where
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    #[inline]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
-            // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<SimdOWF256> = unsafe { std::mem::transmute(pk) };
-            let qs_proof = aes_prove::<SimdOWF256>(w, u, v, pk, chall_2);
-            return (
-                OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
-                OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
-                OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
-            );
-        }
-        aes_prove::<Self>(w, u, v, pk, chall_2)
-    }
-
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
-            // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<SimdOWF256> = unsafe { std::mem::transmute(pk) };
-            let chall3 = aes_verify::<SimdOWF256>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
-            return OWFField::<Self>::from(chall3.as_bytes().as_slice());
-        }
-        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-    }
+    define_owf_proof!(opt_owf = SimdOWF256);
+    define_owf_verify!(opt_owf = SimdOWF256);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1009,57 +927,8 @@ where
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    #[inline]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
-            // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<SimdOWF128EM> = unsafe { std::mem::transmute(pk) };
-            let qs_proof = aes_prove::<SimdOWF128EM>(w, u, v, pk, chall_2);
-            return (
-                OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
-                OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
-                OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
-            );
-        }
-        aes_prove::<Self>(w, u, v, pk, chall_2)
-    }
-
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
-            // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<SimdOWF128EM> = unsafe { std::mem::transmute(pk) };
-            let chall3 = aes_verify::<SimdOWF128EM>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
-            return OWFField::<Self>::from(chall3.as_bytes().as_slice());
-        }
-        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-    }
+    define_owf_proof!(opt_owf = SimdOWF128EM);
+    define_owf_verify!(opt_owf = SimdOWF128EM);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1129,58 +998,8 @@ where
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    #[inline]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
-            // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<SimdOWF192EM> = unsafe { std::mem::transmute(pk) };
-            let qs_proof = aes_prove::<SimdOWF192EM>(w, u, v, pk, chall_2);
-            return (
-                OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
-                OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
-                OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
-            );
-        }
-        aes_prove::<Self>(w, u, v, pk, chall_2)
-    }
-
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        // Dynamic feature detection
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
-            // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<SimdOWF192EM> = unsafe { std::mem::transmute(pk) };
-            let chall3 = aes_verify::<SimdOWF192EM>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
-            return OWFField::<Self>::from(chall3.as_bytes().as_slice());
-        }
-        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-    }
+    define_owf_proof!(opt_owf = SimdOWF192EM);
+    define_owf_verify!(opt_owf = SimdOWF192EM);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1248,57 +1067,8 @@ where
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    #[inline]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
-            // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<SimdOWF256EM> = unsafe { std::mem::transmute(pk) };
-            let qs_proof = aes_prove::<SimdOWF256EM>(w, u, v, pk, chall_2);
-            return (
-                OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
-                OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
-                OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
-            );
-        }
-        aes_prove::<Self>(w, u, v, pk, chall_2)
-    }
-
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
-            // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-            let pk: &PublicKey<SimdOWF256EM> = unsafe { std::mem::transmute(pk) };
-            let chall3 = aes_verify::<SimdOWF256EM>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
-            return OWFField::<Self>::from(chall3.as_bytes().as_slice());
-        }
-        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-    }
+    define_owf_proof!(opt_owf = SimdOWF256EM);
+    define_owf_verify!(opt_owf = SimdOWF256EM);
 }
 
 pub(crate) trait TauParameters {
@@ -1553,7 +1323,7 @@ pub(crate) trait FAESTParameters {
 pub(crate) struct FAEST128sParameters;
 
 impl FAESTParameters for FAEST128sParameters {
-    type OWF = OWF128<GF128>;
+    type OWF = OWF128;
     type Tau = Tau128Small;
     type BAVC = BAVC128Small;
     type WGRIND = U7;
@@ -1564,7 +1334,7 @@ impl FAESTParameters for FAEST128sParameters {
 pub(crate) struct FAEST128fParameters;
 
 impl FAESTParameters for FAEST128fParameters {
-    type OWF = OWF128<GF128>;
+    type OWF = OWF128;
     type Tau = Tau128Fast;
     type BAVC = BAVC128Fast;
     type WGRIND = U8;
