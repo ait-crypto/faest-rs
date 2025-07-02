@@ -1,7 +1,6 @@
 use std::{
     iter::zip,
     marker::PhantomData,
-    mem::swap,
     ops::{Index, IndexMut, Mul},
 };
 
@@ -15,7 +14,7 @@ use crate::{
     bavc::{BatchVectorCommitment, BavcCommitResult, BavcDecommitment, BavcOpenResult},
     parameter::TauParameters,
     prg::{IV, PseudoRandomGenerator},
-    utils::{Reader, decode_all_chall_3, xor_arrays_inplace, xor_arrays_into},
+    utils::{Reader, decode_all_chall_3, xor_arrays_inplace},
 };
 
 /// Initial tweak value as by FEAST specification
@@ -110,9 +109,9 @@ where
     }
 }
 
-fn convert_to_vole<'a, BAVC, LHatBytes>(
-    v: impl ExactSizeIterator<Item = &'a mut GenericArray<u8, LHatBytes>>,
-    sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, BAVC::LambdaBytes>>,
+pub(crate) fn convert_to_vole<'a, 'b, BAVC, LHatBytes>(
+    v: &'a mut [GenericArray<u8, LHatBytes>],
+    mut sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, BAVC::LambdaBytes>>,
     iv: &IV,
     round: u32,
 ) -> Box<GenericArray<u8, LHatBytes>>
@@ -122,41 +121,59 @@ where
 {
     let twk = round + TWEAK_OFFSET;
 
-    // ::1
     let ni = BAVC::TAU::bavc_max_node_index(round as usize);
-    debug_assert!(sd.len() == ni || sd.len() + 1 == ni);
+    debug_assert!(sd.len() == ni);
 
-    // ::2
-    // As in steps 8,9 we only work with two rows at a time, we just allocate 2 r-vectors
-    let mut rj: Vec<Box<GenericArray<u8, LHatBytes>>> = Vec::with_capacity(ni);
-    let mut rj1: Vec<Box<GenericArray<u8, LHatBytes>>> = vec![GenericArray::default_boxed(); ni];
+    // Init auxiliary memory
+    let mut rj: Vec<Box<GenericArray<u8, LHatBytes>>> =
+        vec![GenericArray::default_boxed(); BAVC::TAU::vole_array_length(round as usize)];
+    let mut right_leaf: GenericArray<u8, LHatBytes> = GenericArray::default();
 
-    // ::3,4
-    let offset = sd.len() != ni;
-    if offset {
-        rj.push(GenericArray::default_boxed());
-    }
-    for sdi in sd {
-        rj.push(BAVC::PRG::new_prg(sdi, iv, twk).read_into_boxed());
-    }
+    let mut next = 0;
+    for i in 0..ni / 2 {
+        // 1. Read left leaf and right leaf
+        // SAFETY: FAEST parameters ensure sd.len() = ni, hence the two unwraps are safe
+        BAVC::PRG::new_prg(sd.next().unwrap(), iv, twk).read(&mut rj[next]);
+        BAVC::PRG::new_prg(sd.next().unwrap(), iv, twk).read(&mut right_leaf);
 
-    // ::6..9
-    for (j, vj) in v.enumerate() {
-        for i in 0..(ni >> (j + 1)) {
-            // ::8
-            xor_arrays_inplace(vj.as_mut_slice(), rj[2 * i + 1].as_slice());
-            // ::9
-            xor_arrays_into(
-                rj1[i].as_mut_slice(),
-                rj[2 * i].as_slice(),
-                rj[2 * i + 1].as_slice(),
-            );
+        // 2. Level 0 => update V[0]
+        xor_arrays_inplace(v[0].as_mut_slice(), right_leaf.as_slice());
+
+        // 3. Father (level 1) is left leaf xor right leaf
+        xor_arrays_inplace(&mut rj[next], right_leaf.as_slice());
+
+        // Move one position forward and clean right leaf
+        next += 1;
+        right_leaf.fill(0);
+
+        // Traverse all levels for which we can already compute internal nodes
+        for (d, v_d) in v[1..].iter_mut().enumerate() {
+            // Last two nodes are on different levels => abort
+            if (i + 1) % (1 << (d + 1)) != 0 {
+                break;
+            }
+
+            // Last two nodes are on same level:
+
+            // 1. Save them as left, right
+            let (left, right) = {
+                let (l, r) = rj.split_at_mut(next - 1);
+                (l[l.len() - 1].as_mut_slice(), r[0].as_mut_slice())
+            };
+
+            // 2. Level d => Update V[d]
+            xor_arrays_inplace(v_d.as_mut_slice(), right);
+
+            // 3. Father (level d+1) is left node xor right node
+            xor_arrays_inplace(left, right);
+
+            // 4. Move one position back and clean right node
+            right.fill(0);
+            next -= 1;
         }
-
-        swap(&mut rj, &mut rj1); // At next iteration we want to have last row in rj
     }
 
-    // ::10: after last swap, rj[0] will contain r_{d,0}
+    // ::10: after traversing all levels, rj[0] will contain r_{d,0}
     // SAFETY: FAEST parameters ensure LHatBytes > 0 (hence rj is not empty)
     rj.into_iter().next().unwrap()
 }
@@ -178,13 +195,15 @@ where
     let BavcCommitResult { com, decom, seeds } = BAVC::commit(r, iv);
 
     let mut v = GenericArray::default_boxed();
-    let mut v_iter = v.iter_mut();
 
     let mut seeds_iter = seeds.iter();
 
     // ::3.0
+    let mut v_in;
+    let mut v_next;
+    (v_in, v_next) = v.split_at_mut(BAVC::TAU::bavc_max_node_depth(0));
     let u = convert_to_vole::<BAVC, LHatBytes>(
-        v_iter.by_ref().take(BAVC::TAU::bavc_max_node_depth(0)),
+        v_in,
         seeds_iter.by_ref().take(BAVC::TAU::bavc_max_node_index(0)),
         iv,
         0,
@@ -195,13 +214,10 @@ where
         let ni = BAVC::TAU::bavc_max_node_index(i as usize);
         let ki = BAVC::TAU::bavc_max_node_depth(i as usize);
 
+        (v_in, v_next) = v_next.split_at_mut(ki);
+
         // ::4..6
-        let u_i = convert_to_vole::<BAVC, LHatBytes>(
-            v_iter.by_ref().take(ki),
-            seeds_iter.by_ref().take(ni),
-            iv,
-            i,
-        );
+        let u_i = convert_to_vole::<BAVC, LHatBytes>(v_in, seeds_iter.by_ref().take(ni), iv, i);
 
         // ::8
         for (u_i, u, c) in izip!(u_i.iter(), u.iter(), &mut c[i as usize - 1]) {
@@ -239,6 +255,7 @@ where
     let mut sdi_off = 0;
 
     // ::7
+    let zero_arr = GenericArray::default();
     for i in 0..BAVC::Tau::U32 {
         // ::8
         let delta_i = i_delta[i as usize];
@@ -248,9 +265,12 @@ where
         let qi_ref;
         (qi_ref, q_ref) = q_ref.split_at_mut(ki);
 
-        let seeds_i = (1..ni)
+        let seeds_i = (0..ni)
             // To map values in-order, instead of iterating over j we iterate over j ^ delta_i
             .map(|j_xor_delta| {
+                if j_xor_delta == 0 {
+                    return &zero_arr;
+                }
                 let j = j_xor_delta ^ delta_i as usize;
 
                 let seeds_idx = if j < delta_i as usize {
@@ -265,7 +285,7 @@ where
             });
 
         // ::10
-        let _ = convert_to_vole::<BAVC, LHatBytes>(qi_ref.iter_mut(), seeds_i, iv, i);
+        let _ = convert_to_vole::<BAVC, LHatBytes>(qi_ref, seeds_i, iv, i);
 
         // ::14
         if i != 0 {

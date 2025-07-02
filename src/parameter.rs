@@ -1130,6 +1130,15 @@ pub(crate) trait TauParameters {
         let mask = tmp - 1;
         Self::L::USIZE - 1 + Self::Tau::USIZE * tmp + Self::Tau1::USIZE * (j & mask) + i
     }
+
+    /// Returns the required array length for generating the vole correlations in [`crate::vole::convert_to_vole`]
+    fn vole_array_length(i: usize) -> usize {
+        let n = Self::bavc_max_node_index(i);
+        n / 2
+            - (2..Self::bavc_max_node_depth(i))
+                .map(|d| n / (1 << d) - 1)
+                .sum::<usize>()
+    }
 }
 
 // FAEST
