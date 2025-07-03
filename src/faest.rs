@@ -676,9 +676,7 @@ mod test {
     #[generic_tests::define]
     mod faest_tvs {
         use super::*;
-        use crate::{
-            utils::test::{hash_array, read_test_data},
-        };
+        use crate::utils::test::{hash_array, read_test_data};
 
         use serde::Deserialize;
 
