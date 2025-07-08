@@ -4,10 +4,7 @@
 use std::arch::x86 as x86_64;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64;
-use std::{
-    arch::x86_64::_mm256_set_m128i,
-    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
-};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use x86_64::{
     __m128i, __m256i, _mm_alignr_epi8, _mm_and_si128, _mm_andnot_si128, _mm_bslli_si128,
     _mm_clmulepi64_si128, _mm_cmpeq_epi32, _mm_loadu_si128, _mm_or_si128, _mm_set_epi8,
@@ -16,10 +13,10 @@ use x86_64::{
     _mm_storeu_si128, _mm_test_all_zeros, _mm_xor_si128, _mm256_and_si256, _mm256_blend_epi32,
     _mm256_blendv_epi8, _mm256_cmpeq_epi32, _mm256_extracti128_si256, _mm256_loadu_si256,
     _mm256_maskload_epi64, _mm256_maskstore_epi64, _mm256_or_si256, _mm256_permute4x64_epi64,
-    _mm256_permutevar8x32_epi32, _mm256_set1_epi64x, _mm256_setr_epi64x, _mm256_setr_m128i,
-    _mm256_setzero_si256, _mm256_slli_epi32, _mm256_slli_epi64, _mm256_srai_epi32,
-    _mm256_srli_epi32, _mm256_srli_epi64, _mm256_storeu_si256, _mm256_testz_si256,
-    _mm256_xor_si256,
+    _mm256_permutevar8x32_epi32, _mm256_set_m128i, _mm256_set1_epi64x, _mm256_setr_epi64x,
+    _mm256_setr_m128i, _mm256_setzero_si256, _mm256_slli_epi32, _mm256_slli_epi64,
+    _mm256_srai_epi32, _mm256_srli_epi32, _mm256_srli_epi64, _mm256_storeu_si256,
+    _mm256_testz_si256, _mm256_xor_si256,
 };
 
 use generic_array::{
@@ -32,8 +29,7 @@ use super::{
     ExtensionField, Field, FromBit, GF64, Sigmas, Square,
     large_fields::{
         Alphas, Betas, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192,
-        GF256 as UnoptimizedGF256, GF384 as UnoptimizedGF384, GF576 as UnoptimizedGF576,
-        GF768 as UnoptimizedGF768, Modulus,
+        GF256 as UnoptimizedGF256, GF576 as UnoptimizedGF576, GF768 as UnoptimizedGF768, Modulus,
     },
 };
 
@@ -285,7 +281,7 @@ unsafe fn combine_poly128s_7(v: [__m128i; 7]) -> [__m128i; 4] {
 
 #[inline]
 #[target_feature(enable = "avx2")]
-fn combine_poly128s_13(v: [__m128i; 13]) -> [__m128i; 6] {
+unsafe fn combine_poly128s_13(v: [__m128i; 13]) -> [__m128i; 6] {
     unsafe {
         [
             _mm_xor_si128(v[0], _mm_slli_si128(v[1], 8)),
@@ -311,6 +307,10 @@ const fn u64_as_m128(v: u64) -> __m128i {
 
 const fn u128_as_m128(v: u128) -> __m128i {
     unsafe { GF128ConstHelper { b: v }.a }
+}
+
+const fn m128_as_u128(v: __m128i) -> u128 {
+    unsafe { GF128ConstHelper { a: v }.b }
 }
 
 const fn gfu128_as_m128(v: UnoptimizedGF128) -> __m128i {
@@ -713,20 +713,25 @@ impl Field for GF128 {
         unsafe { _mm_storeu_si128(ret.as_mut_ptr().cast(), self.0) };
         ret
     }
-
-    /*
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
-        unsafe { _mm_storeu_si128(ret.as_mut_ptr().cast(), self.0) };
-        ret
-    }
-    */
 }
 
 impl From<&[u8]> for GF128 {
     fn from(value: &[u8]) -> Self {
         debug_assert_eq!(value.len(), <Self as Field>::Length::USIZE);
         Self(unsafe { _mm_loadu_si128(value.as_ptr().cast()) })
+    }
+}
+
+impl From<UnoptimizedGF128> for GF128 {
+    fn from(value: UnoptimizedGF128) -> Self {
+        let inner = value.0[0];
+        Self(u128_as_m128(inner))
+    }
+}
+
+impl From<GF128> for UnoptimizedGF128 {
+    fn from(value: GF128) -> Self {
+        Self([m128_as_u128(value.0)])
     }
 }
 
@@ -1217,20 +1222,6 @@ impl Field for GF192 {
         };
         ret
     }
-
-    /*
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
-        unsafe {
-            _mm256_maskstore_epi64(
-                ret.as_mut_ptr().cast(),
-                _mm256_setr_epi64x(i64::MIN, i64::MIN, i64::MIN, 0),
-                self.0,
-            )
-        };
-        ret
-    }
-    */
 }
 
 impl From<&[u8]> for GF192 {
@@ -1242,6 +1233,18 @@ impl From<&[u8]> for GF192 {
                 _mm256_setr_epi64x(i64::MIN, i64::MIN, i64::MIN, 0),
             )
         })
+    }
+}
+
+impl From<UnoptimizedGF192> for GF192 {
+    fn from(value: UnoptimizedGF192) -> Self {
+        Self::from(value.as_bytes().as_slice())
+    }
+}
+
+impl From<GF192> for UnoptimizedGF192 {
+    fn from(value: GF192) -> Self {
+        Self::from(value.as_bytes().as_slice())
     }
 }
 
@@ -1700,20 +1703,24 @@ impl Field for GF256 {
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
         ret
     }
-
-    /*
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut ret = GenericArray::<u8, Self::Length>::default_boxed();
-        unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
-        ret
-    }
-    */
 }
 
 impl From<&[u8]> for GF256 {
     fn from(value: &[u8]) -> Self {
         debug_assert_eq!(value.len(), <Self as Field>::Length::USIZE);
         Self(unsafe { _mm256_loadu_si256(value.as_ptr().cast()) })
+    }
+}
+
+impl From<UnoptimizedGF256> for GF256 {
+    fn from(value: UnoptimizedGF256) -> Self {
+        Self::from(value.as_bytes().as_slice())
+    }
+}
+
+impl From<GF256> for UnoptimizedGF256 {
+    fn from(value: GF256) -> Self {
+        Self::from(value.as_bytes().as_slice())
     }
 }
 
@@ -2004,28 +2011,34 @@ impl From<GF384> for (__m256i, __m128i) {
     }
 }
 
-const GF384_MOD_M128: __m128i = u128_as_m128(UnoptimizedGF384::MODULUS);
+#[inline]
+const fn _mm_shl_si128(x: __m128i, other: i32) -> __m128i {
+    u128_as_m128(m128_as_u128(x) << other)
+}
 
+#[inline]
+const fn _mm_shr_si128(x: __m128i, other: i32) -> __m128i {
+    u128_as_m128(m128_as_u128(x) >> other)
+}
+
+#[inline]
 unsafe fn poly512_reduce384(mut x: [__m128i; 4]) -> (__m256i, __m128i) {
     unsafe {
-        let xmod = [
-            m128_clmul_ll(GF384_MOD_M128, x[3]),
-            m128_clmul_lh(GF384_MOD_M128, x[3]),
-        ];
+        let mut tmp = _mm_xor_si128(x[3], _mm_shl_si128(x[3], 2));
+        tmp = _mm_xor_si128(tmp, _mm_shl_si128(x[3], 3));
+        tmp = _mm_xor_si128(tmp, _mm_shl_si128(x[3], 12));
+        x[0] = _mm_xor_si128(x[0], tmp);
 
-        let xmod_combined = [
-            _mm_xor_si128(xmod[0], _mm_slli_si128(xmod[1], 8)),
-            _mm_srli_si128(xmod[1], 8),
-        ];
-
-        x[0] = _mm_xor_si128(x[0], xmod_combined[0]);
-        x[1] = _mm_xor_si128(x[1], xmod_combined[1]);
+        tmp = _mm_xor_si128(_mm_shr_si128(x[3], 126), _mm_shr_si128(x[3], 125));
+        tmp = _mm_xor_si128(tmp, _mm_shr_si128(x[3], 116));
+        x[1] = _mm_xor_si128(x[1], tmp);
 
         (_mm256_setr_m128i(x[0], x[1]), x[2])
     }
 }
 
-fn mul_gf384_gf128(lhs: (__m256i, __m128i), y0: __m128i) -> (__m256i, __m128i) {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf384_gf128(lhs: (__m256i, __m128i), y0: __m128i) -> (__m256i, __m128i) {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs.0, 0);
         let x1 = _mm256_extracti128_si256(lhs.0, 1);
@@ -2054,7 +2067,7 @@ impl Mul<GF128> for GF384 {
 
     #[inline]
     fn mul(self, rhs: GF128) -> Self::Output {
-        Self::from(mul_gf384_gf128(self.into(), rhs.0))
+        Self::from(unsafe { mul_gf384_gf128(self.into(), rhs.0) })
     }
 }
 
@@ -2063,7 +2076,7 @@ impl Mul<&GF128> for GF384 {
 
     #[inline]
     fn mul(self, rhs: &GF128) -> Self::Output {
-        Self::from(mul_gf384_gf128(self.into(), rhs.0))
+        Self::from(unsafe { mul_gf384_gf128(self.into(), rhs.0) })
     }
 }
 
@@ -2279,7 +2292,8 @@ unsafe fn poly768_reduce576(x: [__m128i; 6]) -> (__m256i, __m256i, u64) {
     }
 }
 
-fn mul_gf576_gf192(lhs: (__m256i, __m256i, u64), rhs: __m256i) -> (__m256i, __m256i, u64) {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf576_gf192(lhs: (__m256i, __m256i, u64), rhs: __m256i) -> (__m256i, __m256i, u64) {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs.0, 0);
         let x1 = _mm256_extracti128_si256(lhs.0, 1);
@@ -2346,7 +2360,7 @@ impl Mul<GF192> for GF576 {
 
     #[inline]
     fn mul(self, rhs: GF192) -> Self::Output {
-        let res = mul_gf576_gf192((self.0, self.1, self.2), rhs.0);
+        let res = unsafe { mul_gf576_gf192((self.0, self.1, self.2), rhs.0) };
         Self(res.0, res.1, res.2)
     }
 }
@@ -2356,7 +2370,7 @@ impl Mul<&GF192> for GF576 {
 
     #[inline]
     fn mul(self, rhs: &GF192) -> Self::Output {
-        let res = mul_gf576_gf192((self.0, self.1, self.2), rhs.0);
+        let res = unsafe { mul_gf576_gf192((self.0, self.1, self.2), rhs.0) };
         Self(res.0, res.1, res.2)
     }
 }
@@ -2595,7 +2609,11 @@ unsafe fn poly1024_reduce768(x: [__m128i; 8]) -> (__m256i, __m256i, __m256i) {
     }
 }
 
-fn mul_gf768_gf256(lhs: (__m256i, __m256i, __m256i), rhs: __m256i) -> (__m256i, __m256i, __m256i) {
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
+unsafe fn mul_gf768_gf256(
+    lhs: (__m256i, __m256i, __m256i),
+    rhs: __m256i,
+) -> (__m256i, __m256i, __m256i) {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs.0, 0);
         let x1 = _mm256_extracti128_si256(lhs.0, 1);
@@ -2672,7 +2690,7 @@ impl Mul<GF256> for GF768 {
 
     #[inline]
     fn mul(self, rhs: GF256) -> Self::Output {
-        Self::from(mul_gf768_gf256(self.into(), rhs.0))
+        Self::from(unsafe { mul_gf768_gf256(self.into(), rhs.0) })
     }
 }
 
@@ -2681,7 +2699,7 @@ impl Mul<&GF256> for GF768 {
 
     #[inline]
     fn mul(self, rhs: &GF256) -> Self::Output {
-        Self::from(mul_gf768_gf256(self.into(), rhs.0))
+        Self::from(unsafe { mul_gf768_gf256(self.into(), rhs.0) })
     }
 }
 
@@ -2707,7 +2725,6 @@ impl ExtensionField for GF768 {
 #[cfg(test)]
 mod test {
     use super::*;
-
     const RUNS: usize = 100;
 
     #[generic_tests::define]
@@ -2940,6 +2957,7 @@ mod test {
 
     #[generic_tests::define]
     mod extended_fields {
+
         use super::*;
 
         use std::fmt::Debug;
@@ -2948,6 +2966,8 @@ mod test {
             Rng,
             distributions::{Distribution, Standard},
         };
+
+        use crate::fields::large_fields::{GF384 as UnoptimizedGF384, GF576 as UnoptimizedGF576};
 
         #[test]
         fn add<Fu, F>()
@@ -3026,37 +3046,6 @@ mod test {
             }
         }
 
-        #[test]
-        fn bench<Fu, F>()
-        where
-            Standard: Distribution<Fu> + Distribution<Fu::BaseField>,
-            Fu: ExtensionField + Debug + Eq + Copy,
-            F::BaseField: Copy,
-            for<'a> F: ExtensionField<Length = Fu::Length, BaseField: From<&'a [u8]>>
-                + Debug
-                + Eq
-                + From<&'a [u8]>
-                + Copy,
-        {
-            let mut rng = rand::thread_rng();
-
-            let lhs_bytes: Fu = rng.r#gen();
-            let lhs = F::from(lhs_bytes.as_bytes().as_slice());
-
-            let rhs_bytes: Fu::BaseField = rng.r#gen::<Fu::BaseField>();
-            let rhs = F::BaseField::from(rhs_bytes.as_bytes().as_slice());
-
-            let t = std::time::Instant::now();
-            for _ in 0..100_000 {
-                let r1 = lhs * rhs;
-                std::hint::black_box(lhs);
-                std::hint::black_box(rhs);
-                std::hint::black_box(r1);
-            }
-            let t = t.elapsed();
-            println!("muls GF{} took: {t:?}", F::Length::USIZE * 8);
-        }
-
         #[instantiate_tests(<UnoptimizedGF384, GF384>)]
         mod gf384 {}
 
@@ -3065,5 +3054,28 @@ mod test {
 
         #[instantiate_tests(<UnoptimizedGF768, GF768>)]
         mod gf768 {}
+    }
+
+    #[test]
+    fn bench() {
+        use rand::Rng;
+
+        let mut rng = rand::thread_rng();
+
+        let x: [__m128i; 6] = std::array::from_fn(|_| u128_as_m128(rng.r#gen::<u128>()));
+
+        let t = std::time::Instant::now();
+        for _ in 0..100_000 {
+            std::hint::black_box(unsafe { poly768_reduce576(std::hint::black_box(x)) });
+        }
+        let t = t.elapsed();
+        println!("reduce took: {t:?}");
+
+        // let t = std::time::Instant::now();
+        // for _ in 0..100_000 {
+        //     std::hint::black_box(unsafe { poly768_reduce576_2(std::hint::black_box(x)) });
+        // }
+        // let t = t.elapsed();
+        // println!("reduce_2 took: {t:?}");
     }
 }

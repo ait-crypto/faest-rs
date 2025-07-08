@@ -14,11 +14,30 @@ use crate::{
     fields::{
         BigGaloisField, ExtensionField, Field, GF64, GF128, GF192, GF256, GF384, GF576, GF768,
     },
+    parameter::SecurityParameter,
     prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo},
 };
 
+#[cfg(all(
+    feature = "opt-simd",
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+))]
+use crate::parameter::AVX2_DYNAMIC_DISPATCH_AVAILABLE;
+
+#[cfg(all(
+    feature = "opt-simd",
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+))]
+use crate::fields::x86_simd_large_fields::{
+    GF128 as SimdGF128, GF192 as SimdGF192, GF256 as SimdGF256, GF384 as SimdGF384,
+    GF576 as SimdGF576, GF768 as SimdGF768,
+};
+
+/// Additional bits returned by VOLE hash
 type BBits = U16;
-// Additional bytes returned by VOLE hash
+/// Additional bytes returned by VOLE hash
 pub(crate) type B = Quot<BBits, U8>;
 
 /// Interface to instantiate a VOLE hasher
@@ -77,21 +96,14 @@ where
     t: GF64,
 }
 
-impl VoleHasherInit<GF128> for VoleHasher<GF128> {
-    type SDLength = Sum<Prod<<GF128 as Field>::Length, U5>, <GF64 as Field>::Length>;
-    type OutputLength = Sum<<GF128 as Field>::Length, B>;
-    type Hasher = Self;
-}
-
-impl VoleHasherInit<GF192> for VoleHasher<GF192> {
-    type SDLength = Sum<Prod<<GF192 as Field>::Length, U5>, <GF64 as Field>::Length>;
-    type OutputLength = Sum<<GF192 as Field>::Length, B>;
-    type Hasher = Self;
-}
-
-impl VoleHasherInit<GF256> for VoleHasher<GF256> {
-    type SDLength = Sum<Prod<<GF256 as Field>::Length, U5>, <GF64 as Field>::Length>;
-    type OutputLength = Sum<<GF256 as Field>::Length, B>;
+impl<F> VoleHasherInit<F> for VoleHasher<F>
+where
+    F: BigGaloisField<Length: SecurityParameter>,
+    <F as Field>::Length:
+        Mul<U5, Output: ArrayLength + Add<U8, Output: ArrayLength>> + Add<U2, Output: ArrayLength>,
+{
+    type SDLength = Sum<Prod<<F as Field>::Length, U5>, <GF64 as Field>::Length>;
+    type OutputLength = Sum<<F as Field>::Length, B>;
     type Hasher = Self;
 }
 
@@ -210,16 +222,13 @@ where
     r1: F,
 }
 
-impl ZKHasherInit<GF128> for ZKHasher<GF128> {
-    type SDLength = Sum<Prod<<GF128 as Field>::Length, U3>, <GF64 as Field>::Length>;
-}
-
-impl ZKHasherInit<GF192> for ZKHasher<GF192> {
-    type SDLength = Sum<Prod<<GF192 as Field>::Length, U3>, <GF64 as Field>::Length>;
-}
-
-impl ZKHasherInit<GF256> for ZKHasher<GF256> {
-    type SDLength = Sum<Prod<<GF256 as Field>::Length, U3>, <GF64 as Field>::Length>;
+impl<F> ZKHasherInit<F> for ZKHasher<F>
+where
+    F: BigGaloisField<Length: SecurityParameter>,
+    <F as Field>::Length:
+        Mul<U3, Output: ArrayLength + Add<U8, Output: ArrayLength>> + Add<U2, Output: ArrayLength>,
+{
+    type SDLength = Sum<Prod<<F as Field>::Length, U3>, <GF64 as Field>::Length>;
 }
 
 impl<F> ZKHasherProcess<F> for ZKHasher<F>
@@ -379,12 +388,9 @@ where
         + Mul<U4, Output: ArrayLength>
         + Mul<U8, Output = Self::Lambda>
         + PartialEq,
-    Self::ExtensionField: for<'a> From<&'a [u8]>
-        + for<'a> Mul<&'a Self::F, Output = Self::ExtensionField>
-        + for<'a> Add<&'a Self::ExtensionField, Output = Self::ExtensionField>
-        + Mul<Self::F, Output = Self::ExtensionField>,
+    Self::ExtensionField: ExtensionField<BaseField = Self::F>,
 {
-    type F: Field + for<'a> From<&'a [u8]>;
+    type F: BigGaloisField<Length = Self::LambdaBytes>;
     type ExtensionField: ExtensionField<Length = Prod<Self::LambdaBytes, U3>, BaseField = Self::F>;
     type Lambda: ArrayLength;
     type LambdaBytes: ArrayLength;
@@ -392,7 +398,33 @@ where
     fn hash(
         uhash: &GenericArray<u8, Prod<Self::LambdaBytes, U3>>,
         x: &GenericArray<u8, Prod<Self::LambdaBytes, U4>>,
+    ) -> GenericArray<u8, Prod<Self::LambdaBytes, U3>>;
+}
+pub(crate) struct LeafHasher128;
+impl LeafHasher for LeafHasher128 {
+    type F = GF128;
+    type ExtensionField = GF384;
+    type LambdaBytes = <GF128 as Field>::Length;
+    type Lambda = Prod<Self::LambdaBytes, U8>;
+
+    fn hash(
+        uhash: &GenericArray<u8, Prod<Self::LambdaBytes, U3>>,
+        x: &GenericArray<u8, Prod<Self::LambdaBytes, U4>>,
     ) -> GenericArray<u8, Prod<Self::LambdaBytes, U3>> {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            let u = SimdGF384::from(uhash.as_slice());
+            let x0 = SimdGF128::from(&x[..<SimdGF128 as Field>::Length::USIZE]);
+            let x1 = SimdGF384::from(&x[<<Self as LeafHasher>::F as Field>::Length::USIZE..]);
+
+            let h = (u * x0) + x1;
+            return h.as_bytes();
+        }
+
         let u = <Self as LeafHasher>::ExtensionField::from(uhash.as_slice());
         let x0 =
             <Self as LeafHasher>::F::from(&x[..<<Self as LeafHasher>::F as Field>::Length::USIZE]);
@@ -404,13 +436,6 @@ where
         h.as_bytes()
     }
 }
-pub(crate) struct LeafHasher128;
-impl LeafHasher for LeafHasher128 {
-    type F = GF128;
-    type ExtensionField = GF384;
-    type LambdaBytes = <GF128 as Field>::Length;
-    type Lambda = Prod<Self::LambdaBytes, U8>;
-}
 
 pub(crate) struct LeafHasher192;
 impl LeafHasher for LeafHasher192 {
@@ -418,6 +443,35 @@ impl LeafHasher for LeafHasher192 {
     type ExtensionField = GF576;
     type LambdaBytes = <GF192 as Field>::Length;
     type Lambda = Prod<Self::LambdaBytes, U8>;
+
+    fn hash(
+        uhash: &GenericArray<u8, Prod<Self::LambdaBytes, U3>>,
+        x: &GenericArray<u8, Prod<Self::LambdaBytes, U4>>,
+    ) -> GenericArray<u8, Prod<Self::LambdaBytes, U3>> {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            let u = SimdGF576::from(uhash.as_slice());
+            let x0 = SimdGF192::from(&x[..<SimdGF192 as Field>::Length::USIZE]);
+            let x1 = SimdGF576::from(&x[<<Self as LeafHasher>::F as Field>::Length::USIZE..]);
+
+            let h = (u * x0) + x1;
+            return h.as_bytes();
+        }
+
+        let u = <Self as LeafHasher>::ExtensionField::from(uhash.as_slice());
+        let x0 =
+            <Self as LeafHasher>::F::from(&x[..<<Self as LeafHasher>::F as Field>::Length::USIZE]);
+        let x1 = <Self as LeafHasher>::ExtensionField::from(
+            &x[<<Self as LeafHasher>::F as Field>::Length::USIZE..],
+        );
+
+        let h = (u * x0) + x1;
+        h.as_bytes()
+    }
 }
 
 pub(crate) struct LeafHasher256;
@@ -426,6 +480,35 @@ impl LeafHasher for LeafHasher256 {
     type ExtensionField = GF768;
     type LambdaBytes = <GF256 as Field>::Length;
     type Lambda = Prod<Self::LambdaBytes, U8>;
+
+    fn hash(
+        uhash: &GenericArray<u8, Prod<Self::LambdaBytes, U3>>,
+        x: &GenericArray<u8, Prod<Self::LambdaBytes, U4>>,
+    ) -> GenericArray<u8, Prod<Self::LambdaBytes, U3>> {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            let u = SimdGF768::from(uhash.as_slice());
+            let x0 = SimdGF256::from(&x[..<SimdGF256 as Field>::Length::USIZE]);
+            let x1 = SimdGF768::from(&x[<<Self as LeafHasher>::F as Field>::Length::USIZE..]);
+
+            let h = (u * x0) + x1;
+            return h.as_bytes();
+        }
+
+        let u = <Self as LeafHasher>::ExtensionField::from(uhash.as_slice());
+        let x0 =
+            <Self as LeafHasher>::F::from(&x[..<<Self as LeafHasher>::F as Field>::Length::USIZE]);
+        let x1 = <Self as LeafHasher>::ExtensionField::from(
+            &x[<<Self as LeafHasher>::F as Field>::Length::USIZE..],
+        );
+
+        let h = (u * x0) + x1;
+        h.as_bytes()
+    }
 }
 
 #[cfg(test)]

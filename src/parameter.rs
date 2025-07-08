@@ -1,5 +1,6 @@
 use std::{
-    iter::repeat_n,
+    iter::{repeat_n, zip},
+    marker::PhantomData,
     ops::{Add, Div, Mul, Sub},
 };
 
@@ -7,6 +8,9 @@ use aes::{
     Aes128Enc, Aes192Enc, Aes256Enc,
     cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray as GenericArray_AES},
 };
+
+use cfg_if::cfg_if;
+
 use generic_array::{
     ArrayLength, GenericArray,
     typenum::{
@@ -17,6 +21,7 @@ use generic_array::{
         U984, U1000, U1024, U2048, U4096, Unsigned,
     },
 };
+
 use rand_core::RngCore;
 
 use crate::{
@@ -28,13 +33,45 @@ use crate::{
     fields::{BigGaloisField, GF128, GF192, GF256},
     internal_keys::{PublicKey, SecretKey},
     prg::{PRG128, PRG192, PRG256, PseudoRandomGenerator},
-    random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake256},
+    random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256},
     rijndael_32::{Rijndael192, Rijndael256},
-    universal_hashing::{B, VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit},
+    universal_hashing::{B, VoleHasher, VoleHasherInit, VoleHasherProcess, ZKHasher, ZKHasherInit},
+    utils::xor_arrays_inplace,
     witness::aes_extendedwitness,
-    zk_constraints::aes_verify,
-    zk_constraints::{CstrntsVal, aes_prove},
+    zk_constraints::{CstrntsVal, aes_prove, aes_verify},
 };
+
+cfg_if!(
+    if #[cfg(all(
+    feature = "opt-simd",
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+))]{
+    use crate::fields::{
+        Field,
+        // AVX2-optimized field implementatons
+        x86_simd_large_fields::{GF128 as SimdGF128, GF192 as SimdGF192, GF256 as SimdGF256},
+    };
+
+    /// Weather AVX2 support is detected at runtime
+    pub(crate) static AVX2_DYNAMIC_DISPATCH_AVAILABLE: std::sync::LazyLock<bool> =
+    std::sync::LazyLock::new(|| {
+        is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq")
+    });
+
+    // BaseParameters with optimized field implementation
+    type SimdBaseParams128 = BaseParams128<SimdGF128>;
+    type SimdBaseParams192 = BaseParams192<SimdGF192>;
+    type SimdBaseParams256 = BaseParams256<SimdGF256>;
+
+    // OWFParameters with optimized field implementation
+    type SimdOWF128 = OWF128<SimdGF128>;
+    type SimdOWF192 = OWF192<SimdGF192>;
+    type SimdOWF256 = OWF256<SimdGF256>;
+    type SimdOWF128EM = OWF128EM<SimdGF128>;
+    type SimdOWF192EM = OWF192EM<SimdGF192>;
+    type SimdOWF256EM = OWF256EM<SimdGF256>;
+});
 
 // FAEST signature sizes
 type U4506 = Sum<Prod<U4, U1000>, U506>;
@@ -52,6 +89,10 @@ type U12380 = Sum<Prod<U1000, U12>, U380>;
 type U17984 = Sum<Prod<U1000, U17>, U984>;
 type U23476 = Sum<Prod<U1000, U23>, U476>;
 
+// OWF L_Enc size
+type U1216 = Sum<U1024, U192>;
+type U2432 = Sum<U2048, U384>;
+
 // l_hat = l + 3*lambda + B
 type LHatBytes<LBytes, LambdaBytes, B> = Sum<LBytes, Sum<Prod<U3, LambdaBytes>, Quot<B, U8>>>;
 
@@ -63,7 +104,6 @@ pub(crate) type QSProof<O> = (OWFField<O>, OWFField<O>, OWFField<O>);
 
 /// Witness for the secret key
 pub(crate) type Witness<O> = Box<GenericArray<u8, <O as OWFParameters>::LBytes>>;
-
 pub(crate) trait SecurityParameter:
     ArrayLength
     + Add<Self, Output: ArrayLength>
@@ -78,6 +118,123 @@ pub(crate) trait SecurityParameter:
 impl SecurityParameter for U16 {}
 impl SecurityParameter for U24 {}
 impl SecurityParameter for U32 {}
+
+/// Generates an implementation of [`OWFParameters::prove`] dinamically dispatching the AVX2 optimizations on the underlying galois field
+macro_rules! define_owf_proof {
+    (
+        opt_owf = $opt_owf:ty
+    ) => {
+        #[inline]
+        fn prove(
+            w: &GenericArray<u8, Self::LBytes>,
+            u: &GenericArray<u8, Self::LambdaBytesTimes2>,
+            v: CstrntsVal<Self>,
+            pk: &PublicKey<Self>,
+            chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+        ) -> QSProof<Self> {
+            #[cfg(all(
+                feature = "opt-simd",
+                any(target_arch = "x86", target_arch = "x86_64"),
+                not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+            ))]
+            if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+                // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
+                // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
+                let pk: &PublicKey<$opt_owf> = unsafe { std::mem::transmute(pk) };
+                let qs_proof = aes_prove::<$opt_owf>(w, u, v, pk, chall_2);
+                return (
+                    OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
+                    OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
+                    OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
+                );
+            }
+            aes_prove::<Self>(w, u, v, pk, chall_2)
+        }
+    };
+}
+
+/// Generates an implementation of [`OWFParameters::verify`] dinamically dispatching the AVX2 optimizations on the underlying galois field
+macro_rules! define_owf_verify {
+    (
+        opt_owf = $opt_owf:ty
+    ) => {
+        #[inline]
+        fn verify(
+            q: CstrntsVal<Self>,
+            d: &GenericArray<u8, Self::LBytes>,
+            pk: &PublicKey<Self>,
+            chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
+            chall_3: &GenericArray<u8, Self::LambdaBytes>,
+            a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
+            a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
+        ) -> OWFField<Self> {
+            #[cfg(all(
+                feature = "opt-simd",
+                any(target_arch = "x86", target_arch = "x86_64"),
+                not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+            ))]
+            if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+                // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
+                // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
+                let pk: &PublicKey<$opt_owf> = unsafe { std::mem::transmute(pk) };
+                let chall3 = aes_verify::<$opt_owf>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
+                return OWFField::<Self>::from(chall3.as_bytes().as_slice());
+            }
+            aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
+        }
+    };
+}
+
+#[inline]
+fn hash_v_matrix<BP>(
+    h2_hasher: &mut impl Hasher,
+    v: &[GenericArray<u8, impl ArrayLength>],
+    chall1: &GenericArray<u8, BP::Chall1>,
+) where
+    BP: BaseParameters,
+{
+    let vole_hasher = BP::VoleHasher::new_vole_hasher(chall1);
+
+    for vi in v {
+        // Hash column-wise
+        h2_hasher.update(VoleHasherProcess::process(&vole_hasher, vi).as_slice());
+    }
+}
+
+#[inline]
+fn hash_u_vector<BP>(
+    u_tilde_sig: &mut [u8],
+    u: &GenericArray<u8, impl ArrayLength>,
+    chall1: &GenericArray<u8, BP::Chall1>,
+) where
+    BP: BaseParameters,
+{
+    let vole_hasher_u = BP::VoleHasher::new_vole_hasher(chall1);
+    u_tilde_sig.copy_from_slice(vole_hasher_u.process(u).as_slice());
+}
+
+#[inline]
+fn hash_q_matrix<BP>(
+    h2_hasher: &mut impl Hasher,
+    q: &[GenericArray<u8, impl ArrayLength>],
+    u_tilde_sig: &[u8],
+    chall1: &GenericArray<u8, BP::Chall1>,
+    decoded_chall3_iter: impl Iterator<Item = u8>,
+) where
+    BP: BaseParameters,
+{
+    let vole_hasher = BP::VoleHasher::new_vole_hasher(chall1);
+    for (q_i, d_i) in zip(q, decoded_chall3_iter) {
+        // ::12
+        let mut q_tilde = vole_hasher.process(q_i);
+        // ::14
+        if d_i == 1 {
+            xor_arrays_inplace(&mut q_tilde, u_tilde_sig);
+        }
+        // ::15
+        h2_hasher.update(&q_tilde);
+    }
+}
 
 /// Base parameters per security level
 pub(crate) trait BaseParameters {
@@ -104,13 +261,38 @@ pub(crate) trait BaseParameters {
     type Chall: ArrayLength;
     type Chall1: ArrayLength;
     type VoleHasherOutputLength: ArrayLength;
+    /// Hash `v` row by row using [`Self::ZKHasher`] and update `h2_hasher` with the results
+    fn hash_v_matrix(
+        h2_hasher: &mut impl Hasher,
+        v: &[GenericArray<u8, impl ArrayLength>],
+        chall1: &GenericArray<u8, Self::Chall1>,
+    );
+    /// Hash `u` using [`Self::ZKHasher`] and write the result into `signature_u`
+    fn hash_u_vector(
+        signature_u: &mut [u8],
+        u: &GenericArray<u8, impl ArrayLength>,
+        chall1: &GenericArray<u8, Self::Chall1>,
+    );
+    /// Hash `q` row by row using [`Self::ZKHasher`] and update `h2_hasher` with the results
+    fn hash_q_matrix(
+        h2_hasher: &mut impl Hasher,
+        q: &[GenericArray<u8, impl ArrayLength>],
+        u_tilde_sig: &[u8],
+        chall1: &GenericArray<u8, Self::Chall1>,
+        decoded_chall3_iter: impl Iterator<Item = u8>,
+    );
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct BaseParams128;
+pub(crate) struct BaseParams128<F>(PhantomData<F>)
+where
+    F: BigGaloisField;
 
-impl BaseParameters for BaseParams128 {
-    type Field = GF128;
+impl<F> BaseParameters for BaseParams128<F>
+where
+    F: BigGaloisField<Length = U16> + std::fmt::Debug + std::cmp::PartialEq,
+{
+    type Field = F;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
     type RandomOracle = RandomOracleShake128;
@@ -123,13 +305,75 @@ impl BaseParameters for BaseParams128 {
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
     type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
+
+    fn hash_v_matrix(
+        h2_hasher: &mut impl Hasher,
+        v: &[GenericArray<u8, impl ArrayLength>],
+        chall1: &GenericArray<u8, Self::Chall1>,
+    ) {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            hash_v_matrix::<SimdBaseParams128>(h2_hasher, v, chall1);
+            return;
+        }
+        hash_v_matrix::<Self>(h2_hasher, v, chall1);
+    }
+
+    fn hash_u_vector(
+        signature_u: &mut [u8],
+        u: &GenericArray<u8, impl ArrayLength>,
+        chall1: &GenericArray<u8, Self::Chall1>,
+    ) {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            hash_u_vector::<SimdBaseParams128>(signature_u, u, chall1);
+            return;
+        }
+        hash_u_vector::<Self>(signature_u, u, chall1);
+    }
+
+    fn hash_q_matrix(
+        h2_hasher: &mut impl Hasher,
+        q: &[GenericArray<u8, impl ArrayLength>],
+        u_tilde_sig: &[u8],
+        chall1: &GenericArray<u8, Self::Chall1>,
+        decoded_chall3_iter: impl Iterator<Item = u8>,
+    ) {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            hash_q_matrix::<SimdBaseParams128>(
+                h2_hasher,
+                q,
+                u_tilde_sig,
+                chall1,
+                decoded_chall3_iter,
+            );
+            return;
+        }
+        hash_q_matrix::<Self>(h2_hasher, q, u_tilde_sig, chall1, decoded_chall3_iter);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct BaseParams192;
+pub(crate) struct BaseParams192<F = GF192>(PhantomData<F>);
 
-impl BaseParameters for BaseParams192 {
-    type Field = GF192;
+impl<F> BaseParameters for BaseParams192<F>
+where
+    F: BigGaloisField<Length = U24> + std::fmt::Debug + std::cmp::PartialEq,
+{
+    type Field = F;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
     type RandomOracle = RandomOracleShake256;
@@ -142,13 +386,75 @@ impl BaseParameters for BaseParams192 {
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
     type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
+
+    fn hash_v_matrix(
+        h2_hasher: &mut impl Hasher,
+        v: &[GenericArray<u8, impl ArrayLength>],
+        chall1: &GenericArray<u8, Self::Chall1>,
+    ) {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            hash_v_matrix::<SimdBaseParams192>(h2_hasher, v, chall1);
+            return;
+        }
+        hash_v_matrix::<Self>(h2_hasher, v, chall1);
+    }
+
+    fn hash_u_vector(
+        signature_u: &mut [u8],
+        u: &GenericArray<u8, impl ArrayLength>,
+        chall1: &GenericArray<u8, Self::Chall1>,
+    ) {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            hash_u_vector::<SimdBaseParams192>(signature_u, u, chall1);
+            return;
+        }
+        hash_u_vector::<Self>(signature_u, u, chall1);
+    }
+
+    fn hash_q_matrix(
+        h2_hasher: &mut impl Hasher,
+        q: &[GenericArray<u8, impl ArrayLength>],
+        u_tilde_sig: &[u8],
+        chall1: &GenericArray<u8, Self::Chall1>,
+        decoded_chall3_iter: impl Iterator<Item = u8>,
+    ) {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            hash_q_matrix::<SimdBaseParams192>(
+                h2_hasher,
+                q,
+                u_tilde_sig,
+                chall1,
+                decoded_chall3_iter,
+            );
+            return;
+        }
+        hash_q_matrix::<Self>(h2_hasher, q, u_tilde_sig, chall1, decoded_chall3_iter);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct BaseParams256;
+pub(crate) struct BaseParams256<F = GF256>(PhantomData<F>);
 
-impl BaseParameters for BaseParams256 {
-    type Field = GF256;
+impl<F> BaseParameters for BaseParams256<F>
+where
+    F: BigGaloisField<Length = U32> + std::fmt::Debug + std::cmp::PartialEq,
+{
+    type Field = F;
     type ZKHasher = ZKHasher<Self::Field>;
     type VoleHasher = VoleHasher<Self::Field>;
     type RandomOracle = RandomOracleShake256;
@@ -161,6 +467,65 @@ impl BaseParameters for BaseParams256 {
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
     type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
+
+    fn hash_v_matrix(
+        h2_hasher: &mut impl Hasher,
+        v: &[GenericArray<u8, impl ArrayLength>],
+        chall1: &GenericArray<u8, Self::Chall1>,
+    ) {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            hash_v_matrix::<SimdBaseParams256>(h2_hasher, v, chall1);
+            return;
+        }
+        hash_v_matrix::<Self>(h2_hasher, v, chall1);
+    }
+
+    fn hash_u_vector(
+        signature_u: &mut [u8],
+        u: &GenericArray<u8, impl ArrayLength>,
+        chall1: &GenericArray<u8, Self::Chall1>,
+    ) {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            hash_u_vector::<SimdBaseParams256>(signature_u, u, chall1);
+            return;
+        }
+        hash_u_vector::<Self>(signature_u, u, chall1);
+    }
+
+    fn hash_q_matrix(
+        h2_hasher: &mut impl Hasher,
+        q: &[GenericArray<u8, impl ArrayLength>],
+        u_tilde_sig: &[u8],
+        chall1: &GenericArray<u8, Self::Chall1>,
+        decoded_chall3_iter: impl Iterator<Item = u8>,
+    ) {
+        #[cfg(all(
+            feature = "opt-simd",
+            any(target_arch = "x86", target_arch = "x86_64"),
+            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+        ))]
+        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
+            hash_q_matrix::<SimdBaseParams256>(
+                h2_hasher,
+                q,
+                u_tilde_sig,
+                chall1,
+                decoded_chall3_iter,
+            );
+            return;
+        }
+        hash_q_matrix::<Self>(h2_hasher, q, u_tilde_sig, chall1, decoded_chall3_iter);
+    }
 }
 
 pub(crate) trait OWFParameters: Sized {
@@ -297,10 +662,13 @@ pub(crate) trait OWFParameters: Sized {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct OWF128;
+pub(crate) struct OWF128<F = GF128>(PhantomData<F>);
 
-impl OWFParameters for OWF128 {
-    type BaseParams = BaseParams128;
+impl<F> OWFParameters for OWF128<F>
+where
+    F: BigGaloisField<Length = U16> + std::fmt::Debug + std::cmp::PartialEq,
+{
+    type BaseParams = BaseParams128<F>;
     type InputSize = U16;
     type OutputSize = U16;
 
@@ -353,36 +721,18 @@ impl OWFParameters for OWF128 {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    #[inline]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
-        aes_prove::<Self>(w, u, v, pk, chall_2)
-    }
-
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-    }
+    define_owf_proof!(opt_owf = SimdOWF128);
+    define_owf_verify!(opt_owf = SimdOWF128);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct OWF192;
+pub(crate) struct OWF192<F = GF192>(PhantomData<F>);
 
-impl OWFParameters for OWF192 {
-    type BaseParams = BaseParams192;
+impl<F> OWFParameters for OWF192<F>
+where
+    F: BigGaloisField<Length = U24> + std::fmt::Debug + std::cmp::PartialEq,
+{
+    type BaseParams = BaseParams192<F>;
     type InputSize = U16;
     type OutputSize = U32;
 
@@ -426,13 +776,10 @@ impl OWFParameters for OWF192 {
             GenericArray_AES::from_mut_slice(&mut output[..16]),
         );
 
-        let mut input: [u8; 16] = (*input).try_into().expect("Invalid input length");
+        let mut input = GenericArray_AES::from_slice(input).to_owned();
         input[0] ^= 1;
 
-        aes.encrypt_block_b2b(
-            GenericArray_AES::from_slice(&input),
-            GenericArray_AES::from_mut_slice(&mut output[16..]),
-        );
+        aes.encrypt_block_b2b(&input, GenericArray_AES::from_mut_slice(&mut output[16..]));
     }
 
     #[inline]
@@ -443,38 +790,19 @@ impl OWFParameters for OWF192 {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    #[inline]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
-        aes_prove::<Self>(w, u, v, pk, chall_2)
-    }
+    define_owf_proof!(opt_owf = SimdOWF192);
 
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-    }
+    define_owf_verify!(opt_owf = SimdOWF192);
 }
 
-type U1216 = Sum<U1024, U192>;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct OWF256;
+pub(crate) struct OWF256<F = GF256>(PhantomData<F>);
 
-impl OWFParameters for OWF256 {
-    type BaseParams = BaseParams256;
+impl<F> OWFParameters for OWF256<F>
+where
+    F: BigGaloisField<Length = U32> + std::fmt::Debug + std::cmp::PartialEq,
+{
+    type BaseParams = BaseParams256<F>;
     type InputSize = U16;
     type OutputSize = U32;
 
@@ -518,13 +846,10 @@ impl OWFParameters for OWF256 {
             GenericArray_AES::from_mut_slice(&mut output[..16]),
         );
 
-        let mut input: [u8; 16] = (*input).try_into().expect("Invalid input length");
+        let mut input = GenericArray_AES::from_slice(input).to_owned();
         input[0] ^= 1;
 
-        aes.encrypt_block_b2b(
-            GenericArray_AES::from_slice(&input),
-            GenericArray_AES::from_mut_slice(&mut output[16..]),
-        );
+        aes.encrypt_block_b2b(&input, GenericArray_AES::from_mut_slice(&mut output[16..]));
     }
 
     #[inline]
@@ -535,36 +860,18 @@ impl OWFParameters for OWF256 {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    #[inline]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
-        aes_prove::<Self>(w, u, v, pk, chall_2)
-    }
-
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-    }
+    define_owf_proof!(opt_owf = SimdOWF256);
+    define_owf_verify!(opt_owf = SimdOWF256);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct OWF128EM;
+pub(crate) struct OWF128EM<F = GF128>(PhantomData<F>);
 
-impl OWFParameters for OWF128EM {
-    type BaseParams = BaseParams128;
+impl<F> OWFParameters for OWF128EM<F>
+where
+    F: BigGaloisField<Length = U16> + std::fmt::Debug + std::cmp::PartialEq,
+{
+    type BaseParams = BaseParams128<F>;
     type InputSize = U16;
     type OutputSize = U16;
 
@@ -620,38 +927,22 @@ impl OWFParameters for OWF128EM {
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    #[inline]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
-        aes_prove::<Self>(w, u, v, pk, chall_2)
-    }
-
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-    }
+    define_owf_proof!(opt_owf = SimdOWF128EM);
+    define_owf_verify!(opt_owf = SimdOWF128EM);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct OWF192EM;
+pub(crate) struct OWF192EM<F = GF192>(PhantomData<F>)
+where
+    F: BigGaloisField<Length = U24>;
 
 type U1536 = Sum<U1024, U512>;
 
-impl OWFParameters for OWF192EM {
-    type BaseParams = BaseParams192;
+impl<F> OWFParameters for OWF192EM<F>
+where
+    F: BigGaloisField<Length = U24> + std::fmt::Debug + std::cmp::PartialEq,
+{
+    type BaseParams = BaseParams192<F>;
     type InputSize = U24;
     type OutputSize = U24;
 
@@ -707,38 +998,20 @@ impl OWFParameters for OWF192EM {
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    #[inline]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
-        aes_prove::<Self>(w, u, v, pk, chall_2)
-    }
-
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-    }
+    define_owf_proof!(opt_owf = SimdOWF192EM);
+    define_owf_verify!(opt_owf = SimdOWF192EM);
 }
 
-type U2432 = Sum<U2048, U384>;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct OWF256EM;
+pub(crate) struct OWF256EM<F = GF256>(PhantomData<F>)
+where
+    F: BigGaloisField<Length = U32>;
 
-impl OWFParameters for OWF256EM {
-    type BaseParams = BaseParams256;
+impl<F> OWFParameters for OWF256EM<F>
+where
+    F: BigGaloisField<Length = U32> + std::fmt::Debug + std::cmp::PartialEq,
+{
+    type BaseParams = BaseParams256<F>;
     type InputSize = U32;
     type OutputSize = U32;
 
@@ -794,29 +1067,8 @@ impl OWFParameters for OWF256EM {
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    #[inline]
-    fn prove(
-        w: &GenericArray<u8, Self::LBytes>,
-        u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-        v: CstrntsVal<Self>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self> {
-        aes_prove::<Self>(w, u, v, pk, chall_2)
-    }
-
-    #[inline]
-    fn verify(
-        q: CstrntsVal<Self>,
-        d: &GenericArray<u8, Self::LBytes>,
-        pk: &PublicKey<Self>,
-        chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        chall_3: &GenericArray<u8, Self::LambdaBytes>,
-        a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self> {
-        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-    }
+    define_owf_proof!(opt_owf = SimdOWF256EM);
+    define_owf_verify!(opt_owf = SimdOWF256EM);
 }
 
 pub(crate) trait TauParameters {
@@ -877,6 +1129,15 @@ pub(crate) trait TauParameters {
         // Applying mod 2^(k-1) is same as taking the k-2 LSB
         let mask = tmp - 1;
         Self::L::USIZE - 1 + Self::Tau::USIZE * tmp + Self::Tau1::USIZE * (j & mask) + i
+    }
+
+    /// Returns the required array length for generating the vole correlations in [`crate::vole::convert_to_vole`]
+    fn vole_array_length(i: usize) -> usize {
+        let n = Self::bavc_max_node_index(i);
+        n / 2
+            - (2..Self::bavc_max_node_depth(i))
+                .map(|d| n / (1 << d) - 1)
+                .sum::<usize>()
     }
 }
 

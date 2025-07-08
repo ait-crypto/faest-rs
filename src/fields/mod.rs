@@ -3,14 +3,11 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use generic_array::{ArrayLength, GenericArray};
 
 pub(crate) mod large_fields;
+pub(crate) mod large_fields_constants;
 pub(crate) mod small_fields;
 
-#[cfg(all(
-    feature = "opt-simd",
-    target_arch = "x86_64",
-    target_feature = "avx2",
-    target_feature = "pclmulqdq"
-))]
+#[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
+#[allow(unused_unsafe)]
 pub(crate) mod x86_simd_large_fields;
 
 pub(crate) use large_fields::{
@@ -140,6 +137,8 @@ pub(crate) trait ExtensionField:
     + Neg<Output = Self>
     + Mul<Self::BaseField, Output = Self>
     + for<'a> Mul<&'a Self::BaseField, Output = Self>
+    + for<'a> Add<&'a Self, Output = Self>
+    + for<'a> From<&'a [u8]>
 {
     /// Representation of `0`
     const ZERO: Self;
