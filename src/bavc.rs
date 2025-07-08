@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, ops::Mul};
 
-use bit_set::BitSet;
+use bitvec::prelude::*;
 use generic_array::{
     ArrayLength, GenericArray,
     typenum::{Prod, U2, U3, U8, Unsigned},
@@ -153,7 +153,7 @@ where
 }
 
 fn reconstruct_keys<PRG, TAU>(
-    s: &mut BitSet,
+    s: &mut BitSlice,
     decom_keys: &[&[u8]],
     i_delta: &GenericArray<u16, TAU::Tau>,
     iv: &IV,
@@ -165,17 +165,17 @@ where
     // Steps 8..11
     for i in 0..TAU::Tau::USIZE {
         let alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
-        s.insert(alpha);
+        s.set(alpha, true);
     }
 
     // Steps 13..21
     let mut keys = vec![GenericArray::default(); 2 * TAU::L::USIZE - 1];
     let mut decom_iter = decom_keys.iter();
     for i in (0..TAU::L::USIZE - 1).rev() {
-        let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
+        let (left_child, right_child) = (s[2 * i + 1], s[2 * i + 2]);
 
         if left_child | right_child {
-            s.insert(i);
+            s.set(i, true);
         }
 
         if left_child ^ right_child {
@@ -193,18 +193,16 @@ where
     }
 
     // Steps 25..27
-    for i in 0..TAU::L::USIZE - 1 {
-        if !s.contains(i) {
-            let mut rng = PRG::new_prg(&keys[i], iv, i as Twk);
-            rng.read(&mut keys[2 * i + 1]);
-            rng.read(&mut keys[2 * i + 2]);
-        }
+    for i in s[..TAU::L::USIZE - 1].iter_zeros() {
+        let mut rng = PRG::new_prg(&keys[i], iv, i as Twk);
+        rng.read(&mut keys[2 * i + 1]);
+        rng.read(&mut keys[2 * i + 2]);
     }
 
     Some(keys)
 }
 
-fn mark_nodes<TAU>(s: &mut BitSet, i_delta: &GenericArray<u16, TAU::Tau>) -> Option<u32>
+fn mark_nodes<TAU>(s: &mut BitSlice, i_delta: &GenericArray<u16, TAU::Tau>) -> Option<u32>
 where
     TAU: TauParameters,
 {
@@ -212,9 +210,9 @@ where
     let mut n_h = 0;
     for i in 0..TAU::Tau::USIZE {
         let mut alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
-        s.insert(alpha);
+        s.set(alpha, true);
         n_h += 1;
-        while alpha > 0 && s.insert((alpha - 1) / 2) {
+        while alpha > 0 && !s.replace((alpha - 1) / 2, true) {
             alpha = (alpha - 1) / 2;
             n_h += 1;
         }
@@ -230,7 +228,7 @@ where
 
 fn construct_nodes<'a, LambdaBytes, L>(
     keys: &'a [GenericArray<u8, LambdaBytes>],
-    s: &BitSet,
+    s: &BitSlice,
 ) -> Vec<&'a [u8]>
 where
     L: ArrayLength,
@@ -240,14 +238,13 @@ where
     (0..L::USIZE - 1)
         .rev()
         .filter_map(|i| {
-            let (left_child, right_child) = (s.contains(2 * i + 1), s.contains(2 * i + 2));
+            let (left_child, right_child) = (s.get(2 * i + 1)?, s.get(2 * i + 2)?);
 
-            if left_child ^ right_child {
-                let alpha = 2 * i + 1 + (left_child as usize);
-                Some(keys[alpha].as_ref())
-            } else {
-                None
+            if *left_child ^ *right_child {
+                let alpha = 2 * i + 1 + (*left_child as usize);
+                return Some(keys[alpha].as_ref());
             }
+            None
         })
         .collect()
 }
@@ -376,7 +373,7 @@ where
         i_delta: &GenericArray<u16, TAU::Tau>,
     ) -> Option<BavcOpenResult<'a>> {
         // Step 5
-        let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
+        let mut s = bitvec![0; 2 * TAU::L::USIZE - 1];
 
         // Steps 6..17
         mark_nodes::<TAU>(&mut s, i_delta)?;
@@ -400,14 +397,10 @@ where
         iv: &IV,
     ) -> Option<BavcReconstructResult<Self::LambdaBytes>> {
         // Step 7
-        let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
+        let mut s = bitvec![0; 2 * TAU::L::USIZE - 1];
 
         // Steps 8..27
-        let keys =
-            reconstruct_keys::<PRG, TAU>(&mut s, &decom_i.nodes, i_delta, iv).unwrap_or_default();
-        if keys.is_empty() {
-            return None;
-        }
+        let keys = reconstruct_keys::<PRG, TAU>(&mut s, &decom_i.nodes, i_delta, iv)?;
 
         // Step 4
         let mut h0_hasher = RO::h0_init();
@@ -430,7 +423,7 @@ where
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
                 // Step 33
-                if !s.contains(alpha) {
+                if !*s.get(alpha)? {
                     let (sd, h) = Self::LC::commit(&keys[alpha], iv, i + TAU::L::U32 - 1, &uhash_i);
 
                     seeds.push(sd);
@@ -534,7 +527,7 @@ where
         i_delta: &GenericArray<u16, Self::Tau>,
     ) -> Option<BavcOpenResult<'a>> {
         // Step 5
-        let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
+        let mut s = bitvec![0; 2 * TAU::L::USIZE - 1];
 
         // Steps 6..17
         mark_nodes::<TAU>(&mut s, i_delta)?;
@@ -558,12 +551,12 @@ where
         iv: &IV,
     ) -> Option<BavcReconstructResult<Self::LambdaBytes>> {
         // Step 7
-        let mut s = BitSet::with_capacity(2 * TAU::L::USIZE - 1);
+        let mut s = bitvec![0; 2 * TAU::L::USIZE - 1];
 
         // Steps 8..11
         for i in 0..TAU::Tau::USIZE {
             let alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
-            s.insert(alpha);
+            s.set(alpha, true);
         }
 
         // Steps 13..21
@@ -582,7 +575,7 @@ where
                 let alpha = TAU::pos_in_tree(i as usize, j);
 
                 // Step 33
-                if !s.contains(alpha) {
+                if !*s.get(alpha)? {
                     let (sd, h) = Self::LC::commit_em(&keys[alpha], iv, i + TAU::L::U32 - 1);
                     seeds.push(sd);
                     h1_hasher.update(&h);
