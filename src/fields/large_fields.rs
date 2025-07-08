@@ -37,7 +37,7 @@ const fn allignr_8bytes(x: u128, y: u128) -> u128 {
 const fn combine_poly128s_5(x: [u128; 5]) -> [u128; 3] {
     [
         x[0] ^ x[1] << 64,
-        x[1] >> 64 ^ x[2] ^ x[3] << 64,
+        x[2] ^ allignr_8bytes(x[3], x[1]),
         x[3] >> 64 ^ x[4],
     ]
 }

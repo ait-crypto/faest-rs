@@ -448,7 +448,7 @@ where
 }
 
 #[allow(non_camel_case_types)]
-pub(crate) struct BAVC_EM<RO, PRG, LH, TAU>(
+pub(crate) struct BavcEm<RO, PRG, LH, TAU>(
     PhantomData<RO>,
     PhantomData<PRG>,
     PhantomData<LH>,
@@ -460,7 +460,7 @@ where
     TAU: TauParameters,
     LH: LeafHasher;
 
-impl<RO, PRG, LH, TAU> BatchVectorCommitment for BAVC_EM<RO, PRG, LH, TAU>
+impl<RO, PRG, LH, TAU> BatchVectorCommitment for BavcEm<RO, PRG, LH, TAU>
 where
     RO: RandomOracle,
     PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
@@ -605,15 +605,12 @@ pub(crate) type BAVC192Fast = Bavc<RandomOracleShake256, PRG192, LeafHasher192, 
 pub(crate) type BAVC256Small = Bavc<RandomOracleShake256, PRG256, LeafHasher256, Tau256Small>;
 pub(crate) type BAVC256Fast = Bavc<RandomOracleShake256, PRG256, LeafHasher256, Tau256Fast>;
 
-pub(crate) type BAVC128SmallEM =
-    BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128SmallEM>;
-pub(crate) type BAVC128FastEM = BAVC_EM<RandomOracleShake128, PRG128, LeafHasher128, Tau128FastEM>;
-pub(crate) type BAVC192SmallEM =
-    BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192SmallEM>;
-pub(crate) type BAVC192FastEM = BAVC_EM<RandomOracleShake256, PRG192, LeafHasher192, Tau192FastEM>;
-pub(crate) type BAVC256SmallEM =
-    BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256SmallEM>;
-pub(crate) type BAVC256FastEM = BAVC_EM<RandomOracleShake256, PRG256, LeafHasher256, Tau256FastEM>;
+pub(crate) type BAVC128SmallEM = BavcEm<RandomOracleShake128, PRG128, LeafHasher128, Tau128SmallEM>;
+pub(crate) type BAVC128FastEM = BavcEm<RandomOracleShake128, PRG128, LeafHasher128, Tau128FastEM>;
+pub(crate) type BAVC192SmallEM = BavcEm<RandomOracleShake256, PRG192, LeafHasher192, Tau192SmallEM>;
+pub(crate) type BAVC192FastEM = BavcEm<RandomOracleShake256, PRG192, LeafHasher192, Tau192FastEM>;
+pub(crate) type BAVC256SmallEM = BavcEm<RandomOracleShake256, PRG256, LeafHasher256, Tau256SmallEM>;
+pub(crate) type BAVC256FastEM = BavcEm<RandomOracleShake256, PRG256, LeafHasher256, Tau256FastEM>;
 
 #[cfg(test)]
 mod test {
