@@ -1,6 +1,5 @@
 use faest::*;
-use signature::RandomizedSigner;
-use signature::{Signer, Verifier};
+use signature::{RandomizedSigner, Signer, Verifier};
 
 const MESSAGE: &str = "This is a message.";
 
