@@ -1689,10 +1689,9 @@ mod test {
             let test_data = read_test_data("LargeFieldMul.json")
                 .into_iter()
                 .find(|data: &DataMul| data.lambda == <F as Field>::Length::USIZE * 8)
-                .expect(&format!(
-                    "No test data for GF{}",
-                    <F as Field>::Length::USIZE * 8
-                ));
+                .unwrap_or_else(|| {
+                    panic!("No test data for GF{}", <F as Field>::Length::USIZE * 8)
+                });
 
             for [lhs, rhs, expected] in test_data.database {
                 let mut lhs = F::from(hex::decode(lhs.as_str()).unwrap().as_slice());
@@ -1710,10 +1709,9 @@ mod test {
             let test_data = read_test_data("LargeFieldByteCombine.json")
                 .into_iter()
                 .find(|data: &DataByteCombine| data.lambda == <F as Field>::Length::USIZE * 8)
-                .expect(&format!(
-                    "No test data for GF{}",
-                    <F as Field>::Length::USIZE * 8
-                ));
+                .unwrap_or_else(|| {
+                    panic!("No test data for GF{}", <F as Field>::Length::USIZE * 8)
+                });
 
             for data in test_data.database {
                 let tab = [
@@ -1747,10 +1745,7 @@ mod test {
             let test_data = read_test_data("LargeFieldByteCombineBits.json")
                 .into_iter()
                 .find(|data: &DataByteCombineBit| data.lambda == <F as Field>::Length::USIZE * 8)
-                .expect(&format!(
-                    "No test data for GF{}",
-                    <F as Field>::Length::USIZE * 8
-                ))
+                .unwrap_or_else(|| panic!("No test data for GF{}", <F as Field>::Length::USIZE * 8))
                 .database;
 
             for (x, data) in test_data.into_iter() {
@@ -1783,7 +1778,7 @@ mod test {
             let test_data = read_test_data("ExtendedFields.json")
                 .into_iter()
                 .find(|data: &DataMul| data.lambda == F::Length::USIZE * 8)
-                .expect(&format!("No test data for GF{}", F::Length::USIZE * 8));
+                .unwrap_or_else(|| panic!("No test data for GF{}", F::Length::USIZE * 8));
 
             for [lhs, rhs, res] in test_data.database {
                 let lhs = F::from(hex::decode(lhs.as_str()).unwrap().as_slice());
