@@ -11,14 +11,11 @@ where
 {
     let mut rng = rand::thread_rng();
 
-    println!("Generating {} key ...", name);
+    println!("Generating {name} key ...");
     let keypair = KP::generate(&mut rng);
-    println!("Signing message '{}' with {} ...", MESSAGE, name);
+    println!("Signing message '{MESSAGE}' with {name} ...");
     let signature = keypair.sign(MESSAGE.as_bytes());
-    println!(
-        "Verifying signature on message '{}' with {} ...",
-        MESSAGE, name
-    );
+    println!("Verifying signature on message '{MESSAGE}' with {name} ...");
     let verification_key = keypair.verifying_key();
     assert!(
         verification_key
@@ -26,15 +23,9 @@ where
             .is_ok()
     );
 
-    println!(
-        "Signing message '{}' with {} (randomized)...",
-        MESSAGE, name
-    );
+    println!("Signing message '{MESSAGE}' with {name} (randomized)...");
     let signature = keypair.sign_with_rng(&mut rng, MESSAGE.as_bytes());
-    println!(
-        "Verifying signature on message '{}' with {} ...",
-        MESSAGE, name
-    );
+    println!("Verifying signature on message '{MESSAGE}' with {name} ...");
     assert!(
         verification_key
             .verify(MESSAGE.as_bytes(), &signature)

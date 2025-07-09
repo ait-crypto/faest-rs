@@ -35,7 +35,7 @@ fn read_kats(kats: &str) -> Vec<TestVector> {
             File::open(
                 Path::new(env!("CARGO_MANIFEST_DIR"))
                     .join("tests/data")
-                    .join(format!("reduced_{}", kats)),
+                    .join(format!("reduced_{kats}")),
             )
             .unwrap()
         }),

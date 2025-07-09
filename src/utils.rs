@@ -136,12 +136,12 @@ pub(crate) mod test {
         )
         .map_or_else(
             |_| {
-                println!("Test file {} is not available. Skipping test.", path);
+                println!("Test file {path} is not available. Skipping test.");
                 Ok(Vec::new())
             },
             serde_json::from_reader,
         )
-        .unwrap_or_else(|_| panic!("Failed to read JSON test data from {}", path))
+        .unwrap_or_else(|_| panic!("Failed to read JSON test data from {path}"))
     }
 
     pub(crate) fn hash_array(data: &[u8]) -> Vec<u8> {
