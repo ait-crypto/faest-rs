@@ -474,8 +474,8 @@ unsafe fn mul_gf128(lhs: __m128i, rhs: __m128i) -> __m128i {
         let mask = _mm_setr_epi32(-1, 0x0, 0x0, 0x0);
         let tmp3 = m128_clmul_ll(lhs, rhs);
         let tmp6 = m128_clmul_hh(lhs, rhs);
-        let tmp4 = _mm_shuffle_epi32(lhs, 78);
-        let tmp5 = _mm_shuffle_epi32(rhs, 78);
+        let tmp4 = _mm_shuffle_epi32(lhs, _MM_SHUFFLE(1, 0, 3, 2));
+        let tmp5 = _mm_shuffle_epi32(rhs, _MM_SHUFFLE(1, 0, 3, 2));
         let tmp4 = _mm_xor_si128(tmp4, lhs);
         let tmp5 = _mm_xor_si128(tmp5, rhs);
         let tmp4 = m128_clmul_ll(tmp4, tmp5);
@@ -490,7 +490,7 @@ unsafe fn mul_gf128(lhs: __m128i, rhs: __m128i) -> __m128i {
         let tmp9 = _mm_srli_epi32(tmp6, 25);
         let tmp7 = _mm_xor_si128(tmp7, tmp8);
         let tmp7 = _mm_xor_si128(tmp7, tmp9);
-        let tmp8 = _mm_shuffle_epi32(tmp7, 147);
+        let tmp8 = _mm_shuffle_epi32(tmp7, _MM_SHUFFLE(2, 1, 0, 3));
         let tmp7 = _mm_and_si128(mask, tmp8);
         let tmp8 = _mm_andnot_si128(mask, tmp8);
         let tmp3 = _mm_xor_si128(tmp3, tmp8);
@@ -511,7 +511,7 @@ unsafe fn square_gf128(lhs: __m128i) -> __m128i {
         let mask = _mm_setr_epi32(-1, 0x0, 0x0, 0x0);
         let tmp3 = m128_clmul_ll(lhs, lhs);
         let tmp6 = m128_clmul_hh(lhs, lhs);
-        let tmp4 = _mm_shuffle_epi32(lhs, 78);
+        let tmp4 = _mm_shuffle_epi32(lhs, _MM_SHUFFLE(1, 0, 3, 2));
         let tmp4 = _mm_xor_si128(tmp4, lhs);
         let tmp4 = m128_clmul_ll(tmp4, tmp4);
         let tmp4 = _mm_xor_si128(tmp4, tmp3);
@@ -525,7 +525,7 @@ unsafe fn square_gf128(lhs: __m128i) -> __m128i {
         let tmp9 = _mm_srli_epi32(tmp6, 25);
         let tmp7 = _mm_xor_si128(tmp7, tmp8);
         let tmp7 = _mm_xor_si128(tmp7, tmp9);
-        let tmp8 = _mm_shuffle_epi32(tmp7, 147);
+        let tmp8 = _mm_shuffle_epi32(tmp7, _MM_SHUFFLE(2, 1, 0, 3));
         let tmp7 = _mm_and_si128(mask, tmp8);
         let tmp8 = _mm_andnot_si128(mask, tmp8);
         let tmp3 = _mm_xor_si128(tmp3, tmp8);
@@ -546,8 +546,8 @@ unsafe fn mul_gf128_u64(lhs: __m128i, rhs: u64) -> __m128i {
         let mask = _mm_setr_epi32(-1, 0x0, 0x0, 0x0);
         let rhs = _mm_set_epi64x(0, rhs as i64);
         let tmp3 = m128_clmul_ll(lhs, rhs);
-        let tmp4 = _mm_shuffle_epi32(lhs, 78);
-        let tmp5 = _mm_shuffle_epi32(rhs, 78);
+        let tmp4 = _mm_shuffle_epi32(lhs, _MM_SHUFFLE(1, 0, 3, 2));
+        let tmp5 = _mm_shuffle_epi32(rhs, _MM_SHUFFLE(1, 0, 3, 2));
         let tmp4 = _mm_xor_si128(tmp4, lhs);
         let tmp5 = _mm_xor_si128(tmp5, rhs);
         let tmp4 = m128_clmul_ll(tmp4, tmp5);
@@ -560,7 +560,7 @@ unsafe fn mul_gf128_u64(lhs: __m128i, rhs: u64) -> __m128i {
         let tmp9 = _mm_srli_epi32(tmp4, 25);
         let tmp7 = _mm_xor_si128(tmp7, tmp8);
         let tmp7 = _mm_xor_si128(tmp7, tmp9);
-        let tmp8 = _mm_shuffle_epi32(tmp7, 147);
+        let tmp8 = _mm_shuffle_epi32(tmp7, _MM_SHUFFLE(2, 1, 0, 3));
         let tmp7 = _mm_and_si128(mask, tmp8);
         let tmp8 = _mm_andnot_si128(mask, tmp8);
         let tmp3 = _mm_xor_si128(tmp3, tmp8);
