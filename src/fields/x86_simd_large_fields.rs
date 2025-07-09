@@ -7,16 +7,16 @@ use std::arch::x86_64;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use x86_64::{
     __m128i, __m256i, _mm_alignr_epi8, _mm_and_si128, _mm_andnot_si128, _mm_bslli_si128,
-    _mm_clmulepi64_si128, _mm_cmpeq_epi32, _mm_loadu_si128, _mm_or_si128, _mm_set_epi8,
-    _mm_set_epi64x, _mm_setr_epi32, _mm_setzero_si128, _mm_shuffle_epi8, _mm_shuffle_epi32,
-    _mm_slli_epi32, _mm_slli_epi64, _mm_slli_si128, _mm_srli_epi32, _mm_srli_epi64, _mm_srli_si128,
-    _mm_storeu_si128, _mm_test_all_zeros, _mm_xor_si128, _mm256_and_si256, _mm256_blend_epi32,
-    _mm256_blendv_epi8, _mm256_cmpeq_epi32, _mm256_extracti128_si256, _mm256_loadu_si256,
-    _mm256_maskload_epi64, _mm256_maskstore_epi64, _mm256_or_si256, _mm256_permute4x64_epi64,
-    _mm256_permutevar8x32_epi32, _mm256_set_m128i, _mm256_set1_epi64x, _mm256_setr_epi64x,
-    _mm256_setr_m128i, _mm256_setzero_si256, _mm256_slli_epi32, _mm256_slli_epi64,
-    _mm256_srai_epi32, _mm256_srli_epi32, _mm256_srli_epi64, _mm256_storeu_si256,
-    _mm256_testz_si256, _mm256_xor_si256,
+    _mm_bsrli_si128, _mm_clmulepi64_si128, _mm_cmpeq_epi32, _mm_loadu_si128, _mm_or_si128,
+    _mm_set_epi8, _mm_set_epi64x, _mm_setr_epi32, _mm_setzero_si128, _mm_shuffle_epi8,
+    _mm_shuffle_epi32, _mm_slli_epi32, _mm_slli_epi64, _mm_slli_si128, _mm_srli_epi32,
+    _mm_srli_epi64, _mm_srli_si128, _mm_storeu_si128, _mm_test_all_zeros, _mm_xor_si128,
+    _mm256_and_si256, _mm256_blend_epi32, _mm256_blendv_epi8, _mm256_cmpeq_epi32,
+    _mm256_extracti128_si256, _mm256_loadu_si256, _mm256_maskload_epi64, _mm256_maskstore_epi64,
+    _mm256_or_si256, _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32, _mm256_set_m128i,
+    _mm256_set1_epi64x, _mm256_setr_epi64x, _mm256_setr_m128i, _mm256_setzero_si256,
+    _mm256_slli_epi32, _mm256_slli_epi64, _mm256_srai_epi32, _mm256_srli_epi32, _mm256_srli_epi64,
+    _mm256_storeu_si256, _mm256_testz_si256, _mm256_xor_si256,
 };
 
 use generic_array::{
@@ -2012,26 +2012,27 @@ impl From<GF384> for (__m256i, __m128i) {
 }
 
 #[inline]
-const fn _mm_shl_si128(x: __m128i, other: i32) -> __m128i {
-    u128_as_m128(m128_as_u128(x) << other)
-}
-
-#[inline]
-const fn _mm_shr_si128(x: __m128i, other: i32) -> __m128i {
-    u128_as_m128(m128_as_u128(x) >> other)
-}
-
-#[inline]
 #[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn poly512_reduce384(mut x: [__m128i; 4]) -> (__m256i, __m128i) {
     unsafe {
-        let mut tmp = _mm_xor_si128(x[3], _mm_shl_si128(x[3], 2));
-        tmp = _mm_xor_si128(tmp, _mm_shl_si128(x[3], 3));
-        tmp = _mm_xor_si128(tmp, _mm_shl_si128(x[3], 12));
+        let x3_low = _mm_bslli_si128(x[3], 8); // shift left by 64
+        let mut tmp = _mm_xor_si128(
+            x[3],
+            _mm_or_si128(_mm_slli_epi64(x[3], 2), _mm_srli_epi64(x3_low, 62)),
+        );
+        tmp = _mm_xor_si128(
+            tmp,
+            _mm_or_si128(_mm_slli_epi64(x[3], 3), _mm_srli_epi64(x3_low, 61)),
+        );
+        tmp = _mm_xor_si128(
+            tmp,
+            _mm_or_si128(_mm_slli_epi64(x[3], 12), _mm_srli_epi64(x3_low, 52)),
+        );
         x[0] = _mm_xor_si128(x[0], tmp);
 
-        tmp = _mm_xor_si128(_mm_shr_si128(x[3], 126), _mm_shr_si128(x[3], 125));
-        tmp = _mm_xor_si128(tmp, _mm_shr_si128(x[3], 116));
+        let x3_high = _mm_bsrli_si128(x[3], 14); // shift right by 112
+        tmp = _mm_xor_si128(_mm_srli_epi64(x3_high, 14), _mm_srli_epi64(x3_high, 13));
+        tmp = _mm_xor_si128(tmp, _mm_srli_epi64(x3_high, 4));
         x[1] = _mm_xor_si128(x[1], tmp);
 
         (_mm256_setr_m128i(x[0], x[1]), x[2])
