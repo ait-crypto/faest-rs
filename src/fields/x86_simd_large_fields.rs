@@ -1048,7 +1048,7 @@ unsafe fn mul_gf192(lhs: __m256i, rhs: __m256i) -> __m256i {
             _mm_xor_si128(_mm_xor_si128(xlow_ylow, xsum_ysum), xya1),
             xhigh_yhigh,
         ];
-        poly384_reduce192(combine_poly128s_5(&&combined))
+        poly384_reduce192(combine_poly128s_5(&combined))
     }
 }
 
