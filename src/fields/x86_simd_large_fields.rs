@@ -2022,6 +2022,7 @@ const fn _mm_shr_si128(x: __m128i, other: i32) -> __m128i {
 }
 
 #[inline]
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn poly512_reduce384(mut x: [__m128i; 4]) -> (__m256i, __m128i) {
     unsafe {
         let mut tmp = _mm_xor_si128(x[3], _mm_shl_si128(x[3], 2));
@@ -2268,6 +2269,7 @@ impl From<&[u8]> for GF576 {
 
 const GF576_MOD_M128: __m128i = u128_as_m128(UnoptimizedGF576::MODULUS);
 
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn poly768_reduce576(x: [__m128i; 6]) -> (__m256i, __m256i, u64) {
     unsafe {
         let xmod = [
@@ -2583,6 +2585,7 @@ impl From<(__m256i, __m256i, __m256i)> for GF768 {
 
 const GF768_MOD_M128: __m128i = u128_as_m128(UnoptimizedGF768::MODULUS);
 
+#[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn poly1024_reduce768(x: [__m128i; 8]) -> (__m256i, __m256i, __m256i) {
     unsafe {
         let xmod = [
