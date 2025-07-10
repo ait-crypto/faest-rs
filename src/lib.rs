@@ -610,6 +610,23 @@ mod tests {
             .expect("signature verifies with sk");
     }
 
+    #[test]
+    fn empty_sign_and_verify<KP, S>()
+    where
+        KP: KeypairGenerator + Signer<S> + Verifier<S>,
+        KP::VerifyingKey: Verifier<S> + for<'a> Verifier<SignatureRef<'a>>,
+        S: AsRef<[u8]>,
+    {
+        let kp = KP::generate(rand::thread_rng());
+        let vk = kp.verifying_key();
+        let signature = kp.sign(&[]);
+        vk.verify(&[], &signature).expect("signatures verifies");
+        vk.verify(&[], &SignatureRef::from(signature.as_ref()))
+            .expect("signature verifies as &[u8]");
+        kp.verify(&[], &signature)
+            .expect("signature verifies with sk");
+    }
+
     #[cfg(feature = "randomized-signer")]
     #[test]
     fn randomized_sign_and_verify<KP, S>()
