@@ -78,6 +78,8 @@
 use generic_array::{GenericArray, typenum::Unsigned};
 use paste::paste;
 use rand_core::CryptoRngCore;
+#[cfg(feature = "randomized-signer")]
+use rand_core::RngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "randomized-signer")]
@@ -162,6 +164,15 @@ macro_rules! define_impl {
             struct $param;
 
             impl $param {
+                #[cfg(feature="randomized-signer")]
+                fn sample_rho<R: RngCore>(mut rng: R) -> GenericArray<
+                        u8,
+                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LambdaBytes> {
+                    let mut rho = GenericArray::default();
+                    rng.fill_bytes(&mut rho);
+                    rho
+                }
+
                 #[inline]
                 fn sign(
                     msg: &[u8],
@@ -480,11 +491,7 @@ macro_rules! define_impl {
                     rng: &mut impl CryptoRngCore,
                     msg: &[u8],
                 ) -> Result<[<$param Signature>], Error> {
-                    let mut rho = GenericArray::<
-                        u8,
-                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LambdaBytes,
-                    >::default();
-                    rng.fill_bytes(&mut rho);
+                    let rho = $param::sample_rho(rng);
                     let mut signature = GenericArray::default();
                     $param::sign(msg, &self.0, &rho, &mut signature).map(|_| [<$param Signature>](signature))
                 }
@@ -497,11 +504,7 @@ macro_rules! define_impl {
                     rng: &mut impl CryptoRngCore,
                     msg: &[u8],
                 ) -> Result<Box<[<$param Signature>]>, Error> {
-                    let mut rho = GenericArray::<
-                        u8,
-                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LambdaBytes,
-                    >::default();
-                    rng.fill_bytes(&mut rho);
+                    let rho = $param::sample_rho(rng);
                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));
                     $param::sign(msg, &self.0, &rho, &mut signature.0).map(|_| signature)
                 }
@@ -514,11 +517,7 @@ macro_rules! define_impl {
                     rng: &mut impl CryptoRngCore,
                     msg: &[u8],
                 ) -> Result<[<$param Signature>], Error> {
-                    let mut rho = GenericArray::<
-                        u8,
-                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LambdaBytes,
-                    >::default();
-                    rng.fill_bytes(&mut rho);
+                    let rho = $param::sample_rho(rng);
                     let mut signature = GenericArray::default();
                     $param::unpacked_sign(msg, &self.0, &rho, &mut signature).map(|_| [<$param Signature>](signature))
                 }
