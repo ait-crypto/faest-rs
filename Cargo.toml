@@ -88,3 +88,6 @@ strip = false
 
 [package.metadata.docs.rs]
 all-features = true
+
+[package.metadata.capi.library]
+version = "1.0.0"
