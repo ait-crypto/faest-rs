@@ -1,0 +1,7 @@
+include_guard = "FAEST_H"
+sys_includes = ["stdint.h", "stddef.h"]
+tab_width = 2
+language = "C"
+include_version = false
+no_includes = true
+cpp_compat = true

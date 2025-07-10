@@ -78,7 +78,7 @@
 use generic_array::{GenericArray, typenum::Unsigned};
 use paste::paste;
 use rand_core::CryptoRngCore;
-#[cfg(feature = "randomized-signer")]
+#[cfg(any(feature = "randomized-signer", feature = "capi"))]
 use rand_core::RngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -91,6 +91,8 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 mod aes;
 mod bavc;
+#[cfg(feature = "capi")]
+pub mod capi;
 mod faest;
 mod fields;
 mod internal_keys;
@@ -164,7 +166,14 @@ macro_rules! define_impl {
             struct $param;
 
             impl $param {
-                #[cfg(feature="randomized-signer")]
+                #[cfg(feature="capi")]
+                const SIGNATURE_SIZE: usize = <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE;
+                #[cfg(feature="capi")]
+                const SK_SIZE: usize = <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE;
+                #[cfg(feature="capi")]
+                const PK_SIZE: usize = <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE;
+
+                #[cfg(any(feature="randomized-signer", feature="capi"))]
                 fn sample_rho<R: RngCore>(mut rng: R) -> GenericArray<
                         u8,
                         <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LambdaBytes> {
