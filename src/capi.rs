@@ -36,6 +36,13 @@ impl ResultToErrroCode for Result<(), signature::Error> {
     }
 }
 
+fn clear_private_key(sk: *mut u8, len: usize) {
+    if !sk.is_null() {
+        let sk = unsafe { slice::from_raw_parts_mut(sk, len) };
+        sk.zeroize();
+    }
+}
+
 macro_rules! define_capi_impl {
     (em, $bits:literal, $param:ident) => { define_capi_impl!(FAESTEM, FAEST_EM, $bits, $param); };
     ($bits:literal, $param:ident) => { define_capi_impl!(FAEST, FAEST, $bits, $param); };
@@ -375,10 +382,7 @@ pub unsafe extern "C" fn faest_128f_verify(
 /// - [sk] must be a valid pointer to an array of size [FAEST_128F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_128f_clear_private_key(sk: *mut u8) {
-    if !sk.is_null() {
-        let sk = unsafe { slice::from_raw_parts_mut(sk, FAEST128f::SK_SIZE) };
-        sk.zeroize();
-    }
+    clear_private_key(sk, FAEST128f::SK_SIZE);
 }
 
 /// Size of the public key in bytes.
@@ -472,10 +476,7 @@ pub unsafe extern "C" fn faest_128s_verify(
 /// - [sk] must be a valid pointer to an array of size [FAEST_128S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_128s_clear_private_key(sk: *mut u8) {
-    if !sk.is_null() {
-        let sk = unsafe { slice::from_raw_parts_mut(sk, FAEST128s::SK_SIZE) };
-        sk.zeroize();
-    }
+    clear_private_key(sk, FAEST128s::SK_SIZE);
 }
 
 /// Size of the public key in bytes.
@@ -569,10 +570,7 @@ pub unsafe extern "C" fn faest_192f_verify(
 /// - [sk] must be a valid pointer to an array of size [FAEST_192F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_192f_clear_private_key(sk: *mut u8) {
-    if !sk.is_null() {
-        let sk = unsafe { slice::from_raw_parts_mut(sk, FAEST192f::SK_SIZE) };
-        sk.zeroize();
-    }
+    clear_private_key(sk, FAEST192f::SK_SIZE);
 }
 
 /// Size of the public key in bytes.
@@ -666,10 +664,7 @@ pub unsafe extern "C" fn faest_192s_verify(
 /// - [sk] must be a valid pointer to an array of size [FAEST_192S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_192s_clear_private_key(sk: *mut u8) {
-    if !sk.is_null() {
-        let sk = unsafe { slice::from_raw_parts_mut(sk, FAEST192s::SK_SIZE) };
-        sk.zeroize();
-    }
+    clear_private_key(sk, FAEST192s::SK_SIZE);
 }
 
 /// Size of the public key in bytes.
@@ -763,10 +758,7 @@ pub unsafe extern "C" fn faest_256f_verify(
 /// - [sk] must be a valid pointer to an array of size [FAEST_256F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_256f_clear_private_key(sk: *mut u8) {
-    if !sk.is_null() {
-        let sk = unsafe { slice::from_raw_parts_mut(sk, FAEST256f::SK_SIZE) };
-        sk.zeroize();
-    }
+    clear_private_key(sk, FAEST256f::SK_SIZE);
 }
 
 /// Size of the public key in bytes.
@@ -860,10 +852,7 @@ pub unsafe extern "C" fn faest_256s_verify(
 /// - [sk] must be a valid pointer to an array of size [FAEST_256S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_256s_clear_private_key(sk: *mut u8) {
-    if !sk.is_null() {
-        let sk = unsafe { slice::from_raw_parts_mut(sk, FAEST256s::SK_SIZE) };
-        sk.zeroize();
-    }
+    clear_private_key(sk, FAEST256s::SK_SIZE);
 }
 
 /// Size of the public key in bytes.
@@ -957,10 +946,7 @@ pub unsafe extern "C" fn faest_em_128f_verify(
 /// - [sk] must be a valid pointer to an array of size [FAEST_EM_128F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_128f_clear_private_key(sk: *mut u8) {
-    if !sk.is_null() {
-        let sk = unsafe { slice::from_raw_parts_mut(sk, FAESTEM128f::SK_SIZE) };
-        sk.zeroize();
-    }
+    clear_private_key(sk, FAESTEM128f::SK_SIZE);
 }
 
 /// Size of the public key in bytes.
@@ -1054,10 +1040,7 @@ pub unsafe extern "C" fn faest_em_128s_verify(
 /// - [sk] must be a valid pointer to an array of size [FAEST_RM_128S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_128s_clear_private_key(sk: *mut u8) {
-    if !sk.is_null() {
-        let sk = unsafe { slice::from_raw_parts_mut(sk, FAESTEM128s::SK_SIZE) };
-        sk.zeroize();
-    }
+    clear_private_key(sk, FAESTEM128s::SK_SIZE);
 }
 
 /// Size of the public key in bytes.
@@ -1150,10 +1133,7 @@ pub unsafe extern "C" fn faest_em_192f_verify(
 /// - [sk] must be a valid pointer to an array of size [FAEST_EM_192F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_192f_clear_private_key(sk: *mut u8) {
-    if !sk.is_null() {
-        let sk = unsafe { slice::from_raw_parts_mut(sk, FAESTEM192f::SK_SIZE) };
-        sk.zeroize();
-    }
+    clear_private_key(sk, FAESTEM192f::SK_SIZE);
 }
 
 /// Size of the public key in bytes.
@@ -1247,10 +1227,7 @@ pub unsafe extern "C" fn faest_em_192s_verify(
 /// - [sk] must be a valid pointer to an array of size [FAEST_EM_192S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_192s_clear_private_key(sk: *mut u8) {
-    if !sk.is_null() {
-        let sk = unsafe { slice::from_raw_parts_mut(sk, FAESTEM192s::SK_SIZE) };
-        sk.zeroize();
-    }
+    clear_private_key(sk, FAESTEM192s::SK_SIZE);
 }
 
 /// Size of the public key in bytes.
@@ -1344,10 +1321,7 @@ pub unsafe extern "C" fn faest_em_256f_verify(
 /// - [sk] must be a valid pointer to an array of size [FAEST_EM_256F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_256f_clear_private_key(sk: *mut u8) {
-    if !sk.is_null() {
-        let sk = unsafe { slice::from_raw_parts_mut(sk, FAESTEM256f::SK_SIZE) };
-        sk.zeroize();
-    }
+    clear_private_key(sk, FAESTEM256f::SK_SIZE);
 }
 
 /// Size of the public key in bytes.
@@ -1441,8 +1415,5 @@ pub unsafe extern "C" fn faest_em_256s_verify(
 /// - [sk] must be a valid pointer to an array of size [FAEST_EM_256S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_256s_clear_private_key(sk: *mut u8) {
-    if !sk.is_null() {
-        let sk = unsafe { slice::from_raw_parts_mut(sk, FAESTEM256s::SK_SIZE) };
-        sk.zeroize();
-    }
+    clear_private_key(sk, FAESTEM256s::SK_SIZE);
 }
