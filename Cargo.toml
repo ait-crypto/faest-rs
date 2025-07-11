@@ -34,7 +34,6 @@ paste = "1"
 itertools = { version = "0.14", default-features = false, features = [
   "use_std",
 ] }
-bit-set = "0.8.0"
 cfg-if = "1.0.0"
 libc = { version = "0.2", optional = true }
 bitvec = "1.0.1"
