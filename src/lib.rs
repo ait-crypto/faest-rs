@@ -166,12 +166,16 @@ macro_rules! define_impl {
             struct $param;
 
             impl $param {
-                #[cfg(feature="capi")]
+                cfg_if::cfg_if!(
+                    if #[cfg(feature="capi")] {
+                // TODO: Implement C interfaces for EM version and remove #[allow(dead_code)]
+                #[allow(dead_code)]
                 const SIGNATURE_SIZE: usize = <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE;
-                #[cfg(feature="capi")]
+                #[allow(dead_code)]
                 const SK_SIZE: usize = <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE;
-                #[cfg(feature="capi")]
+                #[allow(dead_code)]
                 const PK_SIZE: usize = <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE;
+                    });
 
                 #[cfg(any(feature="randomized-signer", feature="capi"))]
                 fn sample_rho<R: RngCore>(mut rng: R) -> GenericArray<
