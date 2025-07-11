@@ -447,7 +447,6 @@ where
     }
 }
 
-#[allow(non_camel_case_types)]
 pub(crate) struct BavcEm<RO, PRG, LH, TAU>(
     PhantomData<RO>,
     PhantomData<PRG>,
