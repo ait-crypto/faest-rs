@@ -364,8 +364,8 @@ pub const FAEST_128F_SIGNATURE_SIZE: usize = FAEST128f::SIGNATURE_SIZE;
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_128F_PUBLIC_KEY_SIZE]
-/// - [sk] must be a valid pointer to an array of size [FAEST_128F_PRIVATE_KEY_SIZE]
+/// - `pk` must be a valid pointer to an array of size [FAEST_128F_PUBLIC_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_128F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_128f_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
     faest_128f_keygen_impl(sk, pk)
@@ -375,10 +375,10 @@ pub unsafe extern "C" fn faest_128f_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_128F_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_128F_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_128F_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_128F_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_128f_sign(
     sk: *const u8,
@@ -394,10 +394,10 @@ pub unsafe extern "C" fn faest_128f_sign(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_128F_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_128F_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_128F_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_128F_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_128f_sign_with_randomness(
     sk: *const u8,
@@ -423,9 +423,9 @@ pub unsafe extern "C" fn faest_128f_sign_with_randomness(
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_128F_PUBLIC_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [signature_len]
+/// - `pk` must be a valid pointer to an array of size [FAEST_128F_PUBLIC_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `signature_len`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_128f_verify(
     pk: *const u8,
@@ -441,7 +441,7 @@ pub unsafe extern "C" fn faest_128f_verify(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_128F_PRIVATE_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_128F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_128f_clear_private_key(sk: *mut u8) {
     clear_private_key(sk, FAEST128f::SK_SIZE);
@@ -458,8 +458,8 @@ pub const FAEST_128S_SIGNATURE_SIZE: usize = FAEST128s::SIGNATURE_SIZE;
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_128S_PUBLIC_KEY_SIZE]
-/// - [sk] must be a valid pointer to an array of size [FAEST_128S_PRIVATE_KEY_SIZE]
+/// - `pk` must be a valid pointer to an array of size [FAEST_128S_PUBLIC_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_128S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_128s_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
     faest_128s_keygen_impl(sk, pk)
@@ -469,10 +469,10 @@ pub unsafe extern "C" fn faest_128s_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_128S_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_128S_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_128S_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_128S_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_128s_sign(
     sk: *const u8,
@@ -488,10 +488,10 @@ pub unsafe extern "C" fn faest_128s_sign(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_128S_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_128S_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_128S_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_128S_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_128s_sign_with_randomness(
     sk: *const u8,
@@ -517,9 +517,9 @@ pub unsafe extern "C" fn faest_128s_sign_with_randomness(
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_128S_PUBLIC_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [signature_len]
+/// - `pk` must be a valid pointer to an array of size [FAEST_128S_PUBLIC_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `signature_len`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_128s_verify(
     pk: *const u8,
@@ -535,7 +535,7 @@ pub unsafe extern "C" fn faest_128s_verify(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_128S_PRIVATE_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_128S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_128s_clear_private_key(sk: *mut u8) {
     clear_private_key(sk, FAEST128s::SK_SIZE);
@@ -552,8 +552,8 @@ pub const FAEST_192F_SIGNATURE_SIZE: usize = FAEST192f::SIGNATURE_SIZE;
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_192F_PUBLIC_KEY_SIZE]
-/// - [sk] must be a valid pointer to an array of size [FAEST_192F_PRIVATE_KEY_SIZE]
+/// - `pk` must be a valid pointer to an array of size [FAEST_192F_PUBLIC_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_192F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_192f_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
     faest_192f_keygen_impl(sk, pk)
@@ -563,10 +563,10 @@ pub unsafe extern "C" fn faest_192f_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_192F_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_192F_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_192F_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_192F_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_192f_sign(
     sk: *const u8,
@@ -582,10 +582,10 @@ pub unsafe extern "C" fn faest_192f_sign(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_192F_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_192F_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_192F_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_192F_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_192f_sign_with_randomness(
     sk: *const u8,
@@ -611,9 +611,9 @@ pub unsafe extern "C" fn faest_192f_sign_with_randomness(
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_192F_PUBLIC_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [signature_len]
+/// - `pk` must be a valid pointer to an array of size [FAEST_192F_PUBLIC_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `signature_len`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_192f_verify(
     pk: *const u8,
@@ -629,7 +629,7 @@ pub unsafe extern "C" fn faest_192f_verify(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_192F_PRIVATE_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_192F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_192f_clear_private_key(sk: *mut u8) {
     clear_private_key(sk, FAEST192f::SK_SIZE);
@@ -646,8 +646,8 @@ pub const FAEST_192S_SIGNATURE_SIZE: usize = FAEST192s::SIGNATURE_SIZE;
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_192S_PUBLIC_KEY_SIZE]
-/// - [sk] must be a valid pointer to an array of size [FAEST_192S_PRIVATE_KEY_SIZE]
+/// - `pk` must be a valid pointer to an array of size [FAEST_192S_PUBLIC_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_192S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_192s_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
     faest_192s_keygen_impl(sk, pk)
@@ -657,10 +657,10 @@ pub unsafe extern "C" fn faest_192s_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_192S_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_192S_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_192S_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_192S_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_192s_sign(
     sk: *const u8,
@@ -676,10 +676,10 @@ pub unsafe extern "C" fn faest_192s_sign(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_192S_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_192S_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_192S_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_192S_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_192s_sign_with_randomness(
     sk: *const u8,
@@ -705,9 +705,9 @@ pub unsafe extern "C" fn faest_192s_sign_with_randomness(
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_192S_PUBLIC_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [signature_len]
+/// - `pk` must be a valid pointer to an array of size [FAEST_192S_PUBLIC_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `signature_len`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_192s_verify(
     pk: *const u8,
@@ -723,7 +723,7 @@ pub unsafe extern "C" fn faest_192s_verify(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_192S_PRIVATE_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_192S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_192s_clear_private_key(sk: *mut u8) {
     clear_private_key(sk, FAEST192s::SK_SIZE);
@@ -740,8 +740,8 @@ pub const FAEST_256F_SIGNATURE_SIZE: usize = FAEST256f::SIGNATURE_SIZE;
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_256F_PUBLIC_KEY_SIZE]
-/// - [sk] must be a valid pointer to an array of size [FAEST_256F_PRIVATE_KEY_SIZE]
+/// - `pk` must be a valid pointer to an array of size [FAEST_256F_PUBLIC_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_256F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_256f_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
     faest_256f_keygen_impl(sk, pk)
@@ -751,10 +751,10 @@ pub unsafe extern "C" fn faest_256f_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_256F_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_256F_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_256F_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_256F_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_256f_sign(
     sk: *const u8,
@@ -770,10 +770,10 @@ pub unsafe extern "C" fn faest_256f_sign(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_256F_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_256F_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_256F_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_256F_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_256f_sign_with_randomness(
     sk: *const u8,
@@ -799,9 +799,9 @@ pub unsafe extern "C" fn faest_256f_sign_with_randomness(
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_256F_PUBLIC_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [signature_len]
+/// - `pk` must be a valid pointer to an array of size [FAEST_256F_PUBLIC_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `signature_len`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_256f_verify(
     pk: *const u8,
@@ -817,7 +817,7 @@ pub unsafe extern "C" fn faest_256f_verify(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_256F_PRIVATE_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_256F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_256f_clear_private_key(sk: *mut u8) {
     clear_private_key(sk, FAEST256f::SK_SIZE);
@@ -834,8 +834,8 @@ pub const FAEST_256S_SIGNATURE_SIZE: usize = FAEST256s::SIGNATURE_SIZE;
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_256S_PUBLIC_KEY_SIZE]
-/// - [sk] must be a valid pointer to an array of size [FAEST_256S_PRIVATE_KEY_SIZE]
+/// - `pk` must be a valid pointer to an array of size [FAEST_256S_PUBLIC_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_256S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_256s_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
     faest_256s_keygen_impl(sk, pk)
@@ -845,10 +845,10 @@ pub unsafe extern "C" fn faest_256s_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_256S_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_256S_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_256S_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_256S_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_256s_sign(
     sk: *const u8,
@@ -863,11 +863,11 @@ pub unsafe extern "C" fn faest_256s_sign(
 /// Signs a message with the private key (with custom randomness input)
 ///
 /// # Safety
-///
-/// - [sk] must be a valid pointer to an array of size [FAEST_256S_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_256S_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+//`
+/// - `sk` must be a valid pointer to an array of size [FAEST_256S_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_256S_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_256s_sign_with_randomness(
     sk: *const u8,
@@ -893,9 +893,9 @@ pub unsafe extern "C" fn faest_256s_sign_with_randomness(
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_256S_PUBLIC_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [signature_len]
+/// - `pk` must be a valid pointer to an array of size [FAEST_256S_PUBLIC_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `signature_len`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_256s_verify(
     pk: *const u8,
@@ -911,7 +911,7 @@ pub unsafe extern "C" fn faest_256s_verify(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_256S_PRIVATE_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_256S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_256s_clear_private_key(sk: *mut u8) {
     clear_private_key(sk, FAEST256s::SK_SIZE);
@@ -928,8 +928,8 @@ pub const FAEST_EM_128F_SIGNATURE_SIZE: usize = FAESTEM128f::SIGNATURE_SIZE;
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_EM_128F_PUBLIC_KEY_SIZE]
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_128F_PRIVATE_KEY_SIZE]
+/// - `pk` must be a valid pointer to an array of size [FAEST_EM_128F_PUBLIC_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_128F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_128f_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
     faest_em_128f_keygen_impl(sk, pk)
@@ -939,10 +939,10 @@ pub unsafe extern "C" fn faest_em_128f_keygen(sk: *mut u8, pk: *mut u8) -> c_int
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_128F_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_EM_128F_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_128F_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_EM_128F_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_128f_sign(
     sk: *const u8,
@@ -958,10 +958,10 @@ pub unsafe extern "C" fn faest_em_128f_sign(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_128F_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_EM_128F_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_128F_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_EM_128F_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_128f_sign_with_randomness(
     sk: *const u8,
@@ -987,9 +987,9 @@ pub unsafe extern "C" fn faest_em_128f_sign_with_randomness(
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_EM_128F_PUBLIC_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [signature_len]
+/// - `pk` must be a valid pointer to an array of size [FAEST_EM_128F_PUBLIC_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `signature_len`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_128f_verify(
     pk: *const u8,
@@ -1005,7 +1005,7 @@ pub unsafe extern "C" fn faest_em_128f_verify(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_128F_PRIVATE_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_128F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_128f_clear_private_key(sk: *mut u8) {
     clear_private_key(sk, FAESTEM128f::SK_SIZE);
@@ -1022,8 +1022,8 @@ pub const FAEST_EM_128S_SIGNATURE_SIZE: usize = FAESTEM128s::SIGNATURE_SIZE;
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_EM_128S_PUBLIC_KEY_SIZE]
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_128S_PRIVATE_KEY_SIZE]
+/// - `pk` must be a valid pointer to an array of size [FAEST_EM_128S_PUBLIC_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_128S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_128s_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
     faest_em_128s_keygen_impl(sk, pk)
@@ -1033,10 +1033,10 @@ pub unsafe extern "C" fn faest_em_128s_keygen(sk: *mut u8, pk: *mut u8) -> c_int
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_128S_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_EM_128S_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_128S_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_EM_128S_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_128s_sign(
     sk: *const u8,
@@ -1052,10 +1052,10 @@ pub unsafe extern "C" fn faest_em_128s_sign(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_128S_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_EM_128S_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_128S_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_EM_128S_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_128s_sign_with_randomness(
     sk: *const u8,
@@ -1081,9 +1081,9 @@ pub unsafe extern "C" fn faest_em_128s_sign_with_randomness(
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_EM_128S_PUBLIC_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [signature_len]
+/// - `pk` must be a valid pointer to an array of size [FAEST_EM_128S_PUBLIC_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `signature_len`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_128s_verify(
     pk: *const u8,
@@ -1099,7 +1099,7 @@ pub unsafe extern "C" fn faest_em_128s_verify(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_RM_128S_PRIVATE_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_128S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_128s_clear_private_key(sk: *mut u8) {
     clear_private_key(sk, FAESTEM128s::SK_SIZE);
@@ -1116,8 +1116,8 @@ pub const FAEST_EM_192F_SIGNATURE_SIZE: usize = FAESTEM192f::SIGNATURE_SIZE;
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_EM_192F_PUBLIC_KEY_SIZE]
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_192F_PRIVATE_KEY_SIZE]
+/// - `pk` must be a valid pointer to an array of size [FAEST_EM_192F_PUBLIC_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_192F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_192f_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
     faest_em_192f_keygen_impl(sk, pk)
@@ -1126,10 +1126,10 @@ pub unsafe extern "C" fn faest_em_192f_keygen(sk: *mut u8, pk: *mut u8) -> c_int
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_192F_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_EM_192F_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_192F_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_EM_192F_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_192f_sign(
     sk: *const u8,
@@ -1145,10 +1145,10 @@ pub unsafe extern "C" fn faest_em_192f_sign(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_192F_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_EM_192F_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_192F_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_EM_192F_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_192f_sign_with_randomness(
     sk: *const u8,
@@ -1174,9 +1174,9 @@ pub unsafe extern "C" fn faest_em_192f_sign_with_randomness(
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_EM_192F_PUBLIC_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [signature_len]
+/// - `pk` must be a valid pointer to an array of size [FAEST_EM_192F_PUBLIC_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `signature_len`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_192f_verify(
     pk: *const u8,
@@ -1192,7 +1192,7 @@ pub unsafe extern "C" fn faest_em_192f_verify(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_192F_PRIVATE_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_192F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_192f_clear_private_key(sk: *mut u8) {
     clear_private_key(sk, FAESTEM192f::SK_SIZE);
@@ -1209,8 +1209,8 @@ pub const FAEST_EM_192S_SIGNATURE_SIZE: usize = FAESTEM192s::SIGNATURE_SIZE;
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_EM_192S_PUBLIC_KEY_SIZE]
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_192S_PRIVATE_KEY_SIZE]
+/// - `pk` must be a valid pointer to an array of size [FAEST_EM_192S_PUBLIC_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_192S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_192s_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
     faest_em_192s_keygen_impl(sk, pk)
@@ -1220,10 +1220,10 @@ pub unsafe extern "C" fn faest_em_192s_keygen(sk: *mut u8, pk: *mut u8) -> c_int
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_192S_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_EM_192S_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_192S_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_EM_192S_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_192s_sign(
     sk: *const u8,
@@ -1239,10 +1239,10 @@ pub unsafe extern "C" fn faest_em_192s_sign(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_192S_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_EM_192S_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_192S_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_EM_192S_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_192s_sign_with_randomness(
     sk: *const u8,
@@ -1268,9 +1268,9 @@ pub unsafe extern "C" fn faest_em_192s_sign_with_randomness(
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_EM_192S_PUBLIC_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [signature_len]
+/// - `pk` must be a valid pointer to an array of size [FAEST_EM_192S_PUBLIC_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `signature_len`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_192s_verify(
     pk: *const u8,
@@ -1286,7 +1286,7 @@ pub unsafe extern "C" fn faest_em_192s_verify(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_192S_PRIVATE_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_192S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_192s_clear_private_key(sk: *mut u8) {
     clear_private_key(sk, FAESTEM192s::SK_SIZE);
@@ -1303,8 +1303,8 @@ pub const FAEST_EM_256F_SIGNATURE_SIZE: usize = FAESTEM256f::SIGNATURE_SIZE;
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_EM_256F_PUBLIC_KEY_SIZE]
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_256F_PRIVATE_KEY_SIZE]
+/// - `pk` must be a valid pointer to an array of size [FAEST_EM_256F_PUBLIC_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_256F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_256f_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
     faest_em_256f_keygen_impl(sk, pk)
@@ -1314,10 +1314,10 @@ pub unsafe extern "C" fn faest_em_256f_keygen(sk: *mut u8, pk: *mut u8) -> c_int
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_256F_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_EM_256F_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_256F_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_EM_256F_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_256f_sign(
     sk: *const u8,
@@ -1333,10 +1333,10 @@ pub unsafe extern "C" fn faest_em_256f_sign(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_256F_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_EM_256F_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_256F_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_EM_256F_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_256f_sign_with_randomness(
     sk: *const u8,
@@ -1362,9 +1362,9 @@ pub unsafe extern "C" fn faest_em_256f_sign_with_randomness(
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_EM_256F_PUBLIC_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [signature_len]
+/// - `pk` must be a valid pointer to an array of size [FAEST_EM_256F_PUBLIC_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `signature_len`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_256f_verify(
     pk: *const u8,
@@ -1380,7 +1380,7 @@ pub unsafe extern "C" fn faest_em_256f_verify(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_256F_PRIVATE_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_256F_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_256f_clear_private_key(sk: *mut u8) {
     clear_private_key(sk, FAESTEM256f::SK_SIZE);
@@ -1397,8 +1397,8 @@ pub const FAEST_EM_256S_SIGNATURE_SIZE: usize = FAESTEM256s::SIGNATURE_SIZE;
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_EM_256S_PUBLIC_KEY_SIZE]
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_256S_PRIVATE_KEY_SIZE]
+/// - `pk` must be a valid pointer to an array of size [FAEST_EM_256S_PUBLIC_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_256S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_256s_keygen(sk: *mut u8, pk: *mut u8) -> c_int {
     faest_em_256s_keygen_impl(sk, pk)
@@ -1408,10 +1408,10 @@ pub unsafe extern "C" fn faest_em_256s_keygen(sk: *mut u8, pk: *mut u8) -> c_int
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_256S_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_EM_256S_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_256S_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_EM_256S_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_256s_sign(
     sk: *const u8,
@@ -1427,10 +1427,10 @@ pub unsafe extern "C" fn faest_em_256s_sign(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_256S_PRIVATE_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [\*signature_len] (which needs to be at least [FAEST_EM_256S_SIGNATURE_SIZE] bytes large)
-/// - [signature_len] must be a valid pointer
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_256S_PRIVATE_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `*signature_len` (which needs to be at least [FAEST_EM_256S_SIGNATURE_SIZE] bytes large)
+/// - `signature_len` must be a valid pointer
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_256s_sign_with_randomness(
     sk: *const u8,
@@ -1456,9 +1456,9 @@ pub unsafe extern "C" fn faest_em_256s_sign_with_randomness(
 ///
 /// # Safety
 ///
-/// - [pk] must be a valid pointer to an array of size [FAEST_EM_256S_PUBLIC_KEY_SIZE]
-/// - [message] must be a valid pointer to an array of size [message_len] or `NULL` if [message_len] is `0`
-/// - [signature] must be a valid pointer to an array of size [signature_len]
+/// - `pk` must be a valid pointer to an array of size [FAEST_EM_256S_PUBLIC_KEY_SIZE]
+/// - `message` must be a valid pointer to an array of size `message_len` or `NULL` if `message_len` is `0`
+/// - `signature` must be a valid pointer to an array of size `signature_len`
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_256s_verify(
     pk: *const u8,
@@ -1474,7 +1474,7 @@ pub unsafe extern "C" fn faest_em_256s_verify(
 ///
 /// # Safety
 ///
-/// - [sk] must be a valid pointer to an array of size [FAEST_EM_256S_PRIVATE_KEY_SIZE]
+/// - `sk` must be a valid pointer to an array of size [FAEST_EM_256S_PRIVATE_KEY_SIZE]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn faest_em_256s_clear_private_key(sk: *mut u8) {
     clear_private_key(sk, FAESTEM256s::SK_SIZE);
