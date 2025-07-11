@@ -267,6 +267,66 @@ macro_rules! define_capi_impl {
                 }
 
                 #[test]
+                fn sign_and_verify_with_randomness() {
+                    let mut sk = [0u8; [<$prefix_c _ $bits $param _PRIVATE_KEY_SIZE>]];
+                    let mut pk = [0u8; [<$prefix_c _ $bits $param _PUBLIC_KEY_SIZE>]];
+                    let rho = [0u8; 16];
+
+                    assert_eq!(
+                        unsafe { [<$prefix_c:lower _ $bits $param:lower _keygen>](sk.as_mut_ptr(), pk.as_mut_ptr()) },
+                        0
+                    );
+
+                    let mut signature = [0u8; [<$prefix_c _ $bits $param _SIGNATURE_SIZE>]];
+                    let mut signature_len = signature.len();
+                    assert_eq!(
+                        unsafe {
+                            [<$prefix_c:lower _ $bits $param:lower _sign_with_randomness>](
+                                sk.as_ptr(),
+                                std::ptr::null(),
+                                0,
+                                rho.as_ptr(),
+                                rho.len(),
+                                signature.as_mut_ptr(),
+                                (&mut signature_len) as *mut usize,
+                            )
+                        },
+                        0
+                    );
+                    assert_eq!(signature_len, signature.len());
+
+                    assert_eq!(
+                        unsafe {
+                            [<$prefix_c:lower _ $bits $param:lower _verify>](
+                                pk.as_ptr(),
+                                std::ptr::null(),
+                                0,
+                                signature.as_ptr(),
+                                signature_len,
+                            )
+                        },
+                        0
+                    );
+
+                    let mut signature2 = [0u8; [<$prefix_c _ $bits $param _SIGNATURE_SIZE>]];
+                    assert_eq!(
+                        unsafe {
+                            [<$prefix_c:lower _ $bits $param:lower _sign_with_randomness>](
+                                sk.as_ptr(),
+                                std::ptr::null(),
+                                0,
+                                rho.as_ptr(),
+                                rho.len(),
+                                signature2.as_mut_ptr(),
+                                (&mut signature_len) as *mut usize,
+                            )
+                        },
+                        0
+                    );
+                    assert_eq!(signature, signature2);
+                }
+
+                #[test]
                 fn clear() {
                     let mut sk = [0xffu8; [<$prefix_c _ $bits $param _PRIVATE_KEY_SIZE>]];
                     unsafe { [<$prefix_c:lower _ $bits $param:lower _clear_private_key>](sk.as_mut_ptr()); }
