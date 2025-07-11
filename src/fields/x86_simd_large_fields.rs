@@ -2912,7 +2912,7 @@ mod test {
                 assert_eq!(v1.as_bytes(), v2.as_bytes());
 
                 let v1 = Fu::byte_combine_bits_sq(byte3);
-                let v2 = Fu::byte_combine_bits_sq(byte3);
+                let v2 = F::byte_combine_bits_sq(byte3);
                 assert_eq!(v1.as_bytes(), v2.as_bytes());
             }
 
@@ -2961,7 +2961,6 @@ mod test {
 
     #[generic_tests::define]
     mod extended_fields {
-
         use super::*;
 
         use std::fmt::Debug;

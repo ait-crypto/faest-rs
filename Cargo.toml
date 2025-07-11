@@ -26,6 +26,7 @@ sha3 = "0.10"
 signature = { version = "2", default-features = false, features = ["alloc"] }
 generic-array = { version = "1", features = ["alloc"] }
 rand_core = { version = "0.6", default-features = false }
+rand = { version = "0.8", optional = true }
 zeroize = { version = "1.2", optional = true, default-features = false, features = [
   "derive",
 ] }
@@ -33,7 +34,9 @@ paste = "1"
 itertools = { version = "0.14", default-features = false, features = [
   "use_std",
 ] }
+bit-set = "0.8.0"
 cfg-if = "1.0.0"
+libc = { version = "0.2", optional = true }
 bitvec = "1.0.1"
 
 [dev-dependencies]
@@ -55,6 +58,8 @@ randomized-signer = ["signature/rand_core"]
 serde = ["dep:serde", "generic-array/serde"]
 # enable SIMD optimization implementations
 opt-simd = []
+# provide C interface via cargo-c
+capi = ["dep:rand", "dep:libc", "dep:zeroize"]
 
 [[bench]]
 name = "faest"
