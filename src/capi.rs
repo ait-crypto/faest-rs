@@ -1,6 +1,12 @@
 //! C interface to produce shared library with cargo-c
 //!
 //! The interface is intended by compatible with the reference implementation of FAEST.
+//!
+//! # Warning
+//!
+//! The purpose of this module is to provide a C interface and will follow
+//! changes in FAEST's reference implementation. The functions defined here are
+//! not covered by the SemVer guarantees.
 
 use std::{ffi::c_int, slice};
 

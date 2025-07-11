@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, ops::Mul};
 
-use bitvec::prelude::*;
+use bitvec::{bitvec, slice::BitSlice};
 use generic_array::{
     ArrayLength, GenericArray,
     typenum::{Prod, U2, U3, U8, Unsigned},
