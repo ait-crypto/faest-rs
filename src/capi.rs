@@ -186,14 +186,13 @@ macro_rules! define_capi_impl {
                 use super::*;
 
                 #[test]
-                fn test() {
+                fn sign_and_verify() {
                     let mut sk = [0u8; [<$prefix_c _ $bits $param _PRIVATE_KEY_SIZE>]];
                     let mut pk = [0u8; [<$prefix_c _ $bits $param _PUBLIC_KEY_SIZE>]];
 
                     assert_eq!(
                         unsafe { [<$prefix_c:lower _ $bits $param:lower _keygen>](sk.as_mut_ptr(), pk.as_mut_ptr()) },
-                        0,
-                        "keygen"
+                        0
                     );
 
                     let message = b"the message";
@@ -209,8 +208,7 @@ macro_rules! define_capi_impl {
                                 (&mut signature_len) as *mut usize,
                             )
                         },
-                        0,
-                        "sign with message"
+                        0
                     );
                     assert_eq!(signature_len, signature.len());
 
@@ -224,20 +222,18 @@ macro_rules! define_capi_impl {
                                 signature_len,
                             )
                         },
-                        0,
-                        "verify with message"
+                        0
                     );
                 }
 
                 #[test]
-                fn test_with_null() {
+                fn sign_and_verify_with_null() {
                     let mut sk = [0u8; [<$prefix_c _ $bits $param _PRIVATE_KEY_SIZE>]];
                     let mut pk = [0u8; [<$prefix_c _ $bits $param _PUBLIC_KEY_SIZE>]];
 
                     assert_eq!(
                         unsafe { [<$prefix_c:lower _ $bits $param:lower _keygen>](sk.as_mut_ptr(), pk.as_mut_ptr()) },
-                        0,
-                        "keygen"
+                        0
                     );
 
                     let mut signature = [0u8; [<$prefix_c _ $bits $param _SIGNATURE_SIZE>]];
@@ -252,8 +248,7 @@ macro_rules! define_capi_impl {
                                 (&mut signature_len) as *mut usize,
                             )
                         },
-                        0,
-                        "sign with empty message"
+                        0
                     );
                     assert_eq!(signature_len, signature.len());
 
@@ -267,9 +262,16 @@ macro_rules! define_capi_impl {
                                 signature_len,
                             )
                         },
-                        0,
-                        "verify with empty message"
+                        0
                     );
+                }
+
+                #[test]
+                fn clear() {
+                    let mut sk = [0xffu8; [<$prefix_c _ $bits $param _PRIVATE_KEY_SIZE>]];
+                    unsafe { [<$prefix_c:lower _ $bits $param:lower _clear_private_key>](sk.as_mut_ptr()); }
+                    let all_zeroes = [0u8; [<$prefix_c _ $bits $param _PRIVATE_KEY_SIZE>]];
+                    assert_eq!(sk, all_zeroes);
                 }
             }
         }
