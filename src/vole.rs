@@ -199,9 +199,7 @@ where
     let mut seeds_iter = seeds.iter();
 
     // ::3.0
-    let mut v_in;
-    let mut v_next;
-    (v_in, v_next) = v.split_at_mut(BAVC::TAU::bavc_max_node_depth(0));
+    let (mut v_in, mut v_next) = v.split_at_mut(BAVC::TAU::bavc_max_node_depth(0));
     let u = convert_to_vole::<BAVC, LHatBytes>(
         v_in,
         seeds_iter.by_ref().take(BAVC::TAU::bavc_max_node_index(0)),

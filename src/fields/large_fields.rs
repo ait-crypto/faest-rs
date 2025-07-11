@@ -34,16 +34,16 @@ const fn allignr_8bytes(x: u128, y: u128) -> u128 {
 }
 
 #[inline]
-const fn combine_poly128s_5(x: [u128; 5]) -> [u128; 3] {
+const fn combine_poly128s_5(&x: &[u128; 5]) -> [u128; 3] {
     [
         x[0] ^ x[1] << 64,
-        x[1] >> 64 ^ x[2] ^ x[3] << 64,
+        x[2] ^ allignr_8bytes(x[3], x[1]),
         x[3] >> 64 ^ x[4],
     ]
 }
 
 #[inline]
-const fn combine_poly128s_7(x: [u128; 7]) -> [u128; 4] {
+const fn combine_poly128s_7(x: &[u128; 7]) -> [u128; 4] {
     [
         x[0] ^ x[1] << 64,
         x[2] ^ allignr_8bytes(x[3], x[1]),
@@ -1008,7 +1008,7 @@ fn gf192_mul(x: &mut [u128; 2], y: &[u128; 2]) {
     let xya1 = karatsuba_out[0] ^ karatsuba_out[1];
 
     let xya0_plus_xsum_ysum = xya0 ^ xsum_ysum;
-    let combined = combine_poly128s_5([
+    let combined = combine_poly128s_5(&[
         xlow_ylow,
         xya0_plus_xsum_ysum ^ xhigh_yhigh,
         xya0_plus_xsum_ysum ^ xya1,
@@ -1147,7 +1147,7 @@ fn gf256_mul(x: &mut [u128; 2], y: &[u128; 2]) {
 
     // Combine the result into a single poly of degree 510
     let x0y0_2_plus_x1y1_0 = x0y0[2] ^ x1y1[0];
-    let combined = combine_poly128s_7([
+    let combined = combine_poly128s_7(&[
         x0y0[0],
         x0y0[1],
         xsum_ysum[0] ^ x0y0[0] ^ x0y0_2_plus_x1y1_0,

@@ -256,7 +256,7 @@ unsafe fn combine_poly128s_4(v: [__m128i; 4]) -> [__m128i; 3] {
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn combine_poly128s_5(v: [__m128i; 5]) -> [__m128i; 3] {
+unsafe fn combine_poly128s_5(v: &[__m128i; 5]) -> [__m128i; 3] {
     unsafe {
         [
             _mm_xor_si128(v[0], _mm_slli_si128(v[1], 8)),
@@ -268,7 +268,7 @@ unsafe fn combine_poly128s_5(v: [__m128i; 5]) -> [__m128i; 3] {
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn combine_poly128s_7(v: [__m128i; 7]) -> [__m128i; 4] {
+unsafe fn combine_poly128s_7(v: &[__m128i; 7]) -> [__m128i; 4] {
     unsafe {
         [
             _mm_xor_si128(v[0], _mm_slli_si128(v[1], 8)),
@@ -281,7 +281,7 @@ unsafe fn combine_poly128s_7(v: [__m128i; 7]) -> [__m128i; 4] {
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn combine_poly128s_13(v: [__m128i; 13]) -> [__m128i; 6] {
+unsafe fn combine_poly128s_13(v: &[__m128i; 13]) -> [__m128i; 6] {
     unsafe {
         [
             _mm_xor_si128(v[0], _mm_slli_si128(v[1], 8)),
@@ -1048,7 +1048,7 @@ unsafe fn mul_gf192(lhs: __m256i, rhs: __m256i) -> __m256i {
             _mm_xor_si128(_mm_xor_si128(xlow_ylow, xsum_ysum), xya1),
             xhigh_yhigh,
         ];
-        poly384_reduce192(combine_poly128s_5(combined))
+        poly384_reduce192(combine_poly128s_5(&combined))
     }
 }
 
@@ -1082,7 +1082,7 @@ unsafe fn square_gf192(lhs: __m256i) -> __m256i {
             _mm_xor_si128(_mm_xor_si128(xlow_ylow, xsum_ysum), xya1),
             xhigh_yhigh,
         ];
-        poly384_reduce192(combine_poly128s_5(combined))
+        poly384_reduce192(combine_poly128s_5(&combined))
     }
 }
 
@@ -1548,7 +1548,7 @@ unsafe fn mul_gf256(lhs: __m256i, rhs: __m256i) -> __m256i {
             x1y1[1],
             x1y1[2],
         ];
-        poly512_reduce256(combine_poly128s_7(combined))
+        poly512_reduce256(combine_poly128s_7(&combined))
     }
 }
 
@@ -1570,7 +1570,7 @@ unsafe fn square_gf256(lhs: __m256i) -> __m256i {
             x1y1[1],
             x1y1[2],
         ];
-        poly512_reduce256(combine_poly128s_7(combined))
+        poly512_reduce256(combine_poly128s_7(&combined))
     }
 }
 
@@ -2354,7 +2354,7 @@ unsafe fn mul_gf576_gf192(lhs: (__m256i, __m256i, u64), rhs: __m256i) -> (__m256
             x4y1,
         ];
 
-        poly768_reduce576(combine_poly128s_13(combined))
+        poly768_reduce576(combine_poly128s_13(&combined))
     }
 }
 

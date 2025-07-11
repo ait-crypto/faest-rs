@@ -97,6 +97,9 @@ where
             offset += slice.len();
         }
 
+        // Add 0-padding to decommitment buffer
+        self.decom_i[offset..].fill(0);
+
         // Save ctr
         self.ctr.copy_from_slice(&ctr.to_le_bytes());
     }
