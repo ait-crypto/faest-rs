@@ -1533,7 +1533,7 @@ mod test {
         use rand::RngCore;
 
         #[test]
-        fn from_bit<F: BigGaloisField + Debug + Eq>() {
+        fn from_bit<F: BigGaloisField + Debug>() {
             assert_eq!(F::ONE, F::from_bit(1));
             assert_eq!(F::ZERO, F::from_bit(0));
             assert_eq!(F::ONE, F::from_bit(3));
@@ -1541,7 +1541,7 @@ mod test {
         }
 
         #[test]
-        fn add<F: BigGaloisField + Debug + Eq>()
+        fn add<F: BigGaloisField + Debug>()
         where
             Standard: Distribution<F>,
         {
@@ -1571,7 +1571,7 @@ mod test {
         }
 
         #[test]
-        fn mul_64<F: BigGaloisField + Debug + Eq>()
+        fn mul_64<F: BigGaloisField + Debug>()
         where
             Standard: Distribution<F>,
         {
@@ -1590,7 +1590,7 @@ mod test {
         }
 
         #[test]
-        fn mul_bit<F: BigGaloisField + Debug + Eq>()
+        fn mul_bit<F: BigGaloisField + Debug>()
         where
             Standard: Distribution<F>,
         {
@@ -1613,7 +1613,7 @@ mod test {
         }
 
         #[test]
-        fn sum_poly<F: BigGaloisField + Debug + Eq>() {
+        fn sum_poly<F: BigGaloisField + Debug>() {
             let all_zeroes = vec![F::ZERO; F::Length::USIZE * 8];
             assert_eq!(F::sum_poly(&all_zeroes), F::ZERO);
 
@@ -1625,7 +1625,7 @@ mod test {
         }
 
         #[test]
-        fn byte_combine_constants<F: BigGaloisField + Debug + Eq>() {
+        fn byte_combine_constants<F: BigGaloisField + Debug>() {
             assert_eq!(F::ZERO, F::byte_combine(&[F::ZERO; 8]));
             assert_eq!(
                 F::BYTE_COMBINE_2,
@@ -1658,7 +1658,7 @@ mod test {
         }
 
         #[test]
-        fn byte_combine_slice<F: BigGaloisField + Debug + Eq>()
+        fn byte_combine_slice<F: BigGaloisField + Debug>()
         where
             Standard: Distribution<F>,
         {
@@ -1669,7 +1669,7 @@ mod test {
         }
 
         #[test]
-        fn byte_conversions<F: BigGaloisField + Debug + Eq>()
+        fn byte_conversions<F: BigGaloisField + Debug>()
         where
             Standard: Distribution<F>,
         {
@@ -1682,7 +1682,7 @@ mod test {
         }
 
         #[test]
-        fn mul<F: BigGaloisField + Debug + Eq>() {
+        fn mul<F: BigGaloisField + Debug>() {
             let test_data = read_test_data("LargeFieldMul.json")
                 .into_iter()
                 .find(|data: &DataMul| data.lambda == <F as Field>::Length::USIZE * 8)
@@ -1702,7 +1702,7 @@ mod test {
         }
 
         #[test]
-        fn byte_combine<F: BigGaloisField + Debug + Eq>() {
+        fn byte_combine<F: BigGaloisField + Debug>() {
             let test_data = read_test_data("LargeFieldByteCombine.json")
                 .into_iter()
                 .find(|data: &DataByteCombine| data.lambda == <F as Field>::Length::USIZE * 8)
@@ -1727,7 +1727,7 @@ mod test {
         }
 
         #[test]
-        fn square<F: BigGaloisField + Debug + Eq>()
+        fn square<F: BigGaloisField + Debug>()
         where
             Standard: Distribution<F>,
         {
@@ -1738,7 +1738,7 @@ mod test {
         }
 
         #[test]
-        fn byte_combine_bits<F: BigGaloisField + Debug + Eq>() {
+        fn byte_combine_bits<F: BigGaloisField + Debug>() {
             let test_data = read_test_data("LargeFieldByteCombineBits.json")
                 .into_iter()
                 .find(|data: &DataByteCombineBit| data.lambda == <F as Field>::Length::USIZE * 8)
@@ -1770,7 +1770,7 @@ mod test {
         #[test]
         fn mul<F>()
         where
-            F: ExtensionField + Copy + Debug + Eq,
+            F: ExtensionField + Copy + Debug,
             <F as ExtensionField>::BaseField: for<'a> From<&'a [u8]>,
         {
             let test_data = read_test_data("ExtendedFields.json")
@@ -1787,7 +1787,7 @@ mod test {
         }
 
         #[test]
-        fn byte_conversions<F: ExtensionField + Debug + Eq>()
+        fn byte_conversions<F: ExtensionField + Debug>()
         where
             Standard: Distribution<F>,
         {

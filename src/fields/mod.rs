@@ -139,6 +139,8 @@ pub(crate) trait ExtensionField:
     + for<'a> Mul<&'a Self::BaseField, Output = Self>
     + for<'a> Add<&'a Self, Output = Self>
     + for<'a> From<&'a [u8]>
+    + PartialEq
+    + Eq
 {
     /// Representation of `0`
     const ZERO: Self;
