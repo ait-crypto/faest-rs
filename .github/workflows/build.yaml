@@ -48,7 +48,7 @@ jobs:
   test-capi:
     needs: test
     runs-on: ubuntu-latest
-    name: Test with target-cpu=native
+    name: Test with cargo-c
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
