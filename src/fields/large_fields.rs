@@ -1131,10 +1131,7 @@ pub type GF256 = BigGF<u128, 2, 256>;
 #[cfg(test)]
 impl Distribution<GF192> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF192 {
-        BigGF([rng.sample(self), {
-            let v: u64 = rng.sample(self);
-            v as u128
-        }])
+        BigGF([rng.sample(self), rng.sample::<u64, _>(self) as u128])
     }
 }
 
@@ -1496,9 +1493,9 @@ impl Distribution<GF768> for Standard {
 
 #[cfg(test)]
 mod test {
-
     use super::*;
     use crate::utils::test::read_test_data;
+
     use std::fmt::Debug;
 
     use serde::Deserialize;
@@ -1773,7 +1770,8 @@ mod test {
         #[test]
         fn mul<F>()
         where
-            F: ExtensionField<BaseField: for<'a> From<&'a [u8]>> + Copy + Debug + Eq,
+            F: ExtensionField + Copy + Debug + Eq,
+            <F as ExtensionField>::BaseField: for<'a> From<&'a [u8]>,
         {
             let test_data = read_test_data("ExtendedFields.json")
                 .into_iter()
