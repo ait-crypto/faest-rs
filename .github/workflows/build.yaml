@@ -58,7 +58,9 @@ jobs:
       - name: Install cargo-c
         run: cargo install cargo-c
       - name: Test with capi
-        run: cargo ctest -r
+        run: cargo test -r --features=capi
+      - name: Build with cargo-c
+        run: cargo cbuild -r
 
   test-cross:
     needs: test
