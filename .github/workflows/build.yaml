@@ -23,14 +23,12 @@ jobs:
         with:
           toolchain: ${{matrix.toolchain}}
       - uses: Swatinem/rust-cache@v2
-      - name: Install cargo-nextest
-        run: cargo install cargo-nextest
       - name: Test without default features
-        run: cargo nextest run -r --no-default-features --workspace
+        run: cargo test -r --no-default-features --workspace
       - name: Test with default features
-        run: cargo nextest run -r --workspace
+        run: cargo test -r --workspace
       - name: Test with all features
-        run: cargo nextest run -r --all-features --workspace
+        run: cargo test -r --all-features --workspace
 
   test-native:
     needs: test
@@ -42,10 +40,8 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
-      - name: Install cargo-nextest
-        run: cargo install cargo-nextest
       - name: Test with all features
-        run: cargo nextest run -r --all-features --workspace
+        run: cargo test -r --all-features --workspace
     env:
       RUSTFLAGS: "-C target-cpu=native"
 
