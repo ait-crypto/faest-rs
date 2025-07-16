@@ -45,6 +45,21 @@ jobs:
     env:
       RUSTFLAGS: "-C target-cpu=native"
 
+  test-capi:
+    needs: test
+    runs-on: ubuntu-latest
+    name: Test with target-cpu=native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-c
+        run: cargo install cargo-c
+      - name: Test with capi
+        run: cargo ctest -r
+
   test-cross:
     needs: test
     runs-on: ubuntu-latest
