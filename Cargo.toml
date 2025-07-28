@@ -39,7 +39,7 @@ libc = { version = "0.2", optional = true }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
-criterion = "0.6"
+criterion = "0.7"
 generic-tests = "0.1"
 hex = "0.4"
 nist-pqc-seeded-rng = { version = "0.2.1", default-features = false }
