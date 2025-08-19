@@ -38,7 +38,7 @@ where
         }
     }
 
-    pub(crate) fn get_commits_ref<L2>(&self, start_idx: usize) -> VoleCommitsRef<F, L2>
+    pub(crate) fn get_commits_ref<L2>(&self, start_idx: usize) -> VoleCommitsRef<'_, F, L2>
     where
         L2: ArrayLength,
     {
