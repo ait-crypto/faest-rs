@@ -142,12 +142,6 @@ pub(crate) trait ExtensionField:
     + PartialEq
     + Eq
 {
-    /// Representation of `0`
-    const ZERO: Self;
-
-    /// Representation of `1`
-    const ONE: Self;
-
     /// Length of the byte representation of the field
     type Length: ArrayLength;
 

@@ -1296,9 +1296,6 @@ impl ClearHighBits for GF384 {
 }
 
 impl ExtensionField for GF384 {
-    const ZERO: Self = Self([0, 0, 0]);
-    const ONE: Self = Self([1, 0, 0]);
-
     type Length = U48;
 
     type BaseField = GF128;
@@ -1361,9 +1358,6 @@ impl ClearHighBits for GF576 {
 }
 
 impl ExtensionField for GF576 {
-    const ZERO: Self = Self([0, 0, 0, 0, 0]);
-    const ONE: Self = Self([1, 0, 0, 0, 0]);
-
     type Length = U72;
 
     type BaseField = GF192;
@@ -1437,9 +1431,6 @@ impl ClearHighBits for GF768 {
 }
 
 impl ExtensionField for GF768 {
-    const ZERO: Self = Self([0, 0, 0, 0, 0, 0]);
-    const ONE: Self = Self([1, 0, 0, 0, 0, 0]);
-
     type Length = U96;
 
     type BaseField = GF256;

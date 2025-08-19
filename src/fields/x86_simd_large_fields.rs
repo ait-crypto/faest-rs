@@ -2083,9 +2083,6 @@ impl Mul<&GF128> for GF384 {
 }
 
 impl ExtensionField for GF384 {
-    const ZERO: Self = Self(u64_as_m256(0), u64_as_m128(0));
-    const ONE: Self = Self(u64_as_m256(1), u64_as_m128(0));
-
     type Length = U48;
 
     type BaseField = GF128;
@@ -2379,9 +2376,6 @@ impl Mul<&GF192> for GF576 {
 }
 
 impl ExtensionField for GF576 {
-    const ZERO: Self = Self(u64_as_m256(0), u64_as_m256(0), 0);
-    const ONE: Self = Self(u64_as_m256(1), u64_as_m256(0), 0);
-
     type Length = U72;
 
     type BaseField = GF192;
@@ -2708,9 +2702,6 @@ impl Mul<&GF256> for GF768 {
 }
 
 impl ExtensionField for GF768 {
-    const ZERO: Self = Self(u64_as_m256(0), u64_as_m256(0), u64_as_m256(0));
-    const ONE: Self = Self(u64_as_m256(1), u64_as_m256(0), u64_as_m256(0));
-
     type Length = U96;
 
     type BaseField = GF256;
