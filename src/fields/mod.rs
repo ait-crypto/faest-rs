@@ -1,4 +1,7 @@
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
+
+use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use generic_array::{ArrayLength, GenericArray};
 

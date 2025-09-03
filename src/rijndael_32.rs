@@ -11,6 +11,9 @@
 //!
 //! Originally licensed MIT. Relicensed as Apache 2.0+MIT with permission.
 
+#[cfg(not(feature = "std"))]
+use alloc::{vec, vec::Vec};
+
 use aes::{
     Block,
     cipher::{
@@ -758,7 +761,7 @@ impl BlockEncrypt for Rijndael256 {
 mod test {
     use super::*;
 
-    use std::cmp::max;
+    use core::cmp::max;
 
     use aes::cipher::generic_array::GenericArray;
     use generic_array::typenum::{U4, U6, U8, U10, U12, U14};

@@ -1,5 +1,8 @@
 use generic_array::{GenericArray, typenum::Unsigned};
 
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::ToOwned, vec::Vec};
+
 use super::{
     ByteCommitsRef, FieldCommitDegThree, encryption::enc_cstrnts, key_expansion::key_exp_cstrnts,
 };

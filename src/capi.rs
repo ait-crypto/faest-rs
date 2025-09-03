@@ -8,7 +8,7 @@
 //! changes in FAEST's reference implementation. The functions defined here are
 //! not covered by the SemVer guarantees.
 
-use std::{ffi::c_int, slice};
+use core::{ffi::c_int, slice};
 
 use generic_array::GenericArray;
 use libc::size_t;

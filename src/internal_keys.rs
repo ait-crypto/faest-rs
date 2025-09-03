@@ -2,7 +2,10 @@
 //!
 //! This module also handles serialization and deserialization of any keys.
 
-use std::fmt::{self, Debug};
+use core::fmt::{self, Debug};
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 use generic_array::{GenericArray, typenum::Unsigned};
 #[cfg(feature = "serde")]

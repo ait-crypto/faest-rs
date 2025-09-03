@@ -1,4 +1,7 @@
-use std::ops::{Index, Mul, Range};
+use core::ops::{Index, Mul, Range};
+
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
 
 use generic_array::{ArrayLength, GenericArray, typenum::U8};
 

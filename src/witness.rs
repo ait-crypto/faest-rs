@@ -1,4 +1,7 @@
-use std::mem::size_of;
+use core::mem::size_of;
+
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::ToOwned, boxed::Box};
 
 use generic_array::{
     GenericArray,
@@ -170,6 +173,9 @@ fn round_with_save<O>(
 #[cfg(test)]
 mod test {
     #![allow(clippy::needless_range_loop)]
+
+    #[cfg(not(feature = "std"))]
+    use alloc::vec::Vec;
 
     use crate::{
         fields::{GF128, GF192, GF256},

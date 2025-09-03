@@ -131,6 +131,9 @@ impl RandomOracle for RandomOracleShake256 {
 mod test {
     use super::*;
 
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
+
     fn verify(mut hasher: impl Hasher, input: &[u8], output: &[u8]) {
         hasher.update(input);
         let mut reader = hasher.finish();

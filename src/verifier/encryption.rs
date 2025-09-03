@@ -1,4 +1,4 @@
-use std::iter::zip;
+use core::iter::zip;
 
 use generic_array::{
     ArrayLength, GenericArray,

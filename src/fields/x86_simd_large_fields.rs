@@ -1,10 +1,10 @@
 /// Implementation of the binary fields with 128, 192 and 256 bit based on SSE2/AVX2 and the clmul instruction
 
 #[cfg(target_arch = "x86")]
-use std::arch::x86 as x86_64;
+use core::arch::x86 as x86_64;
 #[cfg(target_arch = "x86_64")]
-use std::arch::x86_64;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use core::arch::x86_64;
+use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use x86_64::{
     __m128i, __m256i, _mm_alignr_epi8, _mm_and_si128, _mm_andnot_si128, _mm_bslli_si128,
     _mm_bsrli_si128, _mm_clmulepi64_si128, _mm_cmpeq_epi32, _mm_loadu_si128, _mm_or_si128,
@@ -2726,7 +2726,7 @@ mod test {
     mod field_ops {
         use super::*;
 
-        use std::fmt::Debug;
+        use core::fmt::Debug;
 
         use rand::{
             Rng, RngCore,
@@ -2875,7 +2875,7 @@ mod test {
     mod big_gf_ops {
         use super::*;
 
-        use std::{fmt::Debug, iter::zip};
+        use core::{fmt::Debug, iter::zip};
 
         use rand::{
             Rng,
@@ -2954,7 +2954,7 @@ mod test {
     mod extended_fields {
         use super::*;
 
-        use std::fmt::Debug;
+        use core::fmt::Debug;
 
         use rand::{
             Rng,
@@ -3048,28 +3048,5 @@ mod test {
 
         #[instantiate_tests(<UnoptimizedGF768, GF768>)]
         mod gf768 {}
-    }
-
-    #[test]
-    fn bench() {
-        use rand::Rng;
-
-        let mut rng = rand::thread_rng();
-
-        let x: [__m128i; 6] = std::array::from_fn(|_| u128_as_m128(rng.r#gen::<u128>()));
-
-        let t = std::time::Instant::now();
-        for _ in 0..100_000 {
-            std::hint::black_box(unsafe { poly768_reduce576(std::hint::black_box(x)) });
-        }
-        let t = t.elapsed();
-        println!("reduce took: {t:?}");
-
-        // let t = std::time::Instant::now();
-        // for _ in 0..100_000 {
-        //     std::hint::black_box(unsafe { poly768_reduce576_2(std::hint::black_box(x)) });
-        // }
-        // let t = t.elapsed();
-        // println!("reduce_2 took: {t:?}");
     }
 }

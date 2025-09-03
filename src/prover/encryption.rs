@@ -1,4 +1,7 @@
-use std::{iter::zip, ops::AddAssign};
+use core::{iter::zip, ops::AddAssign};
+
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
 
 use generic_array::{
     GenericArray,

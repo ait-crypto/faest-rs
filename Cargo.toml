@@ -17,25 +17,25 @@ categories = ["cryptography"]
 exclude = ["tests/data/*.json", "tests/data/PQCsignKAT_*.rsp"]
 
 [dependencies]
-aes = "0.8"
-ctr = "0.9"
+aes = { version = "0.8", default-features = false }
+ctr = { version = "0.9", default-features = false }
 serde = { version = "1", optional = true, default-features = false, features = [
   "derive",
 ] }
-sha3 = "0.10"
+sha3 = { version = "0.10", default-features = false, features = ["asm"] }
 signature = { version = "2", default-features = false, features = ["alloc"] }
-generic-array = { version = "1", features = ["alloc"] }
+generic-array = { version = "1", default-features = false, features = [
+  "alloc",
+] }
 rand_core = { version = "0.6", default-features = false }
-rand = { version = "0.8", optional = true }
+rand = { version = "0.8", optional = true, default-features = false }
 zeroize = { version = "1.2", optional = true, default-features = false, features = [
   "derive",
 ] }
 paste = "1"
-itertools = { version = "0.14", default-features = false, features = [
-  "use_std",
-] }
+itertools = { version = "0.14", default-features = false }
 cfg-if = "1.0.0"
-libc = { version = "0.2", optional = true }
+libc = { version = "0.2", optional = true, default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
@@ -43,12 +43,13 @@ criterion = "0.7"
 generic-tests = "0.1"
 hex = "0.4"
 nist-pqc-seeded-rng = { version = "0.2.1", default-features = false }
-rand = "0.8"
+rand = { version = "0.8", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 [features]
-default = ["zeroize", "randomized-signer", "opt-simd"]
+default = ["zeroize", "randomized-signer", "opt-simd", "std"]
+std = ["itertools/use_std", "ctr/std", "rand/std_rng", "rand/std"]
 # zeroize secret keys
 zeroize = ["dep:zeroize", "aes/zeroize", "ctr/zeroize"]
 # implement randomized signer interfaces of the signature crate
@@ -56,24 +57,24 @@ randomized-signer = ["signature/rand_core"]
 # provide serialization via serde
 serde = ["dep:serde", "generic-array/serde"]
 # enable SIMD optimization implementations
-opt-simd = []
+opt-simd = ["std"]
 # provide C interface via cargo-c
-capi = ["dep:rand", "dep:libc", "dep:zeroize"]
+capi = ["dep:rand", "dep:libc", "dep:zeroize", "rand/std_rng", "rand/std"]
 
 [[bench]]
 name = "faest"
 path = "benches/bench.rs"
-required-features = ["randomized-signer"]
+required-features = ["randomized-signer", "std"]
 harness = false
 test = false
 
 [[example]]
 name = "simple"
-required-features = ["randomized-signer"]
+required-features = ["randomized-signer", "std"]
 
 [[test]]
 name = "nist"
-required-features = ["randomized-signer"]
+required-features = ["randomized-signer", "std"]
 
 [profile.dev.package."*"]
 opt-level = 3

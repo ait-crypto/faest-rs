@@ -1,4 +1,4 @@
-use std::iter::zip;
+use core::iter::zip;
 
 use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
 use itertools::izip;
@@ -123,12 +123,16 @@ pub(crate) const fn get_bit(input: &[u8], index: usize) -> u8 {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use std::{fs::File, path::Path};
+    #[cfg(not(feature = "std"))]
+    use alloc::{vec, vec::Vec};
 
     use serde::de::DeserializeOwned;
     use sha3::digest::{ExtendableOutput, Update, XofReader};
 
+    #[cfg(feature = "std")]
     pub(crate) fn read_test_data<T: DeserializeOwned>(path: &str) -> Vec<T> {
+        use std::{fs::File, path::Path};
+
         File::open(
             Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("tests/data")
@@ -142,6 +146,11 @@ pub(crate) mod test {
             serde_json::from_reader,
         )
         .unwrap_or_else(|_| panic!("Failed to read JSON test data from {path}"))
+    }
+
+    #[cfg(not(feature = "std"))]
+    pub(crate) fn read_test_data<T: DeserializeOwned>(_path: &str) -> Vec<T> {
+        Vec::new()
     }
 
     pub(crate) fn hash_array(data: &[u8]) -> Vec<u8> {

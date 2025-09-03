@@ -1,4 +1,7 @@
-use std::{marker::PhantomData, ops::Mul};
+use core::{marker::PhantomData, ops::Mul};
+
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::ToOwned, vec, vec::Vec};
 
 use bitvec::{bitvec, slice::BitSlice};
 use generic_array::{
@@ -614,7 +617,9 @@ pub(crate) type BAVC256FastEM = BavcEm<RandomOracleShake256, PRG256, LeafHasher2
 #[cfg(test)]
 mod test {
     use super::*;
-    use core::panic;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::string::String;
 
     use generic_array::GenericArray;
     use serde::Deserialize;

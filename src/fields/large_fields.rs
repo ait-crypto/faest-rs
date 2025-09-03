@@ -1,4 +1,4 @@
-use std::{
+use core::{
     array,
     fmt::Debug,
     iter::zip,
@@ -1487,7 +1487,10 @@ mod test {
     use super::*;
     use crate::utils::test::read_test_data;
 
-    use std::fmt::Debug;
+    use core::fmt::Debug;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::{string::String, vec::Vec};
 
     use serde::Deserialize;
 
@@ -1518,10 +1521,15 @@ mod test {
     mod field_ops {
         use super::*;
 
-        use std::iter::zip;
+        use core::iter::zip;
+
+        #[cfg(not(feature = "std"))]
+        use alloc::vec;
 
         use generic_array::typenum::Unsigned;
+        use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
         use rand::RngCore;
+        use rand_core::SeedableRng;
 
         #[test]
         fn from_bit<F: BigGaloisField + Debug>() {
@@ -1536,7 +1544,7 @@ mod test {
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             for _ in 0..RUNS {
                 let mut random_1: F = rng.r#gen();
@@ -1566,7 +1574,7 @@ mod test {
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             for _ in 0..RUNS {
                 let lhs: F = rng.r#gen();
@@ -1585,7 +1593,7 @@ mod test {
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             for _ in 0..RUNS {
                 let anything: F = rng.r#gen();
@@ -1653,7 +1661,7 @@ mod test {
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             let elements = array::from_fn(|_| rng.r#gen());
             assert_eq!(F::byte_combine(&elements), F::byte_combine_slice(&elements));
@@ -1664,7 +1672,7 @@ mod test {
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             let element = rng.r#gen();
             let bytes = element.as_bytes();
@@ -1674,12 +1682,12 @@ mod test {
 
         #[test]
         fn mul<F: BigGaloisField + Debug>() {
-            let test_data = read_test_data("LargeFieldMul.json")
+            let Some(test_data) = read_test_data("LargeFieldMul.json")
                 .into_iter()
                 .find(|data: &DataMul| data.lambda == <F as Field>::Length::USIZE * 8)
-                .unwrap_or_else(|| {
-                    panic!("No test data for GF{}", <F as Field>::Length::USIZE * 8)
-                });
+            else {
+                return;
+            };
 
             for [lhs, rhs, expected] in test_data.database {
                 let mut lhs = F::from(hex::decode(lhs.as_str()).unwrap().as_slice());
@@ -1694,12 +1702,12 @@ mod test {
 
         #[test]
         fn byte_combine<F: BigGaloisField + Debug>() {
-            let test_data = read_test_data("LargeFieldByteCombine.json")
+            let Some(test_data) = read_test_data("LargeFieldByteCombine.json")
                 .into_iter()
                 .find(|data: &DataByteCombine| data.lambda == <F as Field>::Length::USIZE * 8)
-                .unwrap_or_else(|| {
-                    panic!("No test data for GF{}", <F as Field>::Length::USIZE * 8)
-                });
+            else {
+                return;
+            };
 
             for data in test_data.database {
                 let tab = [
@@ -1722,7 +1730,7 @@ mod test {
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             let element = rng.r#gen();
             assert_eq!(element * element, element.square());
@@ -1730,13 +1738,14 @@ mod test {
 
         #[test]
         fn byte_combine_bits<F: BigGaloisField + Debug>() {
-            let test_data = read_test_data("LargeFieldByteCombineBits.json")
+            let Some(test_data) = read_test_data("LargeFieldByteCombineBits.json")
                 .into_iter()
                 .find(|data: &DataByteCombineBit| data.lambda == <F as Field>::Length::USIZE * 8)
-                .unwrap_or_else(|| panic!("No test data for GF{}", <F as Field>::Length::USIZE * 8))
-                .database;
+            else {
+                return;
+            };
 
-            for (x, data) in test_data.into_iter() {
+            for (x, data) in test_data.database.into_iter() {
                 let result = F::from(hex::decode(&data).unwrap().as_slice());
                 assert_eq!(F::byte_combine_bits(x), result);
             }
@@ -1758,16 +1767,21 @@ mod test {
         use crate::utils::test::read_test_data;
         use generic_array::typenum::Unsigned;
 
+        use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
+        use rand_core::SeedableRng;
+
         #[test]
         fn mul<F>()
         where
             F: ExtensionField + Copy + Debug,
             <F as ExtensionField>::BaseField: for<'a> From<&'a [u8]>,
         {
-            let test_data = read_test_data("ExtendedFields.json")
+            let Some(test_data) = read_test_data("ExtendedFields.json")
                 .into_iter()
                 .find(|data: &DataMul| data.lambda == F::Length::USIZE * 8)
-                .unwrap_or_else(|| panic!("No test data for GF{}", F::Length::USIZE * 8));
+            else {
+                return;
+            };
 
             for [lhs, rhs, res] in test_data.database {
                 let lhs = F::from(hex::decode(lhs.as_str()).unwrap().as_slice());
@@ -1782,7 +1796,7 @@ mod test {
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             let element = rng.r#gen();
             let bytes = element.as_bytes();

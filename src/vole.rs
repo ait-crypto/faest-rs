@@ -1,8 +1,11 @@
-use std::{
+use core::{
     iter::zip,
     marker::PhantomData,
     ops::{Index, IndexMut, Mul},
 };
+
+#[cfg(not(feature = "std"))]
+use alloc::{boxed::Box, vec, vec::Vec};
 
 use generic_array::{
     ArrayLength, GenericArray,
@@ -310,6 +313,9 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::{borrow::ToOwned, string::String, vec::Vec};
 
     use generic_array::GenericArray;
     use serde::Deserialize;

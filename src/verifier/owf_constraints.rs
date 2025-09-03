@@ -1,4 +1,7 @@
-use std::array;
+use core::array;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 use generic_array::{GenericArray, typenum::Unsigned};
 

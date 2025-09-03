@@ -1,8 +1,13 @@
-use std::{
+use core::{
+    cmp::PartialEq,
+    fmt::Debug,
     iter::{repeat_n, zip},
     marker::PhantomData,
     ops::{Add, Div, Mul, Sub},
 };
+
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::ToOwned, boxed::Box};
 
 use aes::{
     Aes128Enc, Aes192Enc, Aes256Enc,
@@ -138,9 +143,9 @@ macro_rules! define_owf_proof {
                 not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
             ))]
             if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-                // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
+                // SAFETY: call to `core::mem::transmute` is safe because `PublicKey` only depends on
                 // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-                let pk: &PublicKey<$opt_owf> = unsafe { std::mem::transmute(pk) };
+                let pk: &PublicKey<$opt_owf> = unsafe { core::mem::transmute(pk) };
                 let qs_proof = aes_prove::<$opt_owf>(w, u, v, pk, chall_2);
                 return (
                     OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
@@ -239,7 +244,7 @@ fn hash_q_matrix<BP>(
 /// Base parameters per security level
 pub(crate) trait BaseParameters {
     /// The field that is of size `2^λ` which is defined as [`Self::Lambda`]
-    type Field: BigGaloisField<Length = Self::LambdaBytes> + std::fmt::Debug + std::cmp::PartialEq;
+    type Field: BigGaloisField<Length = Self::LambdaBytes> + Debug + PartialEq;
     /// Hasher implementation of `ZKHash`
     type ZKHasher: ZKHasherInit<Self::Field, SDLength = Self::Chall>;
     /// Hasher implementation of `VOLEHash`
@@ -290,7 +295,7 @@ where
 
 impl<F> BaseParameters for BaseParams128<F>
 where
-    F: BigGaloisField<Length = U16> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U16> + Debug + PartialEq,
 {
     type Field = F;
     type ZKHasher = ZKHasher<Self::Field>;
@@ -371,7 +376,7 @@ pub(crate) struct BaseParams192<F = GF192>(PhantomData<F>);
 
 impl<F> BaseParameters for BaseParams192<F>
 where
-    F: BigGaloisField<Length = U24> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U24> + Debug + PartialEq,
 {
     type Field = F;
     type ZKHasher = ZKHasher<Self::Field>;
@@ -452,7 +457,7 @@ pub(crate) struct BaseParams256<F = GF256>(PhantomData<F>);
 
 impl<F> BaseParameters for BaseParams256<F>
 where
-    F: BigGaloisField<Length = U32> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U32> + Debug + PartialEq,
 {
     type Field = F;
     type ZKHasher = ZKHasher<Self::Field>;
@@ -666,7 +671,7 @@ pub(crate) struct OWF128<F = GF128>(PhantomData<F>);
 
 impl<F> OWFParameters for OWF128<F>
 where
-    F: BigGaloisField<Length = U16> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U16> + Debug + PartialEq,
 {
     type BaseParams = BaseParams128<F>;
     type InputSize = U16;
@@ -730,7 +735,7 @@ pub(crate) struct OWF192<F = GF192>(PhantomData<F>);
 
 impl<F> OWFParameters for OWF192<F>
 where
-    F: BigGaloisField<Length = U24> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U24> + Debug + PartialEq,
 {
     type BaseParams = BaseParams192<F>;
     type InputSize = U16;
@@ -800,7 +805,7 @@ pub(crate) struct OWF256<F = GF256>(PhantomData<F>);
 
 impl<F> OWFParameters for OWF256<F>
 where
-    F: BigGaloisField<Length = U32> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U32> + Debug + PartialEq,
 {
     type BaseParams = BaseParams256<F>;
     type InputSize = U16;
@@ -869,7 +874,7 @@ pub(crate) struct OWF128EM<F = GF128>(PhantomData<F>);
 
 impl<F> OWFParameters for OWF128EM<F>
 where
-    F: BigGaloisField<Length = U16> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U16> + Debug,
 {
     type BaseParams = BaseParams128<F>;
     type InputSize = U16;
@@ -940,7 +945,7 @@ type U1536 = Sum<U1024, U512>;
 
 impl<F> OWFParameters for OWF192EM<F>
 where
-    F: BigGaloisField<Length = U24> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U24> + Debug + PartialEq,
 {
     type BaseParams = BaseParams192<F>;
     type InputSize = U24;
@@ -1009,7 +1014,7 @@ where
 
 impl<F> OWFParameters for OWF256EM<F>
 where
-    F: BigGaloisField<Length = U32> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U32> + Debug + PartialEq,
 {
     type BaseParams = BaseParams256<F>;
     type InputSize = U32;

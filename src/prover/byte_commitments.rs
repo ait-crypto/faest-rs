@@ -1,4 +1,7 @@
-use std::ops::Mul;
+use core::ops::Mul;
+
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::ToOwned, boxed::Box};
 
 use generic_array::{
     ArrayLength, GenericArray,
