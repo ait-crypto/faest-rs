@@ -39,7 +39,6 @@ libc = { version = "0.2", optional = true, default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
-criterion = "0.7"
 generic-tests = "0.1"
 hex = "0.4"
 nist-pqc-seeded-rng = { version = "0.2.1", default-features = false }
@@ -60,13 +59,6 @@ serde = ["dep:serde", "generic-array/serde"]
 opt-simd = ["std"]
 # provide C interface via cargo-c
 capi = ["dep:rand", "dep:libc", "dep:zeroize", "rand/std_rng", "rand/std"]
-
-[[bench]]
-name = "faest"
-path = "benches/bench.rs"
-required-features = ["randomized-signer", "std"]
-harness = false
-test = false
 
 [[example]]
 name = "simple"
@@ -92,3 +84,6 @@ all-features = true
 
 [package.metadata.capi.library]
 version = "1.0.0"
+
+[workspace]
+members = ["faest-benches"]
