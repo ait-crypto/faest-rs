@@ -372,12 +372,8 @@ where
 
 impl<T, const N: usize, const LENGTH: usize> ByteCombine for BigGF<T, N, LENGTH>
 where
-    Self: Alphas
-        + Field
-        + Copy
-        + Debug
-        + ApplyMask<T, Output = Self>
-        + for<'a> Mul<&'a Self, Output = Self>,
+    Self:
+        Alphas + Field + Copy + ApplyMask<T, Output = Self> + for<'a> Mul<&'a Self, Output = Self>,
     u8: ToMask<T>,
 {
     fn byte_combine(x: &[Self; 8]) -> Self {
@@ -1532,7 +1528,7 @@ mod test {
         use rand_core::SeedableRng;
 
         #[test]
-        fn from_bit<F: BigGaloisField + Debug>() {
+        fn from_bit<F: BigGaloisField>() {
             assert_eq!(F::ONE, F::from_bit(1));
             assert_eq!(F::ZERO, F::from_bit(0));
             assert_eq!(F::ONE, F::from_bit(3));
@@ -1540,7 +1536,7 @@ mod test {
         }
 
         #[test]
-        fn add<F: BigGaloisField + Debug>()
+        fn add<F: BigGaloisField>()
         where
             Standard: Distribution<F>,
         {
@@ -1570,7 +1566,7 @@ mod test {
         }
 
         #[test]
-        fn mul_64<F: BigGaloisField + Debug>()
+        fn mul_64<F: BigGaloisField>()
         where
             Standard: Distribution<F>,
         {
@@ -1589,7 +1585,7 @@ mod test {
         }
 
         #[test]
-        fn mul_bit<F: BigGaloisField + Debug>()
+        fn mul_bit<F: BigGaloisField>()
         where
             Standard: Distribution<F>,
         {
@@ -1612,7 +1608,7 @@ mod test {
         }
 
         #[test]
-        fn sum_poly<F: BigGaloisField + Debug>() {
+        fn sum_poly<F: BigGaloisField>() {
             let all_zeroes = vec![F::ZERO; F::Length::USIZE * 8];
             assert_eq!(F::sum_poly(&all_zeroes), F::ZERO);
 
@@ -1624,7 +1620,7 @@ mod test {
         }
 
         #[test]
-        fn byte_combine_constants<F: BigGaloisField + Debug>() {
+        fn byte_combine_constants<F: BigGaloisField>() {
             assert_eq!(F::ZERO, F::byte_combine(&[F::ZERO; 8]));
             assert_eq!(
                 F::BYTE_COMBINE_2,
@@ -1657,7 +1653,7 @@ mod test {
         }
 
         #[test]
-        fn byte_combine_slice<F: BigGaloisField + Debug>()
+        fn byte_combine_slice<F: BigGaloisField>()
         where
             Standard: Distribution<F>,
         {
@@ -1668,7 +1664,7 @@ mod test {
         }
 
         #[test]
-        fn byte_conversions<F: BigGaloisField + Debug>()
+        fn byte_conversions<F: BigGaloisField>()
         where
             Standard: Distribution<F>,
         {
@@ -1681,7 +1677,7 @@ mod test {
         }
 
         #[test]
-        fn mul<F: BigGaloisField + Debug>() {
+        fn mul<F: BigGaloisField>() {
             let Some(test_data) = read_test_data("LargeFieldMul.json")
                 .into_iter()
                 .find(|data: &DataMul| data.lambda == <F as Field>::Length::USIZE * 8)
@@ -1701,7 +1697,7 @@ mod test {
         }
 
         #[test]
-        fn byte_combine<F: BigGaloisField + Debug>() {
+        fn byte_combine<F: BigGaloisField>() {
             let Some(test_data) = read_test_data("LargeFieldByteCombine.json")
                 .into_iter()
                 .find(|data: &DataByteCombine| data.lambda == <F as Field>::Length::USIZE * 8)
@@ -1726,7 +1722,7 @@ mod test {
         }
 
         #[test]
-        fn square<F: BigGaloisField + Debug>()
+        fn square<F: BigGaloisField>()
         where
             Standard: Distribution<F>,
         {
@@ -1737,7 +1733,7 @@ mod test {
         }
 
         #[test]
-        fn byte_combine_bits<F: BigGaloisField + Debug>() {
+        fn byte_combine_bits<F: BigGaloisField>() {
             let Some(test_data) = read_test_data("LargeFieldByteCombineBits.json")
                 .into_iter()
                 .find(|data: &DataByteCombineBit| data.lambda == <F as Field>::Length::USIZE * 8)
@@ -1765,15 +1761,15 @@ mod test {
     mod extended_field_ops {
         use super::*;
         use crate::utils::test::read_test_data;
-        use generic_array::typenum::Unsigned;
 
+        use generic_array::typenum::Unsigned;
         use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
         use rand_core::SeedableRng;
 
         #[test]
         fn mul<F>()
         where
-            F: ExtensionField + Copy + Debug,
+            F: ExtensionField + Copy,
             <F as ExtensionField>::BaseField: for<'a> From<&'a [u8]>,
         {
             let Some(test_data) = read_test_data("ExtendedFields.json")
@@ -1792,7 +1788,7 @@ mod test {
         }
 
         #[test]
-        fn byte_conversions<F: ExtensionField + Debug>()
+        fn byte_conversions<F: ExtensionField>()
         where
             Standard: Distribution<F>,
         {

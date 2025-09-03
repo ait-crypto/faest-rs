@@ -1,7 +1,10 @@
 #[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
 
-use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use core::{
+    fmt::Debug,
+    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+};
 
 use generic_array::{ArrayLength, GenericArray};
 
@@ -144,6 +147,7 @@ pub(crate) trait ExtensionField:
     + for<'a> From<&'a [u8]>
     + PartialEq
     + Eq
+    + Debug
 {
     /// Length of the byte representation of the field
     type Length: ArrayLength;

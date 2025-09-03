@@ -2726,18 +2726,16 @@ mod test {
     mod field_ops {
         use super::*;
 
-        use core::fmt::Debug;
-
         use rand::{
             Rng, RngCore,
             distributions::{Distribution, Standard},
         };
 
         #[test]
-        fn add<Fu, F: BigGaloisField + Debug + Eq>()
+        fn add<Fu, F: BigGaloisField>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length>,
         {
             let mut rng = rand::thread_rng();
 
@@ -2762,10 +2760,10 @@ mod test {
         }
 
         #[test]
-        fn mul<Fu, F: BigGaloisField + Debug + Eq>()
+        fn mul<Fu, F: BigGaloisField>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length>,
         {
             let mut rng = rand::thread_rng();
 
@@ -2793,10 +2791,10 @@ mod test {
         }
 
         #[test]
-        fn mul_u64<Fu, F: BigGaloisField + Debug + Eq>()
+        fn mul_u64<Fu, F: BigGaloisField>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length>,
         {
             let mut rng = rand::thread_rng();
 
@@ -2819,10 +2817,10 @@ mod test {
         }
 
         #[test]
-        fn mul_u8<Fu, F: BigGaloisField + Debug + Eq>()
+        fn mul_u8<Fu, F: BigGaloisField>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length>,
         {
             let mut rng = rand::thread_rng();
 
@@ -2841,10 +2839,10 @@ mod test {
         }
 
         #[test]
-        fn double<Fu, F: BigGaloisField + Debug + Eq>()
+        fn double<Fu, F: BigGaloisField>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length>,
         {
             let mut rng = rand::thread_rng();
 
@@ -2875,7 +2873,7 @@ mod test {
     mod big_gf_ops {
         use super::*;
 
-        use core::{fmt::Debug, iter::zip};
+        use core::iter::zip;
 
         use rand::{
             Rng,
@@ -2883,10 +2881,10 @@ mod test {
         };
 
         #[test]
-        fn byte_combine_sq<Fu, F: BigGaloisField + Debug + Eq>()
+        fn byte_combine_sq<Fu, F: BigGaloisField>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length>,
         {
             let mut rng = rand::thread_rng();
 
@@ -2918,10 +2916,10 @@ mod test {
         }
 
         #[test]
-        fn constants<Fu, F: BigGaloisField + Alphas + Debug + Eq>()
+        fn constants<Fu, F: BigGaloisField + Alphas>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Alphas + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length> + Alphas,
         {
             for (x, y) in zip(F::ALPHA, Fu::ALPHA) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
@@ -2954,8 +2952,6 @@ mod test {
     mod extended_fields {
         use super::*;
 
-        use core::fmt::Debug;
-
         use rand::{
             Rng,
             distributions::{Distribution, Standard},
@@ -2967,8 +2963,8 @@ mod test {
         fn add<Fu, F>()
         where
             Standard: Distribution<Fu>,
-            Fu: ExtensionField + Debug + Eq + Copy,
-            for<'a> F: ExtensionField<Length = Fu::Length> + Debug + Eq + From<&'a [u8]> + Copy,
+            Fu: ExtensionField + Copy,
+            for<'a> F: ExtensionField<Length = Fu::Length> + From<&'a [u8]> + Copy,
         {
             let mut rng = rand::thread_rng();
 
@@ -2993,10 +2989,8 @@ mod test {
         fn mul<Fu, F>()
         where
             Standard: Distribution<Fu> + Distribution<Fu::BaseField>,
-            Fu: ExtensionField + Debug + Eq + Copy,
+            Fu: ExtensionField + Copy,
             for<'a> F: ExtensionField<Length = Fu::Length, BaseField: From<&'a [u8]>>
-                + Debug
-                + Eq
                 + From<&'a [u8]>
                 + Copy,
         {
@@ -3019,10 +3013,8 @@ mod test {
         fn serialization<Fu, F>()
         where
             Standard: Distribution<Fu> + Distribution<Fu::BaseField>,
-            Fu: ExtensionField + Debug + Eq + Copy,
+            Fu: ExtensionField + Copy,
             for<'a> F: ExtensionField<Length = Fu::Length, BaseField: From<&'a [u8]>>
-                + Debug
-                + Eq
                 + From<&'a [u8]>
                 + Copy,
         {
