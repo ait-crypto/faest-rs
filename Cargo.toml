@@ -40,7 +40,7 @@ bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
 generic-tests = "0.1"
-hex = "0.4"
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
 nist-pqc-seeded-rng = { version = "0.2.1", default-features = false }
 rand = { version = "0.8", default-features = false }
 serde = { version = "1", features = ["derive"] }
