@@ -462,10 +462,8 @@ mod test {
                     let r = GenericArray::from_slice(&r[..16]);
 
                     if data.mode == "s" {
-                        println!("FAEST-128s - testing VOLE..");
                         vole_check::<OWF128, BAVC128Small>(data, r);
                     } else {
-                        println!("FAEST-128f - testing VOLE..");
                         vole_check::<OWF128, BAVC128Fast>(data, r);
                     }
                 }
@@ -474,20 +472,16 @@ mod test {
                     let r = GenericArray::from_slice(&r[..24]);
 
                     if data.mode == "s" {
-                        println!("FAEST-192s - testing VOLE..");
                         vole_check::<OWF192, BAVC192Small>(data, r);
                     } else {
-                        println!("FAEST-192f - testing VOLE..");
                         vole_check::<OWF192, BAVC192Fast>(data, r);
                     }
                 }
 
                 _ => {
                     if data.mode == "s" {
-                        println!("FAEST-256s - testing VOLE..");
                         vole_check::<OWF256, BAVC256Small>(data, &r);
                     } else {
-                        println!("FAEST-256f - testing VOLE..");
                         vole_check::<OWF256, BAVC256Fast>(data, &r);
                     }
                 }
@@ -511,10 +505,8 @@ mod test {
                     let r = GenericArray::from_slice(&r[..16]);
 
                     if data.mode == "s" {
-                        println!("FAEST-EM-128s - testing VOLE..");
                         vole_check::<OWF128EM, BAVC128SmallEM>(data, r);
                     } else {
-                        println!("FAEST-EM-128f - testing VOLE..");
                         vole_check::<OWF128EM, BAVC128FastEM>(data, r);
                     }
                 }
@@ -523,20 +515,16 @@ mod test {
                     let r = GenericArray::from_slice(&r[..24]);
 
                     if data.mode == "s" {
-                        println!("FAEST-EM-192s - testing VOLE..");
                         vole_check::<OWF192EM, BAVC192SmallEM>(data, r);
                     } else {
-                        println!("FAEST-EM-192s - testing VOLE..");
                         vole_check::<OWF192EM, BAVC192FastEM>(data, r);
                     }
                 }
 
                 _ => {
                     if data.mode == "s" {
-                        println!("FAEST-EM-256s - testing VOLE..");
                         vole_check::<OWF256EM, BAVC256SmallEM>(data, &r);
                     } else {
-                        println!("FAEST-EM-256f - testing VOLE..");
                         vole_check::<OWF256EM, BAVC256FastEM>(data, &r);
                     }
                 }

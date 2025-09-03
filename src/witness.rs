@@ -200,7 +200,6 @@ mod test {
         fn extend_witness_test(&self) -> bool {
             match self.lambda {
                 128 => {
-                    println!("AES-128 - testing witness extension..");
                     let wit = OWF128::<GF128>::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
@@ -208,7 +207,6 @@ mod test {
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 192 => {
-                    println!("AES-192 - testing witness extension..");
                     let wit = OWF192::<GF192>::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
@@ -216,7 +214,6 @@ mod test {
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 _ => {
-                    println!("AES-256 - testing witness extension..");
                     let wit = OWF256::<GF256>::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
@@ -229,7 +226,6 @@ mod test {
         fn extend_witness_test_em(&self) -> bool {
             match self.lambda {
                 128 => {
-                    println!("AES-EM-128 - testing witness extension..");
                     let wit = OWF128EM::<GF128>::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
@@ -237,7 +233,6 @@ mod test {
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 192 => {
-                    println!("AES-EM-192 - testing witness extension..");
                     let wit = OWF192EM::<GF192>::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
@@ -245,7 +240,6 @@ mod test {
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 _ => {
-                    println!("AES-EM-256 - testing witness extension..");
                     let wit = OWF256EM::<GF256>::extendwitness(
                         GenericArray::from_slice(&self.key),
                         GenericArray::from_slice(&self.input),
