@@ -56,6 +56,7 @@ randomized-signer = ["signature/rand_core"]
 # provide serialization via serde
 serde = ["dep:serde", "generic-array/serde"]
 # enable SIMD optimization implementations
+# (opt-simd currently implies an x86(-64) machine, so no_std doesn't make too much sense)
 opt-simd = ["std"]
 # provide C interface via cargo-c
 capi = ["dep:rand", "dep:libc", "dep:zeroize", "rand/std_rng", "rand/std"]

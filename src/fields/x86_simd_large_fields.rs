@@ -1,10 +1,10 @@
 /// Implementation of the binary fields with 128, 192 and 256 bit based on SSE2/AVX2 and the clmul instruction
 
 #[cfg(target_arch = "x86")]
-use core::arch::x86 as x86_64;
+use std::arch::x86 as x86_64;
 #[cfg(target_arch = "x86_64")]
-use core::arch::x86_64;
-use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::arch::x86_64;
+use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use x86_64::{
     __m128i, __m256i, _mm_alignr_epi8, _mm_and_si128, _mm_andnot_si128, _mm_bslli_si128,
     _mm_bsrli_si128, _mm_clmulepi64_si128, _mm_cmpeq_epi32, _mm_loadu_si128, _mm_or_si128,
