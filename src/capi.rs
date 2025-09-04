@@ -95,7 +95,7 @@ macro_rules! define_capi_impl {
                 };
                 let signature = unsafe { slice::from_raw_parts_mut(signature, [<$prefix $bits $param:lower>]::SIGNATURE_SIZE) };
 
-                if let Ok(sk) = [<$prefix $bits $param:lower SigningKey>]::try_from(sk) {
+                [<$prefix $bits $param:lower SigningKey>]::try_from(sk).map(|sk| {
                     let rho = [<$prefix $bits $param:lower>]::sample_rho(rand::thread_rng());
                     [<$prefix $bits $param:lower>]::sign(
                         msg,
@@ -107,9 +107,7 @@ macro_rules! define_capi_impl {
                         unsafe { *signature_len = [<$prefix $bits $param:lower>]::SIGNATURE_SIZE };
                         0
                     })
-                } else {
-                    -1
-                }
+                }).unwrap_or(-1)
             }
 
             fn [<$prefix_c:lower _ $bits $param:lower _sign_with_randomness_impl>](
@@ -144,16 +142,14 @@ macro_rules! define_capi_impl {
                 };
                 let signature = unsafe { slice::from_raw_parts_mut(signature, [<$prefix $bits $param:lower>]::SIGNATURE_SIZE) };
 
-                if let Ok(sk) = [<$prefix $bits $param:lower SigningKey>]::try_from(sk) {
+                [<$prefix $bits $param:lower SigningKey>]::try_from(sk).map(|sk| {
                     [<$prefix $bits $param:lower>]::sign(msg, &sk.0, rho, GenericArray::from_mut_slice(signature)).map_to_error_code(
                         |_| {
                             unsafe { *signature_len = [<$prefix $bits $param:lower>]::SIGNATURE_SIZE };
                             0
-                        },
+                        }
                     )
-                } else {
-                    -1
-                }
+                }).unwrap_or(-1)
             }
 
             fn [<$prefix_c:lower _ $bits $param:lower _verify_impl>](
@@ -179,11 +175,9 @@ macro_rules! define_capi_impl {
                 };
                 let signature = unsafe { slice::from_raw_parts(signature, [<$prefix $bits $param:lower>]::SIGNATURE_SIZE) };
 
-                if let Ok(pk) = [<$prefix $bits $param:lower VerificationKey>]::try_from(pk) {
+                [<$prefix $bits $param:lower VerificationKey>]::try_from(pk).map(|pk| {
                     [<$prefix $bits $param:lower>]::verify(msg, &pk.0, GenericArray::from_slice(signature)).to_error_code()
-                } else {
-                    -1
-                }
+                }).unwrap_or(-1)
             }
 
             #[cfg(test)]
