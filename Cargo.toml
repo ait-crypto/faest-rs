@@ -34,7 +34,6 @@ zeroize = { version = "1.2", optional = true, default-features = false, features
 ] }
 paste = "1"
 itertools = { version = "0.14", default-features = false }
-cfg-if = "1.0.0"
 libc = { version = "0.2", optional = true, default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 
