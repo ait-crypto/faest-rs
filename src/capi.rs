@@ -13,10 +13,9 @@ use core::{ffi::c_int, slice};
 use generic_array::GenericArray;
 use libc::size_t;
 use paste::paste;
-use signature::Keypair;
 use zeroize::Zeroize;
 
-use crate::{ByteEncoding, KeypairGenerator};
+use crate::{ByteEncoding, Error, Keypair, KeypairGenerator};
 
 /// Internal helper trait to map `Result`s to error codes
 trait ResultToErrroCode: Sized {
@@ -29,7 +28,7 @@ trait ResultToErrroCode: Sized {
         F: FnOnce(()) -> c_int;
 }
 
-impl ResultToErrroCode for Result<(), signature::Error> {
+impl ResultToErrroCode for Result<(), Error> {
     fn to_error_code(self) -> c_int {
         self.map(|_| 0).unwrap_or(-1)
     }
