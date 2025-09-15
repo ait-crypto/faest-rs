@@ -12,7 +12,7 @@ use core::{ffi::c_int, slice};
 
 use generic_array::GenericArray;
 use libc::size_t;
-use paste::paste;
+use pastey::paste;
 use zeroize::Zeroize;
 
 use crate::{ByteEncoding, Error, Keypair, KeypairGenerator};

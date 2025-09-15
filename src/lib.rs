@@ -89,7 +89,7 @@ extern crate alloc;
 use alloc::{boxed::Box, vec::Vec};
 
 use generic_array::{GenericArray, typenum::Unsigned};
-use paste::paste;
+use pastey::paste;
 use rand_core::CryptoRngCore;
 #[cfg(any(feature = "randomized-signer", feature = "capi"))]
 use rand_core::RngCore;
