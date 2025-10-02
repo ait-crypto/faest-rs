@@ -173,22 +173,27 @@ pub trait ByteEncoding: Clone + Sized + for<'a> TryFrom<&'a [u8]> + TryInto<Self
     fn encoded_len(&self) -> usize;
 }
 
+#[cfg(all(
+    feature = "opt-simd",
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+))]
+use parameter::x86_simd;
+
+cpufeatures::new!(x86_intrinsics, "avx2", "pclmulqdq");
+
 macro_rules! define_impl {
     ($param:ident) => {
         paste! {
             struct $param;
 
             impl $param {
-                cfg_if::cfg_if!(
-                    if #[cfg(feature="capi")] {
-                // TODO: Implement C interfaces for EM version and remove #[allow(dead_code)]
-                #[allow(dead_code)]
+                #[cfg(feature="capi")]
                 const SIGNATURE_SIZE: usize = <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE;
-                #[allow(dead_code)]
+                #[cfg(feature="capi")]
                 const SK_SIZE: usize = <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE;
-                #[allow(dead_code)]
+                #[cfg(feature="capi")]
                 const PK_SIZE: usize = <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE;
-                    });
 
                 #[cfg(any(feature="randomized-signer", feature="capi"))]
                 fn sample_rho<R: RngCore>(mut rng: R) -> GenericArray<
@@ -206,7 +211,12 @@ macro_rules! define_impl {
                     rho: &[u8],
                     signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
                 ) -> Result<(), Error> {
-                    faest_sign::<[<$param Parameters>]>(msg, sk, rho, signature)
+                    if x86_intrinsics::get() {
+                        let sk: &SecretKey<<x86_simd::[<$param Parameters>] as FAESTParameters>::OWF> = unsafe { core::mem::transmute(sk) };
+                        faest_sign::<x86_simd::[<$param Parameters>]>(msg, sk, rho, signature)
+                    }else{
+                        faest_sign::<[<$param Parameters>]>(msg, sk, rho, signature)
+                    }
                 }
 
                 #[inline]
@@ -216,7 +226,12 @@ macro_rules! define_impl {
                     rho: &[u8],
                     signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
                 ) -> Result<(), Error>  {
-                    faest_unpacked_sign::<[<$param Parameters>]>(msg, sk, rho, signature)
+                    if x86_intrinsics::get() {
+                        let sk: &UnpackedSecretKey<<x86_simd::[<$param Parameters>] as FAESTParameters>::OWF> = unsafe { core::mem::transmute(sk) };
+                        faest_unpacked_sign::<x86_simd::[<$param Parameters>]>(msg, sk, rho, signature)
+                    }else{
+                        faest_unpacked_sign::<[<$param Parameters>]>(msg, sk, rho, signature)
+                    }
                 }
 
                 #[inline]
@@ -226,7 +241,12 @@ macro_rules! define_impl {
                     sigma: &GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
                 ) -> Result<(), Error>
                 {
-                    faest_verify::<[<$param Parameters>]>(msg, pk, sigma)
+                    if x86_intrinsics::get() {
+                        let pk: &PublicKey<<x86_simd::[<$param Parameters>] as FAESTParameters>::OWF> = unsafe { core::mem::transmute(pk) };
+                        faest_verify::<x86_simd::[<$param Parameters>]>(msg, pk, sigma)
+                    }else{
+                        faest_verify::<[<$param Parameters>]>(msg, pk, sigma)
+                    }
                 }
             }
 

@@ -28,7 +28,6 @@ use rand_core::RngCore;
     any(target_arch = "x86", target_arch = "x86_64"),
     not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
 ))]
-use crate::fields::Field;
 use crate::{
     bavc::{
         BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast, BAVC192FastEM,
@@ -51,42 +50,33 @@ use crate::{
     any(target_arch = "x86", target_arch = "x86_64"),
     not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
 ))]
-mod x86_simd {
-    use std::sync::LazyLock;
+pub(crate) mod x86_simd {
+    // use std::sync::LazyLock;
 
-    use super::{
-        BaseParams128, BaseParams192, BaseParams256, OWF128, OWF128EM, OWF192, OWF192EM, OWF256,
-        OWF256EM,
-    };
     use crate::fields::{
         // AVX2-optimized field implementatons
-        x86_simd_large_fields::{GF128 as SimdGF128, GF192 as SimdGF192, GF256 as SimdGF256},
+        x86_simd_large_fields::{GF128, GF192, GF256},
     };
 
-    /// Weather AVX2 support is detected at runtime
-    pub(crate) static AVX2_DYNAMIC_DISPATCH_AVAILABLE: LazyLock<bool> =
-        LazyLock::new(|| is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq"));
+    // FAESTParameters with optimized field implementation
+    pub(crate) type FAEST128sParameters = super::FAEST128sParameters<GF128>;
+    pub(crate) type FAEST128fParameters = super::FAEST128fParameters<GF128>;
 
-    // BaseParameters with optimized field implementation
-    pub(crate) type SimdBaseParams128 = BaseParams128<SimdGF128>;
-    pub(crate) type SimdBaseParams192 = BaseParams192<SimdGF192>;
-    pub(crate) type SimdBaseParams256 = BaseParams256<SimdGF256>;
+    pub(crate) type FAEST192sParameters = super::FAEST192sParameters<GF192>;
+    pub(crate) type FAEST192fParameters = super::FAEST192fParameters<GF192>;
 
-    // OWFParameters with optimized field implementation
-    pub(crate) type SimdOWF128 = OWF128<SimdGF128>;
-    pub(crate) type SimdOWF192 = OWF192<SimdGF192>;
-    pub(crate) type SimdOWF256 = OWF256<SimdGF256>;
-    pub(crate) type SimdOWF128EM = OWF128EM<SimdGF128>;
-    pub(crate) type SimdOWF192EM = OWF192EM<SimdGF192>;
-    pub(crate) type SimdOWF256EM = OWF256EM<SimdGF256>;
+    pub(crate) type FAEST256sParameters = super::FAEST256sParameters<GF256>;
+    pub(crate) type FAEST256fParameters = super::FAEST256fParameters<GF256>;
+
+    pub(crate) type FAESTEM128sParameters = super::FAESTEM128sParameters<GF128>;
+    pub(crate) type FAESTEM128fParameters = super::FAESTEM128fParameters<GF128>;
+
+    pub(crate) type FAESTEM192sParameters = super::FAESTEM192sParameters<GF192>;
+    pub(crate) type FAESTEM192fParameters = super::FAESTEM192fParameters<GF192>;
+
+    pub(crate) type FAESTEM256sParameters = super::FAESTEM256sParameters<GF256>;
+    pub(crate) type FAESTEM256fParameters = super::FAESTEM256fParameters<GF256>;
 }
-
-#[cfg(all(
-    feature = "opt-simd",
-    any(target_arch = "x86", target_arch = "x86_64"),
-    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-))]
-pub(crate) use x86_simd::*;
 
 // FAEST signature sizes
 type U4506 = Sum<Prod<U4, U1000>, U506>;
@@ -147,22 +137,6 @@ macro_rules! define_owf_proof {
             pk: &PublicKey<Self>,
             chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
         ) -> QSProof<Self> {
-            #[cfg(all(
-                feature = "opt-simd",
-                any(target_arch = "x86", target_arch = "x86_64"),
-                not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-            ))]
-            if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-                // SAFETY: call to `core::mem::transmute` is safe because `PublicKey` only depends on
-                // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-                let pk: &PublicKey<$opt_owf> = unsafe { core::mem::transmute(pk) };
-                let qs_proof = aes_prove::<$opt_owf>(w, u, v, pk, chall_2);
-                return (
-                    OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
-                    OWFField::<Self>::from(qs_proof.1.as_bytes().as_slice()),
-                    OWFField::<Self>::from(qs_proof.2.as_bytes().as_slice()),
-                );
-            }
             aes_prove::<Self>(w, u, v, pk, chall_2)
         }
     };
@@ -183,18 +157,6 @@ macro_rules! define_owf_verify {
             a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
             a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
         ) -> OWFField<Self> {
-            #[cfg(all(
-                feature = "opt-simd",
-                any(target_arch = "x86", target_arch = "x86_64"),
-                not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-            ))]
-            if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-                // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
-                // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-                let pk: &PublicKey<$opt_owf> = unsafe { std::mem::transmute(pk) };
-                let chall3 = aes_verify::<$opt_owf>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde);
-                return OWFField::<Self>::from(chall3.as_bytes().as_slice());
-            }
             aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
         }
     };
@@ -330,10 +292,6 @@ where
             any(target_arch = "x86", target_arch = "x86_64"),
             not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
         ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_v_matrix::<SimdBaseParams128>(h2_hasher, v, chall1);
-            return;
-        }
         hash_v_matrix::<Self>(h2_hasher, v, chall1);
     }
 
@@ -342,15 +300,6 @@ where
         u: &GenericArray<u8, impl ArrayLength>,
         chall1: &GenericArray<u8, Self::Chall1>,
     ) {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_u_vector::<SimdBaseParams128>(signature_u, u, chall1);
-            return;
-        }
         hash_u_vector::<Self>(signature_u, u, chall1);
     }
 
@@ -361,21 +310,6 @@ where
         chall1: &GenericArray<u8, Self::Chall1>,
         decoded_chall3_iter: impl Iterator<Item = u8>,
     ) {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_q_matrix::<SimdBaseParams128>(
-                h2_hasher,
-                q,
-                u_tilde_sig,
-                chall1,
-                decoded_chall3_iter,
-            );
-            return;
-        }
         hash_q_matrix::<Self>(h2_hasher, q, u_tilde_sig, chall1, decoded_chall3_iter);
     }
 }
@@ -406,15 +340,6 @@ where
         v: &[GenericArray<u8, impl ArrayLength>],
         chall1: &GenericArray<u8, Self::Chall1>,
     ) {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_v_matrix::<SimdBaseParams192>(h2_hasher, v, chall1);
-            return;
-        }
         hash_v_matrix::<Self>(h2_hasher, v, chall1);
     }
 
@@ -423,15 +348,6 @@ where
         u: &GenericArray<u8, impl ArrayLength>,
         chall1: &GenericArray<u8, Self::Chall1>,
     ) {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_u_vector::<SimdBaseParams192>(signature_u, u, chall1);
-            return;
-        }
         hash_u_vector::<Self>(signature_u, u, chall1);
     }
 
@@ -442,21 +358,6 @@ where
         chall1: &GenericArray<u8, Self::Chall1>,
         decoded_chall3_iter: impl Iterator<Item = u8>,
     ) {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_q_matrix::<SimdBaseParams192>(
-                h2_hasher,
-                q,
-                u_tilde_sig,
-                chall1,
-                decoded_chall3_iter,
-            );
-            return;
-        }
         hash_q_matrix::<Self>(h2_hasher, q, u_tilde_sig, chall1, decoded_chall3_iter);
     }
 }
@@ -487,15 +388,6 @@ where
         v: &[GenericArray<u8, impl ArrayLength>],
         chall1: &GenericArray<u8, Self::Chall1>,
     ) {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_v_matrix::<SimdBaseParams256>(h2_hasher, v, chall1);
-            return;
-        }
         hash_v_matrix::<Self>(h2_hasher, v, chall1);
     }
 
@@ -504,15 +396,6 @@ where
         u: &GenericArray<u8, impl ArrayLength>,
         chall1: &GenericArray<u8, Self::Chall1>,
     ) {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_u_vector::<SimdBaseParams256>(signature_u, u, chall1);
-            return;
-        }
         hash_u_vector::<Self>(signature_u, u, chall1);
     }
 
@@ -523,21 +406,6 @@ where
         chall1: &GenericArray<u8, Self::Chall1>,
         decoded_chall3_iter: impl Iterator<Item = u8>,
     ) {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-            hash_q_matrix::<SimdBaseParams256>(
-                h2_hasher,
-                q,
-                u_tilde_sig,
-                chall1,
-                decoded_chall3_iter,
-            );
-            return;
-        }
         hash_q_matrix::<Self>(h2_hasher, q, u_tilde_sig, chall1, decoded_chall3_iter);
     }
 }
@@ -735,8 +603,8 @@ where
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    define_owf_proof!(opt_owf = SimdOWF128);
-    define_owf_verify!(opt_owf = SimdOWF128);
+    define_owf_proof!(opt_owf = x86_simd::OWF128);
+    define_owf_verify!(opt_owf = x86_simd::OWF128);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -804,8 +672,8 @@ where
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    define_owf_proof!(opt_owf = SimdOWF192);
-    define_owf_verify!(opt_owf = SimdOWF192);
+    define_owf_proof!(opt_owf = x86_simd::OWF192);
+    define_owf_verify!(opt_owf = x86_simd::OWF192);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -873,8 +741,8 @@ where
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    define_owf_proof!(opt_owf = SimdOWF256);
-    define_owf_verify!(opt_owf = SimdOWF256);
+    define_owf_proof!(opt_owf = x86_simd::OWF256);
+    define_owf_verify!(opt_owf = x86_simd::OWF256);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -940,8 +808,8 @@ where
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    define_owf_proof!(opt_owf = SimdOWF128EM);
-    define_owf_verify!(opt_owf = SimdOWF128EM);
+    define_owf_proof!(opt_owf = x86_simd::OWF128EM);
+    define_owf_verify!(opt_owf = x86_simd::OWF128EM);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1011,8 +879,8 @@ where
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    define_owf_proof!(opt_owf = SimdOWF192EM);
-    define_owf_verify!(opt_owf = SimdOWF192EM);
+    define_owf_proof!(opt_owf = x86_simd::OWF192EM);
+    define_owf_verify!(opt_owf = x86_simd::OWF192EM);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1080,8 +948,8 @@ where
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    define_owf_proof!(opt_owf = SimdOWF256EM);
-    define_owf_verify!(opt_owf = SimdOWF256EM);
+    define_owf_proof!(opt_owf = x86_simd::OWF256EM);
+    define_owf_verify!(opt_owf = x86_simd::OWF256EM);
 }
 
 pub(crate) trait TauParameters {
@@ -1342,10 +1210,13 @@ pub(crate) trait FAESTParameters {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FAEST128sParameters;
+pub(crate) struct FAEST128sParameters<F = GF128>(PhantomData<F>);
 
-impl FAESTParameters for FAEST128sParameters {
-    type OWF = OWF128;
+impl<F> FAESTParameters for FAEST128sParameters<F>
+where
+    F: BigGaloisField<Length = U16>,
+{
+    type OWF = OWF128<F>;
     type Tau = Tau128Small;
     type BAVC = BAVC128Small;
     type WGRIND = U7;
@@ -1353,10 +1224,13 @@ impl FAESTParameters for FAEST128sParameters {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FAEST128fParameters;
+pub(crate) struct FAEST128fParameters<F = GF128>(PhantomData<F>);
 
-impl FAESTParameters for FAEST128fParameters {
-    type OWF = OWF128;
+impl<F> FAESTParameters for FAEST128fParameters<F>
+where
+    F: BigGaloisField<Length = U16>,
+{
+    type OWF = OWF128<F>;
     type Tau = Tau128Fast;
     type BAVC = BAVC128Fast;
     type WGRIND = U8;
@@ -1364,10 +1238,13 @@ impl FAESTParameters for FAEST128fParameters {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FAEST192sParameters;
+pub(crate) struct FAEST192sParameters<F = GF192>(PhantomData<F>);
 
-impl FAESTParameters for FAEST192sParameters {
-    type OWF = OWF192;
+impl<F> FAESTParameters for FAEST192sParameters<F>
+where
+    F: BigGaloisField<Length = U24>,
+{
+    type OWF = OWF192<F>;
     type Tau = Tau192Small;
     type BAVC = BAVC192Small;
     type WGRIND = U12;
@@ -1375,10 +1252,13 @@ impl FAESTParameters for FAEST192sParameters {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FAEST192fParameters;
+pub(crate) struct FAEST192fParameters<F = GF192>(PhantomData<F>);
 
-impl FAESTParameters for FAEST192fParameters {
-    type OWF = OWF192;
+impl<F> FAESTParameters for FAEST192fParameters<F>
+where
+    F: BigGaloisField<Length = U24>,
+{
+    type OWF = OWF192<F>;
     type Tau = Tau192Fast;
     type BAVC = BAVC192Fast;
     type WGRIND = U8;
@@ -1386,10 +1266,13 @@ impl FAESTParameters for FAEST192fParameters {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FAEST256sParameters;
+pub(crate) struct FAEST256sParameters<F = GF256>(PhantomData<F>);
 
-impl FAESTParameters for FAEST256sParameters {
-    type OWF = OWF256;
+impl<F> FAESTParameters for FAEST256sParameters<F>
+where
+    F: BigGaloisField<Length = U32>,
+{
+    type OWF = OWF256<F>;
     type Tau = Tau256Small;
     type BAVC = BAVC256Small;
     type WGRIND = U6;
@@ -1397,10 +1280,13 @@ impl FAESTParameters for FAEST256sParameters {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FAEST256fParameters;
+pub(crate) struct FAEST256fParameters<F = GF256>(PhantomData<F>);
 
-impl FAESTParameters for FAEST256fParameters {
-    type OWF = OWF256;
+impl<F> FAESTParameters for FAEST256fParameters<F>
+where
+    F: BigGaloisField<Length = U32>,
+{
+    type OWF = OWF256<F>;
     type Tau = Tau256Fast;
     type BAVC = BAVC256Fast;
     type WGRIND = U8;
@@ -1408,10 +1294,13 @@ impl FAESTParameters for FAEST256fParameters {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FAESTEM128sParameters;
+pub(crate) struct FAESTEM128sParameters<F = GF128>(PhantomData<F>);
 
-impl FAESTParameters for FAESTEM128sParameters {
-    type OWF = OWF128EM;
+impl<F> FAESTParameters for FAESTEM128sParameters<F>
+where
+    F: BigGaloisField<Length = U16>,
+{
+    type OWF = OWF128EM<F>;
     type Tau = Tau128SmallEM;
     type BAVC = BAVC128SmallEM;
     type WGRIND = U7;
@@ -1419,10 +1308,13 @@ impl FAESTParameters for FAESTEM128sParameters {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FAESTEM128fParameters;
+pub(crate) struct FAESTEM128fParameters<F = GF128>(PhantomData<F>);
 
-impl FAESTParameters for FAESTEM128fParameters {
-    type OWF = OWF128EM;
+impl<F> FAESTParameters for FAESTEM128fParameters<F>
+where
+    F: BigGaloisField<Length = U16>,
+{
+    type OWF = OWF128EM<F>;
     type Tau = Tau128FastEM;
     type BAVC = BAVC128FastEM;
     type WGRIND = U8;
@@ -1430,10 +1322,13 @@ impl FAESTParameters for FAESTEM128fParameters {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FAESTEM192sParameters;
+pub(crate) struct FAESTEM192sParameters<F = GF192>(PhantomData<F>);
 
-impl FAESTParameters for FAESTEM192sParameters {
-    type OWF = OWF192EM;
+impl<F> FAESTParameters for FAESTEM192sParameters<F>
+where
+    F: BigGaloisField<Length = U24>,
+{
+    type OWF = OWF192EM<F>;
     type Tau = Tau192SmallEM;
     type BAVC = BAVC192SmallEM;
     type WGRIND = U8;
@@ -1441,10 +1336,13 @@ impl FAESTParameters for FAESTEM192sParameters {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FAESTEM192fParameters;
+pub(crate) struct FAESTEM192fParameters<F = GF192>(PhantomData<F>);
 
-impl FAESTParameters for FAESTEM192fParameters {
-    type OWF = OWF192EM;
+impl<F> FAESTParameters for FAESTEM192fParameters<F>
+where
+    F: BigGaloisField<Length = U24>,
+{
+    type OWF = OWF192EM<F>;
     type Tau = Tau192FastEM;
     type BAVC = BAVC192FastEM;
     type WGRIND = U8;
@@ -1452,10 +1350,13 @@ impl FAESTParameters for FAESTEM192fParameters {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FAESTEM256sParameters;
+pub(crate) struct FAESTEM256sParameters<F = GF256>(PhantomData<F>);
 
-impl FAESTParameters for FAESTEM256sParameters {
-    type OWF = OWF256EM;
+impl<F> FAESTParameters for FAESTEM256sParameters<F>
+where
+    F: BigGaloisField<Length = U32>,
+{
+    type OWF = OWF256EM<F>;
     type Tau = Tau256SmallEM;
     type BAVC = BAVC256SmallEM;
     type WGRIND = U6;
@@ -1463,10 +1364,13 @@ impl FAESTParameters for FAESTEM256sParameters {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FAESTEM256fParameters;
+pub(crate) struct FAESTEM256fParameters<F = GF256>(PhantomData<F>);
 
-impl FAESTParameters for FAESTEM256fParameters {
-    type OWF = OWF256EM;
+impl<F> FAESTParameters for FAESTEM256fParameters<F>
+where
+    F: BigGaloisField<Length = U32>,
+{
+    type OWF = OWF256EM<F>;
     type Tau = Tau256FastEM;
     type BAVC = BAVC256FastEM;
     type WGRIND = U8;
