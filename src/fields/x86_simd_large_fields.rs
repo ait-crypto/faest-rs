@@ -2083,9 +2083,6 @@ impl Mul<&GF128> for GF384 {
 }
 
 impl ExtensionField for GF384 {
-    const ZERO: Self = Self(u64_as_m256(0), u64_as_m128(0));
-    const ONE: Self = Self(u64_as_m256(1), u64_as_m128(0));
-
     type Length = U48;
 
     type BaseField = GF128;
@@ -2379,9 +2376,6 @@ impl Mul<&GF192> for GF576 {
 }
 
 impl ExtensionField for GF576 {
-    const ZERO: Self = Self(u64_as_m256(0), u64_as_m256(0), 0);
-    const ONE: Self = Self(u64_as_m256(1), u64_as_m256(0), 0);
-
     type Length = U72;
 
     type BaseField = GF192;
@@ -2708,9 +2702,6 @@ impl Mul<&GF256> for GF768 {
 }
 
 impl ExtensionField for GF768 {
-    const ZERO: Self = Self(u64_as_m256(0), u64_as_m256(0), u64_as_m256(0));
-    const ONE: Self = Self(u64_as_m256(1), u64_as_m256(0), u64_as_m256(0));
-
     type Length = U96;
 
     type BaseField = GF256;
@@ -2735,18 +2726,16 @@ mod test {
     mod field_ops {
         use super::*;
 
-        use std::fmt::Debug;
-
         use rand::{
             Rng, RngCore,
             distributions::{Distribution, Standard},
         };
 
         #[test]
-        fn add<Fu, F: BigGaloisField + Debug + Eq>()
+        fn add<Fu, F: BigGaloisField>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length>,
         {
             let mut rng = rand::thread_rng();
 
@@ -2771,10 +2760,10 @@ mod test {
         }
 
         #[test]
-        fn mul<Fu, F: BigGaloisField + Debug + Eq>()
+        fn mul<Fu, F: BigGaloisField>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length>,
         {
             let mut rng = rand::thread_rng();
 
@@ -2802,10 +2791,10 @@ mod test {
         }
 
         #[test]
-        fn mul_u64<Fu, F: BigGaloisField + Debug + Eq>()
+        fn mul_u64<Fu, F: BigGaloisField>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length>,
         {
             let mut rng = rand::thread_rng();
 
@@ -2828,10 +2817,10 @@ mod test {
         }
 
         #[test]
-        fn mul_u8<Fu, F: BigGaloisField + Debug + Eq>()
+        fn mul_u8<Fu, F: BigGaloisField>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length>,
         {
             let mut rng = rand::thread_rng();
 
@@ -2850,10 +2839,10 @@ mod test {
         }
 
         #[test]
-        fn double<Fu, F: BigGaloisField + Debug + Eq>()
+        fn double<Fu, F: BigGaloisField>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length>,
         {
             let mut rng = rand::thread_rng();
 
@@ -2884,7 +2873,7 @@ mod test {
     mod big_gf_ops {
         use super::*;
 
-        use std::{fmt::Debug, iter::zip};
+        use core::iter::zip;
 
         use rand::{
             Rng,
@@ -2892,10 +2881,10 @@ mod test {
         };
 
         #[test]
-        fn byte_combine_sq<Fu, F: BigGaloisField + Debug + Eq>()
+        fn byte_combine_sq<Fu, F: BigGaloisField>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length>,
         {
             let mut rng = rand::thread_rng();
 
@@ -2927,10 +2916,10 @@ mod test {
         }
 
         #[test]
-        fn constants<Fu, F: BigGaloisField + Alphas + Debug + Eq>()
+        fn constants<Fu, F: BigGaloisField + Alphas>()
         where
             Standard: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length> + Alphas + Debug + Eq,
+            Fu: BigGaloisField<Length = F::Length> + Alphas,
         {
             for (x, y) in zip(F::ALPHA, Fu::ALPHA) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
@@ -2963,8 +2952,6 @@ mod test {
     mod extended_fields {
         use super::*;
 
-        use std::fmt::Debug;
-
         use rand::{
             Rng,
             distributions::{Distribution, Standard},
@@ -2976,8 +2963,8 @@ mod test {
         fn add<Fu, F>()
         where
             Standard: Distribution<Fu>,
-            Fu: ExtensionField + Debug + Eq + Copy,
-            for<'a> F: ExtensionField<Length = Fu::Length> + Debug + Eq + From<&'a [u8]> + Copy,
+            Fu: ExtensionField + Copy,
+            for<'a> F: ExtensionField<Length = Fu::Length> + From<&'a [u8]> + Copy,
         {
             let mut rng = rand::thread_rng();
 
@@ -3002,10 +2989,8 @@ mod test {
         fn mul<Fu, F>()
         where
             Standard: Distribution<Fu> + Distribution<Fu::BaseField>,
-            Fu: ExtensionField + Debug + Eq + Copy,
+            Fu: ExtensionField + Copy,
             for<'a> F: ExtensionField<Length = Fu::Length, BaseField: From<&'a [u8]>>
-                + Debug
-                + Eq
                 + From<&'a [u8]>
                 + Copy,
         {
@@ -3028,10 +3013,8 @@ mod test {
         fn serialization<Fu, F>()
         where
             Standard: Distribution<Fu> + Distribution<Fu::BaseField>,
-            Fu: ExtensionField + Debug + Eq + Copy,
+            Fu: ExtensionField + Copy,
             for<'a> F: ExtensionField<Length = Fu::Length, BaseField: From<&'a [u8]>>
-                + Debug
-                + Eq
                 + From<&'a [u8]>
                 + Copy,
         {
@@ -3057,28 +3040,5 @@ mod test {
 
         #[instantiate_tests(<UnoptimizedGF768, GF768>)]
         mod gf768 {}
-    }
-
-    #[test]
-    fn bench() {
-        use rand::Rng;
-
-        let mut rng = rand::thread_rng();
-
-        let x: [__m128i; 6] = std::array::from_fn(|_| u128_as_m128(rng.r#gen::<u128>()));
-
-        let t = std::time::Instant::now();
-        for _ in 0..100_000 {
-            std::hint::black_box(unsafe { poly768_reduce576(std::hint::black_box(x)) });
-        }
-        let t = t.elapsed();
-        println!("reduce took: {t:?}");
-
-        // let t = std::time::Instant::now();
-        // for _ in 0..100_000 {
-        //     std::hint::black_box(unsafe { poly768_reduce576_2(std::hint::black_box(x)) });
-        // }
-        // let t = t.elapsed();
-        // println!("reduce_2 took: {t:?}");
     }
 }

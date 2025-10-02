@@ -18,36 +18,49 @@ jobs:
     runs-on: ${{matrix.runner}}
     name: Test with Rust ${{matrix.toolchain}} toolchain on ${{matrix.runner}}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{matrix.toolchain}}
       - uses: Swatinem/rust-cache@v2
-      - name: Install cargo-nextest
-        run: cargo install cargo-nextest
       - name: Test without default features
-        run: cargo nextest run -r --no-default-features --workspace
+        run: cargo test -r --no-default-features --workspace
       - name: Test with default features
-        run: cargo nextest run -r --workspace
+        run: cargo test -r --workspace
       - name: Test with all features
-        run: cargo nextest run -r --all-features --workspace
+        run: cargo test -r --all-features --workspace
 
   test-native:
     needs: test
     runs-on: ubuntu-latest
     name: Test with target-cpu=native
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
-      - name: Install cargo-nextest
-        run: cargo install cargo-nextest
       - name: Test with all features
-        run: cargo nextest run -r --all-features --workspace
+        run: cargo test -r --all-features --workspace
     env:
       RUSTFLAGS: "-C target-cpu=native"
+
+  test-capi:
+    needs: test
+    runs-on: ubuntu-latest
+    name: Test with cargo-c
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-c
+        run: cargo install cargo-c
+      - name: Test with capi
+        run: cargo test -r --features=capi
+      - name: Build with cargo-c
+        run: cargo cbuild -r
 
   test-cross:
     needs: test
@@ -60,7 +73,7 @@ jobs:
           - s390x-unknown-linux-gnu
     name: Cross test for ${{matrix.target}}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{matrix.target}}
@@ -76,7 +89,7 @@ jobs:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -87,7 +100,7 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy

@@ -1,5 +1,6 @@
-use std::{
+use core::{
     array,
+    fmt::Debug,
     iter::zip,
     ops::{Add, Mul},
 };
@@ -166,7 +167,7 @@ where
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Init part
 pub(crate) trait ZKHasherInit<F>
 where
-    F: BigGaloisField + std::fmt::Debug,
+    F: BigGaloisField + Debug,
 {
     type SDLength: ArrayLength;
 
@@ -257,7 +258,7 @@ where
 
 impl<F> ZKProofHasher<F>
 where
-    F: BigGaloisField + PartialEq + std::fmt::Debug,
+    F: BigGaloisField + PartialEq + Debug,
 {
     pub(crate) const fn new(
         a0_hasher: ZKHasher<F>,
@@ -514,6 +515,9 @@ impl LeafHasher for LeafHasher256 {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::vec::Vec;
 
     use generic_array::GenericArray;
     use serde::{Deserialize, de::DeserializeOwned};

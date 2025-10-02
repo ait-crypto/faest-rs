@@ -1,7 +1,11 @@
-use std::{
+use core::{
     iter::zip,
+    mem,
     ops::{AddAssign, Mul},
 };
+
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::ToOwned, boxed::Box};
 
 use generic_array::{
     ArrayLength, GenericArray,
@@ -170,7 +174,7 @@ where
         for r in 0..4 {
             for c in 0..nst {
                 let off = if (nst != 8) || (r <= 1) { 0 } else { 1 };
-                std::mem::swap(
+                mem::swap(
                     &mut self[4 * c + r],
                     &mut tmp[4 * ((c + r + off) % nst) + r],
                 );

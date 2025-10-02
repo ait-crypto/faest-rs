@@ -1,3 +1,6 @@
+#[cfg(not(feature = "std"))]
+use alloc::{vec, vec::Vec};
+
 use generic_array::{GenericArray, typenum::Unsigned};
 
 use crate::{

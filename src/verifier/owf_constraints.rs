@@ -1,3 +1,8 @@
+use core::array;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 use generic_array::{GenericArray, typenum::Unsigned};
 
 use super::{
@@ -59,7 +64,7 @@ pub(crate) fn owf_constraints<O>(
 
         // ::16
         let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKe>(0));
-        let extended_key: Vec<_> = (0..O::R::USIZE + 1)
+        let extended_key: Vec<_> = (0..=O::R::USIZE)
             .map(|i| k.get_commits_ref::<O::NStBits>(i * O::NStBits::USIZE))
             .collect();
 
@@ -90,16 +95,7 @@ fn byte_to_field<F>(byte: u8, delta: F) -> [F; 8]
 where
     F: BigGaloisField,
 {
-    [
-        delta * (byte & 1),
-        delta * (byte >> 1 & 1),
-        delta * (byte >> 2 & 1),
-        delta * (byte >> 3 & 1),
-        delta * (byte >> 4 & 1),
-        delta * (byte >> 5 & 1),
-        delta * (byte >> 6 & 1),
-        delta * (byte >> 7 & 1),
-    ]
+    array::from_fn(|i| delta * ((byte >> i) & 1))
 }
 
 #[inline]
@@ -114,11 +110,10 @@ where
         .chunks_exact(32)
         .take(O::R::USIZE + 1)
         .map(|chunk| {
-            let scalars = chunk
+            let scalars = chunk[..O::NStBytes::USIZE]
                 .iter()
-                .take(O::NStBytes::USIZE)
                 .flat_map(|&byte| byte_to_field(byte, *delta))
-                .collect::<Box<GenericArray<OWFField<O>, O::NStBits>>>();
+                .collect();
             VoleCommits { scalars, delta }
         })
         .collect()

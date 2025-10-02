@@ -1,4 +1,7 @@
-use std::{iter::zip, ops::Mul};
+use core::{iter::zip, mem, ops::Mul};
+
+#[cfg(not(feature = "std"))]
+use alloc::borrow::ToOwned;
 
 use generic_array::{
     ArrayLength, GenericArray,
@@ -333,7 +336,7 @@ where
         for r in 0..4 {
             for c in 0..nst {
                 let off = if (nst != 8) || (r <= 1) { 0 } else { 1 };
-                std::mem::swap(
+                mem::swap(
                     &mut self.scalars[4 * c + r],
                     &mut tmp[4 * ((c + r + off) % nst) + r],
                 );

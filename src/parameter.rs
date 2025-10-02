@@ -1,16 +1,16 @@
-use std::{
+use core::{
     iter::{repeat_n, zip},
     marker::PhantomData,
     ops::{Add, Div, Mul, Sub},
 };
 
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::ToOwned, boxed::Box};
+
 use aes::{
     Aes128Enc, Aes192Enc, Aes256Enc,
     cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray as GenericArray_AES},
 };
-
-use cfg_if::cfg_if;
-
 use generic_array::{
     ArrayLength, GenericArray,
     typenum::{
@@ -21,9 +21,14 @@ use generic_array::{
         U984, U1000, U1024, U2048, U4096, Unsigned,
     },
 };
-
 use rand_core::RngCore;
 
+#[cfg(all(
+    feature = "opt-simd",
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+))]
+use crate::fields::Field;
 use crate::{
     bavc::{
         BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast, BAVC192FastEM,
@@ -41,37 +46,47 @@ use crate::{
     zk_constraints::{CstrntsVal, aes_prove, aes_verify},
 };
 
-cfg_if!(
-    if #[cfg(all(
+#[cfg(all(
     feature = "opt-simd",
     any(target_arch = "x86", target_arch = "x86_64"),
     not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-))]{
+))]
+mod x86_simd {
+    use std::sync::LazyLock;
+
+    use super::{
+        BaseParams128, BaseParams192, BaseParams256, OWF128, OWF128EM, OWF192, OWF192EM, OWF256,
+        OWF256EM,
+    };
     use crate::fields::{
-        Field,
         // AVX2-optimized field implementatons
         x86_simd_large_fields::{GF128 as SimdGF128, GF192 as SimdGF192, GF256 as SimdGF256},
     };
 
     /// Weather AVX2 support is detected at runtime
-    pub(crate) static AVX2_DYNAMIC_DISPATCH_AVAILABLE: std::sync::LazyLock<bool> =
-    std::sync::LazyLock::new(|| {
-        is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq")
-    });
+    pub(crate) static AVX2_DYNAMIC_DISPATCH_AVAILABLE: LazyLock<bool> =
+        LazyLock::new(|| is_x86_feature_detected!("avx2") && is_x86_feature_detected!("pclmulqdq"));
 
     // BaseParameters with optimized field implementation
-    type SimdBaseParams128 = BaseParams128<SimdGF128>;
-    type SimdBaseParams192 = BaseParams192<SimdGF192>;
-    type SimdBaseParams256 = BaseParams256<SimdGF256>;
+    pub(crate) type SimdBaseParams128 = BaseParams128<SimdGF128>;
+    pub(crate) type SimdBaseParams192 = BaseParams192<SimdGF192>;
+    pub(crate) type SimdBaseParams256 = BaseParams256<SimdGF256>;
 
     // OWFParameters with optimized field implementation
-    type SimdOWF128 = OWF128<SimdGF128>;
-    type SimdOWF192 = OWF192<SimdGF192>;
-    type SimdOWF256 = OWF256<SimdGF256>;
-    type SimdOWF128EM = OWF128EM<SimdGF128>;
-    type SimdOWF192EM = OWF192EM<SimdGF192>;
-    type SimdOWF256EM = OWF256EM<SimdGF256>;
-});
+    pub(crate) type SimdOWF128 = OWF128<SimdGF128>;
+    pub(crate) type SimdOWF192 = OWF192<SimdGF192>;
+    pub(crate) type SimdOWF256 = OWF256<SimdGF256>;
+    pub(crate) type SimdOWF128EM = OWF128EM<SimdGF128>;
+    pub(crate) type SimdOWF192EM = OWF192EM<SimdGF192>;
+    pub(crate) type SimdOWF256EM = OWF256EM<SimdGF256>;
+}
+
+#[cfg(all(
+    feature = "opt-simd",
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+))]
+pub(crate) use x86_simd::*;
 
 // FAEST signature sizes
 type U4506 = Sum<Prod<U4, U1000>, U506>;
@@ -138,9 +153,9 @@ macro_rules! define_owf_proof {
                 not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
             ))]
             if *AVX2_DYNAMIC_DISPATCH_AVAILABLE {
-                // SAFETY: call to `std::mem::transmute` is safe because `PublicKey` only depends on
+                // SAFETY: call to `core::mem::transmute` is safe because `PublicKey` only depends on
                 // [`OWFParameters::InputSize`] and [`OWFParameters::OutputSize`] (and not on the underlying field implementation)
-                let pk: &PublicKey<$opt_owf> = unsafe { std::mem::transmute(pk) };
+                let pk: &PublicKey<$opt_owf> = unsafe { core::mem::transmute(pk) };
                 let qs_proof = aes_prove::<$opt_owf>(w, u, v, pk, chall_2);
                 return (
                     OWFField::<Self>::from(qs_proof.0.as_bytes().as_slice()),
@@ -194,7 +209,6 @@ fn hash_v_matrix<BP>(
     BP: BaseParameters,
 {
     let vole_hasher = BP::VoleHasher::new_vole_hasher(chall1);
-
     for vi in v {
         // Hash column-wise
         h2_hasher.update(VoleHasherProcess::process(&vole_hasher, vi).as_slice());
@@ -239,7 +253,7 @@ fn hash_q_matrix<BP>(
 /// Base parameters per security level
 pub(crate) trait BaseParameters {
     /// The field that is of size `2^λ` which is defined as [`Self::Lambda`]
-    type Field: BigGaloisField<Length = Self::LambdaBytes> + std::fmt::Debug + std::cmp::PartialEq;
+    type Field: BigGaloisField<Length = Self::LambdaBytes>;
     /// Hasher implementation of `ZKHash`
     type ZKHasher: ZKHasherInit<Self::Field, SDLength = Self::Chall>;
     /// Hasher implementation of `VOLEHash`
@@ -290,7 +304,7 @@ where
 
 impl<F> BaseParameters for BaseParams128<F>
 where
-    F: BigGaloisField<Length = U16> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U16>,
 {
     type Field = F;
     type ZKHasher = ZKHasher<Self::Field>;
@@ -371,7 +385,7 @@ pub(crate) struct BaseParams192<F = GF192>(PhantomData<F>);
 
 impl<F> BaseParameters for BaseParams192<F>
 where
-    F: BigGaloisField<Length = U24> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U24>,
 {
     type Field = F;
     type ZKHasher = ZKHasher<Self::Field>;
@@ -452,7 +466,7 @@ pub(crate) struct BaseParams256<F = GF256>(PhantomData<F>);
 
 impl<F> BaseParameters for BaseParams256<F>
 where
-    F: BigGaloisField<Length = U32> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U32>,
 {
     type Field = F;
     type ZKHasher = ZKHasher<Self::Field>;
@@ -666,7 +680,7 @@ pub(crate) struct OWF128<F = GF128>(PhantomData<F>);
 
 impl<F> OWFParameters for OWF128<F>
 where
-    F: BigGaloisField<Length = U16> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U16>,
 {
     type BaseParams = BaseParams128<F>;
     type InputSize = U16;
@@ -730,7 +744,7 @@ pub(crate) struct OWF192<F = GF192>(PhantomData<F>);
 
 impl<F> OWFParameters for OWF192<F>
 where
-    F: BigGaloisField<Length = U24> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U24>,
 {
     type BaseParams = BaseParams192<F>;
     type InputSize = U16;
@@ -791,7 +805,6 @@ where
     }
 
     define_owf_proof!(opt_owf = SimdOWF192);
-
     define_owf_verify!(opt_owf = SimdOWF192);
 }
 
@@ -800,7 +813,7 @@ pub(crate) struct OWF256<F = GF256>(PhantomData<F>);
 
 impl<F> OWFParameters for OWF256<F>
 where
-    F: BigGaloisField<Length = U32> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U32>,
 {
     type BaseParams = BaseParams256<F>;
     type InputSize = U16;
@@ -869,7 +882,7 @@ pub(crate) struct OWF128EM<F = GF128>(PhantomData<F>);
 
 impl<F> OWFParameters for OWF128EM<F>
 where
-    F: BigGaloisField<Length = U16> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U16>,
 {
     type BaseParams = BaseParams128<F>;
     type InputSize = U16;
@@ -940,7 +953,7 @@ type U1536 = Sum<U1024, U512>;
 
 impl<F> OWFParameters for OWF192EM<F>
 where
-    F: BigGaloisField<Length = U24> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U24>,
 {
     type BaseParams = BaseParams192<F>;
     type InputSize = U24;
@@ -1009,7 +1022,7 @@ where
 
 impl<F> OWFParameters for OWF256EM<F>
 where
-    F: BigGaloisField<Length = U32> + std::fmt::Debug + std::cmp::PartialEq,
+    F: BigGaloisField<Length = U32>,
 {
     type BaseParams = BaseParams256<F>;
     type InputSize = U32;

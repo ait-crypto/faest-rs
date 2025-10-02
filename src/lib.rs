@@ -9,6 +9,7 @@
 //!
 //! Key generation, signing and verification can be implemented as follows:
 //! ```
+//! # #[cfg(feature="std")] {
 //! use faest::{FAEST128fSigningKey, FAEST128fSignature};
 //! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
 //!
@@ -18,10 +19,12 @@
 //!
 //! let verification_key = sk.verifying_key();
 //! verification_key.verify(msg, &signature).expect("Verification failed");
+//! # }
 //! ```
 //!
 //! Due to the size of the signatures, all variants support signing into boxed signatures:
 //! ```
+//! # #[cfg(feature="std")] {
 //! use faest::{FAEST128fSigningKey, FAEST128fSignature};
 //! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
 //!
@@ -31,6 +34,7 @@
 //!
 //! let verification_key = sk.verifying_key();
 //! verification_key.verify(msg, &signature).expect("Verification failed");
+//! # }
 //! ```
 //!
 //! The signature generation is determinstic per default. If the
@@ -38,7 +42,7 @@
 //! trait is also implemented which allows the caller to specify an RNG to
 //! provide additional randomness:
 //! ```
-//! # #[cfg(feature="randomized-signer")] {
+//! # #[cfg(all(feature="randomized-signer", feature="std"))] {
 //! use faest::{FAEST128fSigningKey, FAEST128fSignature};
 //! use faest::{signature::{RandomizedSigner, Verifier, Keypair}, KeypairGenerator};
 //!
@@ -58,6 +62,7 @@
 //! multiple messages. "Unpacked" keys support the same interfaces and keys can
 //! be converted back and forth:
 //! ```
+//! # #[cfg(feature="std")] {
 //! use faest::{FAEST128fSigningKey, FAEST128fUnpackedSigningKey, FAEST128fSignature, ByteEncoding};
 //! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
 //!
@@ -70,13 +75,21 @@
 //!
 //! let verification_key = unpacked_sk.verifying_key();
 //! verification_key.verify(msg, &signature).expect("Verification failed");
+//! # }
 //! ```
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![warn(missing_docs)]
 #![warn(clippy::use_self)]
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{boxed::Box, vec::Vec};
+
 use generic_array::{GenericArray, typenum::Unsigned};
-use paste::paste;
+use pastey::paste;
 use rand_core::CryptoRngCore;
 #[cfg(any(feature = "randomized-signer", feature = "capi"))]
 use rand_core::RngCore;
@@ -219,6 +232,7 @@ macro_rules! define_impl {
 
             #[doc = "Signing key for " $param]
             /// ```
+            /// # #[cfg(feature="std")] {
             #[doc = "use faest::{" $param "SigningKey as SK, " $param "Signature as Sig};"]
             /// use faest::{Signer, Verifier, Keypair, KeypairGenerator};
             ///
@@ -231,6 +245,7 @@ macro_rules! define_impl {
             /// verification_key.verify(msg, &signature).expect("Verification failed");
             /// // secret keys can also verify
             /// sk.verify(msg, &signature).expect("Verification failed");
+            /// # }
             /// ```
             #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
@@ -273,9 +288,9 @@ macro_rules! define_impl {
                 }
             }
 
-
             #[doc = "Unpacked signing key for " $param]
             /// ```
+            /// # #[cfg(feature="std")] {
             #[doc = "use faest::{" $param "UnpackedSigningKey as UnpackedSK, " $param "Signature as Sig};"]
             /// use faest::{Signer, Verifier, Keypair, KeypairGenerator};
             ///
@@ -289,6 +304,7 @@ macro_rules! define_impl {
             /// verification_key.verify(msg, &signature).expect("Verification failed");
             /// // secret keys can also verify
             /// unpacked_sk.verify(msg, &signature).expect("Verification failed");
+            /// # }
             /// ```
             #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -598,8 +614,10 @@ define_impl!(FAESTEM256s);
 mod tests {
     use super::*;
 
-    use std::fmt::Debug;
+    use core::fmt::Debug;
 
+    use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
+    use rand_core::SeedableRng;
     #[cfg(feature = "serde")]
     use serde::{Serialize, de::DeserializeOwned};
 
@@ -612,7 +630,7 @@ mod tests {
         KP::VerifyingKey: Verifier<S> + for<'a> Verifier<SignatureRef<'a>>,
         S: AsRef<[u8]>,
     {
-        let kp = KP::generate(rand::thread_rng());
+        let kp = KP::generate(NistPqcAes256CtrRng::seed_from_u64(1234));
         let vk = kp.verifying_key();
         let signature = kp.sign(TEST_MESSAGE);
         vk.verify(TEST_MESSAGE, &signature)
@@ -630,7 +648,7 @@ mod tests {
         KP::VerifyingKey: Verifier<S> + for<'a> Verifier<SignatureRef<'a>>,
         S: AsRef<[u8]>,
     {
-        let kp = KP::generate(rand::thread_rng());
+        let kp = KP::generate(NistPqcAes256CtrRng::seed_from_u64(1234));
         let vk = kp.verifying_key();
         let signature = kp.sign(&[]);
         vk.verify(&[], &signature).expect("signatures verifies");
@@ -648,7 +666,7 @@ mod tests {
         KP::VerifyingKey: Verifier<S> + for<'a> Verifier<SignatureRef<'a>>,
         S: AsRef<[u8]>,
     {
-        let mut rng = rand::thread_rng();
+        let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
         let kp = KP::generate(&mut rng);
         let vk = kp.verifying_key();
         let signature = kp.sign_with_rng(&mut rng, TEST_MESSAGE);
@@ -667,7 +685,7 @@ mod tests {
         KP::VerifyingKey: Verifier<S> + for<'a> Verifier<SignatureRef<'a>>,
         S: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = Error>,
     {
-        let kp = KP::generate(rand::thread_rng());
+        let kp = KP::generate(NistPqcAes256CtrRng::seed_from_u64(1234));
         let vk = kp.verifying_key();
         let signature = kp.sign(TEST_MESSAGE);
         let signature2 = S::try_from(signature.as_ref()).expect("signature deserializes");
@@ -683,7 +701,7 @@ mod tests {
         for<'a> <KP as TryFrom<&'a [u8]>>::Error: Debug,
         for<'a> <KP::VerifyingKey as TryFrom<&'a [u8]>>::Error: Debug,
     {
-        let kp = KP::generate(rand::thread_rng());
+        let kp = KP::generate(NistPqcAes256CtrRng::seed_from_u64(1234));
         let vk = kp.verifying_key();
         let signature = kp.sign(TEST_MESSAGE);
 
@@ -709,7 +727,7 @@ mod tests {
         let mut out = vec![];
         let mut ser = serde_json::Serializer::new(&mut out);
 
-        let kp = KP::generate(rand::thread_rng());
+        let kp = KP::generate(NistPqcAes256CtrRng::seed_from_u64(1234));
         kp.serialize(&mut ser).expect("serialize key pair");
         let serialized = String::from_utf8(out).expect("serialize to string");
 

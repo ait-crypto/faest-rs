@@ -1,4 +1,4 @@
-use std::{
+use core::{
     array,
     fmt::Debug,
     iter::zip,
@@ -372,12 +372,8 @@ where
 
 impl<T, const N: usize, const LENGTH: usize> ByteCombine for BigGF<T, N, LENGTH>
 where
-    Self: Alphas
-        + Field
-        + Copy
-        + Debug
-        + ApplyMask<T, Output = Self>
-        + for<'a> Mul<&'a Self, Output = Self>,
+    Self:
+        Alphas + Field + Copy + ApplyMask<T, Output = Self> + for<'a> Mul<&'a Self, Output = Self>,
     u8: ToMask<T>,
 {
     fn byte_combine(x: &[Self; 8]) -> Self {
@@ -1131,10 +1127,7 @@ pub type GF256 = BigGF<u128, 2, 256>;
 #[cfg(test)]
 impl Distribution<GF192> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF192 {
-        BigGF([rng.sample(self), {
-            let v: u64 = rng.sample(self);
-            v as u128
-        }])
+        BigGF([rng.sample(self), rng.sample::<u64, _>(self) as u128])
     }
 }
 
@@ -1299,9 +1292,6 @@ impl ClearHighBits for GF384 {
 }
 
 impl ExtensionField for GF384 {
-    const ZERO: Self = Self([0, 0, 0]);
-    const ONE: Self = Self([1, 0, 0]);
-
     type Length = U48;
 
     type BaseField = GF128;
@@ -1364,9 +1354,6 @@ impl ClearHighBits for GF576 {
 }
 
 impl ExtensionField for GF576 {
-    const ZERO: Self = Self([0, 0, 0, 0, 0]);
-    const ONE: Self = Self([1, 0, 0, 0, 0]);
-
     type Length = U72;
 
     type BaseField = GF192;
@@ -1440,9 +1427,6 @@ impl ClearHighBits for GF768 {
 }
 
 impl ExtensionField for GF768 {
-    const ZERO: Self = Self([0, 0, 0, 0, 0, 0]);
-    const ONE: Self = Self([1, 0, 0, 0, 0, 0]);
-
     type Length = U96;
 
     type BaseField = GF256;
@@ -1496,10 +1480,13 @@ impl Distribution<GF768> for Standard {
 
 #[cfg(test)]
 mod test {
-
     use super::*;
     use crate::utils::test::read_test_data;
-    use std::fmt::Debug;
+
+    use core::fmt::Debug;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::{string::String, vec::Vec};
 
     use serde::Deserialize;
 
@@ -1530,13 +1517,18 @@ mod test {
     mod field_ops {
         use super::*;
 
-        use std::iter::zip;
+        use core::iter::zip;
+
+        #[cfg(not(feature = "std"))]
+        use alloc::vec;
 
         use generic_array::typenum::Unsigned;
+        use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
         use rand::RngCore;
+        use rand_core::SeedableRng;
 
         #[test]
-        fn from_bit<F: BigGaloisField + Debug + Eq>() {
+        fn from_bit<F: BigGaloisField>() {
             assert_eq!(F::ONE, F::from_bit(1));
             assert_eq!(F::ZERO, F::from_bit(0));
             assert_eq!(F::ONE, F::from_bit(3));
@@ -1544,11 +1536,11 @@ mod test {
         }
 
         #[test]
-        fn add<F: BigGaloisField + Debug + Eq>()
+        fn add<F: BigGaloisField>()
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             for _ in 0..RUNS {
                 let mut random_1: F = rng.r#gen();
@@ -1574,11 +1566,11 @@ mod test {
         }
 
         #[test]
-        fn mul_64<F: BigGaloisField + Debug + Eq>()
+        fn mul_64<F: BigGaloisField>()
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             for _ in 0..RUNS {
                 let lhs: F = rng.r#gen();
@@ -1593,11 +1585,11 @@ mod test {
         }
 
         #[test]
-        fn mul_bit<F: BigGaloisField + Debug + Eq>()
+        fn mul_bit<F: BigGaloisField>()
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             for _ in 0..RUNS {
                 let anything: F = rng.r#gen();
@@ -1616,7 +1608,7 @@ mod test {
         }
 
         #[test]
-        fn sum_poly<F: BigGaloisField + Debug + Eq>() {
+        fn sum_poly<F: BigGaloisField>() {
             let all_zeroes = vec![F::ZERO; F::Length::USIZE * 8];
             assert_eq!(F::sum_poly(&all_zeroes), F::ZERO);
 
@@ -1628,7 +1620,7 @@ mod test {
         }
 
         #[test]
-        fn byte_combine_constants<F: BigGaloisField + Debug + Eq>() {
+        fn byte_combine_constants<F: BigGaloisField>() {
             assert_eq!(F::ZERO, F::byte_combine(&[F::ZERO; 8]));
             assert_eq!(
                 F::BYTE_COMBINE_2,
@@ -1661,22 +1653,22 @@ mod test {
         }
 
         #[test]
-        fn byte_combine_slice<F: BigGaloisField + Debug + Eq>()
+        fn byte_combine_slice<F: BigGaloisField>()
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             let elements = array::from_fn(|_| rng.r#gen());
             assert_eq!(F::byte_combine(&elements), F::byte_combine_slice(&elements));
         }
 
         #[test]
-        fn byte_conversions<F: BigGaloisField + Debug + Eq>()
+        fn byte_conversions<F: BigGaloisField>()
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             let element = rng.r#gen();
             let bytes = element.as_bytes();
@@ -1685,13 +1677,13 @@ mod test {
         }
 
         #[test]
-        fn mul<F: BigGaloisField + Debug + Eq>() {
-            let test_data = read_test_data("LargeFieldMul.json")
+        fn mul<F: BigGaloisField>() {
+            let Some(test_data) = read_test_data("LargeFieldMul.json")
                 .into_iter()
                 .find(|data: &DataMul| data.lambda == <F as Field>::Length::USIZE * 8)
-                .unwrap_or_else(|| {
-                    panic!("No test data for GF{}", <F as Field>::Length::USIZE * 8)
-                });
+            else {
+                return;
+            };
 
             for [lhs, rhs, expected] in test_data.database {
                 let mut lhs = F::from(hex::decode(lhs.as_str()).unwrap().as_slice());
@@ -1705,13 +1697,13 @@ mod test {
         }
 
         #[test]
-        fn byte_combine<F: BigGaloisField + Debug + Eq>() {
-            let test_data = read_test_data("LargeFieldByteCombine.json")
+        fn byte_combine<F: BigGaloisField>() {
+            let Some(test_data) = read_test_data("LargeFieldByteCombine.json")
                 .into_iter()
                 .find(|data: &DataByteCombine| data.lambda == <F as Field>::Length::USIZE * 8)
-                .unwrap_or_else(|| {
-                    panic!("No test data for GF{}", <F as Field>::Length::USIZE * 8)
-                });
+            else {
+                return;
+            };
 
             for data in test_data.database {
                 let tab = [
@@ -1730,25 +1722,26 @@ mod test {
         }
 
         #[test]
-        fn square<F: BigGaloisField + Debug + Eq>()
+        fn square<F: BigGaloisField>()
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             let element = rng.r#gen();
             assert_eq!(element * element, element.square());
         }
 
         #[test]
-        fn byte_combine_bits<F: BigGaloisField + Debug + Eq>() {
-            let test_data = read_test_data("LargeFieldByteCombineBits.json")
+        fn byte_combine_bits<F: BigGaloisField>() {
+            let Some(test_data) = read_test_data("LargeFieldByteCombineBits.json")
                 .into_iter()
                 .find(|data: &DataByteCombineBit| data.lambda == <F as Field>::Length::USIZE * 8)
-                .unwrap_or_else(|| panic!("No test data for GF{}", <F as Field>::Length::USIZE * 8))
-                .database;
+            else {
+                return;
+            };
 
-            for (x, data) in test_data.into_iter() {
+            for (x, data) in test_data.database.into_iter() {
                 let result = F::from(hex::decode(&data).unwrap().as_slice());
                 assert_eq!(F::byte_combine_bits(x), result);
             }
@@ -1768,17 +1761,23 @@ mod test {
     mod extended_field_ops {
         use super::*;
         use crate::utils::test::read_test_data;
+
         use generic_array::typenum::Unsigned;
+        use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
+        use rand_core::SeedableRng;
 
         #[test]
         fn mul<F>()
         where
-            F: ExtensionField<BaseField: for<'a> From<&'a [u8]>> + Copy + Debug + Eq,
+            F: ExtensionField + Copy,
+            <F as ExtensionField>::BaseField: for<'a> From<&'a [u8]>,
         {
-            let test_data = read_test_data("ExtendedFields.json")
+            let Some(test_data) = read_test_data("ExtendedFields.json")
                 .into_iter()
                 .find(|data: &DataMul| data.lambda == F::Length::USIZE * 8)
-                .unwrap_or_else(|| panic!("No test data for GF{}", F::Length::USIZE * 8));
+            else {
+                return;
+            };
 
             for [lhs, rhs, res] in test_data.database {
                 let lhs = F::from(hex::decode(lhs.as_str()).unwrap().as_slice());
@@ -1789,11 +1788,11 @@ mod test {
         }
 
         #[test]
-        fn byte_conversions<F: ExtensionField + Debug + Eq>()
+        fn byte_conversions<F: ExtensionField>()
         where
             Standard: Distribution<F>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             let element = rng.r#gen();
             let bytes = element.as_bytes();

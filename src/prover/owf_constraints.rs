@@ -1,5 +1,8 @@
 use generic_array::{GenericArray, typenum::Unsigned};
 
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::ToOwned, vec::Vec};
+
 use super::{
     ByteCommitsRef, FieldCommitDegThree, encryption::enc_cstrnts, key_expansion::key_exp_cstrnts,
 };
@@ -65,7 +68,7 @@ pub(crate) fn owf_constraints<O>(
         // ::16
         let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKeBytes>(0));
         // Get references to the R+1 key commitments
-        let extended_key: Vec<_> = (0..O::R::USIZE + 1)
+        let extended_key: Vec<_> = (0..=O::R::USIZE)
             .map(|i| k.get_commits_ref::<O::NStBytes>(i * O::NStBytes::USIZE))
             .collect();
 

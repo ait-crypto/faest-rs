@@ -1,4 +1,4 @@
-use std::{
+use core::{
     num::Wrapping,
     ops::{
         Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
@@ -256,12 +256,13 @@ impl From<&[u8]> for GF64 {
 #[cfg(test)]
 mod test {
     use rand::Rng;
+    use rand_core::SeedableRng;
 
     use super::*;
 
     #[test]
     fn gf64_test_mul() {
-        let mut rng = rand::thread_rng();
+        let mut rng = nist_pqc_seeded_rng::NistPqcAes256CtrRng::seed_from_u64(1234);
 
         let anything: u64 = rng.r#gen();
         let pol_anything = GF64::from(anything);

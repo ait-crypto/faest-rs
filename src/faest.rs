@@ -1,4 +1,7 @@
-use std::marker::PhantomData;
+use core::marker::PhantomData;
+
+#[cfg(not(feature = "std"))]
+use alloc::borrow::ToOwned;
 
 use generic_array::{GenericArray, typenum::Unsigned};
 use rand_core::CryptoRngCore;
@@ -586,6 +589,12 @@ mod test {
     mod faest {
         use super::*;
 
+        #[cfg(not(feature = "std"))]
+        use alloc::{vec, vec::Vec};
+
+        use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
+        use rand_core::SeedableRng;
+
         fn random_message(mut rng: impl RngCore) -> Vec<u8> {
             let mut length = [0];
             while length[0] == 0 {
@@ -598,7 +607,7 @@ mod test {
 
         #[test]
         fn sign_and_verify<P: FAESTParameters>() {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
             for _i in 0..RUNS {
                 let sk = P::OWF::keygen_with_rng(&mut rng);
                 let msg = random_message(&mut rng);
@@ -613,7 +622,7 @@ mod test {
         #[cfg(feature = "serde")]
         #[test]
         fn serialize<P: FAESTParameters>() {
-            let mut rng = rand::thread_rng();
+            let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
             let sk = P::OWF::keygen_with_rng(&mut rng);
 
             let mut out = vec![];
@@ -680,6 +689,9 @@ mod test {
     mod faest_tvs {
         use super::*;
         use crate::utils::test::{hash_array, read_test_data};
+
+        #[cfg(not(feature = "std"))]
+        use alloc::vec::Vec;
 
         use serde::Deserialize;
 

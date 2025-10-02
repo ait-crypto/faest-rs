@@ -1,4 +1,7 @@
-use std::ops::Mul;
+use core::ops::Mul;
+
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::ToOwned, boxed::Box};
 
 use generic_array::{
     ArrayLength, GenericArray,
@@ -70,7 +73,7 @@ where
         )
     }
 
-    pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<F, L2>
+    pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<'_, F, L2>
     where
         L2: ArrayLength + Mul<U8, Output: ArrayLength>,
     {
@@ -84,7 +87,7 @@ where
         }
     }
 
-    pub(crate) fn to_ref(&self) -> ByteCommitsRef<F, L> {
+    pub(crate) fn to_ref(&self) -> ByteCommitsRef<'_, F, L> {
         ByteCommitsRef {
             keys: &self.keys,
             tags: &self.tags,
@@ -135,7 +138,7 @@ where
         )
     }
 
-    pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<F, L2>
+    pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<'_, F, L2>
     where
         L2: ArrayLength + Mul<U8, Output: ArrayLength>,
     {

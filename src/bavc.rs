@@ -1,6 +1,9 @@
-use std::{marker::PhantomData, ops::Mul};
+use core::{marker::PhantomData, ops::Mul};
 
-use bitvec::prelude::*;
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::ToOwned, vec, vec::Vec};
+
+use bitvec::{bitvec, slice::BitSlice};
 use generic_array::{
     ArrayLength, GenericArray,
     typenum::{Prod, U2, U3, U8, Unsigned},
@@ -447,7 +450,6 @@ where
     }
 }
 
-#[allow(non_camel_case_types)]
 pub(crate) struct BavcEm<RO, PRG, LH, TAU>(
     PhantomData<RO>,
     PhantomData<PRG>,
@@ -615,7 +617,9 @@ pub(crate) type BAVC256FastEM = BavcEm<RandomOracleShake256, PRG256, LeafHasher2
 #[cfg(test)]
 mod test {
     use super::*;
-    use core::panic;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::string::String;
 
     use generic_array::GenericArray;
     use serde::Deserialize;
@@ -743,7 +747,6 @@ mod test {
 
             match data.lambda {
                 128 => {
-                    println!("lambda = 128 - testing leaf_commitment..");
                     let (sd, com) = LeafCommitment::<PRG128, LeafHasher128>::commit(
                         GenericArray::from_slice(&data.key),
                         iv,
@@ -755,7 +758,6 @@ mod test {
                 }
 
                 192 => {
-                    println!("lambda = 192 - testing leaf_commitment..");
                     let (sd, com) = LeafCommitment::<PRG192, LeafHasher192>::commit(
                         GenericArray::from_slice(&data.key),
                         iv,
@@ -767,7 +769,6 @@ mod test {
                 }
 
                 256 => {
-                    println!("lambda = 256 - testing leaf_commitment..");
                     let (sd, com) = LeafCommitment::<PRG256, LeafHasher256>::commit(
                         GenericArray::from_slice(&data.key),
                         iv,
@@ -791,7 +792,6 @@ mod test {
 
             match data.lambda {
                 128 => {
-                    println!("lambda = 128 - testing leaf_commitment_em..");
                     let (sd, com) = LeafCommitment::<PRG128, LeafHasher128>::commit_em(
                         GenericArray::from_slice(&data.key),
                         iv,
@@ -802,7 +802,6 @@ mod test {
                 }
 
                 192 => {
-                    println!("lambda = 192 - testing leaf_commitment_em..");
                     let (sd, com) = LeafCommitment::<PRG192, LeafHasher192>::commit_em(
                         GenericArray::from_slice(&data.key),
                         iv,
@@ -813,7 +812,6 @@ mod test {
                 }
 
                 256 => {
-                    println!("lambda = 256 - testing leaf_commitment_em..");
                     let (sd, com) = LeafCommitment::<PRG256, LeafHasher256>::commit_em(
                         GenericArray::from_slice(&data.key),
                         iv,
@@ -849,8 +847,6 @@ mod test {
                     let r = GenericArray::from_slice(&r[..16]);
 
                     if data.mode == "s" {
-                        println!("FAEST-128s - testing BAVC..");
-
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
                         let res_commit = BAVC128Small::commit(r, &iv);
@@ -865,8 +861,6 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        println!("FAEST-128f - testing BAVC..");
-
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
                         let res_commit = BAVC128Fast::commit(r, &iv);
@@ -886,8 +880,6 @@ mod test {
                     let r = GenericArray::from_slice(&r[..24]);
 
                     if data.mode == "s" {
-                        println!("FAEST-192s - testing BAVC..");
-
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
                         let res_commit = BAVC192Small::commit(r, &iv);
@@ -902,8 +894,6 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        println!("FAEST-192f - testing BAVC..");
-
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
                         let res_commit = BAVC192Fast::commit(r, &iv);
@@ -921,8 +911,6 @@ mod test {
 
                 _ => {
                     if data.mode == "s" {
-                        println!("FAEST-256s - testing BAVC..");
-
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
                         let res_commit = BAVC256Small::commit(&r, &iv);
@@ -936,8 +924,6 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        println!("FAEST-256f - testing BAVC..");
-
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
                         let res_commit = BAVC256Fast::commit(&r, &iv);
@@ -976,8 +962,6 @@ mod test {
                     let r = GenericArray::from_slice(&r[..16]);
 
                     if data.mode == "s" {
-                        println!("FAEST-EM-128s: testing BAVC..");
-
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
                         let res_commit = BAVC128SmallEM::commit(r, &iv);
@@ -992,8 +976,6 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        println!("FAEST-EM-128f: testing BAVC..");
-
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
                         let res_commit = BAVC128FastEM::commit(r, &iv);
@@ -1013,8 +995,6 @@ mod test {
                     let r = GenericArray::from_slice(&r[..24]);
 
                     if data.mode == "s" {
-                        println!("FAEST-EM-192s: testing BAVC..");
-
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
                         let res_commit = BAVC192SmallEM::commit(r, &iv);
@@ -1029,8 +1009,6 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        println!("FAEST-EM-192f: testing BAVC..");
-
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
                         let res_commit = BAVC192FastEM::commit(r, &iv);
@@ -1048,8 +1026,6 @@ mod test {
                 }
                 _ => {
                     if data.mode == "s" {
-                        println!("FAEST-EM-256s: testing BAVC..");
-
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
                         let res_commit = BAVC256SmallEM::commit(&r, &iv);
@@ -1064,8 +1040,6 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        println!("FAEST-EM-256f: testing BAVC..");
-
                         let i_delta = GenericArray::from_slice(&data.i_delta);
 
                         let res_commit = BAVC256FastEM::commit(&r, &iv);

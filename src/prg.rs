@@ -1,5 +1,8 @@
 //! Implementation of the PRGs for security levels 128, 192 and 256
 
+#[cfg(not(feature = "std"))]
+use alloc::borrow::ToOwned;
+
 use aes::cipher::{KeyIvInit, StreamCipher, generic_array::GenericArray as GenericArray_0_14};
 use generic_array::{
     ArrayLength, GenericArray,
