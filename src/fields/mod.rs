@@ -6,7 +6,10 @@ use core::{
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-use generic_array::{ArrayLength, GenericArray};
+use generic_array::{
+    ArrayLength, GenericArray,
+    typenum::{Prod, U3},
+};
 
 pub(crate) mod large_fields;
 pub(crate) mod large_fields_constants;
@@ -25,7 +28,7 @@ pub(crate) use large_fields::{
     target_feature = "avx2",
     target_feature = "pclmulqdq"
 )))]
-pub(crate) use large_fields::{GF128, GF192, GF256, GF384, GF576, GF768};
+pub(crate) use large_fields::{GF128, GF192, GF256};
 pub(crate) use small_fields::{GF8, GF64};
 
 #[cfg(all(
@@ -68,6 +71,10 @@ pub(crate) trait Field:
     /// Obtain a boxed byte representation of the field element
     fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>>;
     */
+}
+
+pub(crate) trait Base: Field<Length: Mul<U3, Output: ArrayLength>> {
+    type Extension: ExtensionField<BaseField = Self, Length = Prod<Self::Length, U3>>;
 }
 
 /// Double a field element

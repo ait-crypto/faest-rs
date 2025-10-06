@@ -24,6 +24,8 @@ use generic_array::{
     typenum::{U16, U24, U32, U48, U72, U96, Unsigned},
 };
 
+use crate::fields::Base;
+
 use super::{
     BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquaredConstants, Double,
     ExtensionField, Field, FromBit, GF64, Sigmas, Square,
@@ -344,6 +346,10 @@ const fn gfu256_as_m256(v: UnoptimizedGF256) -> __m256i {
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub(crate) struct GF128(__m128i);
+
+impl Base for GF128 {
+    type Extension = GF384;
+}
 
 impl Default for GF128 {
     #[inline]
@@ -858,6 +864,10 @@ impl<'de> serde::Deserialize<'de> for GF128 {
 #[repr(transparent)]
 pub(crate) struct GF192(__m256i);
 
+impl Base for GF192 {
+    type Extension = GF576;
+}
+
 impl Default for GF192 {
     #[inline]
     fn default() -> Self {
@@ -1370,6 +1380,10 @@ impl<'de> serde::Deserialize<'de> for GF192 {
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub(crate) struct GF256(__m256i);
+
+impl Base for GF256 {
+    type Extension = GF768;
+}
 
 impl Default for GF256 {
     #[inline]
