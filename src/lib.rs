@@ -132,6 +132,19 @@ use crate::{
     },
 };
 
+#[cfg(all(
+    feature = "opt-simd",
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+))]
+use parameter::x86_simd;
+#[cfg(all(
+    feature = "opt-simd",
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+))]
+cpufeatures::new!(x86_intrinsics, "avx2", "pclmulqdq");
+
 /// Generate a key pair from a cryptographically secure RNG
 pub trait KeypairGenerator: Keypair {
     /// Generate a new keypair
@@ -172,15 +185,6 @@ pub trait ByteEncoding: Clone + Sized + for<'a> TryFrom<&'a [u8]> + TryInto<Self
     /// Get length of encoded key.
     fn encoded_len(&self) -> usize;
 }
-
-#[cfg(all(
-    feature = "opt-simd",
-    any(target_arch = "x86", target_arch = "x86_64"),
-    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-))]
-use parameter::x86_simd;
-
-cpufeatures::new!(x86_intrinsics, "avx2", "pclmulqdq");
 
 macro_rules! define_impl {
     ($param:ident) => {

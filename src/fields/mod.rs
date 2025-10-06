@@ -73,8 +73,11 @@ pub(crate) trait Field:
     */
 }
 
-pub(crate) trait Base: Field<Length: Mul<U3, Output: ArrayLength>> {
-    type Extension: ExtensionField<BaseField = Self, Length = Prod<Self::Length, U3>>;
+/// Marker trait denoting that the current field is the base field of some `ExtensionField`.
+///
+/// For security, FAEST requires the extension field to have 3x the length of the base field.
+pub(crate) trait BaseField: Field<Length: Mul<U3, Output: ArrayLength>> {
+    type ExtenionField: ExtensionField<BaseField = Self, Length = Prod<Self::Length, U3>>;
 }
 
 /// Double a field element

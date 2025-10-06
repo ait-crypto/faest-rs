@@ -20,7 +20,7 @@ use rand::{
     distributions::{Distribution, Standard},
 };
 
-use crate::fields::Base;
+use crate::fields::BaseField;
 
 use super::{Double, ExtensionField, Field, GF8, GF64, Square};
 
@@ -965,8 +965,8 @@ impl<'de> serde::Deserialize<'de> for BigGF<u128, 1, 128> {
 /// Type representing binary Galois field of size `2^128`
 pub type GF128 = BigGF<u128, 1, 128>;
 
-impl Base for GF128 {
-    type Extension = GF384;
+impl BaseField for GF128 {
+    type ExtenionField = GF384;
 }
 
 #[cfg(test)]
@@ -991,8 +991,8 @@ impl ClearHighBits for BigGF<u128, 2, 192> {
 /// Type representing binary Galois field of size `2^192`
 pub type GF192 = BigGF<u128, 2, 192>;
 
-impl Base for GF192 {
-    type Extension = GF576;
+impl BaseField for GF192 {
+    type ExtenionField = GF576;
 }
 
 /// Multiplies two 192-bit polynomials 'x', 'y' over the finite field GF(2). Stores the result in 'x'.
@@ -1134,8 +1134,8 @@ impl<'de> serde::Deserialize<'de> for BigGF<u128, 2, 192> {
 /// Type representing binary Galois field of size `2^256`
 pub type GF256 = BigGF<u128, 2, 256>;
 
-impl Base for GF256 {
-    type Extension = GF768;
+impl BaseField for GF256 {
+    type ExtenionField = GF768;
 }
 
 #[cfg(test)]

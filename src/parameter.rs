@@ -23,23 +23,23 @@ use generic_array::{
 };
 use rand_core::RngCore;
 
+use crate::fields::BaseField;
 #[cfg(all(
     feature = "opt-simd",
     any(target_arch = "x86", target_arch = "x86_64"),
     not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
 ))]
 use crate::{
-    bavc::{
-        BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast, BAVC192FastEM,
-        BAVC192Small, BAVC192SmallEM, BAVC256Fast, BAVC256FastEM, BAVC256Small, BAVC256SmallEM,
-        BatchVectorCommitment,
-    },
+    bavc::{BatchVectorCommitment, Bavc, BavcEm},
     fields::{BigGaloisField, GF128, GF192, GF256},
     internal_keys::{PublicKey, SecretKey},
     prg::{PRG128, PRG192, PRG256, PseudoRandomGenerator},
     random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256},
     rijndael_32::{Rijndael192, Rijndael256},
-    universal_hashing::{B, VoleHasher, VoleHasherInit, VoleHasherProcess, ZKHasher, ZKHasherInit},
+    universal_hashing::{
+        B, LeafHasher128, LeafHasher192, LeafHasher256, VoleHasher, VoleHasherInit,
+        VoleHasherProcess, ZKHasher, ZKHasherInit,
+    },
     utils::xor_arrays_inplace,
     witness::aes_extendedwitness,
     zk_constraints::{CstrntsVal, aes_prove, aes_verify},
@@ -51,31 +51,28 @@ use crate::{
     not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
 ))]
 pub(crate) mod x86_simd {
-    // use std::sync::LazyLock;
-
     use crate::fields::{
         // AVX2-optimized field implementatons
         x86_simd_large_fields::{GF128, GF192, GF256},
     };
 
-    // FAESTParameters with optimized field implementation
-    pub(crate) type FAEST128sParameters = super::FAEST128sParameters<GF128>;
     pub(crate) type FAEST128fParameters = super::FAEST128fParameters<GF128>;
+    pub(crate) type FAEST128sParameters = super::FAEST128sParameters<GF128>;
 
-    pub(crate) type FAEST192sParameters = super::FAEST192sParameters<GF192>;
-    pub(crate) type FAEST192fParameters = super::FAEST192fParameters<GF192>;
-
-    pub(crate) type FAEST256sParameters = super::FAEST256sParameters<GF256>;
-    pub(crate) type FAEST256fParameters = super::FAEST256fParameters<GF256>;
-
-    pub(crate) type FAESTEM128sParameters = super::FAESTEM128sParameters<GF128>;
     pub(crate) type FAESTEM128fParameters = super::FAESTEM128fParameters<GF128>;
+    pub(crate) type FAESTEM128sParameters = super::FAESTEM128sParameters<GF128>;
 
-    pub(crate) type FAESTEM192sParameters = super::FAESTEM192sParameters<GF192>;
+    pub(crate) type FAEST192fParameters = super::FAEST192fParameters<GF192>;
+    pub(crate) type FAEST192sParameters = super::FAEST192sParameters<GF192>;
+
     pub(crate) type FAESTEM192fParameters = super::FAESTEM192fParameters<GF192>;
+    pub(crate) type FAESTEM192sParameters = super::FAESTEM192sParameters<GF192>;
 
-    pub(crate) type FAESTEM256sParameters = super::FAESTEM256sParameters<GF256>;
+    pub(crate) type FAEST256fParameters = super::FAEST256fParameters<GF256>;
+    pub(crate) type FAEST256sParameters = super::FAEST256sParameters<GF256>;
+
     pub(crate) type FAESTEM256fParameters = super::FAESTEM256fParameters<GF256>;
+    pub(crate) type FAESTEM256sParameters = super::FAESTEM256sParameters<GF256>;
 }
 
 // FAEST signature sizes
@@ -1214,11 +1211,11 @@ pub(crate) struct FAEST128sParameters<F = GF128>(PhantomData<F>);
 
 impl<F> FAESTParameters for FAEST128sParameters<F>
 where
-    F: BigGaloisField<Length = U16>,
+    F: BigGaloisField<Length = U16> + BaseField,
 {
     type OWF = OWF128<F>;
     type Tau = Tau128Small;
-    type BAVC = BAVC128Small;
+    type BAVC = BAVC128Small<F>;
     type WGRIND = U7;
     type SignatureSize = U4506;
 }
@@ -1228,11 +1225,11 @@ pub(crate) struct FAEST128fParameters<F = GF128>(PhantomData<F>);
 
 impl<F> FAESTParameters for FAEST128fParameters<F>
 where
-    F: BigGaloisField<Length = U16>,
+    F: BigGaloisField<Length = U16> + BaseField,
 {
     type OWF = OWF128<F>;
     type Tau = Tau128Fast;
-    type BAVC = BAVC128Fast;
+    type BAVC = BAVC128Fast<F>;
     type WGRIND = U8;
     type SignatureSize = U5924;
 }
@@ -1242,11 +1239,11 @@ pub(crate) struct FAEST192sParameters<F = GF192>(PhantomData<F>);
 
 impl<F> FAESTParameters for FAEST192sParameters<F>
 where
-    F: BigGaloisField<Length = U24>,
+    F: BigGaloisField<Length = U24> + BaseField,
 {
     type OWF = OWF192<F>;
     type Tau = Tau192Small;
-    type BAVC = BAVC192Small;
+    type BAVC = BAVC192Small<F>;
     type WGRIND = U12;
     type SignatureSize = U11260;
 }
@@ -1256,11 +1253,11 @@ pub(crate) struct FAEST192fParameters<F = GF192>(PhantomData<F>);
 
 impl<F> FAESTParameters for FAEST192fParameters<F>
 where
-    F: BigGaloisField<Length = U24>,
+    F: BigGaloisField<Length = U24> + BaseField,
 {
     type OWF = OWF192<F>;
     type Tau = Tau192Fast;
-    type BAVC = BAVC192Fast;
+    type BAVC = BAVC192Fast<F>;
     type WGRIND = U8;
     type SignatureSize = U14948;
 }
@@ -1270,11 +1267,11 @@ pub(crate) struct FAEST256sParameters<F = GF256>(PhantomData<F>);
 
 impl<F> FAESTParameters for FAEST256sParameters<F>
 where
-    F: BigGaloisField<Length = U32>,
+    F: BigGaloisField<Length = U32> + BaseField,
 {
     type OWF = OWF256<F>;
     type Tau = Tau256Small;
-    type BAVC = BAVC256Small;
+    type BAVC = BAVC256Small<F>;
     type WGRIND = U6;
     type SignatureSize = U20696;
 }
@@ -1284,11 +1281,11 @@ pub(crate) struct FAEST256fParameters<F = GF256>(PhantomData<F>);
 
 impl<F> FAESTParameters for FAEST256fParameters<F>
 where
-    F: BigGaloisField<Length = U32>,
+    F: BigGaloisField<Length = U32> + BaseField,
 {
     type OWF = OWF256<F>;
     type Tau = Tau256Fast;
-    type BAVC = BAVC256Fast;
+    type BAVC = BAVC256Fast<F>;
     type WGRIND = U8;
     type SignatureSize = U26548;
 }
@@ -1298,11 +1295,11 @@ pub(crate) struct FAESTEM128sParameters<F = GF128>(PhantomData<F>);
 
 impl<F> FAESTParameters for FAESTEM128sParameters<F>
 where
-    F: BigGaloisField<Length = U16>,
+    F: BigGaloisField<Length = U16> + BaseField,
 {
     type OWF = OWF128EM<F>;
     type Tau = Tau128SmallEM;
-    type BAVC = BAVC128SmallEM;
+    type BAVC = BAVC128SmallEM<F>;
     type WGRIND = U7;
     type SignatureSize = U3906;
 }
@@ -1312,11 +1309,11 @@ pub(crate) struct FAESTEM128fParameters<F = GF128>(PhantomData<F>);
 
 impl<F> FAESTParameters for FAESTEM128fParameters<F>
 where
-    F: BigGaloisField<Length = U16>,
+    F: BigGaloisField<Length = U16> + BaseField,
 {
     type OWF = OWF128EM<F>;
     type Tau = Tau128FastEM;
-    type BAVC = BAVC128FastEM;
+    type BAVC = BAVC128FastEM<F>;
     type WGRIND = U8;
     type SignatureSize = U5060;
 }
@@ -1326,11 +1323,11 @@ pub(crate) struct FAESTEM192sParameters<F = GF192>(PhantomData<F>);
 
 impl<F> FAESTParameters for FAESTEM192sParameters<F>
 where
-    F: BigGaloisField<Length = U24>,
+    F: BigGaloisField<Length = U24> + BaseField,
 {
     type OWF = OWF192EM<F>;
     type Tau = Tau192SmallEM;
-    type BAVC = BAVC192SmallEM;
+    type BAVC = BAVC192SmallEM<F>;
     type WGRIND = U8;
     type SignatureSize = U9340;
 }
@@ -1340,11 +1337,11 @@ pub(crate) struct FAESTEM192fParameters<F = GF192>(PhantomData<F>);
 
 impl<F> FAESTParameters for FAESTEM192fParameters<F>
 where
-    F: BigGaloisField<Length = U24>,
+    F: BigGaloisField<Length = U24> + BaseField,
 {
     type OWF = OWF192EM<F>;
     type Tau = Tau192FastEM;
-    type BAVC = BAVC192FastEM;
+    type BAVC = BAVC192FastEM<F>;
     type WGRIND = U8;
     type SignatureSize = U12380;
 }
@@ -1354,11 +1351,11 @@ pub(crate) struct FAESTEM256sParameters<F = GF256>(PhantomData<F>);
 
 impl<F> FAESTParameters for FAESTEM256sParameters<F>
 where
-    F: BigGaloisField<Length = U32>,
+    F: BigGaloisField<Length = U32> + BaseField,
 {
     type OWF = OWF256EM<F>;
     type Tau = Tau256SmallEM;
-    type BAVC = BAVC256SmallEM;
+    type BAVC = BAVC256SmallEM<F>;
     type WGRIND = U6;
     type SignatureSize = U17984;
 }
@@ -1368,14 +1365,34 @@ pub(crate) struct FAESTEM256fParameters<F = GF256>(PhantomData<F>);
 
 impl<F> FAESTParameters for FAESTEM256fParameters<F>
 where
-    F: BigGaloisField<Length = U32>,
+    F: BigGaloisField<Length = U32> + BaseField,
 {
     type OWF = OWF256EM<F>;
     type Tau = Tau256FastEM;
-    type BAVC = BAVC256FastEM;
+    type BAVC = BAVC256FastEM<F>;
     type WGRIND = U8;
     type SignatureSize = U23476;
 }
+
+pub(crate) type BAVC128Small<F> = Bavc<RandomOracleShake128, PRG128, LeafHasher128<F>, Tau128Small>;
+pub(crate) type BAVC128Fast<F> = Bavc<RandomOracleShake128, PRG128, LeafHasher128<F>, Tau128Fast>;
+pub(crate) type BAVC192Small<F> = Bavc<RandomOracleShake256, PRG192, LeafHasher192<F>, Tau192Small>;
+pub(crate) type BAVC192Fast<F> = Bavc<RandomOracleShake256, PRG192, LeafHasher192<F>, Tau192Fast>;
+pub(crate) type BAVC256Small<F> = Bavc<RandomOracleShake256, PRG256, LeafHasher256<F>, Tau256Small>;
+pub(crate) type BAVC256Fast<F> = Bavc<RandomOracleShake256, PRG256, LeafHasher256<F>, Tau256Fast>;
+
+pub(crate) type BAVC128SmallEM<F> =
+    BavcEm<RandomOracleShake128, PRG128, LeafHasher128<F>, Tau128SmallEM>;
+pub(crate) type BAVC128FastEM<F> =
+    BavcEm<RandomOracleShake128, PRG128, LeafHasher128<F>, Tau128FastEM>;
+pub(crate) type BAVC192SmallEM<F> =
+    BavcEm<RandomOracleShake256, PRG192, LeafHasher192<F>, Tau192SmallEM>;
+pub(crate) type BAVC192FastEM<F> =
+    BavcEm<RandomOracleShake256, PRG192, LeafHasher192<F>, Tau192FastEM>;
+pub(crate) type BAVC256SmallEM<F> =
+    BavcEm<RandomOracleShake256, PRG256, LeafHasher256<F>, Tau256SmallEM>;
+pub(crate) type BAVC256FastEM<F> =
+    BavcEm<RandomOracleShake256, PRG256, LeafHasher256<F>, Tau256FastEM>;
 
 #[cfg(test)]
 mod test {
