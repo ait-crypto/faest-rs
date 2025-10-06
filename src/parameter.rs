@@ -7,6 +7,21 @@ use core::{
 #[cfg(not(feature = "std"))]
 use alloc::{borrow::ToOwned, boxed::Box};
 
+use crate::{
+    bavc::{BatchVectorCommitment, Bavc, BavcEm},
+    fields::{BaseField, BigGaloisField, GF128, GF192, GF256},
+    internal_keys::{PublicKey, SecretKey},
+    prg::{PRG128, PRG192, PRG256, PseudoRandomGenerator},
+    random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256},
+    rijndael_32::{Rijndael192, Rijndael256},
+    universal_hashing::{
+        B, LeafHasher128, LeafHasher192, LeafHasher256, VoleHasher, VoleHasherInit,
+        VoleHasherProcess, ZKHasher, ZKHasherInit,
+    },
+    utils::xor_arrays_inplace,
+    witness::aes_extendedwitness,
+    zk_constraints::{CstrntsVal, aes_prove, aes_verify},
+};
 use aes::{
     Aes128Enc, Aes192Enc, Aes256Enc,
     cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray as GenericArray_AES},
@@ -22,28 +37,6 @@ use generic_array::{
     },
 };
 use rand_core::RngCore;
-
-use crate::fields::BaseField;
-#[cfg(all(
-    feature = "opt-simd",
-    any(target_arch = "x86", target_arch = "x86_64"),
-    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-))]
-use crate::{
-    bavc::{BatchVectorCommitment, Bavc, BavcEm},
-    fields::{BigGaloisField, GF128, GF192, GF256},
-    internal_keys::{PublicKey, SecretKey},
-    prg::{PRG128, PRG192, PRG256, PseudoRandomGenerator},
-    random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256},
-    rijndael_32::{Rijndael192, Rijndael256},
-    universal_hashing::{
-        B, LeafHasher128, LeafHasher192, LeafHasher256, VoleHasher, VoleHasherInit,
-        VoleHasherProcess, ZKHasher, ZKHasherInit,
-    },
-    utils::xor_arrays_inplace,
-    witness::aes_extendedwitness,
-    zk_constraints::{CstrntsVal, aes_prove, aes_verify},
-};
 
 #[cfg(all(
     feature = "opt-simd",
