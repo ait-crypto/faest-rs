@@ -121,43 +121,6 @@ impl SecurityParameter for U16 {}
 impl SecurityParameter for U24 {}
 impl SecurityParameter for U32 {}
 
-/// Generates an implementation of [`OWFParameters::prove`] dinamically dispatching the AVX2 optimizations on the underlying galois field
-macro_rules! define_owf_proof {
-    (
-        opt_owf = $opt_owf:ty
-    ) => {
-        #[inline]
-        fn prove(
-            w: &GenericArray<u8, Self::LBytes>,
-            u: &GenericArray<u8, Self::LambdaBytesTimes2>,
-            v: CstrntsVal<Self>,
-            pk: &PublicKey<Self>,
-            chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-        ) -> QSProof<Self> {
-            aes_prove::<Self>(w, u, v, pk, chall_2)
-        }
-    };
-}
-
-/// Generates an implementation of [`OWFParameters::verify`] dinamically dispatching the AVX2 optimizations on the underlying galois field
-macro_rules! define_owf_verify {
-    (
-        opt_owf = $opt_owf:ty
-    ) => {
-        #[inline]
-        fn verify(
-            q: CstrntsVal<Self>,
-            d: &GenericArray<u8, Self::LBytes>,
-            pk: &PublicKey<Self>,
-            chall_2: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-            chall_3: &GenericArray<u8, Self::LambdaBytes>,
-            a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
-            a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-        ) -> OWFField<Self> {
-            aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-        }
-    };
-}
 
 #[inline]
 fn hash_v_matrix<BP>(
@@ -500,7 +463,9 @@ pub(crate) trait OWFParameters: Sized {
         v: CstrntsVal<Self>,
         pk: &PublicKey<Self>,
         chall: &GenericArray<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    ) -> QSProof<Self>;
+    ) -> QSProof<Self> {
+        aes_prove::<Self>(w, u, v, pk, chall)
+    }
 
     /// Derives the prover's challenge that can be used to verify the Quicksilver constraints
     fn verify(
@@ -511,7 +476,9 @@ pub(crate) trait OWFParameters: Sized {
         chall_3: &GenericArray<u8, Self::LambdaBytes>,
         a1_tilde: &GenericArray<u8, Self::LambdaBytes>,
         a2_tilde: &GenericArray<u8, Self::LambdaBytes>,
-    ) -> OWFField<Self>;
+    ) -> OWFField<Self> {
+        aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
+    }
 
     /// Generates the prover's secret key using the input generator
     fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<Self> {
@@ -599,9 +566,6 @@ where
     ) -> Box<GenericArray<u8, Self::LBytes>> {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
-
-    define_owf_proof!(opt_owf = x86_simd::OWF128);
-    define_owf_verify!(opt_owf = x86_simd::OWF128);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -669,8 +633,6 @@ where
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    define_owf_proof!(opt_owf = x86_simd::OWF192);
-    define_owf_verify!(opt_owf = x86_simd::OWF192);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -738,8 +700,6 @@ where
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
 
-    define_owf_proof!(opt_owf = x86_simd::OWF256);
-    define_owf_verify!(opt_owf = x86_simd::OWF256);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -805,8 +765,6 @@ where
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    define_owf_proof!(opt_owf = x86_simd::OWF128EM);
-    define_owf_verify!(opt_owf = x86_simd::OWF128EM);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -876,8 +834,6 @@ where
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    define_owf_proof!(opt_owf = x86_simd::OWF192EM);
-    define_owf_verify!(opt_owf = x86_simd::OWF192EM);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -945,8 +901,6 @@ where
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
 
-    define_owf_proof!(opt_owf = x86_simd::OWF256EM);
-    define_owf_verify!(opt_owf = x86_simd::OWF256EM);
 }
 
 pub(crate) trait TauParameters {
