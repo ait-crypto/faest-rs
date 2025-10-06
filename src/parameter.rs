@@ -121,57 +121,6 @@ impl SecurityParameter for U16 {}
 impl SecurityParameter for U24 {}
 impl SecurityParameter for U32 {}
 
-
-#[inline]
-fn hash_v_matrix<BP>(
-    h2_hasher: &mut impl Hasher,
-    v: &[GenericArray<u8, impl ArrayLength>],
-    chall1: &GenericArray<u8, BP::Chall1>,
-) where
-    BP: BaseParameters,
-{
-    let vole_hasher = BP::VoleHasher::new_vole_hasher(chall1);
-    for vi in v {
-        // Hash column-wise
-        h2_hasher.update(VoleHasherProcess::process(&vole_hasher, vi).as_slice());
-    }
-}
-
-#[inline]
-fn hash_u_vector<BP>(
-    u_tilde_sig: &mut [u8],
-    u: &GenericArray<u8, impl ArrayLength>,
-    chall1: &GenericArray<u8, BP::Chall1>,
-) where
-    BP: BaseParameters,
-{
-    let vole_hasher_u = BP::VoleHasher::new_vole_hasher(chall1);
-    u_tilde_sig.copy_from_slice(vole_hasher_u.process(u).as_slice());
-}
-
-#[inline]
-fn hash_q_matrix<BP>(
-    h2_hasher: &mut impl Hasher,
-    q: &[GenericArray<u8, impl ArrayLength>],
-    u_tilde_sig: &[u8],
-    chall1: &GenericArray<u8, BP::Chall1>,
-    decoded_chall3_iter: impl Iterator<Item = u8>,
-) where
-    BP: BaseParameters,
-{
-    let vole_hasher = BP::VoleHasher::new_vole_hasher(chall1);
-    for (q_i, d_i) in zip(q, decoded_chall3_iter) {
-        // ::12
-        let mut q_tilde = vole_hasher.process(q_i);
-        // ::14
-        if d_i == 1 {
-            xor_arrays_inplace(&mut q_tilde, u_tilde_sig);
-        }
-        // ::15
-        h2_hasher.update(&q_tilde);
-    }
-}
-
 /// Base parameters per security level
 pub(crate) trait BaseParameters {
     /// The field that is of size `2^λ` which is defined as [`Self::Lambda`]
@@ -202,13 +151,22 @@ pub(crate) trait BaseParameters {
         h2_hasher: &mut impl Hasher,
         v: &[GenericArray<u8, impl ArrayLength>],
         chall1: &GenericArray<u8, Self::Chall1>,
-    );
+    ) {
+        let vole_hasher = Self::VoleHasher::new_vole_hasher(chall1);
+        for vi in v {
+            // Hash column-wise
+            h2_hasher.update(VoleHasherProcess::process(&vole_hasher, vi).as_slice());
+        }
+    }
     /// Hash `u` using [`Self::ZKHasher`] and write the result into `signature_u`
     fn hash_u_vector(
         signature_u: &mut [u8],
         u: &GenericArray<u8, impl ArrayLength>,
         chall1: &GenericArray<u8, Self::Chall1>,
-    );
+    ) {
+        let vole_hasher_u = Self::VoleHasher::new_vole_hasher(chall1);
+        signature_u.copy_from_slice(vole_hasher_u.process(u).as_slice());
+    }
     /// Hash `q` row by row using [`Self::ZKHasher`] and update `h2_hasher` with the results
     fn hash_q_matrix(
         h2_hasher: &mut impl Hasher,
@@ -216,7 +174,19 @@ pub(crate) trait BaseParameters {
         u_tilde_sig: &[u8],
         chall1: &GenericArray<u8, Self::Chall1>,
         decoded_chall3_iter: impl Iterator<Item = u8>,
-    );
+    ) {
+        let vole_hasher = Self::VoleHasher::new_vole_hasher(chall1);
+        for (q_i, d_i) in zip(q, decoded_chall3_iter) {
+            // ::12
+            let mut q_tilde = vole_hasher.process(q_i);
+            // ::14
+            if d_i == 1 {
+                xor_arrays_inplace(&mut q_tilde, u_tilde_sig);
+            }
+            // ::15
+            h2_hasher.update(&q_tilde);
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -241,37 +211,6 @@ where
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
     type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
-
-    fn hash_v_matrix(
-        h2_hasher: &mut impl Hasher,
-        v: &[GenericArray<u8, impl ArrayLength>],
-        chall1: &GenericArray<u8, Self::Chall1>,
-    ) {
-        #[cfg(all(
-            feature = "opt-simd",
-            any(target_arch = "x86", target_arch = "x86_64"),
-            not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
-        ))]
-        hash_v_matrix::<Self>(h2_hasher, v, chall1);
-    }
-
-    fn hash_u_vector(
-        signature_u: &mut [u8],
-        u: &GenericArray<u8, impl ArrayLength>,
-        chall1: &GenericArray<u8, Self::Chall1>,
-    ) {
-        hash_u_vector::<Self>(signature_u, u, chall1);
-    }
-
-    fn hash_q_matrix(
-        h2_hasher: &mut impl Hasher,
-        q: &[GenericArray<u8, impl ArrayLength>],
-        u_tilde_sig: &[u8],
-        chall1: &GenericArray<u8, Self::Chall1>,
-        decoded_chall3_iter: impl Iterator<Item = u8>,
-    ) {
-        hash_q_matrix::<Self>(h2_hasher, q, u_tilde_sig, chall1, decoded_chall3_iter);
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -294,32 +233,6 @@ where
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
     type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
-
-    fn hash_v_matrix(
-        h2_hasher: &mut impl Hasher,
-        v: &[GenericArray<u8, impl ArrayLength>],
-        chall1: &GenericArray<u8, Self::Chall1>,
-    ) {
-        hash_v_matrix::<Self>(h2_hasher, v, chall1);
-    }
-
-    fn hash_u_vector(
-        signature_u: &mut [u8],
-        u: &GenericArray<u8, impl ArrayLength>,
-        chall1: &GenericArray<u8, Self::Chall1>,
-    ) {
-        hash_u_vector::<Self>(signature_u, u, chall1);
-    }
-
-    fn hash_q_matrix(
-        h2_hasher: &mut impl Hasher,
-        q: &[GenericArray<u8, impl ArrayLength>],
-        u_tilde_sig: &[u8],
-        chall1: &GenericArray<u8, Self::Chall1>,
-        decoded_chall3_iter: impl Iterator<Item = u8>,
-    ) {
-        hash_q_matrix::<Self>(h2_hasher, q, u_tilde_sig, chall1, decoded_chall3_iter);
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -342,32 +255,6 @@ where
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
     type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
     type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
-
-    fn hash_v_matrix(
-        h2_hasher: &mut impl Hasher,
-        v: &[GenericArray<u8, impl ArrayLength>],
-        chall1: &GenericArray<u8, Self::Chall1>,
-    ) {
-        hash_v_matrix::<Self>(h2_hasher, v, chall1);
-    }
-
-    fn hash_u_vector(
-        signature_u: &mut [u8],
-        u: &GenericArray<u8, impl ArrayLength>,
-        chall1: &GenericArray<u8, Self::Chall1>,
-    ) {
-        hash_u_vector::<Self>(signature_u, u, chall1);
-    }
-
-    fn hash_q_matrix(
-        h2_hasher: &mut impl Hasher,
-        q: &[GenericArray<u8, impl ArrayLength>],
-        u_tilde_sig: &[u8],
-        chall1: &GenericArray<u8, Self::Chall1>,
-        decoded_chall3_iter: impl Iterator<Item = u8>,
-    ) {
-        hash_q_matrix::<Self>(h2_hasher, q, u_tilde_sig, chall1, decoded_chall3_iter);
-    }
 }
 
 pub(crate) trait OWFParameters: Sized {
@@ -632,7 +519,6 @@ where
     ) -> Box<GenericArray<u8, Self::LBytes>> {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
-
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -699,7 +585,6 @@ where
     ) -> Box<GenericArray<u8, Self::LBytes>> {
         aes_extendedwitness::<Self>(owf_key, owf_input)
     }
-
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -764,7 +649,6 @@ where
     ) -> Box<GenericArray<u8, Self::LBytes>> {
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
-
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -833,7 +717,6 @@ where
     ) -> Box<GenericArray<u8, Self::LBytes>> {
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
-
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -900,7 +783,6 @@ where
     ) -> Box<GenericArray<u8, Self::LBytes>> {
         aes_extendedwitness::<Self>(owf_input, owf_key)
     }
-
 }
 
 pub(crate) trait TauParameters {
