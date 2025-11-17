@@ -132,6 +132,19 @@ use crate::{
     },
 };
 
+#[cfg(all(
+    feature = "opt-simd",
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+))]
+use parameter::x86_simd;
+#[cfg(all(
+    feature = "opt-simd",
+    any(target_arch = "x86", target_arch = "x86_64"),
+    not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+))]
+cpufeatures::new!(x86_intrinsics, "avx2", "pclmulqdq");
+
 /// Generate a key pair from a cryptographically secure RNG
 pub trait KeypairGenerator: Keypair {
     /// Generate a new keypair
@@ -202,6 +215,15 @@ macro_rules! define_impl {
                     rho: &[u8],
                     signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
                 ) -> Result<(), Error> {
+                    #[cfg(all(
+                        feature = "opt-simd",
+                        any(target_arch = "x86", target_arch = "x86_64"),
+                        not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+                    ))]
+                    if x86_intrinsics::get() {
+                        let sk: &SecretKey<<x86_simd::[<$param Parameters>] as FAESTParameters>::OWF> = unsafe { core::mem::transmute(sk) };
+                        return faest_sign::<x86_simd::[<$param Parameters>]>(msg, sk, rho, signature);
+                    }
                     faest_sign::<[<$param Parameters>]>(msg, sk, rho, signature)
                 }
 
@@ -212,6 +234,15 @@ macro_rules! define_impl {
                     rho: &[u8],
                     signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
                 ) -> Result<(), Error>  {
+                    #[cfg(all(
+                        feature = "opt-simd",
+                        any(target_arch = "x86", target_arch = "x86_64"),
+                        not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+                    ))]
+                    if x86_intrinsics::get() {
+                        let sk: &UnpackedSecretKey<<x86_simd::[<$param Parameters>] as FAESTParameters>::OWF> = unsafe { core::mem::transmute(sk) };
+                        return faest_unpacked_sign::<x86_simd::[<$param Parameters>]>(msg, sk, rho, signature);
+                    }
                     faest_unpacked_sign::<[<$param Parameters>]>(msg, sk, rho, signature)
                 }
 
@@ -222,6 +253,15 @@ macro_rules! define_impl {
                     sigma: &GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
                 ) -> Result<(), Error>
                 {
+                    #[cfg(all(
+                        feature = "opt-simd",
+                        any(target_arch = "x86", target_arch = "x86_64"),
+                        not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
+                    ))]
+                    if x86_intrinsics::get() {
+                        let pk: &PublicKey<<x86_simd::[<$param Parameters>] as FAESTParameters>::OWF> = unsafe { core::mem::transmute(pk) };
+                        return faest_verify::<x86_simd::[<$param Parameters>]>(msg, pk, sigma);
+                    }
                     faest_verify::<[<$param Parameters>]>(msg, pk, sigma)
                 }
             }

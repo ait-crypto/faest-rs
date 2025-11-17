@@ -37,6 +37,9 @@ itertools = { version = "0.14", default-features = false }
 libc = { version = "0.2", optional = true, default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 
+[target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
+cpufeatures = "0.2.17"
+
 [dev-dependencies]
 generic-tests = "0.1"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }

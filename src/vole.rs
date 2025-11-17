@@ -321,12 +321,13 @@ mod test {
     use serde::Deserialize;
 
     use crate::{
-        bavc::{
+        bavc::BatchVectorCommitment,
+        fields::{GF128, GF192, GF256},
+        parameter::{
             BAVC128Fast, BAVC128FastEM, BAVC128Small, BAVC128SmallEM, BAVC192Fast, BAVC192FastEM,
             BAVC192Small, BAVC192SmallEM, BAVC256Fast, BAVC256FastEM, BAVC256Small, BAVC256SmallEM,
-            BatchVectorCommitment,
+            OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM, OWFParameters,
         },
-        parameter::{OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM, OWFParameters},
         utils::test::{hash_array, read_test_data},
     };
 
@@ -468,9 +469,9 @@ mod test {
                     let r = GenericArray::from_slice(&r[..16]);
 
                     if data.mode == "s" {
-                        vole_check::<OWF128, BAVC128Small>(data, r);
+                        vole_check::<OWF128, BAVC128Small<GF128>>(data, r);
                     } else {
-                        vole_check::<OWF128, BAVC128Fast>(data, r);
+                        vole_check::<OWF128, BAVC128Fast<GF128>>(data, r);
                     }
                 }
 
@@ -478,17 +479,17 @@ mod test {
                     let r = GenericArray::from_slice(&r[..24]);
 
                     if data.mode == "s" {
-                        vole_check::<OWF192, BAVC192Small>(data, r);
+                        vole_check::<OWF192, BAVC192Small<GF192>>(data, r);
                     } else {
-                        vole_check::<OWF192, BAVC192Fast>(data, r);
+                        vole_check::<OWF192, BAVC192Fast<GF192>>(data, r);
                     }
                 }
 
                 _ => {
                     if data.mode == "s" {
-                        vole_check::<OWF256, BAVC256Small>(data, &r);
+                        vole_check::<OWF256, BAVC256Small<GF256>>(data, &r);
                     } else {
-                        vole_check::<OWF256, BAVC256Fast>(data, &r);
+                        vole_check::<OWF256, BAVC256Fast<GF256>>(data, &r);
                     }
                 }
             }
@@ -511,9 +512,9 @@ mod test {
                     let r = GenericArray::from_slice(&r[..16]);
 
                     if data.mode == "s" {
-                        vole_check::<OWF128EM, BAVC128SmallEM>(data, r);
+                        vole_check::<OWF128EM, BAVC128SmallEM<GF128>>(data, r);
                     } else {
-                        vole_check::<OWF128EM, BAVC128FastEM>(data, r);
+                        vole_check::<OWF128EM, BAVC128FastEM<GF128>>(data, r);
                     }
                 }
 
@@ -521,17 +522,17 @@ mod test {
                     let r = GenericArray::from_slice(&r[..24]);
 
                     if data.mode == "s" {
-                        vole_check::<OWF192EM, BAVC192SmallEM>(data, r);
+                        vole_check::<OWF192EM, BAVC192SmallEM<GF192>>(data, r);
                     } else {
-                        vole_check::<OWF192EM, BAVC192FastEM>(data, r);
+                        vole_check::<OWF192EM, BAVC192FastEM<GF192>>(data, r);
                     }
                 }
 
                 _ => {
                     if data.mode == "s" {
-                        vole_check::<OWF256EM, BAVC256SmallEM>(data, &r);
+                        vole_check::<OWF256EM, BAVC256SmallEM<GF256>>(data, &r);
                     } else {
-                        vole_check::<OWF256EM, BAVC256FastEM>(data, &r);
+                        vole_check::<OWF256EM, BAVC256FastEM<GF256>>(data, &r);
                     }
                 }
             }
