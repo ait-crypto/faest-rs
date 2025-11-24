@@ -18,7 +18,7 @@ jobs:
     runs-on: ${{matrix.runner}}
     name: Test with Rust ${{matrix.toolchain}} toolchain on ${{matrix.runner}}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{matrix.toolchain}}
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Test with target-cpu=native
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Test with cargo-c
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -73,7 +73,7 @@ jobs:
           - s390x-unknown-linux-gnu
     name: Cross test for ${{matrix.target}}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{matrix.target}}
@@ -89,7 +89,7 @@ jobs:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -100,7 +100,7 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
