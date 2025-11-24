@@ -32,7 +32,7 @@ rand = { version = "0.8", optional = true, default-features = false }
 zeroize = { version = "1.2", optional = true, default-features = false, features = [
   "derive",
 ] }
-pastey = "0.1"
+pastey = "0.2"
 itertools = { version = "0.14", default-features = false }
 libc = { version = "0.2", optional = true, default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
