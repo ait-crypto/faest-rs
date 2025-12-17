@@ -19,14 +19,32 @@ use crate::{
 };
 
 /// Internal representation of a secret key.
-#[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
 pub(crate) struct SecretKey<O>
 where
     O: OWFParameters,
 {
     pub(crate) owf_key: GenericArray<u8, O::LambdaBytes>,
-    #[cfg_attr(feature = "zeroize", zeroize(skip))]
     pub(crate) pk: PublicKey<O>,
+}
+
+#[cfg(feature = "zeroize")]
+impl<O> Zeroize for SecretKey<O>
+where
+    O: OWFParameters,
+{
+    fn zeroize(&mut self) {
+        self.owf_key.zeroize();
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl<O> Drop for SecretKey<O>
+where
+    O: OWFParameters,
+{
+    fn drop(&mut self) {
+        self.zeroize();
+    }
 }
 
 impl<O> Clone for SecretKey<O>
