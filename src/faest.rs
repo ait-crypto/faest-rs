@@ -2,6 +2,8 @@ use core::marker::PhantomData;
 
 #[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
+#[cfg(feature="valgrind")]
+use crate::faest_memcheck::FaestMemcheck;
 
 use generic_array::{GenericArray, typenum::Unsigned};
 use rand_core::CryptoRngCore;
@@ -464,6 +466,9 @@ where
     for ctr in 0u32.. {
         // ::20
         RO::<P>::hash_challenge_3_finalize(&hasher, signature.chall3, ctr);
+        #[cfg(feature = "valgrind")]
+        // declassify chall_3 which is put into the signature
+        signature.chall3.faest_declassify();
         // ::21
         if check_challenge_3::<P, O>(signature.chall3) {
             // ::24

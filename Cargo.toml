@@ -70,6 +70,11 @@ valgrind = ["valgrind_bindings"]
 name = "simple"
 required-features = ["randomized-signer", "std"]
 
+[[bin]]
+name = "faest-memcheck"
+path = "faest-memcheck/api_test.rs"
+required-features = ["valgrind"]
+
 [[test]]
 name = "nist"
 required-features = ["randomized-signer", "std"]
