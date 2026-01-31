@@ -36,6 +36,7 @@ pastey = "0.2"
 itertools = { version = "0.14", default-features = false }
 libc = { version = "0.2", optional = true, default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
+valgrind_bindings = {path = "valgrind-bindings", optional = true}
 
 [target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
 cpufeatures = "0.2.17"
@@ -62,6 +63,8 @@ serde = ["dep:serde", "generic-array/serde"]
 opt-simd = ["std"]
 # provide C interface via cargo-c
 capi = ["dep:rand", "dep:libc", "dep:zeroize", "rand/std_rng", "rand/std"]
+# valgrind instrumentation for constant-time check
+valgrind = ["valgrind_bindings"]
 
 [[example]]
 name = "simple"
@@ -89,4 +92,4 @@ all-features = true
 version = "1.0.0"
 
 [workspace]
-members = ["faest-benches"]
+members = ["faest-benches", "valgrind-bindings"]
