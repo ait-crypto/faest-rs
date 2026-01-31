@@ -107,6 +107,8 @@ mod bavc;
 #[cfg(feature = "capi")]
 pub mod capi;
 mod faest;
+#[cfg(feature = "valgrind")]
+pub mod faest_memcheck;
 mod fields;
 mod internal_keys;
 mod parameter;
