@@ -1,9 +1,9 @@
 use core::marker::PhantomData;
 
+#[cfg(feature = "valgrind")]
+use crate::faest_memcheck::FaestMemcheck;
 #[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
-#[cfg(feature="valgrind")]
-use crate::faest_memcheck::FaestMemcheck;
 
 use generic_array::{GenericArray, typenum::Unsigned};
 use rand_core::CryptoRngCore;
