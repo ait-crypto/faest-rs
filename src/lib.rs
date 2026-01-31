@@ -108,6 +108,7 @@ mod bavc;
 pub mod capi;
 mod faest;
 #[cfg(feature = "valgrind")]
+#[allow(missing_docs)]
 pub mod faest_memcheck;
 mod fields;
 mod internal_keys;

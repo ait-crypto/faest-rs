@@ -7,4 +7,6 @@
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 #[cfg(not(has_valgrind))]
-panic!("Unable to find valgrind library");
+mod bindings_fallback;
+#[cfg(not(has_valgrind))]
+pub use bindings_fallback::*;

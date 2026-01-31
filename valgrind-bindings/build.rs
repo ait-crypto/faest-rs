@@ -1,22 +1,23 @@
 use std::env;
 use std::path::PathBuf;
 
-fn check_valgrind_installed() {
-    if pkg_config::Config::new()
-        // Don't link valgrind library
+// Look for valgrind library
+fn is_valgrind_installed() -> bool {
+    pkg_config::Config::new()
+        // Don't link (we only need header macros)
         .cargo_metadata(false)
         .probe("valgrind")
-        .is_err()
-    {
-        panic!("Unable to find valgrind with pkg-config");
-    }
-    // Define has_valgrind flag
-    println!("cargo:rustc-cfg=has_valgrind");
+        .is_ok()
 }
 
 fn main() {
-    // Ensure valgrind is installed in the target
-    check_valgrind_installed();
+    if !is_valgrind_installed() {
+        // Only build if valgrind is installed
+        return;
+    }
+
+    // Set has_valgrind flag
+    println!("cargo:rustc-cfg=has_valgrind");
 
     // Invalidate the built crate whenever the wrapper and the build script changes.
     println!("cargo:rerun-if-changed=wrapper.h");
