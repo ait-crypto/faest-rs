@@ -286,9 +286,9 @@ where
             .update(&(b_sq.key * a.tag[0] + b_sq.tag[0] * a.key - b.tag[0]));
 
         // Degree 3 (i.e., commitments) should be zero
-        #[cfg(not(feature = "valgrind" ))]
+        #[cfg(not(feature = "valgrind"))]
         debug_assert_eq!(a_sq.key * b.key - a.key, F::ZERO);
-        #[cfg(not(feature = "valgrind" ))]
+        #[cfg(not(feature = "valgrind"))]
         debug_assert_eq!(b_sq.key * a.key - b.key, F::ZERO);
     }
 

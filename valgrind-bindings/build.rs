@@ -15,7 +15,6 @@ fn check_valgrind_installed() {
 }
 
 fn main() {
-
     // Ensure valgrind is installed in the target
     check_valgrind_installed();
 
