@@ -62,6 +62,9 @@ where
 }
 
 fn main() {
+    if !valgrind_bindings::HAS_VALGRIND {
+        panic!("Unable to find valgrind library")
+    }
     // TODO: preliminary testing only includes "f" version.
     // If necessary also include "s" versions (much slower with valgrind instrumentation).
     api_test::<FAEST128fSigningKey, FAEST128fSignature>("FAEST-128f");
