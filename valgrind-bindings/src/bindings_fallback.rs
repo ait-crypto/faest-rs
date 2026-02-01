@@ -1,3 +1,5 @@
+#![allow(clippy::missing_safety_doc)]
+
 pub unsafe fn valgrind_make_mem_undefined(
     _qzz_addr: *mut ::core::ffi::c_void,
     _qzz_len: usize,
