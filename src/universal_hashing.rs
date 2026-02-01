@@ -266,6 +266,7 @@ where
         debug_assert_eq!(val.key, F::ZERO);
     }
 
+    /// Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
     pub(crate) fn lift_and_process(
         &mut self,
         a: &FieldCommitDegOne<F>,
@@ -273,8 +274,6 @@ where
         b: &FieldCommitDegOne<F>,
         b_sq: &FieldCommitDegOne<F>,
     ) {
-        // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
-
         // Degree 1
         self.a1_hasher.update(&(a_sq.tag[0] * b.tag[0]));
         self.a1_hasher.update(&(b_sq.tag[0] * a.tag[0]));
@@ -353,9 +352,8 @@ where
         self.update(&(self.delta * st0_i + *si * st1_i));
     }
 
+    /// Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
     pub(crate) fn lift_and_process(&mut self, a: &F, a_sq: &F, b: &F, b_sq: &F) {
-        // Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
-
         // Raise to degree 3 and update
         self.update(&(self.delta * (*a_sq * b - self.delta * a)));
         self.update(&(self.delta * (*a * b_sq - self.delta * b)));

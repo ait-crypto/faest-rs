@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2 (2025-12-17)
+
+* Improve dynamic dispatch of AVX2 optimized codepaths.
+* Add initial support for `no_std` builds. (#15)
+
 ## 0.2.1 (2025-05-16)
 
 * Add unpacked secret keys with pre-computed witnesses.
