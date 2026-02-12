@@ -10,7 +10,7 @@ rust-version = "1.86"
 faest = { path = "../", features = ["randomized-signer"] }
 
 [dev-dependencies]
-nist-pqc-seeded-rng = "0.2.1"
+nist-pqc-seeded-rng = "0.4.0"
 rand = "0.8"
 criterion = "0.8"
 
