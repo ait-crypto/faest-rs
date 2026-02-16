@@ -39,7 +39,7 @@ bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 valgrind_bindings = {path = "valgrind-bindings", optional = true}
 
 [target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
-cpufeatures = "0.2.17"
+cpufeatures = "0.3.0"
 
 [dev-dependencies]
 generic-tests = "0.1"
