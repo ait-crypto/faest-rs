@@ -29,6 +29,9 @@ jobs:
         run: cargo test -r --workspace
       - name: Test with all features
         run: cargo test -r --all-features --workspace
+      - name: Valgrind memcheck
+        run: faest-memcheck/test_with_valgrind.sh
+
 
   test-native:
     needs: test
@@ -42,6 +45,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Test with all features
         run: cargo test -r --all-features --workspace
+      - name: Valgrind memcheck
+        run: faest-memcheck/test_with_valgrind.sh --opt-simd
     env:
       RUSTFLAGS: "-C target-cpu=native"
 
