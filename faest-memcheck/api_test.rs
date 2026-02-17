@@ -65,12 +65,20 @@ fn main() {
     if !valgrind_bindings::HAS_VALGRIND {
         panic!("Unable to find valgrind library")
     }
-    // TODO: preliminary testing only includes "f" version.
-    // If necessary also include "s" versions (much slower with valgrind instrumentation).
+
+    // FAEST-f
     api_test::<FAEST128fSigningKey, FAEST128fSignature>("FAEST-128f");
     api_test::<FAESTEM128fSigningKey, FAESTEM128fSignature>("FAEST-EM-128f");
     api_test::<FAEST192fSigningKey, FAEST192fSignature>("FAEST-192f");
     api_test::<FAESTEM192fSigningKey, FAESTEM192fSignature>("FAEST-EM-192f");
     api_test::<FAEST256fSigningKey, FAEST256fSignature>("FAEST-256f");
     api_test::<FAESTEM256fSigningKey, FAESTEM256fSignature>("FAEST-EM-256f");
+
+    // FAEST-s
+    api_test::<FAEST128fSigningKey, FAEST128fSignature>("FAEST-128s");
+    api_test::<FAESTEM128fSigningKey, FAESTEM128fSignature>("FAEST-EM-128s");
+    api_test::<FAEST192fSigningKey, FAEST192fSignature>("FAEST-192s");
+    api_test::<FAESTEM192fSigningKey, FAESTEM192fSignature>("FAEST-EM-192s");
+    api_test::<FAEST256fSigningKey, FAEST256fSignature>("FAEST-256s");
+    api_test::<FAESTEM256fSigningKey, FAESTEM256fSignature>("FAEST-EM-256s");
 }
