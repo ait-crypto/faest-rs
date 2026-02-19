@@ -14,7 +14,7 @@ default = ["faest/opt-simd"]
 
 [dev-dependencies]
 nist-pqc-seeded-rng = "0.2.1"
-rand = "0.8"
+rand = "0.10"
 criterion = "0.8"
 
 [lib]
