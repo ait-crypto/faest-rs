@@ -7,6 +7,16 @@ SHA3 and AES, which are believed to remain secure against quantum adversaries.
 This crate provides an implementation of FAEST written in Rust. The implementation is compatible
 with version 2 of the FAEST specification.
 
+## Testing
+
+For tests, run `cargo test`. This will verify the implementation against the test vectors of the
+FAEST submission to NIST.
+
+## Benchmarking
+
+The benchmarks are contained in the `faest-benches` crate. From there, run `cargo bench` for
+benchmarking.
+
 ## Security Notes
 
 This crate has received no security audit. Use at your own risk.
