@@ -1,11 +1,12 @@
+use core::{convert::AsRef, ffi::c_void};
+
 use crate::{
     FAEST128fSigningKey, FAEST128sSigningKey, FAEST192fSigningKey, FAEST192sSigningKey,
     FAEST256fSigningKey, FAEST256sSigningKey, FAESTEM128fSigningKey, FAESTEM128sSigningKey,
     FAESTEM192fSigningKey, FAESTEM192sSigningKey, FAESTEM256fSigningKey, FAESTEM256sSigningKey,
 };
-use core::ffi::c_void;
+
 use pastey::paste;
-use std::convert::AsRef;
 use valgrind_bindings::{valgrind_make_mem_defined, valgrind_make_mem_undefined};
 
 /// Defines valgrind wrappers that allow checking constant-time implementation.
