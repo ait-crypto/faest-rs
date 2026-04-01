@@ -60,6 +60,7 @@ fn main() -> Result<(), std::io::Error> {
             .args([
                 "--tool=memcheck".into(),
                 "--error-exitcode=1".into(),
+                "--track-origins=yes".into(),
                 env::current_exe().unwrap().into_os_string(),
             ])
             .exec())
