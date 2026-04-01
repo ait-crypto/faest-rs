@@ -31,18 +31,18 @@ macro_rules! define_impl {
             impl FaestMemcheck for [<$param SigningKey>] {
                 fn faest_classify(&self) {
                     unsafe {
-                        make_mem_undefined(self.0.owf_key.as_ptr() as *mut c_void, self.0.owf_key.len());
+                        make_mem_undefined(self.0.owf_key.as_ptr(), self.0.owf_key.len());
                     }
                 }
 
                 fn faest_declassify(&self) {
                     unsafe {
-                        make_mem_defined(self.0.owf_key.as_ptr() as *mut c_void, self.0.owf_key.len());
+                        make_mem_defined(self.0.owf_key.as_ptr(), self.0.owf_key.len());
                     }
                 }
             }
         }
-    }
+    };
 }
 
 define_impl!(FAEST128f);
@@ -64,13 +64,13 @@ where
 {
     fn faest_classify(&self) {
         unsafe {
-            make_mem_undefined(self.as_ref().as_ptr() as *mut c_void, self.as_ref().len());
+            make_mem_undefined(self.as_ref().as_ptr(), self.as_ref().len());
         }
     }
 
     fn faest_declassify(&self) {
         unsafe {
-            make_mem_defined(self.as_ref().as_ptr() as *mut c_void, self.as_ref().len());
+            make_mem_defined(self.as_ref().as_ptr(), self.as_ref().len());
         }
     }
 }
