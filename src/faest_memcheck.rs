@@ -7,7 +7,7 @@ use crate::{
 };
 
 use pastey::paste;
-use valgrind_bindings::{valgrind_make_mem_defined, valgrind_make_mem_undefined};
+use vgzzq::memcheck::{make_mem_defined, make_mem_undefined};
 
 /// Defines valgrind wrappers that allow checking constant-time implementation.
 pub trait FaestMemcheck {
@@ -31,19 +31,17 @@ macro_rules! define_impl {
             impl FaestMemcheck for [<$param SigningKey>] {
                 fn faest_classify(&self) {
                     unsafe {
-                    valgrind_make_mem_undefined(self.0.owf_key.as_ptr() as *mut c_void, self.0.owf_key.len());
+                        make_mem_undefined(self.0.owf_key.as_ptr() as *mut c_void, self.0.owf_key.len());
                     }
                 }
 
                 fn faest_declassify(&self) {
                     unsafe {
-                        valgrind_make_mem_defined(self.0.owf_key.as_ptr() as *mut c_void, self.0.owf_key.len());
+                        make_mem_defined(self.0.owf_key.as_ptr() as *mut c_void, self.0.owf_key.len());
                     }
                 }
             }
         }
-
-
     }
 }
 
@@ -66,13 +64,13 @@ where
 {
     fn faest_classify(&self) {
         unsafe {
-            valgrind_make_mem_undefined(self.as_ref().as_ptr() as *mut c_void, self.as_ref().len());
+            make_mem_undefined(self.as_ref().as_ptr() as *mut c_void, self.as_ref().len());
         }
     }
 
     fn faest_declassify(&self) {
         unsafe {
-            valgrind_make_mem_defined(self.as_ref().as_ptr() as *mut c_void, self.as_ref().len());
+            make_mem_defined(self.as_ref().as_ptr() as *mut c_void, self.as_ref().len());
         }
     }
 }

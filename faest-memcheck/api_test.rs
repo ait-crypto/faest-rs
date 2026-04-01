@@ -1,7 +1,9 @@
+use std::convert::AsRef;
+
 use faest::*;
 use faest_memcheck::FaestMemcheck;
 use signature::{RandomizedSigner, Signer, Verifier};
-use std::convert::AsRef;
+use vgzzq::running_on_valgrind;
 
 const MESSAGE: &str = "This is a message.";
 
@@ -62,7 +64,7 @@ where
 }
 
 fn main() {
-    if !valgrind_bindings::HAS_VALGRIND {
+    if running_on_valgrind() == 0 {
         panic!("Unable to find valgrind library")
     }
 
