@@ -2,8 +2,6 @@
 
 set -e # Exit immediately if any command exits with a non-zero status
 
-SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
-
 helpFunction()
 {
   echo ""
@@ -27,10 +25,9 @@ done
 
 if [[ -v opt_simd ]] ; then
     echo "Testing avx2 implementation..."
-    RUSTFLAGS="-C target-cpu=native" cargo build --all-features
+    RUSTFLAGS="-C target-cpu=native --cfg=valgrind=\"enabled\"" cargo test -r --all-features --test=memcheck
 else
     echo "Testing unoptimized implementation..."
-    cargo build --no-default-features --features valgrind,std,randomized-signer
+    RUSTFLAGS="--cfg=valgrind=\"enabled\"" cargo test -r --no-default-features --features std,randomized-signer --test=memcheck
 fi
-valgrind --tool=memcheck --error-exitcode=1 $SCRIPT_DIR/../target/debug/faest-memcheck 
 echo "Done."

@@ -37,11 +37,11 @@ itertools = { version = "0.14", default-features = false }
 libc = { version = "0.2", optional = true, default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 
-[target.'cfg(any(target_arch = "x86", target_arch = "x86_64", target_arch = "arm", target_arch = "aarch64", target_os="unix"))'.dependencies]
-vgzzq = { version = "1", optional = true }
-
 [target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
 cpufeatures = "0.3.0"
+
+[target.'cfg(valgrind = "enabled")'.dependencies]
+vgzzq = "1"
 
 [dev-dependencies]
 generic-tests = "0.1"
@@ -50,6 +50,7 @@ nist-pqc-seeded-rng = { version = "0.2.1", default-features = false }
 rand = { version = "0.8", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+cfg-if = "1"
 
 [features]
 default = ["zeroize", "randomized-signer", "opt-simd", "std"]
@@ -66,22 +67,17 @@ opt-simd = ["std"]
 # provide C interface via cargo-c
 capi = ["dep:rand", "dep:libc", "dep:zeroize", "rand/std_rng", "rand/std"]
 
-[target.'cfg(any(target_arch = "x86", target_arch = "x86_64", target_arch = "arm", target_arch = "aarch64", target_os="unix"))'.features]
-# valgrind instrumentation for constant-time check
-# (this feature is not covered by any semver guarantees)
-valgrind = ["dep:vgzzq"]
-
 [[example]]
 name = "simple"
 required-features = ["randomized-signer", "std"]
 
-[[bin]]
-name = "faest-memcheck"
-path = "faest-memcheck/api_test.rs"
-required-features = ["valgrind"]
-
 [[test]]
 name = "nist"
+required-features = ["randomized-signer", "std"]
+
+[[test]]
+name = "memcheck"
+harness = false
 required-features = ["randomized-signer", "std"]
 
 [profile.dev.package."*"]
@@ -100,6 +96,11 @@ all-features = true
 
 [package.metadata.capi.library]
 version = "1.0.0"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+  'cfg(valgrind, values("enabled"))',
+] }
 
 [workspace]
 members = ["faest-benches"]

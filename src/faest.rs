@@ -1,7 +1,5 @@
 use core::marker::PhantomData;
 
-#[cfg(feature = "valgrind")]
-use crate::faest_memcheck::FaestMemcheck;
 #[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
 
@@ -11,6 +9,7 @@ use rand_core::CryptoRngCore;
 use crate::{
     Error, UnpackedSecretKey,
     bavc::{BatchVectorCommitment, BavcOpenResult},
+    declassify,
     fields::Field,
     internal_keys::{PublicKey, SecretKey},
     parameter::{BaseParameters, FAESTParameters, OWFParameters, TauParameters, Witness},
@@ -466,9 +465,8 @@ where
     for ctr in 0u32.. {
         // ::20
         RO::<P>::hash_challenge_3_finalize(&hasher, signature.chall3, ctr);
-        #[cfg(feature = "valgrind")]
         // declassify chall_3 which is put into the signature
-        signature.chall3.faest_declassify();
+        declassify!(signature.chall3);
         // ::21
         if check_challenge_3::<P, O>(signature.chall3) {
             // ::24
