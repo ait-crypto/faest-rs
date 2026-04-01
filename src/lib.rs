@@ -112,6 +112,8 @@ mod faest;
 pub mod faest_memcheck;
 mod fields;
 mod internal_keys;
+#[cfg(valgrind = "enabled")]
+mod memcheck;
 mod parameter;
 mod prg;
 mod prover;
@@ -147,6 +149,42 @@ use parameter::x86_simd;
     not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
 ))]
 cpufeatures::new!(x86_intrinsics, "avx2", "pclmulqdq");
+
+#[cfg(not(valgrind = "enabled"))]
+macro_rules! classify {
+    ($val:expr) => {};
+}
+
+#[cfg(not(valgrind = "enabled"))]
+macro_rules! declassify {
+    ($val:expr) => {};
+}
+
+#[cfg(not(valgrind = "enabled"))]
+pub(crate) use classify;
+#[cfg(not(valgrind = "enabled"))]
+pub(crate) use declassify;
+
+#[cfg(valgrind = "enabled")]
+pub use memcheck::Classifier;
+
+#[cfg(valgrind = "enabled")]
+#[macro_export]
+/// Mark a value as "classified" via valgrind
+macro_rules! classify {
+    ($val:expr) => {
+        $crate::Classifier::classify(&$val);
+    };
+}
+
+#[cfg(valgrind = "enabled")]
+#[macro_export]
+/// Mark a value as "unclassified" via valgrind
+macro_rules! declassify {
+    ($val:expr) => {
+        $crate::Classifier::declassify(&$val);
+    };
+}
 
 /// Generate a key pair from a cryptographically secure RNG
 pub trait KeypairGenerator: Keypair {
@@ -474,21 +512,21 @@ macro_rules! define_impl {
             impl Signer<[<$param Signature>]> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
                     let mut signature = GenericArray::default();
-                    $param::sign(msg, &self.0, &[], &mut signature).map(|_| [<$param Signature>](signature))
+                    $param::sign(msg, &self.0, &[], &mut signature).map(|_| { declassify!(signature); [<$param Signature>](signature) })
                 }
             }
 
             impl Signer<Box<[<$param Signature>]>> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<Box<[<$param Signature>]>, Error> {
                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));
-                    $param::sign(msg, &self.0, &[], &mut signature.0).map(|_| signature)
+                    $param::sign(msg, &self.0, &[], &mut signature.0).map(|_| { declassify!(signature.0); signature })
                 }
             }
 
             impl Signer<[<$param Signature>]> for [<$param UnpackedSigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
                     let mut signature = GenericArray::default();
-                    $param::unpacked_sign(msg, &self.0, &[], &mut signature).map(|_| [<$param Signature>](signature))
+                    $param::unpacked_sign(msg, &self.0, &[], &mut signature).map(|_| { declassify!(signature); [<$param Signature>](signature) })
                 }
             }
 
@@ -561,7 +599,7 @@ macro_rules! define_impl {
                 ) -> Result<[<$param Signature>], Error> {
                     let rho = $param::sample_rho(rng);
                     let mut signature = GenericArray::default();
-                    $param::sign(msg, &self.0, &rho, &mut signature).map(|_| [<$param Signature>](signature))
+                    $param::sign(msg, &self.0, &rho, &mut signature).map(|_| { declassify!(signature); [<$param Signature>](signature) })
                 }
             }
 
@@ -574,7 +612,7 @@ macro_rules! define_impl {
                 ) -> Result<Box<[<$param Signature>]>, Error> {
                     let rho = $param::sample_rho(rng);
                     let mut signature = Box::new([<$param Signature>](GenericArray::default()));
-                    $param::sign(msg, &self.0, &rho, &mut signature.0).map(|_| signature)
+                    $param::sign(msg, &self.0, &rho, &mut signature.0).map(|_| { declassify!(signature.0); signature })
                 }
             }
 
@@ -587,7 +625,7 @@ macro_rules! define_impl {
                 ) -> Result<[<$param Signature>], Error> {
                     let rho = $param::sample_rho(rng);
                     let mut signature = GenericArray::default();
-                    $param::unpacked_sign(msg, &self.0, &rho, &mut signature).map(|_| [<$param Signature>](signature))
+                    $param::unpacked_sign(msg, &self.0, &rho, &mut signature).map(|_| { declassify!(signature); [<$param Signature>](signature) })
                 }
             }
 

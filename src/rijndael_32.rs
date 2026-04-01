@@ -16,14 +16,11 @@ use alloc::{vec, vec::Vec};
 
 use aes::{
     Block,
-    cipher::{
-        BlockEncrypt, BlockSizeUser, KeyInit, KeySizeUser,
-        generic_array::typenum::{U24, U32},
-    },
+    cipher::{BlockEncrypt, BlockSizeUser, KeyInit, KeySizeUser},
 };
 use generic_array::{
     GenericArray,
-    typenum::{U2, U6, U8, U12, U14, Unsigned},
+    typenum::{U2, U6, U8, U12, U14, U24, U32, Unsigned},
 };
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;

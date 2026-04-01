@@ -14,7 +14,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
-    ByteEncoding, Error,
+    ByteEncoding, Error, classify, declassify,
     parameter::{OWFParameters, Witness},
 };
 
@@ -77,6 +77,10 @@ where
                 return Err(Error::new());
             }
 
+            classify!(owf_key);
+            declassify!(owf_output);
+            declassify!(owf_input);
+
             Ok(Self {
                 owf_key: owf_key.clone(),
                 pk: PublicKey {
@@ -109,6 +113,7 @@ where
         let mut buf = GenericArray::default();
         buf[..O::InputSize::USIZE].copy_from_slice(&self.pk.owf_input);
         buf[O::InputSize::USIZE..].copy_from_slice(&self.owf_key);
+        classify!(buf);
         buf
     }
 
@@ -116,6 +121,7 @@ where
         let mut buf = Vec::with_capacity(O::SK::USIZE);
         buf.extend_from_slice(&self.pk.owf_input);
         buf.extend_from_slice(&self.owf_key);
+        classify!(buf);
         buf
     }
 
