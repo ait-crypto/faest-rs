@@ -13,7 +13,7 @@ faest = { path = "../", default-features = false,  features = ["randomized-signe
 default = ["faest/opt-simd"]
 
 [dev-dependencies]
-nist-pqc-seeded-rng = "0.2.1"
+nist-pqc-seeded-rng = "0.4.0"
 rand = "0.8"
 criterion = "0.8"
 
