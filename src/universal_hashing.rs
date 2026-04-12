@@ -1,6 +1,7 @@
 use core::{
     array,
     fmt::Debug,
+    hint::black_box,
     iter::zip,
     ops::{Add, Mul},
 };
@@ -134,7 +135,7 @@ where
     fn process_block(&self, h0: &mut F, h1: &mut GF64, data: &[u8]) {
         *h0 = *h0 * self.s + F::from(data);
         for data in data.chunks_exact(<GF64 as Field>::Length::USIZE) {
-            *h1 = *h1 * self.t + GF64::from(data);
+            *h1 = *h1 * black_box(self.t) + GF64::from(data);
         }
     }
 
