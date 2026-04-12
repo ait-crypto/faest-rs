@@ -59,9 +59,7 @@ where
     fn process(&self, x: &[u8]) -> GenericArray<u8, OutputLength> {
         debug_assert!(x.len() > OutputLength::USIZE);
 
-        let x0 = &x[..x.len() - OutputLength::USIZE];
-        let x1 = &x[x.len() - OutputLength::USIZE..];
-
+        let (x0, x1) = x.split_at(x.len() - OutputLength::USIZE);
         self.process_split(x0, GenericArray::from_slice(x1))
     }
 
