@@ -1,64 +1,71 @@
-use core::{
-    num::Wrapping,
-    ops::{
-        Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
-    },
+use cmov::Cmov;
+use core::ops::{
+    Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
 };
-
 use generic_array::{GenericArray, typenum::U8};
 
 use super::{Field, Square};
 
 trait GaloisFieldHelper<T>
 where
-    T: Sized + Copy,
-    Wrapping<T>: BitAnd<Output = Wrapping<T>>
-        + BitXor<Output = Wrapping<T>>
-        + BitXorAssign
-        + Neg<Output = Wrapping<T>>
-        + Shl<usize, Output = Wrapping<T>>
-        + Shr<usize, Output = Wrapping<T>>,
+    T: Sized
+        + Copy
+        + Cmov
+        + PartialEq
+        + BitXor<Output = T>
+        + BitAnd<Output = T>
+        + Shl<usize, Output = T>
+        + Shr<usize, Output = T>,
 {
-    const MODULUS: Wrapping<T>;
+    const MODULUS: SmallGF<T>;
 
-    const ONE: Wrapping<T>;
+    const ZERO: SmallGF<T>;
+
+    const ONE: SmallGF<T>;
 
     const BITS: usize;
 
-    fn mul_helper(mut left: Wrapping<T>, right: Wrapping<T>) -> Wrapping<T> {
-        let mut result_value = (-(right & Self::ONE)) & left;
+    fn mul_helper(mut left: SmallGF<T>, right: SmallGF<T>) -> SmallGF<T> {
+        let mut result_value = Self::ZERO;
+        result_value.cmovnz(&left, { right & Self::ONE == Self::ONE } as u8);
         for i in 1..Self::BITS {
-            let mask = -((left >> (Self::BITS - 1)) & Self::ONE);
-            left = (left << 1) ^ (mask & Self::MODULUS);
-            result_value ^= (-((right >> i) & Self::ONE)) & left;
+            let mut mask = Self::ZERO;
+            mask.cmovnz(
+                &Self::MODULUS,
+                { (left >> (Self::BITS - 1) & Self::ONE) == Self::ONE } as u8,
+            );
+            left = (left << 1) + mask;
+
+            let mut add = Self::ZERO;
+            add.cmovnz(&left, { (right >> i) & Self::ONE == Self::ONE } as u8);
+            result_value += add;
         }
         result_value
     }
 }
 
-/// Small binary fields to a size up to 64 bits
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(transparent)]
-pub struct SmallGF<T>(Wrapping<T>);
+pub struct SmallGF<T>(T);
 
 impl<T> From<T> for SmallGF<T> {
     #[inline]
     fn from(value: T) -> Self {
-        Self(Wrapping(value))
+        Self(value)
     }
 }
 
 impl From<SmallGF<Self>> for u8 {
     #[inline]
     fn from(value: SmallGF<Self>) -> Self {
-        value.0.0
+        value.0
     }
 }
 
 impl From<SmallGF<Self>> for u64 {
     #[inline]
     fn from(value: SmallGF<Self>) -> Self {
-        value.0.0
+        value.0
     }
 }
 
@@ -68,7 +75,7 @@ where
 {
     #[inline]
     fn default() -> Self {
-        Self(Wrapping::default())
+        Self(T::default())
     }
 }
 
@@ -77,13 +84,23 @@ where
     T: PartialEq<T>,
 {
     fn eq(&self, other: &T) -> bool {
-        self.0.0 == *other
+        self.0 == *other
+    }
+}
+
+impl<T> BitAnd for SmallGF<T>
+where
+    T: BitAnd<Output = T>,
+{
+    type Output = Self;
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self(self.0 & rhs.0)
     }
 }
 
 impl<T> Add for SmallGF<T>
 where
-    Wrapping<T>: BitXor<Output = Wrapping<T>>,
+    T: BitXor<Output = T>,
 {
     type Output = Self;
 
@@ -96,18 +113,18 @@ where
 
 impl<T> AddAssign for SmallGF<T>
 where
-    Wrapping<T>: BitXorAssign,
+    T: Copy + BitXor<Output = T>,
 {
     #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: Self) {
-        self.0 ^= rhs.0;
+        self.0 = self.0 ^ rhs.0;
     }
 }
 
 impl<T> Sub for SmallGF<T>
 where
-    Wrapping<T>: BitXor<Output = Wrapping<T>>,
+    T: BitXor<Output = T>,
 {
     type Output = Self;
 
@@ -120,7 +137,7 @@ where
 
 impl<T> SubAssign for SmallGF<T>
 where
-    Wrapping<T>: BitXorAssign,
+    T: BitXorAssign,
 {
     #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
@@ -138,70 +155,107 @@ impl<T> Neg for SmallGF<T> {
     }
 }
 
+impl<T> Shl<usize> for SmallGF<T>
+where
+    T: Shl<usize, Output = T>,
+{
+    type Output = Self;
+    fn shl(self, rhs: usize) -> Self::Output {
+        Self(self.0 << rhs)
+    }
+}
+
+impl<T> Shr<usize> for SmallGF<T>
+where
+    T: Shr<usize, Output = T>,
+{
+    type Output = Self;
+    fn shr(self, rhs: usize) -> Self::Output {
+        Self(self.0 >> rhs)
+    }
+}
+
+impl<T> Cmov for SmallGF<T>
+where
+    T: Cmov,
+{
+    fn cmovnz(&mut self, value: &Self, condition: cmov::Condition) {
+        self.0.cmovnz(&value.0, condition);
+    }
+    fn cmovz(&mut self, value: &Self, condition: cmov::Condition) {
+        self.0.cmovnz(&value.0, condition);
+    }
+}
+
 impl GaloisFieldHelper<u64> for SmallGF<u64> {
     const BITS: usize = u64::BITS as usize;
-    const MODULUS: Wrapping<u64> = Wrapping(0b00011011u64);
-    const ONE: Wrapping<u64> = Wrapping(1u64);
+    const MODULUS: Self = Self(0b00011011u64);
+    const ZERO: Self = Self(0u64);
+    const ONE: Self = Self(1u64);
 }
 
 impl GaloisFieldHelper<u8> for SmallGF<u8> {
     const BITS: usize = u8::BITS as usize;
-    const MODULUS: Wrapping<u8> = Wrapping(0b00011011);
-    const ONE: Wrapping<u8> = Wrapping(1u8);
+    const MODULUS: Self = Self(0b00011011);
+    const ZERO: Self = Self(0u8);
+    const ONE: Self = Self(1u8);
 }
 
 impl<T> Mul for SmallGF<T>
 where
     Self: GaloisFieldHelper<T>,
-    T: Sized + Copy,
-    Wrapping<T>: BitAnd<Output = Wrapping<T>>
-        + BitXor<Output = Wrapping<T>>
-        + BitXorAssign
-        + Neg<Output = Wrapping<T>>
-        + Shl<usize, Output = Wrapping<T>>
-        + Shr<usize, Output = Wrapping<T>>,
+    T: Sized
+        + Copy
+        + Cmov
+        + PartialEq
+        + BitAnd<Output = T>
+        + BitXor<Output = T>
+        + Shl<usize, Output = T>
+        + Shr<usize, Output = T>,
 {
     type Output = Self;
 
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
-        Self(Self::mul_helper(self.0, rhs.0))
+        Self::mul_helper(self, rhs)
     }
 }
 
 impl<T> MulAssign for SmallGF<T>
 where
     Self: GaloisFieldHelper<T>,
-    T: Sized + Copy,
-    Wrapping<T>: BitAnd<Output = Wrapping<T>>
-        + BitXor<Output = Wrapping<T>>
-        + BitXorAssign
-        + Neg<Output = Wrapping<T>>
-        + Shl<usize, Output = Wrapping<T>>
-        + Shr<usize, Output = Wrapping<T>>,
+    T: Sized
+        + Copy
+        + Cmov
+        + PartialEq
+        + BitXor<Output = T>
+        + BitAnd<Output = T>
+        + Shl<usize, Output = T>
+        + Shr<usize, Output = T>,
 {
     #[inline]
     fn mul_assign(&mut self, rhs: Self) {
-        self.0 = Self::mul_helper(self.0, rhs.0);
+        *self = Self::mul_helper(*self, rhs);
     }
 }
 
 impl<T> Square for SmallGF<T>
 where
     Self: GaloisFieldHelper<T>,
-    T: Sized + Copy,
-    Wrapping<T>: BitAnd<Output = Wrapping<T>>
-        + BitXor<Output = Wrapping<T>>
-        + BitXorAssign
-        + Neg<Output = Wrapping<T>>
-        + Shl<usize, Output = Wrapping<T>>
-        + Shr<usize, Output = Wrapping<T>>,
+    T: Sized
+        + Copy
+        + Cmov
+        + PartialEq
+        + BitXor<Output = T>
+        + BitAnd<Output = T>
+        + Shl<usize, Output = T>
+        + Shr<usize, Output = T>,
 {
     type Output = Self;
 
     #[inline]
     fn square(self) -> Self::Output {
-        Self(Self::mul_helper(self.0, self.0))
+        Self::mul_helper(self, self)
     }
 }
 
@@ -226,13 +280,13 @@ impl GF8 {
 pub type GF64 = SmallGF<u64>;
 
 impl Field for GF64 {
-    const ZERO: Self = Self(Wrapping(0));
-    const ONE: Self = Self(Wrapping(1));
+    const ZERO: Self = Self(0);
+    const ONE: Self = Self(1);
 
     type Length = U8;
 
     fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        GenericArray::from(self.0.0.to_le_bytes())
+        GenericArray::from(self.0.to_le_bytes())
     }
 
     /*
