@@ -7,6 +7,40 @@ use hybrid_array::{Array, typenum::U8};
 
 use super::{Field, Square};
 
+trait ExtractBit {
+    fn extract_bit(&self, bit: usize) -> Condition;
+    fn extract_lowest_bit(&self) -> Condition;
+    fn extract_highest_bit(&self) -> Condition;
+}
+
+impl ExtractBit for u64 {
+    fn extract_bit(&self, bit: usize) -> Condition {
+        ((self >> bit) & 0x1) as u8
+    }
+
+    fn extract_lowest_bit(&self) -> Condition {
+        (self & 0x1) as u8
+    }
+
+    fn extract_highest_bit(&self) -> Condition {
+        (self >> 63) as u8
+    }
+}
+
+impl ExtractBit for u8 {
+    fn extract_bit(&self, bit: usize) -> Condition {
+        (self >> bit) & 0x1
+    }
+
+    fn extract_lowest_bit(&self) -> Condition {
+        self & 0x1
+    }
+
+    fn extract_highest_bit(&self) -> Condition {
+        self >> 7
+    }
+}
+
 trait GaloisFieldHelper<T>
 where
     T: Sized
@@ -17,32 +51,28 @@ where
         + BitXorAssign
         + BitAnd<Output = T>
         + Shl<usize, Output = T>
-        + Shr<usize, Output = T>,
+        + Shr<usize, Output = T>
+        + ExtractBit,
 {
-    const MODULUS: SmallGF<T>;
+    const MODULUS: T;
 
-    const ZERO: SmallGF<T>;
-
-    const ONE: SmallGF<T>;
+    const ZERO: T;
 
     const BITS: usize;
 
     fn mul_helper(mut left: SmallGF<T>, right: SmallGF<T>) -> SmallGF<T> {
         let mut result_value = Self::ZERO;
-        result_value.cmovnz(&left, { right & Self::ONE == Self::ONE } as u8);
+        result_value.cmovnz(&left.0, right.0.extract_lowest_bit());
         for i in 1..Self::BITS {
             let mut mask = Self::ZERO;
-            mask.cmovnz(
-                &Self::MODULUS,
-                { (left >> (Self::BITS - 1) & Self::ONE) == Self::ONE } as u8,
-            );
-            left = (left << 1) + mask;
+            mask.cmovnz(&Self::MODULUS, left.0.extract_highest_bit());
+            left.0 = (left.0 << 1) ^ mask;
 
             let mut add = Self::ZERO;
-            add.cmovnz(&left, { (right >> i) & Self::ONE == Self::ONE } as u8);
-            result_value += add;
+            add.cmovnz(&left.0, right.0.extract_bit(i));
+            result_value ^= add;
         }
-        result_value
+        SmallGF(result_value)
     }
 }
 
@@ -157,50 +187,16 @@ impl<T> Neg for SmallGF<T> {
     }
 }
 
-impl<T> Shl<usize> for SmallGF<T>
-where
-    T: Shl<usize, Output = T>,
-{
-    type Output = Self;
-    fn shl(self, rhs: usize) -> Self::Output {
-        Self(self.0 << rhs)
-    }
-}
-
-impl<T> Shr<usize> for SmallGF<T>
-where
-    T: Shr<usize, Output = T>,
-{
-    type Output = Self;
-    fn shr(self, rhs: usize) -> Self::Output {
-        Self(self.0 >> rhs)
-    }
-}
-
-impl<T> Cmov for SmallGF<T>
-where
-    T: Cmov,
-{
-    fn cmovnz(&mut self, value: &Self, condition: Condition) {
-        self.0.cmovnz(&value.0, condition);
-    }
-    fn cmovz(&mut self, value: &Self, condition: Condition) {
-        self.0.cmovnz(&value.0, condition);
-    }
-}
-
 impl GaloisFieldHelper<u64> for SmallGF<u64> {
     const BITS: usize = u64::BITS as usize;
-    const MODULUS: Self = Self(0b00011011u64);
-    const ZERO: Self = Self(0u64);
-    const ONE: Self = Self(1u64);
+    const MODULUS: u64 = 0b00011011u64;
+    const ZERO: u64 = 0u64;
 }
 
 impl GaloisFieldHelper<u8> for SmallGF<u8> {
     const BITS: usize = u8::BITS as usize;
-    const MODULUS: Self = Self(0b00011011);
-    const ZERO: Self = Self(0u8);
-    const ONE: Self = Self(1u8);
+    const MODULUS: u8 = 0b00011011;
+    const ZERO: u8 = 0u8;
 }
 
 impl<T> Mul for SmallGF<T>
@@ -214,7 +210,8 @@ where
         + BitXor<Output = T>
         + BitXorAssign
         + Shl<usize, Output = T>
-        + Shr<usize, Output = T>,
+        + Shr<usize, Output = T>
+        + ExtractBit,
 {
     type Output = Self;
 
@@ -235,7 +232,8 @@ where
         + BitXorAssign
         + BitAnd<Output = T>
         + Shl<usize, Output = T>
-        + Shr<usize, Output = T>,
+        + Shr<usize, Output = T>
+        + ExtractBit,
 {
     #[inline]
     fn mul_assign(&mut self, rhs: Self) {
@@ -254,7 +252,8 @@ where
         + BitXorAssign
         + BitAnd<Output = T>
         + Shl<usize, Output = T>
-        + Shr<usize, Output = T>,
+        + Shr<usize, Output = T>
+        + ExtractBit,
 {
     type Output = Self;
 
