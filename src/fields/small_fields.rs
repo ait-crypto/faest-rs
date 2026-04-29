@@ -1,7 +1,8 @@
-use cmov::Cmov;
 use core::ops::{
     Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
 };
+
+use cmov::{Cmov, Condition};
 use hybrid_array::{Array, typenum::U8};
 
 use super::{Field, Square};
@@ -13,6 +14,7 @@ where
         + Cmov
         + PartialEq
         + BitXor<Output = T>
+        + BitXorAssign
         + BitAnd<Output = T>
         + Shl<usize, Output = T>
         + Shr<usize, Output = T>,
@@ -113,12 +115,12 @@ where
 
 impl<T> AddAssign for SmallGF<T>
 where
-    T: Copy + BitXor<Output = T>,
+    T: BitXorAssign,
 {
     #[inline]
     #[allow(clippy::suspicious_op_assign_impl)]
     fn add_assign(&mut self, rhs: Self) {
-        self.0 = self.0 ^ rhs.0;
+        self.0 ^= rhs.0;
     }
 }
 
@@ -179,10 +181,10 @@ impl<T> Cmov for SmallGF<T>
 where
     T: Cmov,
 {
-    fn cmovnz(&mut self, value: &Self, condition: cmov::Condition) {
+    fn cmovnz(&mut self, value: &Self, condition: Condition) {
         self.0.cmovnz(&value.0, condition);
     }
-    fn cmovz(&mut self, value: &Self, condition: cmov::Condition) {
+    fn cmovz(&mut self, value: &Self, condition: Condition) {
         self.0.cmovnz(&value.0, condition);
     }
 }
@@ -210,6 +212,7 @@ where
         + PartialEq
         + BitAnd<Output = T>
         + BitXor<Output = T>
+        + BitXorAssign
         + Shl<usize, Output = T>
         + Shr<usize, Output = T>,
 {
@@ -229,6 +232,7 @@ where
         + Cmov
         + PartialEq
         + BitXor<Output = T>
+        + BitXorAssign
         + BitAnd<Output = T>
         + Shl<usize, Output = T>
         + Shr<usize, Output = T>,
@@ -247,6 +251,7 @@ where
         + Cmov
         + PartialEq
         + BitXor<Output = T>
+        + BitXorAssign
         + BitAnd<Output = T>
         + Shl<usize, Output = T>
         + Shr<usize, Output = T>,
