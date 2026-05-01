@@ -16,7 +16,7 @@ use alloc::{vec, vec::Vec};
 
 use aes::{
     Block,
-    cipher::{BlockEncrypt, BlockSizeUser, KeyInit, KeySizeUser},
+    cipher::{BlockCipherEncrypt, BlockSizeUser, KeyInit, KeySizeUser},
 };
 use generic_array::{
     GenericArray,
@@ -696,10 +696,10 @@ impl BlockSizeUser for Rijndael192 {
     type BlockSize = U24;
 }
 
-impl BlockEncrypt for Rijndael192 {
+impl BlockCipherEncrypt for Rijndael192 {
     fn encrypt_with_backend(
         &self,
-        _f: impl aes::cipher::BlockClosure<BlockSize = Self::BlockSize>,
+        _f: impl aes::cipher::BlockCipherEncClosure<BlockSize = Self::BlockSize>,
     ) {
         unimplemented!();
     }
@@ -735,10 +735,10 @@ impl BlockSizeUser for Rijndael256 {
     type BlockSize = U32;
 }
 
-impl BlockEncrypt for Rijndael256 {
+impl BlockCipherEncrypt for Rijndael256 {
     fn encrypt_with_backend(
         &self,
-        _f: impl aes::cipher::BlockClosure<BlockSize = Self::BlockSize>,
+        _f: impl aes::cipher::BlockCipherEncClosure<BlockSize = Self::BlockSize>,
     ) {
         unimplemented!();
     }
@@ -760,7 +760,7 @@ mod test {
 
     use core::cmp::max;
 
-    use aes::cipher::generic_array::GenericArray;
+    use aes::cipher::array::Array;
     use generic_array::typenum::{U4, U6, U8, U10, U12, U14};
     use serde::Deserialize;
 
@@ -831,7 +831,7 @@ mod test {
 
     #[test]
     fn test_rijndael192() {
-        let mut key = GenericArray::default();
+        let mut key = Array::default();
         key[0] = 0x80;
 
         let expected = [
@@ -840,8 +840,8 @@ mod test {
         ];
 
         let rijndael = Rijndael192::new(&key);
-        let plaintext = GenericArray::default();
-        let mut ciphertext = GenericArray::default();
+        let plaintext = Array::default();
+        let mut ciphertext = Array::default();
 
         rijndael.encrypt_block_b2b(&plaintext, &mut ciphertext);
         assert_eq!(ciphertext.as_slice(), &expected);
@@ -849,7 +849,7 @@ mod test {
 
     #[test]
     fn test_rijndael256() {
-        let mut key = GenericArray::default();
+        let mut key = Array::default();
         key[0] = 0x80;
 
         let expected = [
@@ -859,8 +859,8 @@ mod test {
         ];
 
         let rijndael = Rijndael256::new(&key);
-        let plaintext = GenericArray::default();
-        let mut ciphertext = GenericArray::default();
+        let plaintext = Array::default();
+        let mut ciphertext = Array::default();
 
         rijndael.encrypt_block_b2b(&plaintext, &mut ciphertext);
         assert_eq!(ciphertext.as_slice(), &expected);
