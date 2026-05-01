@@ -24,7 +24,7 @@ use crate::{
 };
 use aes::{
     Aes128Enc, Aes192Enc, Aes256Enc,
-    cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray as GenericArray_AES},
+    cipher::{BlockCipherEncrypt, KeyInit, array::Array as GenericArray_AES},
 };
 use generic_array::{
     ArrayLength, GenericArray,
