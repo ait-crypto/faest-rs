@@ -170,7 +170,7 @@ pub use memcheck::Classifier;
 /// Mark a value as "classified" via valgrind
 macro_rules! classify {
     ($val:expr) => {
-        $crate::Classifier::classify(&$val);
+        $crate::Classifier::classify($val);
     };
 }
 
@@ -179,7 +179,7 @@ macro_rules! classify {
 /// Mark a value as "unclassified" via valgrind
 macro_rules! declassify {
     ($val:expr) => {
-        $crate::Classifier::declassify(&$val);
+        $crate::Classifier::declassify($val);
     };
 }
 
@@ -512,21 +512,21 @@ macro_rules! define_impl {
             impl Signer<[<$param Signature>]> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
                     let mut signature = [0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE];
-                    $param::sign(msg, &self.0, &[], &mut signature).map(|_| { declassify!(signature); [<$param Signature>](signature) })
+                    $param::sign(msg, &self.0, &[], &mut signature).map(|_| { declassify!(&signature); [<$param Signature>](signature) })
                 }
             }
 
             impl Signer<Box<[<$param Signature>]>> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<Box<[<$param Signature>]>, Error> {
                     let mut signature = Box::new([<$param Signature>]([0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE]));
-                    $param::sign(msg, &self.0, &[], &mut signature.0).map(|_| { declassify!(signature.0); signature })
+                    $param::sign(msg, &self.0, &[], &mut signature.0).map(|_| { declassify!(&signature.0); signature })
                 }
             }
 
             impl Signer<[<$param Signature>]> for [<$param UnpackedSigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
                     let mut signature = [0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE];
-                    $param::unpacked_sign(msg, &self.0, &[], &mut signature).map(|_| { declassify!(signature); [<$param Signature>](signature) })
+                    $param::unpacked_sign(msg, &self.0, &[], &mut signature).map(|_| { declassify!(&signature); [<$param Signature>](signature) })
                 }
             }
 
@@ -599,7 +599,7 @@ macro_rules! define_impl {
                 ) -> Result<[<$param Signature>], Error> {
                     let rho = $param::sample_rho(rng);
                     let mut signature = [0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE];
-                    $param::sign(msg, &self.0, &rho, &mut signature).map(|_| { declassify!(signature); [<$param Signature>](signature) })
+                    $param::sign(msg, &self.0, &rho, &mut signature).map(|_| { declassify!(&signature); [<$param Signature>](signature) })
                 }
             }
 
@@ -612,7 +612,7 @@ macro_rules! define_impl {
                 ) -> Result<Box<[<$param Signature>]>, Error> {
                     let rho = $param::sample_rho(rng);
                     let mut signature = Box::new([<$param Signature>]([0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE]));
-                    $param::sign(msg, &self.0, &rho, &mut signature.0).map(|_| { declassify!(signature.0); signature })
+                    $param::sign(msg, &self.0, &rho, &mut signature.0).map(|_| { declassify!(&signature.0); signature })
                 }
             }
 
@@ -625,7 +625,7 @@ macro_rules! define_impl {
                 ) -> Result<[<$param Signature>], Error> {
                     let rho = $param::sample_rho(rng);
                     let mut signature = [0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE];
-                    $param::unpacked_sign(msg, &self.0, &rho, &mut signature).map(|_| { declassify!(signature); [<$param Signature>](signature) })
+                    $param::unpacked_sign(msg, &self.0, &rho, &mut signature).map(|_| { declassify!(&signature); [<$param Signature>](signature) })
                 }
             }
 

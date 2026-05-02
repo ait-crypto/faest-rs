@@ -16,7 +16,7 @@ pub trait Classifier {
     fn declassify(&self);
 }
 
-impl<T> Classifier for &[T] {
+ impl<T> Classifier for [T] {
     #[inline(always)]
     fn classify(&self) {
         unsafe {
@@ -32,19 +32,15 @@ impl<T> Classifier for &[T] {
     }
 }
 
-impl<T> Classifier for &mut [T] {
+impl<T, const N: usize> Classifier for [T; N] {
     #[inline(always)]
     fn classify(&self) {
-        unsafe {
-            make_mem_undefined(self.as_ptr(), self.len());
-        }
+        self[..].classify()
     }
 
     #[inline(always)]
     fn declassify(&self) {
-        unsafe {
-            make_mem_defined(self.as_ptr(), self.len());
-        }
+        self[..].declassify()
     }
 }
 
