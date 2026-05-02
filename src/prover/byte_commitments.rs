@@ -3,8 +3,8 @@ use core::ops::Mul;
 #[cfg(not(feature = "std"))]
 use alloc::{borrow::ToOwned, boxed::Box};
 
-use generic_array::{
-    ArrayLength, GenericArray,
+use hybrid_array::{
+    Array, ArraySize,
     typenum::{Prod, U8},
 };
 
@@ -17,7 +17,7 @@ where
     F: BigGaloisField,
 {
     pub(crate) key: u8,
-    pub(crate) tags: GenericArray<F, U8>,
+    pub(crate) tags: Array<F, U8>,
 }
 
 impl<F> ByteCommitment<F>
@@ -41,21 +41,18 @@ where
 pub(crate) struct ByteCommits<F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
 {
-    pub(crate) keys: Box<GenericArray<u8, L>>,
-    pub(crate) tags: Box<GenericArray<F, Prod<L, U8>>>,
+    pub(crate) keys: Box<Array<u8, L>>,
+    pub(crate) tags: Box<Array<F, Prod<L, U8>>>,
 }
 
 impl<F, L> ByteCommits<F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
 {
-    pub(crate) fn new(
-        keys: Box<GenericArray<u8, L>>,
-        tags: Box<GenericArray<F, Prod<L, U8>>>,
-    ) -> Self {
+    pub(crate) fn new(keys: Box<Array<u8, L>>, tags: Box<Array<F, Prod<L, U8>>>) -> Self {
         Self { keys, tags }
     }
 
@@ -75,15 +72,13 @@ where
 
     pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<'_, F, L2>
     where
-        L2: ArrayLength + Mul<U8, Output: ArrayLength>,
+        L2: ArraySize + Mul<U8, Output: ArraySize>,
     {
         debug_assert!(start_byte + L2::USIZE <= L::USIZE);
 
         ByteCommitsRef {
-            keys: GenericArray::from_slice(&self.keys[start_byte..start_byte + L2::USIZE]),
-            tags: GenericArray::from_slice(
-                &self.tags[start_byte * 8..(start_byte + L2::USIZE) * 8],
-            ),
+            keys: Array::from_slice(&self.keys[start_byte..start_byte + L2::USIZE]),
+            tags: Array::from_slice(&self.tags[start_byte * 8..(start_byte + L2::USIZE) * 8]),
         }
     }
 
@@ -97,7 +92,7 @@ where
     fn get(&self, idx: usize) -> ByteCommitment<F> {
         ByteCommitment {
             key: self.keys[idx],
-            tags: GenericArray::from_slice(&self.tags[idx * 8..idx * 8 + 8]).to_owned(),
+            tags: Array::from_slice(&self.tags[idx * 8..idx * 8 + 8]).to_owned(),
         }
     }
 
@@ -110,24 +105,24 @@ where
 pub(crate) struct ByteCommitsRef<'a, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
 {
-    pub(crate) keys: &'a GenericArray<u8, L>,
-    pub(crate) tags: &'a GenericArray<F, Prod<L, U8>>,
+    pub(crate) keys: &'a Array<u8, L>,
+    pub(crate) tags: &'a Array<F, Prod<L, U8>>,
 }
 
 impl<'a, F, L> ByteCommitsRef<'a, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
 {
     /// Create a new instance of ByteCommitsRef from slices to commitment keys and tags.
     ///
     /// Panics if the lengths of the keys is not equal to the length of the tags divided by 8.
     pub(crate) fn from_slices(keys: &'a [u8], tags: &'a [F]) -> Self {
         Self {
-            keys: GenericArray::from_slice(keys),
-            tags: GenericArray::from_slice(tags),
+            keys: Array::from_slice(keys),
+            tags: Array::from_slice(tags),
         }
     }
 
@@ -140,15 +135,13 @@ where
 
     pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<'_, F, L2>
     where
-        L2: ArrayLength + Mul<U8, Output: ArrayLength>,
+        L2: ArraySize + Mul<U8, Output: ArraySize>,
     {
         debug_assert!(start_byte + L2::USIZE <= L::USIZE);
 
         ByteCommitsRef {
-            keys: GenericArray::from_slice(&self.keys[start_byte..start_byte + L2::USIZE]),
-            tags: GenericArray::from_slice(
-                &self.tags[start_byte * 8..(start_byte + L2::USIZE) * 8],
-            ),
+            keys: Array::from_slice(&self.keys[start_byte..start_byte + L2::USIZE]),
+            tags: Array::from_slice(&self.tags[start_byte * 8..(start_byte + L2::USIZE) * 8]),
         }
     }
 }

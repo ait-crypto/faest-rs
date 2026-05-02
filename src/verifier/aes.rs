@@ -3,8 +3,8 @@ use core::{iter::zip, mem, ops::Mul};
 #[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
 
-use generic_array::{
-    ArrayLength, GenericArray,
+use hybrid_array::{
+    Array, ArraySize,
     typenum::{U4, U8, marker_traits::Unsigned},
 };
 
@@ -25,7 +25,7 @@ impl<O> StateToBytes<O> for VoleCommits<'_, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = GenericArray<OWFField<O>, O::NStBytes>;
+    type Output = Array<OWFField<O>, O::NStBytes>;
 
     fn state_to_bytes(&self) -> Self::Output {
         self.scalars
@@ -39,7 +39,7 @@ impl<O> StateToBytes<O> for VoleCommitsRef<'_, OWFField<O>, O::NStBits>
 where
     O: OWFParameters,
 {
-    type Output = GenericArray<OWFField<O>, O::NStBytes>;
+    type Output = Array<OWFField<O>, O::NStBytes>;
 
     fn state_to_bytes(&self) -> Self::Output {
         self.scalars
@@ -52,15 +52,17 @@ where
 impl<'a, F, L> AddRoundKey<Self> for &VoleCommits<'a, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     type Output = VoleCommits<'a, F, L>;
 
     fn add_round_key(&self, rhs: Self) -> Self::Output {
         Self::Output {
-            scalars: zip(self.scalars.iter(), rhs.scalars.iter())
-                .map(|(x, y)| *x + y)
-                .collect(),
+            scalars: Box::new(
+                zip(self.scalars.iter(), rhs.scalars.iter())
+                    .map(|(x, y)| *x + y)
+                    .collect(),
+            ),
             delta: self.delta,
         }
     }
@@ -69,15 +71,17 @@ where
 impl<'a, F, L> AddRoundKey<&VoleCommits<'a, F, L>> for VoleCommitsRef<'a, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     type Output = VoleCommits<'a, F, L>;
 
     fn add_round_key(&self, rhs: &VoleCommits<'a, F, L>) -> Self::Output {
         Self::Output {
-            scalars: zip(self.scalars, rhs.scalars.iter())
-                .map(|(x, y)| *x + y)
-                .collect(),
+            scalars: Box::new(
+                zip(self.scalars, rhs.scalars.iter())
+                    .map(|(x, y)| *x + y)
+                    .collect(),
+            ),
             delta: self.delta,
         }
     }
@@ -86,50 +90,53 @@ where
 impl<'a, F, L> AddRoundKey<&Self> for VoleCommitsRef<'a, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     type Output = VoleCommits<'a, F, L>;
 
     fn add_round_key(&self, rhs: &Self) -> Self::Output {
         Self::Output {
-            scalars: zip(self.scalars, rhs.scalars)
-                .map(|(x, y)| *x + y)
-                .collect(),
+            scalars: Box::new(
+                zip(self.scalars, rhs.scalars)
+                    .map(|(x, y)| *x + y)
+                    .collect(),
+            ),
             delta: self.delta,
         }
     }
 }
 
-impl<'a, F, L> AddRoundKey<&GenericArray<F, L>> for VoleCommitsRef<'a, F, L>
+impl<'a, F, L> AddRoundKey<&Array<F, L>> for VoleCommitsRef<'a, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     type Output = VoleCommits<'a, F, L>;
 
-    fn add_round_key(&self, rhs: &GenericArray<F, L>) -> Self::Output {
+    fn add_round_key(&self, rhs: &Array<F, L>) -> Self::Output {
         Self::Output {
-            scalars: zip(self.scalars, rhs).map(|(x, y)| *x + y).collect(),
+            scalars: Box::new(zip(self.scalars, rhs).map(|(x, y)| *x + y).collect()),
             delta: self.delta,
         }
     }
 }
 
-impl<'a, F, L, L2> AddRoundKey<&GenericArray<u8, L>> for VoleCommitsRef<'a, F, L2>
+impl<'a, F, L, L2> AddRoundKey<&Array<u8, L>> for VoleCommitsRef<'a, F, L2>
 where
     F: BigGaloisField,
-    L: ArrayLength + Mul<U8, Output = L2>,
-    L2: ArrayLength,
+    L: ArraySize + Mul<U8, Output = L2>,
+    L2: ArraySize,
 {
     type Output = VoleCommits<'a, F, L2>;
 
-    fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
-        let scalars = self
-            .scalars
-            .iter()
-            .enumerate()
-            .map(|(i, comm_i)| *comm_i + *self.delta * ((rhs[i / 8] >> (i % 8)) & 1))
-            .collect();
+    fn add_round_key(&self, rhs: &Array<u8, L>) -> Self::Output {
+        let scalars = Box::new(
+            self.scalars
+                .iter()
+                .enumerate()
+                .map(|(i, comm_i)| *comm_i + *self.delta * ((rhs[i / 8] >> (i % 8)) & 1))
+                .collect(),
+        );
 
         VoleCommits {
             scalars,
@@ -141,7 +148,7 @@ where
 impl<F, L> AddRoundKeyAssign<&Self> for VoleCommits<'_, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     fn add_round_key_assign(&mut self, rhs: &Self) {
         for (x, y) in zip(self.scalars.iter_mut(), rhs.scalars.iter()) {
@@ -153,7 +160,7 @@ where
 impl<F, L> AddRoundKeyAssign<&VoleCommitsRef<'_, F, L>> for VoleCommits<'_, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     fn add_round_key_assign(&mut self, rhs: &VoleCommitsRef<'_, F, L>) {
         for (x, y) in zip(self.scalars.iter_mut(), rhs.scalars.iter()) {
@@ -162,12 +169,12 @@ where
     }
 }
 
-impl<F, L> AddRoundKeyAssign<&GenericArray<F, L>> for VoleCommits<'_, F, L>
+impl<F, L> AddRoundKeyAssign<&Array<F, L>> for VoleCommits<'_, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
-    fn add_round_key_assign(&mut self, rhs: &GenericArray<F, L>) {
+    fn add_round_key_assign(&mut self, rhs: &Array<F, L>) {
         for (x, y) in zip(self.scalars.iter_mut(), rhs.iter()) {
             *x += y;
         }
@@ -181,7 +188,7 @@ where
     type Output = VoleCommits<'a, OWFField<O>, O::NStBits>;
 
     fn inverse_shift_rows(&self) -> Self::Output {
-        let mut state_prime = GenericArray::default_boxed();
+        let mut state_prime: Box<Array<_, O::NStBits>> = Box::default();
 
         for r in 0..4 {
             for c in 0..O::NSt::USIZE {
@@ -212,7 +219,7 @@ where
     type Output = VoleCommits<'a, OWFField<O>, O::NStBits>;
 
     fn inverse_shift_rows(&self) -> Self::Output {
-        let mut state_prime = GenericArray::default_boxed();
+        let mut state_prime: Box<Array<_, O::NStBits>> = Box::default();
 
         for r in 0..4 {
             for c in 0..O::NSt::USIZE {
@@ -243,7 +250,7 @@ where
     type Output = VoleCommits<'a, OWFField<O>, O::NStBits>;
 
     fn bytewise_mix_columns(&self) -> Self::Output {
-        let mut o = GenericArray::<_, O::NStBits>::default_boxed();
+        let mut o: Box<Array<_, O::NStBits>> = Box::default();
 
         for c in 0..O::NSt::USIZE {
             for r in 0..4 {
@@ -302,18 +309,20 @@ where
         let t = sq as usize;
 
         // :: 8-10
-        let scalars = (0..O::NStBytes::USIZE)
-            .map(|i| {
-                // :: 9
-                let mut y_i = sigmas[8] * self.delta.square();
+        let scalars = Box::new(
+            (0..O::NStBytes::USIZE)
+                .map(|i| {
+                    // :: 9
+                    let mut y_i = sigmas[8] * self.delta.square();
 
-                for (sigma_idx, sigma) in sigmas.iter().enumerate().take(8) {
-                    y_i += self.scalars[i * 8 + (sigma_idx + t) % 8] * sigma;
-                }
+                    for (sigma_idx, sigma) in sigmas.iter().enumerate().take(8) {
+                        y_i += self.scalars[i * 8 + (sigma_idx + t) % 8] * sigma;
+                    }
 
-                y_i
-            })
-            .collect();
+                    y_i
+                })
+                .collect(),
+        );
 
         Self::Output {
             scalars,
@@ -325,7 +334,7 @@ where
 impl<F, L> ShiftRows for VoleCommits<'_, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     fn shift_rows(&mut self) {
         // TODO: Copy row by row instead of entire state
@@ -348,14 +357,14 @@ where
 impl<F, L> InverseAffine for VoleCommits<'_, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     fn inverse_affine(&mut self) {
         let nst_bytes = L::USIZE / 8;
 
         for i in 0..nst_bytes {
-            let xi_tags: GenericArray<_, U8> =
-                GenericArray::from_slice(&self.scalars[8 * i..8 * i + 8]).to_owned();
+            let xi_tags: Array<_, U8> =
+                Array::from_slice(&self.scalars[8 * i..8 * i + 8]).to_owned();
             for bit_i in 0..8 {
                 // ::6
                 self.scalars[8 * i + bit_i] = xi_tags[(bit_i + 8 - 1) % 8]
@@ -389,7 +398,7 @@ where
 
         for c in 0..O::NSt::USIZE {
             // Save the 4 state's columns that will be modified in this round
-            let tmp = GenericArray::<_, U4>::from_slice(&self.scalars[4 * c..4 * c + 4]).to_owned();
+            let tmp = Array::<_, U4>::from_slice(&self.scalars[4 * c..4 * c + 4]).to_owned();
 
             let i0 = 4 * c;
             let i1 = i0 + 1;
@@ -403,18 +412,18 @@ where
             // ::9
             self.scalars[i2] = tmp[2] * v2 + tmp[3] * v3 + tmp[0] + tmp[1];
             // ::10
-            let (tmp0, tmp1, tmp2, tmp3) = tmp.into();
+            let Array([tmp0, tmp1, tmp2, tmp3]) = tmp;
             self.scalars[i3] = tmp0 * v3 + tmp3 * v2 + tmp1 + tmp2;
         }
     }
 }
 
-impl<F, L> AddRoundKeyBytes<&GenericArray<F, L>> for VoleCommits<'_, F, L>
+impl<F, L> AddRoundKeyBytes<&Array<F, L>> for VoleCommits<'_, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
-    fn add_round_key_bytes(&mut self, rhs: &GenericArray<F, L>, sq: bool) {
+    fn add_round_key_bytes(&mut self, rhs: &Array<F, L>, sq: bool) {
         if sq {
             for (st, k) in zip(self.scalars.iter_mut(), rhs) {
                 *st += k;

@@ -10,8 +10,8 @@ use core::{
     },
 };
 
-use generic_array::{
-    GenericArray,
+use hybrid_array::{
+    Array,
     typenum::{U16, U24, U32, U48, U72, U96},
 };
 #[cfg(test)]
@@ -921,8 +921,8 @@ impl Field for BigGF<u128, 1, 128> {
 
     type Length = U16;
 
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        GenericArray::from(self.0[0].to_le_bytes())
+    fn as_bytes(&self) -> Array<u8, Self::Length> {
+        Array::from(self.0[0].to_le_bytes())
     }
 }
 
@@ -1087,8 +1087,8 @@ impl Field for BigGF<u128, 2, 192> {
 
     type Length = U24;
 
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        let mut ret = GenericArray::default();
+    fn as_bytes(&self) -> Array<u8, Self::Length> {
+        let mut ret = Array::default();
         ret[..16].copy_from_slice(&self.0[0].to_le_bytes());
         ret[16..].copy_from_slice(&self.0[1].to_le_bytes()[..8]);
         ret
@@ -1240,8 +1240,8 @@ impl Field for BigGF<u128, 2, 256> {
 
     type Length = U32;
 
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        let mut ret = GenericArray::default();
+    fn as_bytes(&self) -> Array<u8, Self::Length> {
+        let mut ret = Array::default();
         ret[..16].copy_from_slice(&self.0[0].to_le_bytes());
         ret[16..].copy_from_slice(&self.0[1].to_le_bytes());
         ret
@@ -1310,8 +1310,8 @@ impl ExtensionField for GF384 {
 
     type BaseField = GF128;
 
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        let mut ret = GenericArray::default();
+    fn as_bytes(&self) -> Array<u8, Self::Length> {
+        let mut ret = Array::default();
         ret[..16].copy_from_slice(&self.0[0].to_le_bytes());
         ret[16..32].copy_from_slice(&self.0[1].to_le_bytes());
         ret[32..].copy_from_slice(&self.0[2].to_le_bytes());
@@ -1372,8 +1372,8 @@ impl ExtensionField for GF576 {
 
     type BaseField = GF192;
 
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        let mut ret = GenericArray::default();
+    fn as_bytes(&self) -> Array<u8, Self::Length> {
+        let mut ret = Array::default();
         ret[..16].copy_from_slice(&self.0[0].to_le_bytes());
         ret[16..32].copy_from_slice(&self.0[1].to_le_bytes());
         ret[32..48].copy_from_slice(&self.0[2].to_le_bytes());
@@ -1445,8 +1445,8 @@ impl ExtensionField for GF768 {
 
     type BaseField = GF256;
 
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        let mut ret = GenericArray::default();
+    fn as_bytes(&self) -> Array<u8, Self::Length> {
+        let mut ret = Array::default();
         for (dst, src) in zip(ret.chunks_exact_mut(16), self.0.as_ref()) {
             dst.copy_from_slice(&src.to_le_bytes());
         }
@@ -1536,7 +1536,7 @@ mod test {
         #[cfg(not(feature = "std"))]
         use alloc::vec;
 
-        use generic_array::typenum::Unsigned;
+        use hybrid_array::typenum::Unsigned;
         use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
         use rand::RngCore;
         use rand_core::SeedableRng;
@@ -1564,9 +1564,8 @@ mod test {
                 let res_bytes = res.as_bytes();
                 let random_1_bytes = random_1.as_bytes();
                 let random_2_bytes = random_2.as_bytes();
-                let expected = GenericArray::from_iter(
-                    zip(random_1_bytes, random_2_bytes).map(|(a, b)| a ^ b),
-                );
+                let expected =
+                    Array::from_iter(zip(random_1_bytes, random_2_bytes).map(|(a, b)| a ^ b));
                 assert_eq!(res_bytes, expected);
                 assert_eq!(random_2 + random_1, res);
 
@@ -1588,7 +1587,7 @@ mod test {
 
             for _ in 0..RUNS {
                 let lhs: F = rng.r#gen();
-                let mut rhs = GenericArray::<u8, F::Length>::default();
+                let mut rhs = Array::<u8, F::Length>::default();
                 rng.fill_bytes(&mut rhs[..8]);
 
                 let rhs_f = F::from(&rhs);
@@ -1776,7 +1775,7 @@ mod test {
         use super::*;
         use crate::utils::test::read_test_data;
 
-        use generic_array::typenum::Unsigned;
+        use hybrid_array::typenum::Unsigned;
         use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
         use rand_core::SeedableRng;
 

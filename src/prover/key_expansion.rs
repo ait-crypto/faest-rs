@@ -1,5 +1,5 @@
-use generic_array::{
-    GenericArray,
+use hybrid_array::{
+    Array,
     typenum::{U8, Unsigned},
 };
 use itertools::iproduct;
@@ -124,7 +124,7 @@ where
         // ::7
         let mut x_tilde = x.keys[j] ^ xk.keys[iwd / 8 + (j % 4)];
 
-        let xt_0: GenericArray<_, U8> = (0..8)
+        let xt_0: Array<_, U8> = (0..8)
             .map(|i| x.tags[8 * j + i] + xk.tags[iwd + 8 * (j % 4) + i])
             .collect();
 
@@ -153,7 +153,7 @@ where
     y
 }
 
-fn inverse_affine_byte<F>(x: u8, x_0: &GenericArray<F, U8>, y: &mut u8, y_0: &mut [F])
+fn inverse_affine_byte<F>(x: u8, x_0: &Array<F, U8>, y: &mut u8, y_0: &mut [F])
 where
     F: BigGaloisField,
 {

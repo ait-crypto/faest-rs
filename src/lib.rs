@@ -88,7 +88,7 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::{boxed::Box, vec::Vec};
 
-use generic_array::{GenericArray, typenum::Unsigned};
+use hybrid_array::{Array, typenum::Unsigned};
 use pastey::paste;
 use rand_core::CryptoRngCore;
 #[cfg(any(feature = "randomized-signer", feature = "capi"))]
@@ -231,17 +231,17 @@ macro_rules! define_impl {
 
             impl $param {
                 #[cfg(feature="capi")]
-                const SIGNATURE_SIZE: usize = <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE;
+                const SIGNATURE_SIZE: usize = <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE;
                 #[cfg(feature="capi")]
                 const SK_SIZE: usize = <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE;
                 #[cfg(feature="capi")]
                 const PK_SIZE: usize = <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE;
 
                 #[cfg(any(feature="randomized-signer", feature="capi"))]
-                fn sample_rho<R: RngCore>(mut rng: R) -> GenericArray<
+                fn sample_rho<R: RngCore>(mut rng: R) -> Array<
                         u8,
                         <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LambdaBytes> {
-                    let mut rho = GenericArray::default();
+                    let mut rho = Array::default();
                     rng.fill_bytes(&mut rho);
                     rho
                 }
@@ -251,7 +251,7 @@ macro_rules! define_impl {
                     msg: &[u8],
                     sk: &SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
                     rho: &[u8],
-                    signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
+                    signature: &mut [u8;  <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE],
                 ) -> Result<(), Error> {
                     #[cfg(all(
                         feature = "opt-simd",
@@ -270,7 +270,7 @@ macro_rules! define_impl {
                     msg: &[u8],
                     sk: &UnpackedSecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
                     rho: &[u8],
-                    signature: &mut GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
+                    signature: &mut [u8;  <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE],
                 ) -> Result<(), Error>  {
                     #[cfg(all(
                         feature = "opt-simd",
@@ -288,7 +288,7 @@ macro_rules! define_impl {
                 fn verify(
                     msg: &[u8],
                     pk: &PublicKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
-                    sigma: &GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>,
+                    sigma: &[u8;  <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE],
                 ) -> Result<(), Error>
                 {
                     #[cfg(all(
@@ -350,7 +350,7 @@ macro_rules! define_impl {
                 type Repr = [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE];
 
                 fn to_bytes(&self) -> Self::Repr {
-                    self.0.to_bytes().into_array()
+                    self.0.to_bytes().into()
                 }
 
                 fn to_vec(&self) -> Vec<u8> {
@@ -414,7 +414,7 @@ macro_rules! define_impl {
                 type Repr = [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::SK::USIZE];
 
                 fn to_bytes(&self) -> Self::Repr {
-                    self.0.to_bytes().into_array()
+                    self.0.to_bytes().into()
                 }
 
                 fn to_vec(&self) -> Vec<u8> {
@@ -455,7 +455,7 @@ macro_rules! define_impl {
                 type Repr = [u8; <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE];
 
                 fn to_bytes(&self) -> Self::Repr {
-                    self.0.to_bytes().into_array()
+                    self.0.to_bytes().into()
                 }
 
                 fn to_vec(&self) -> Vec<u8> {
@@ -504,25 +504,25 @@ macro_rules! define_impl {
             #[doc = "Signature for " $param]
             #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-            pub struct [<$param Signature>](GenericArray<u8, <[<$param Parameters>] as FAESTParameters>::SignatureSize>);
+            pub struct [<$param Signature>]([u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE]);
 
             impl Signer<[<$param Signature>]> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
-                    let mut signature = GenericArray::default();
+                    let mut signature = [0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE];
                     $param::sign(msg, &self.0, &[], &mut signature).map(|_| { declassify!(signature); [<$param Signature>](signature) })
                 }
             }
 
             impl Signer<Box<[<$param Signature>]>> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<Box<[<$param Signature>]>, Error> {
-                    let mut signature = Box::new([<$param Signature>](GenericArray::default()));
+                    let mut signature = Box::new([<$param Signature>]([0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE]));
                     $param::sign(msg, &self.0, &[], &mut signature.0).map(|_| { declassify!(signature.0); signature })
                 }
             }
 
             impl Signer<[<$param Signature>]> for [<$param UnpackedSigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
-                    let mut signature = GenericArray::default();
+                    let mut signature = [0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE];
                     $param::unpacked_sign(msg, &self.0, &[], &mut signature).map(|_| { declassify!(signature); [<$param Signature>](signature) })
                 }
             }
@@ -541,9 +541,9 @@ macro_rules! define_impl {
 
             impl Verifier<SignatureRef<'_>> for [<$param VerificationKey>] {
                 fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
-                    GenericArray::try_from_slice(signature.0)
+                    <[u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE]>::try_from(signature.0)
                         .map_err(|_| Error::new())
-                        .and_then(|sig| $param::verify(msg, &self.0, sig))
+                        .and_then(|sig| $param::verify(msg, &self.0, &sig))
                 }
             }
 
@@ -561,9 +561,9 @@ macro_rules! define_impl {
 
             impl Verifier<SignatureRef<'_>> for [<$param SigningKey>] {
                 fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
-                    GenericArray::try_from_slice(signature.0)
+                    <[u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE]>::try_from(signature.0)
                         .map_err(|_| Error::new())
-                        .and_then(|sig| $param::verify(msg, &self.0.pk, sig))
+                        .and_then(|sig| $param::verify(msg, &self.0.pk, &sig))
                 }
             }
 
@@ -581,9 +581,9 @@ macro_rules! define_impl {
 
             impl Verifier<SignatureRef<'_>> for [<$param UnpackedSigningKey>] {
                 fn verify(&self, msg: &[u8], signature: &SignatureRef<'_>) -> Result<(), Error> {
-                    GenericArray::try_from_slice(signature.0)
+                    <[u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE]>::try_from(signature.0)
                         .map_err(|_| Error::new())
-                        .and_then(|sig| $param::verify(msg, &self.verifying_key().0, sig))
+                        .and_then(|sig| $param::verify(msg, &self.verifying_key().0, &sig))
                 }
             }
 
@@ -595,7 +595,7 @@ macro_rules! define_impl {
                     msg: &[u8],
                 ) -> Result<[<$param Signature>], Error> {
                     let rho = $param::sample_rho(rng);
-                    let mut signature = GenericArray::default();
+                    let mut signature = [0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE];
                     $param::sign(msg, &self.0, &rho, &mut signature).map(|_| { declassify!(signature); [<$param Signature>](signature) })
                 }
             }
@@ -608,7 +608,7 @@ macro_rules! define_impl {
                     msg: &[u8],
                 ) -> Result<Box<[<$param Signature>]>, Error> {
                     let rho = $param::sample_rho(rng);
-                    let mut signature = Box::new([<$param Signature>](GenericArray::default()));
+                    let mut signature = Box::new([<$param Signature>]([0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE]));
                     $param::sign(msg, &self.0, &rho, &mut signature.0).map(|_| { declassify!(signature.0); signature })
                 }
             }
@@ -621,7 +621,7 @@ macro_rules! define_impl {
                     msg: &[u8],
                 ) -> Result<[<$param Signature>], Error> {
                     let rho = $param::sample_rho(rng);
-                    let mut signature = GenericArray::default();
+                    let mut signature = [0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE];
                     $param::unpacked_sign(msg, &self.0, &rho, &mut signature).map(|_| { declassify!(signature); [<$param Signature>](signature) })
                 }
             }
@@ -636,24 +636,24 @@ macro_rules! define_impl {
                 type Error = Error;
 
                 fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-                    GenericArray::try_from_slice(value)
+                    <[u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE]>::try_from(value)
                         .map_err(|_| Error::new())
                         .map(|arr| Self(arr.clone()))
                 }
             }
 
-            impl From<[<$param Signature>]> for [u8; <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE] {
+            impl From<[<$param Signature>]> for [u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE] {
                 fn from(value: [<$param Signature>]) -> Self {
                     value.to_bytes()
                 }
             }
 
             impl SignatureEncoding for [<$param Signature>] {
-                type Repr = [u8; <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE];
+                type Repr = [u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE];
 
                 fn to_bytes(&self) -> Self::Repr {
                     // NOTE: this could be done with Into if it would be supported
-                    let mut ret = [0; <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE];
+                    let mut ret = [0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE];
                     ret.copy_from_slice(self.0.as_slice());
                     ret
                 }
@@ -663,7 +663,7 @@ macro_rules! define_impl {
                 }
 
                 fn encoded_len(&self) -> usize {
-                    <[<$param Parameters>] as FAESTParameters>::SignatureSize::USIZE
+                    <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE
                 }
             }
         }

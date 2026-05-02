@@ -2,7 +2,7 @@ use cmov::Cmov;
 use core::ops::{
     Add, AddAssign, BitAnd, BitXor, BitXorAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
 };
-use generic_array::{GenericArray, typenum::U8};
+use hybrid_array::{Array, typenum::U8};
 
 use super::{Field, Square};
 
@@ -285,13 +285,13 @@ impl Field for GF64 {
 
     type Length = U8;
 
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        GenericArray::from(self.0.to_le_bytes())
+    fn as_bytes(&self) -> Array<u8, Self::Length> {
+        Array::from(self.0.to_le_bytes())
     }
 
     /*
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>> {
-        let mut arr = GenericArray::default_boxed();
+    fn as_boxed_bytes(&self) -> Box<Array<u8, Self::Length>> {
+        let mut arr = Array::default_boxed();
         arr.copy_from_slice(&self.0.0.to_le_bytes());
         arr
     }

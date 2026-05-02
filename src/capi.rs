@@ -10,7 +10,6 @@
 
 use core::{ffi::c_int, slice};
 
-use generic_array::GenericArray;
 use libc::size_t;
 use pastey::paste;
 use zeroize::Zeroize;
@@ -99,7 +98,7 @@ macro_rules! define_capi_impl {
                     } else {
                         &[]
                     };
-                    let signature = unsafe { slice::from_raw_parts_mut(signature, Params::SIGNATURE_SIZE) };
+                    let signature = unsafe { &mut *(signature as *mut [u8; Params::SIGNATURE_SIZE]) };
 
                     SigningKey::try_from(sk).map(|sk| {
                         let rho = Params::sample_rho(rand::thread_rng());
@@ -107,7 +106,7 @@ macro_rules! define_capi_impl {
                             msg,
                             &sk.0,
                             rho.as_slice(),
-                            GenericArray::from_mut_slice(signature),
+                            signature,
                         )
                         .map_to_error_code(|_| {
                             unsafe { *signature_len = Params::SIGNATURE_SIZE };
@@ -146,10 +145,10 @@ macro_rules! define_capi_impl {
                     } else {
                         &[]
                     };
-                    let signature = unsafe { slice::from_raw_parts_mut(signature, Params::SIGNATURE_SIZE) };
+                    let signature = unsafe { &mut *(signature as *mut [u8; Params::SIGNATURE_SIZE]) };
 
                     SigningKey::try_from(sk).map(|sk| {
-                        Params::sign(msg, &sk.0, rho, GenericArray::from_mut_slice(signature)).map_to_error_code(
+                        Params::sign(msg, &sk.0, rho, signature).map_to_error_code(
                             |_| {
                                 unsafe { *signature_len = Params::SIGNATURE_SIZE };
                                 0
@@ -179,10 +178,10 @@ macro_rules! define_capi_impl {
                     } else {
                         &[]
                     };
-                    let signature = unsafe { slice::from_raw_parts(signature, Params::SIGNATURE_SIZE) };
+                    let signature = unsafe { &mut *(signature as *mut [u8; Params::SIGNATURE_SIZE]) };
 
                     VerificationKey::try_from(pk).map(|pk| {
-                        Params::verify(msg, &pk.0, GenericArray::from_slice(signature)).to_error_code()
+                        Params::verify(msg, &pk.0, signature).to_error_code()
                     }).unwrap_or(-1)
                 }
 

@@ -7,8 +7,8 @@ use core::{
 #[cfg(not(feature = "std"))]
 use alloc::{borrow::ToOwned, boxed::Box};
 
-use generic_array::{
-    ArrayLength, GenericArray,
+use hybrid_array::{
+    Array, ArraySize,
     typenum::{U4, U8, Unsigned},
 };
 
@@ -25,91 +25,93 @@ use crate::{
 
 // Helper type aliases
 pub(crate) type StateBitsSquaredCommits<O> =
-    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NStBits>>;
+    Box<Array<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NStBits>>;
 
 pub(crate) type StateBytesCommits<O> =
-    Box<GenericArray<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NStBytes>>;
+    Box<Array<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NStBytes>>;
 
 pub(crate) type StateBytesSquaredCommits<O> =
-    Box<GenericArray<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NStBytes>>;
+    Box<Array<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NStBytes>>;
 
 // implementations of StateToBytes
 
 // Committed state
 impl<O, L> StateToBytes<O> for ByteCommitsRef<'_, OWFField<O>, L>
 where
-    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
     O: OWFParameters,
 {
     type Output = StateBytesCommits<O>;
 
     fn state_to_bytes(&self) -> Self::Output
 where {
-        (0..L::USIZE).map(|i| self.get_field_commit(i)).collect()
+        Box::new((0..L::USIZE).map(|i| self.get_field_commit(i)).collect())
     }
 }
 
 // Scalar commitments to known state
-impl<O, L> StateToBytes<O> for GenericArray<u8, L>
+impl<O, L> StateToBytes<O> for Array<u8, L>
 where
-    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
     O: OWFParameters,
 {
-    type Output = Box<GenericArray<OWFField<O>, O::NStBytes>>;
+    type Output = Box<Array<OWFField<O>, O::NStBytes>>;
 
     fn state_to_bytes(&self) -> Self::Output {
-        self.iter()
-            .map(|&k| OWFField::<O>::byte_combine_bits(k))
-            .collect()
+        Box::new(
+            self.iter()
+                .map(|&k| OWFField::<O>::byte_combine_bits(k))
+                .collect(),
+        )
     }
 }
 
 // Implementations of AddRound key
 
 // Known state, owned hidden key
-impl<F, L> AddRoundKey<&GenericArray<u8, L>> for ByteCommits<F, L>
+impl<F, L> AddRoundKey<&Array<u8, L>> for ByteCommits<F, L>
 where
-    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
     F: BigGaloisField,
 {
     type Output = Self;
 
-    fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
+    fn add_round_key(&self, rhs: &Array<u8, L>) -> Self::Output {
         Self::new(
-            zip(self.keys.iter(), rhs).map(|(a, b)| a ^ b).collect(),
+            Box::new(zip(self.keys.iter(), rhs).map(|(a, b)| a ^ b).collect()),
             self.tags.to_owned(),
         )
     }
 }
 
 // Known state, ref to hidden key
-impl<F, L> AddRoundKey<&GenericArray<u8, L>> for ByteCommitsRef<'_, F, L>
+impl<F, L> AddRoundKey<&Array<u8, L>> for ByteCommitsRef<'_, F, L>
 where
-    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
     F: BigGaloisField,
 {
     type Output = ByteCommits<F, L>;
 
-    fn add_round_key(&self, rhs: &GenericArray<u8, L>) -> Self::Output {
+    fn add_round_key(&self, rhs: &Array<u8, L>) -> Self::Output {
         ByteCommits {
-            keys: zip(self.keys, rhs).map(|(a, b)| a ^ b).collect(),
+            keys: Box::new(zip(self.keys, rhs).map(|(a, b)| a ^ b).collect()),
             tags: Box::new(self.tags.to_owned()),
         }
     }
 }
 
 // Committed state, ref to hidden known key
-impl<F, L> AddRoundKey<&ByteCommitsRef<'_, F, L>> for &GenericArray<u8, L>
+impl<F, L> AddRoundKey<&ByteCommitsRef<'_, F, L>> for &Array<u8, L>
 where
-    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
     F: BigGaloisField,
 {
     type Output = ByteCommits<F, L>;
 
     fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
         ByteCommits {
-            keys: zip(self.iter(), rhs.keys).map(|(a, b)| a ^ b).collect(),
-            tags: Box::new(GenericArray::from_slice(&rhs.tags[..L::USIZE * 8]).to_owned()),
+            keys: Box::new(zip(self.iter(), rhs.keys).map(|(a, b)| a ^ b).collect()),
+            tags: Box::new(Array::from_slice(&rhs.tags[..L::USIZE * 8]).to_owned()),
         }
     }
 }
@@ -117,19 +119,23 @@ where
 // Committed state, hidden key
 impl<F, L> AddRoundKey<&ByteCommitsRef<'_, F, L>> for ByteCommits<F, L>
 where
-    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
     F: BigGaloisField,
 {
     type Output = Self;
 
     fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
         Self {
-            keys: zip(self.keys.iter(), rhs.keys)
-                .map(|(a, b)| a ^ b)
-                .collect(),
-            tags: zip(self.tags.iter(), rhs.tags)
-                .map(|(&a, b)| a + b)
-                .collect(),
+            keys: Box::new(
+                zip(self.keys.iter(), rhs.keys)
+                    .map(|(a, b)| a ^ b)
+                    .collect(),
+            ),
+            tags: Box::new(
+                zip(self.tags.iter(), rhs.tags)
+                    .map(|(&a, b)| a + b)
+                    .collect(),
+            ),
         }
     }
 }
@@ -137,12 +143,12 @@ where
 // Implementations for AddRoundKeyAssign
 
 // Known state, hidden key
-impl<F, L> AddRoundKeyAssign<&GenericArray<u8, L>> for ByteCommits<F, L>
+impl<F, L> AddRoundKeyAssign<&Array<u8, L>> for ByteCommits<F, L>
 where
-    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
     F: BigGaloisField,
 {
-    fn add_round_key_assign(&mut self, rhs: &GenericArray<u8, L>) {
+    fn add_round_key_assign(&mut self, rhs: &Array<u8, L>) {
         xor_arrays_inplace(self.keys.as_mut_slice(), rhs.as_slice());
     }
 }
@@ -150,7 +156,7 @@ where
 // Committed state, hidden key
 impl<F, L> AddRoundKeyAssign<&ByteCommitsRef<'_, F, L>> for ByteCommits<F, L>
 where
-    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
     F: BigGaloisField,
 {
     fn add_round_key_assign(&mut self, rhs: &ByteCommitsRef<'_, F, L>) {
@@ -161,10 +167,10 @@ where
     }
 }
 
-impl<T, L> ShiftRows for GenericArray<T, L>
+impl<T, L> ShiftRows for Array<T, L>
 where
     T: Clone,
-    L: ArrayLength,
+    L: ArraySize,
 {
     fn shift_rows(&mut self) {
         // TODO: Copy row by row instead of entire state
@@ -183,13 +189,13 @@ where
     }
 }
 
-impl<F, L, T> AddRoundKeyBytes<&GenericArray<T, L>> for Box<GenericArray<FieldCommitDegTwo<F>, L>>
+impl<F, L, T> AddRoundKeyBytes<&Array<T, L>> for Box<Array<FieldCommitDegTwo<F>, L>>
 where
     F: BigGaloisField,
-    L: ArrayLength + Mul<U8, Output: ArrayLength>,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
     for<'a> FieldCommitDegTwo<F>: AddAssign<&'a T>,
 {
-    fn add_round_key_bytes(&mut self, key: &GenericArray<T, L>, _sq: bool) {
+    fn add_round_key_bytes(&mut self, key: &Array<T, L>, _sq: bool) {
         for (st, k) in zip(self.iter_mut(), key) {
             *st += k;
         }
@@ -243,7 +249,7 @@ where
 
         for c in 0..O::NSt::USIZE {
             // Save the 4 state's columns that will be modified in this round
-            let tmp = GenericArray::<_, U4>::from_slice(&self[4 * c..4 * c + 4]).to_owned();
+            let tmp = Array::<_, U4>::from_slice(&self[4 * c..4 * c + 4]).to_owned();
 
             let i0 = 4 * c;
             let i1 = i0 + 1;
@@ -257,7 +263,7 @@ where
             // ::9
             self[i2] = &tmp[2] * v2 + &tmp[3] * v3 + &tmp[0] + &tmp[1];
             // ::10
-            let (tmp0, tmp1, tmp2, tmp3) = tmp.into();
+            let Array([tmp0, tmp1, tmp2, tmp3]) = tmp;
             self[i3] = tmp0 * v3 + tmp3 * v2 + &tmp1 + &tmp2;
         }
     }
@@ -339,17 +345,19 @@ where
         let t = sq as usize;
 
         // :: 8-10
-        (0..O::NStBytes::USIZE)
-            .map(|i| {
-                // :: 9
-                let mut y_i = &self[i * 8 + t % 8] * sigmas[0];
-                for sigma_idx in 1..8 {
-                    y_i += &self[i * 8 + (sigma_idx + t) % 8] * sigmas[sigma_idx];
-                }
-                y_i += sigmas[8];
-                y_i
-            })
-            .collect()
+        Box::new(
+            (0..O::NStBytes::USIZE)
+                .map(|i| {
+                    // :: 9
+                    let mut y_i = &self[i * 8 + t % 8] * sigmas[0];
+                    for sigma_idx in 1..8 {
+                        y_i += &self[i * 8 + (sigma_idx + t) % 8] * sigmas[sigma_idx];
+                    }
+                    y_i += sigmas[8];
+                    y_i
+                })
+                .collect(),
+        )
     }
 }
 
@@ -366,8 +374,7 @@ where
                 ^ self.keys[i].rotate_right(2)
                 ^ 0x5;
 
-            let xi_tags =
-                GenericArray::<_, U8>::from_slice(&self.tags[8 * i..8 * i + 8]).to_owned();
+            let xi_tags = Array::<_, U8>::from_slice(&self.tags[8 * i..8 * i + 8]).to_owned();
             for bit_i in 0..8 {
                 // ::6
                 self.tags[8 * i + bit_i] = xi_tags[(bit_i + 8 - 1) % 8]

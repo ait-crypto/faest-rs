@@ -4,8 +4,8 @@ use core::{marker::PhantomData, ops::Mul};
 use alloc::{borrow::ToOwned, vec, vec::Vec};
 
 use bitvec::{bitvec, slice::BitSlice};
-use generic_array::{
-    ArrayLength, GenericArray,
+use hybrid_array::{
+    Array, ArraySize,
     typenum::{Prod, U2, U3, U8, Unsigned},
 };
 
@@ -20,12 +20,12 @@ use crate::{
 #[derive(Clone, Debug, Default)]
 pub(crate) struct BavcCommitResult<LambdaBytes, NLeafCommit>
 where
-    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<NLeafCommit, Output: ArrayLength>,
-    NLeafCommit: ArrayLength,
+    LambdaBytes: ArraySize + Mul<U2, Output: ArraySize> + Mul<NLeafCommit, Output: ArraySize>,
+    NLeafCommit: ArraySize,
 {
-    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
+    pub com: Array<u8, Prod<LambdaBytes, U2>>,
     pub decom: BavcDecommitment<LambdaBytes, NLeafCommit>,
-    pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
+    pub seeds: Vec<Array<u8, LambdaBytes>>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -37,45 +37,45 @@ pub(crate) struct BavcOpenResult<'a> {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct BavcReconstructResult<LambdaBytes>
 where
-    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength>,
+    LambdaBytes: ArraySize + Mul<U2, Output: ArraySize>,
 {
-    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
-    pub seeds: Vec<GenericArray<u8, LambdaBytes>>,
+    pub com: Array<u8, Prod<LambdaBytes, U2>>,
+    pub seeds: Vec<Array<u8, LambdaBytes>>,
 }
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct BavcDecommitment<LambdaBytes, NLeafCommit>
 where
-    LambdaBytes: ArrayLength + Mul<NLeafCommit, Output: ArrayLength>,
-    NLeafCommit: ArrayLength,
+    LambdaBytes: ArraySize + Mul<NLeafCommit, Output: ArraySize>,
+    NLeafCommit: ArraySize,
 {
-    keys: Vec<GenericArray<u8, LambdaBytes>>,
-    coms: Vec<GenericArray<u8, Prod<LambdaBytes, NLeafCommit>>>,
+    keys: Vec<Array<u8, LambdaBytes>>,
+    coms: Vec<Array<u8, Prod<LambdaBytes, NLeafCommit>>>,
 }
 
 pub(crate) trait LeafCommit {
-    type LambdaBytes: ArrayLength;
-    type LambdaBytesTimes2: ArrayLength;
-    type LambdaBytesTimes3: ArrayLength;
+    type LambdaBytes: ArraySize;
+    type LambdaBytesTimes2: ArraySize;
+    type LambdaBytesTimes3: ArraySize;
     type PRG: PseudoRandomGenerator;
 
     fn commit(
-        r: &GenericArray<u8, Self::LambdaBytes>,
+        r: &Array<u8, Self::LambdaBytes>,
         iv: &IV,
         tweak: Twk,
-        uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
+        uhash: &Array<u8, Self::LambdaBytesTimes3>,
     ) -> (
-        GenericArray<u8, Self::LambdaBytes>,
-        GenericArray<u8, Self::LambdaBytesTimes3>,
+        Array<u8, Self::LambdaBytes>,
+        Array<u8, Self::LambdaBytesTimes3>,
     );
 
     fn commit_em(
-        r: &GenericArray<u8, Self::LambdaBytes>,
+        r: &Array<u8, Self::LambdaBytes>,
         iv: &IV,
         tewak: Twk,
     ) -> (
-        GenericArray<u8, Self::LambdaBytes>,
-        GenericArray<u8, Self::LambdaBytesTimes2>,
+        Array<u8, Self::LambdaBytes>,
+        Array<u8, Self::LambdaBytesTimes2>,
     );
 }
 
@@ -95,18 +95,18 @@ where
     type PRG = PRG;
 
     fn commit(
-        r: &GenericArray<u8, Self::LambdaBytes>,
+        r: &Array<u8, Self::LambdaBytes>,
         iv: &IV,
         tweak: Twk,
-        uhash: &GenericArray<u8, Self::LambdaBytesTimes3>,
+        uhash: &Array<u8, Self::LambdaBytesTimes3>,
     ) -> (
-        GenericArray<u8, Self::LambdaBytes>,
-        GenericArray<u8, Self::LambdaBytesTimes3>,
+        Array<u8, Self::LambdaBytes>,
+        Array<u8, Self::LambdaBytesTimes3>,
     ) {
         // Step 2
         let hash = PRG::new_prg(r, iv, tweak).read_into();
 
-        let com = LH::hash(uhash, &hash);
+        let com = <LH as LeafHasher>::hash(uhash, &hash);
 
         let sd = hash.into_iter().take(Self::LambdaBytes::USIZE).collect();
 
@@ -114,12 +114,12 @@ where
     }
 
     fn commit_em(
-        r: &GenericArray<u8, Self::LambdaBytes>,
+        r: &Array<u8, Self::LambdaBytes>,
         iv: &IV,
         tweak: Twk,
     ) -> (
-        GenericArray<u8, Self::LambdaBytes>,
-        GenericArray<u8, Self::LambdaBytesTimes2>,
+        Array<u8, Self::LambdaBytes>,
+        Array<u8, Self::LambdaBytesTimes2>,
     ) {
         // Step 1
         let com = PRG::new_prg(r, iv, tweak).read_into();
@@ -131,18 +131,15 @@ where
     }
 }
 
-fn construct_keys<PRG, L>(
-    r: &GenericArray<u8, PRG::KeySize>,
-    iv: &IV,
-) -> Vec<GenericArray<u8, PRG::KeySize>>
+fn construct_keys<PRG, TAU>(r: &Array<u8, PRG::KeySize>, iv: &IV) -> Vec<Array<u8, PRG::KeySize>>
 where
     PRG: PseudoRandomGenerator,
-    L: ArrayLength,
+    TAU: TauParameters,
 {
-    let mut keys = vec![GenericArray::default(); 2 * L::USIZE - 1];
+    let mut keys = vec![Array::default(); 2 * TAU::L - 1];
     keys[0].copy_from_slice(r);
 
-    for alpha in 0..L::USIZE - 1 {
+    for alpha in 0..TAU::L - 1 {
         let mut prg = PRG::new_prg(&keys[alpha], iv, alpha as Twk);
         prg.read(&mut keys[2 * alpha + 1]);
         prg.read(&mut keys[2 * alpha + 2]);
@@ -154,9 +151,9 @@ where
 fn reconstruct_keys<PRG, TAU>(
     s: &mut BitSlice,
     decom_keys: &[&[u8]],
-    i_delta: &GenericArray<u16, TAU::Tau>,
+    i_delta: &Array<u16, TAU::Tau>,
     iv: &IV,
-) -> Option<Vec<GenericArray<u8, PRG::KeySize>>>
+) -> Option<Vec<Array<u8, PRG::KeySize>>>
 where
     PRG: PseudoRandomGenerator,
     TAU: TauParameters,
@@ -168,9 +165,9 @@ where
     }
 
     // Steps 13..21
-    let mut keys = vec![GenericArray::default(); 2 * TAU::L::USIZE - 1];
+    let mut keys = vec![Array::default(); 2 * TAU::L - 1];
     let mut decom_iter = decom_keys.iter();
-    for i in (0..TAU::L::USIZE - 1).rev() {
+    for i in (0..TAU::L - 1).rev() {
         let (left_child, right_child) = (s[2 * i + 1], s[2 * i + 2]);
 
         if left_child | right_child {
@@ -192,7 +189,7 @@ where
     }
 
     // Steps 25..27
-    for i in s[..TAU::L::USIZE - 1].iter_zeros() {
+    for i in s[..TAU::L - 1].iter_zeros() {
         let mut rng = PRG::new_prg(&keys[i], iv, i as Twk);
         rng.read(&mut keys[2 * i + 1]);
         rng.read(&mut keys[2 * i + 2]);
@@ -201,7 +198,7 @@ where
     Some(keys)
 }
 
-fn mark_nodes<TAU>(s: &mut BitSlice, i_delta: &GenericArray<u16, TAU::Tau>) -> Option<u32>
+fn mark_nodes<TAU>(s: &mut BitSlice, i_delta: &Array<u16, TAU::Tau>) -> Option<u32>
 where
     TAU: TauParameters,
 {
@@ -225,16 +222,16 @@ where
     }
 }
 
-fn construct_nodes<'a, LambdaBytes, L>(
-    keys: &'a [GenericArray<u8, LambdaBytes>],
+fn construct_nodes<'a, LambdaBytes, TAU>(
+    keys: &'a [Array<u8, LambdaBytes>],
     s: &BitSlice,
 ) -> Vec<&'a [u8]>
 where
-    L: ArrayLength,
-    LambdaBytes: ArrayLength,
+    LambdaBytes: ArraySize,
+    TAU: TauParameters,
 {
     // Steps 19..22
-    (0..L::USIZE - 1)
+    (0..TAU::L - 1)
         .rev()
         .filter_map(|i| {
             let (left_child, right_child) = (s.get(2 * i + 1)?, s.get(2 * i + 2)?);
@@ -248,41 +245,39 @@ where
         .collect()
 }
 
-pub(crate) trait BatchVectorCommitment
-where
-    Self::LambdaBytes: Mul<U2, Output = Self::LambdaBytesTimes2>
-        + Mul<U3, Output = Self::LambdaBytesTimes3>
-        + Mul<U8, Output = Self::Lambda>
-        + Mul<Self::NLeafCommit, Output: ArrayLength>,
-{
+pub(crate) trait BatchVectorCommitment {
     type PRG: PseudoRandomGenerator<KeySize = Self::LambdaBytes>;
-    type TAU: TauParameters<Tau = Self::Tau, L = Self::L>;
+    type TAU: TauParameters<Tau = Self::Tau>;
     type LH: LeafHasher;
     type RO: RandomOracle;
 
-    type Lambda: ArrayLength;
-    type LambdaBytes: ArrayLength;
-    type LambdaBytesTimes2: ArrayLength;
-    type LambdaBytesTimes3: ArrayLength;
-    type Tau: ArrayLength;
-    type L: ArrayLength;
+    type Lambda: ArraySize;
+    type LambdaBytes: ArraySize
+        + Mul<U2, Output = Self::LambdaBytesTimes2>
+        + Mul<U3, Output = Self::LambdaBytesTimes3>
+        + Mul<U8, Output = Self::Lambda>
+        + Mul<Self::NLeafCommit, Output: ArraySize>;
+    type LambdaBytesTimes2: ArraySize;
+    type LambdaBytesTimes3: ArraySize;
+    type Tau: ArraySize;
+    const L: usize;
     type LC: LeafCommit;
-    type NLeafCommit: ArrayLength;
-    type Topen: ArrayLength;
+    type NLeafCommit: ArraySize;
+    type Topen: ArraySize;
 
     fn commit(
-        r: &GenericArray<u8, Self::LambdaBytes>,
+        r: &Array<u8, Self::LambdaBytes>,
         iv: &IV,
     ) -> BavcCommitResult<Self::LambdaBytes, Self::NLeafCommit>;
 
     fn open<'a>(
         decom: &'a BavcDecommitment<Self::LambdaBytes, Self::NLeafCommit>,
-        i_delta: &GenericArray<u16, Self::Tau>,
+        i_delta: &Array<u16, Self::Tau>,
     ) -> Option<BavcOpenResult<'a>>;
 
     fn reconstruct(
         decom_i: &BavcOpenResult,
-        i_delta: &GenericArray<u16, Self::Tau>,
+        i_delta: &Array<u16, Self::Tau>,
         iv: &IV,
     ) -> Option<BavcReconstructResult<Self::LambdaBytes>>;
 }
@@ -315,13 +310,13 @@ where
     type LC = LeafCommitment<PRG, LH>;
     type TAU = TAU;
     type Tau = TAU::Tau;
-    type L = TAU::L;
+    const L: usize = TAU::L;
     type PRG = PRG;
     type Topen = TAU::Topen;
     type NLeafCommit = U3;
 
     fn commit(
-        r: &GenericArray<u8, Self::LambdaBytes>,
+        r: &Array<u8, Self::LambdaBytes>,
         iv: &IV,
     ) -> BavcCommitResult<Self::LambdaBytes, Self::NLeafCommit> {
         // Step 3
@@ -330,23 +325,23 @@ where
         let mut h0_hasher = h0_hasher.finish();
 
         // Steps 5..7
-        let keys = construct_keys::<PRG, Self::L>(r, iv);
+        let keys = construct_keys::<PRG, TAU>(r, iv);
 
         // Setps 8..13
         let mut com_hasher = RO::h1_init();
-        let mut seeds = Vec::with_capacity(TAU::L::USIZE);
-        let mut coms = Vec::with_capacity(TAU::L::USIZE);
+        let mut seeds = Vec::with_capacity(Self::L);
+        let mut coms = Vec::with_capacity(Self::L);
 
         for i in 0..TAU::Tau::U32 {
             // Step 2
             let mut hi_hasher = RO::h1_init();
-            let mut uhash_i = GenericArray::default();
+            let mut uhash_i = Array::default();
             h0_hasher.read(&mut uhash_i);
 
             let n_i = TAU::bavc_max_node_index(i as usize);
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
-                let tweak = i + TAU::L::U32 - 1;
+                let tweak = i + Self::L as u32 - 1;
 
                 let (sd, com) = Self::LC::commit(&keys[alpha], iv, tweak, &uhash_i);
 
@@ -369,16 +364,16 @@ where
 
     fn open<'a>(
         decom: &'a BavcDecommitment<Self::LambdaBytes, Self::NLeafCommit>,
-        i_delta: &GenericArray<u16, TAU::Tau>,
+        i_delta: &Array<u16, TAU::Tau>,
     ) -> Option<BavcOpenResult<'a>> {
         // Step 5
-        let mut s = bitvec![0; 2 * TAU::L::USIZE - 1];
+        let mut s = bitvec![0; 2 * TAU::L - 1];
 
         // Steps 6..17
         mark_nodes::<TAU>(&mut s, i_delta)?;
 
         // Steps 19..23
-        let nodes = construct_nodes::<Self::LambdaBytes, Self::L>(&decom.keys, &s);
+        let nodes = construct_nodes::<Self::LambdaBytes, TAU>(&decom.keys, &s);
 
         // Skip step 24: as we know expected nodes len we can keep the 0s-pad implicit
 
@@ -392,11 +387,11 @@ where
 
     fn reconstruct(
         decom_i: &BavcOpenResult,
-        i_delta: &GenericArray<u16, TAU::Tau>,
+        i_delta: &Array<u16, TAU::Tau>,
         iv: &IV,
     ) -> Option<BavcReconstructResult<Self::LambdaBytes>> {
         // Step 7
-        let mut s = bitvec![0; 2 * TAU::L::USIZE - 1];
+        let mut s = bitvec![0; 2 * TAU::L - 1];
 
         // Steps 8..27
         let keys = reconstruct_keys::<PRG, TAU>(&mut s, &decom_i.nodes, i_delta, iv)?;
@@ -408,12 +403,12 @@ where
 
         // Steps 28..34
         let mut h1_com_hasher = RO::h1_init();
-        let mut seeds = Vec::with_capacity(TAU::L::USIZE - TAU::Tau::USIZE);
+        let mut seeds = Vec::with_capacity(TAU::L - TAU::Tau::USIZE);
         let mut com_it = decom_i.coms.iter();
 
         for i in 0u32..TAU::Tau::U32 {
             // Step 3
-            let mut uhash_i = GenericArray::default();
+            let mut uhash_i = Array::default();
             h0_hasher.read(&mut uhash_i);
 
             let mut h1_hasher = RO::h1_init();
@@ -423,7 +418,8 @@ where
                 let alpha = TAU::pos_in_tree(i as usize, j);
                 // Step 33
                 if !*s.get(alpha)? {
-                    let (sd, h) = Self::LC::commit(&keys[alpha], iv, i + TAU::L::U32 - 1, &uhash_i);
+                    let (sd, h) =
+                        Self::LC::commit(&keys[alpha], iv, i + TAU::L as u32 - 1, &uhash_i);
 
                     seeds.push(sd);
                     h1_hasher.update(&h);
@@ -476,21 +472,21 @@ where
     type LambdaBytesTimes2 = Prod<LH::LambdaBytes, U2>;
     type LambdaBytesTimes3 = Prod<LH::LambdaBytes, U3>;
     type Tau = TAU::Tau;
-    type L = TAU::L;
+    const L: usize = TAU::L;
     type Topen = TAU::Topen;
     type NLeafCommit = U2;
 
     fn commit(
-        r: &GenericArray<u8, Self::LambdaBytes>,
+        r: &Array<u8, Self::LambdaBytes>,
         iv: &IV,
     ) -> BavcCommitResult<Self::LambdaBytes, Self::NLeafCommit> {
         // Steps 5..7
-        let keys = construct_keys::<PRG, Self::L>(r, iv);
+        let keys = construct_keys::<PRG, TAU>(r, iv);
 
         // Setps 8..13
         let mut com_hasher = RO::h1_init();
-        let mut seeds = Vec::with_capacity(TAU::L::USIZE);
-        let mut coms = Vec::with_capacity(TAU::L::USIZE);
+        let mut seeds = Vec::with_capacity(TAU::L);
+        let mut coms = Vec::with_capacity(TAU::L);
 
         for i in 0..TAU::Tau::U32 {
             let mut hi_hasher = RO::h1_init();
@@ -498,7 +494,7 @@ where
             let n_i = TAU::bavc_max_node_index(i as usize);
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
-                let tweak = i + TAU::L::U32 - 1;
+                let tweak = i + TAU::L as u32 - 1;
 
                 let (seed, com) = Self::LC::commit_em(&keys[alpha], iv, tweak);
 
@@ -522,16 +518,16 @@ where
 
     fn open<'a>(
         decom: &'a BavcDecommitment<Self::LambdaBytes, Self::NLeafCommit>,
-        i_delta: &GenericArray<u16, Self::Tau>,
+        i_delta: &Array<u16, Self::Tau>,
     ) -> Option<BavcOpenResult<'a>> {
         // Step 5
-        let mut s = bitvec![0; 2 * TAU::L::USIZE - 1];
+        let mut s = bitvec![0; 2 * TAU::L - 1];
 
         // Steps 6..17
         mark_nodes::<TAU>(&mut s, i_delta)?;
 
         // Steps 19..23
-        let nodes = construct_nodes::<Self::LambdaBytes, Self::L>(&decom.keys, &s);
+        let nodes = construct_nodes::<Self::LambdaBytes, Self::TAU>(&decom.keys, &s);
 
         // Skip step 24: as we know expected nodes len we can keep the 0s-pad implicit
 
@@ -545,11 +541,11 @@ where
 
     fn reconstruct(
         decom_i: &BavcOpenResult,
-        i_delta: &GenericArray<u16, Self::Tau>,
+        i_delta: &Array<u16, Self::Tau>,
         iv: &IV,
     ) -> Option<BavcReconstructResult<Self::LambdaBytes>> {
         // Step 7
-        let mut s = bitvec![0; 2 * TAU::L::USIZE - 1];
+        let mut s = bitvec![0; 2 * TAU::L - 1];
 
         // Steps 8..11
         for i in 0..TAU::Tau::USIZE {
@@ -562,7 +558,7 @@ where
 
         // Steps 28..34
         let mut h1_com_hasher = RO::h1_init();
-        let mut seeds = Vec::with_capacity(TAU::L::USIZE - TAU::Tau::USIZE);
+        let mut seeds = Vec::with_capacity(TAU::L - TAU::Tau::USIZE);
         let mut com_it = decom_i.coms.iter();
 
         for i in 0u32..TAU::Tau::U32 {
@@ -574,7 +570,7 @@ where
 
                 // Step 33
                 if !*s.get(alpha)? {
-                    let (sd, h) = Self::LC::commit_em(&keys[alpha], iv, i + TAU::L::U32 - 1);
+                    let (sd, h) = Self::LC::commit_em(&keys[alpha], iv, i + TAU::L as u32 - 1);
                     seeds.push(sd);
                     h1_hasher.update(&h);
                 }
@@ -603,7 +599,7 @@ mod test {
     #[cfg(not(feature = "std"))]
     use alloc::string::String;
 
-    use generic_array::GenericArray;
+    use hybrid_array::Array;
     use serde::Deserialize;
 
     use crate::{
@@ -666,8 +662,8 @@ mod test {
     );
 
     fn compare_expected_with_result<
-        Lambda: ArrayLength + Mul<NLeafCommit, Output: ArrayLength> + Mul<U2, Output: ArrayLength>,
-        NLeafCommit: ArrayLength,
+        Lambda: ArraySize + Mul<NLeafCommit, Output: ArraySize> + Mul<U2, Output: ArraySize>,
+        NLeafCommit: ArraySize,
         TAU: TauParameters,
     >(
         expected: &DataBAVAC,
@@ -734,10 +730,10 @@ mod test {
             match data.lambda {
                 128 => {
                     let (sd, com) = LeafCommitment::<PRG128, LeafHasher128>::commit(
-                        GenericArray::from_slice(&data.key),
+                        Array::from_slice(&data.key),
                         iv,
                         data.tweak,
-                        GenericArray::from_slice(&data.uhash),
+                        Array::from_slice(&data.uhash),
                     );
                     assert_eq!(sd.as_slice(), data.expected_sd.as_slice());
                     assert_eq!(com.as_slice(), data.expected_com.as_slice());
@@ -745,10 +741,10 @@ mod test {
 
                 192 => {
                     let (sd, com) = LeafCommitment::<PRG192, LeafHasher192>::commit(
-                        GenericArray::from_slice(&data.key),
+                        Array::from_slice(&data.key),
                         iv,
                         data.tweak,
-                        GenericArray::from_slice(&data.uhash),
+                        Array::from_slice(&data.uhash),
                     );
                     assert_eq!(sd.as_slice(), data.expected_sd.as_slice());
                     assert_eq!(com.as_slice(), data.expected_com.as_slice());
@@ -756,10 +752,10 @@ mod test {
 
                 256 => {
                     let (sd, com) = LeafCommitment::<PRG256, LeafHasher256>::commit(
-                        GenericArray::from_slice(&data.key),
+                        Array::from_slice(&data.key),
                         iv,
                         data.tweak,
-                        GenericArray::from_slice(&data.uhash),
+                        Array::from_slice(&data.uhash),
                     );
                     assert_eq!(sd.as_slice(), data.expected_sd.as_slice());
                     assert_eq!(com.as_slice(), data.expected_com.as_slice());
@@ -779,7 +775,7 @@ mod test {
             match data.lambda {
                 128 => {
                     let (sd, com) = LeafCommitment::<PRG128, LeafHasher128>::commit_em(
-                        GenericArray::from_slice(&data.key),
+                        Array::from_slice(&data.key),
                         iv,
                         data.tweak,
                     );
@@ -789,7 +785,7 @@ mod test {
 
                 192 => {
                     let (sd, com) = LeafCommitment::<PRG192, LeafHasher192>::commit_em(
-                        GenericArray::from_slice(&data.key),
+                        Array::from_slice(&data.key),
                         iv,
                         data.tweak,
                     );
@@ -799,7 +795,7 @@ mod test {
 
                 256 => {
                     let (sd, com) = LeafCommitment::<PRG256, LeafHasher256>::commit_em(
-                        GenericArray::from_slice(&data.key),
+                        Array::from_slice(&data.key),
                         iv,
                         data.tweak,
                     );
@@ -814,14 +810,14 @@ mod test {
 
     #[test]
     fn bavc_test() {
-        let r: GenericArray<u8, _> = GenericArray::from_array([
+        let r: Array<u8, _> = Array::from([
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
             0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b,
             0x1c, 0x1d, 0x1e, 0x1f,
         ]);
 
         // Differently from C test vectors I've created a random initialization vector
-        let iv: IV = GenericArray::from_array([
+        let iv: IV = Array::from([
             0x64, 0x2b, 0xb1, 0xf9, 0x7c, 0x5f, 0x97, 0x9a, 0x72, 0xb1, 0xee, 0x39, 0xbe, 0x4e,
             0x78, 0x22,
         ]);
@@ -830,10 +826,10 @@ mod test {
         for data in database {
             match data.lambda {
                 128 => {
-                    let r = GenericArray::from_slice(&r[..16]);
+                    let r = Array::from_slice(&r[..16]);
 
                     if data.mode == "s" {
-                        let i_delta = GenericArray::from_slice(&data.i_delta);
+                        let i_delta = Array::from_slice(&data.i_delta);
 
                         let res_commit = BAVC128Small::<GF128>::commit(r, &iv);
 
@@ -848,7 +844,7 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        let i_delta = GenericArray::from_slice(&data.i_delta);
+                        let i_delta = Array::from_slice(&data.i_delta);
 
                         let res_commit = BAVC128Fast::<GF128>::commit(r, &iv);
 
@@ -865,10 +861,10 @@ mod test {
                     }
                 }
                 192 => {
-                    let r = GenericArray::from_slice(&r[..24]);
+                    let r = Array::from_slice(&r[..24]);
 
                     if data.mode == "s" {
-                        let i_delta = GenericArray::from_slice(&data.i_delta);
+                        let i_delta = Array::from_slice(&data.i_delta);
 
                         let res_commit = BAVC192Small::<GF192>::commit(r, &iv);
 
@@ -883,7 +879,7 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        let i_delta = GenericArray::from_slice(&data.i_delta);
+                        let i_delta = Array::from_slice(&data.i_delta);
 
                         let res_commit = BAVC192Fast::<GF192>::commit(r, &iv);
 
@@ -901,7 +897,7 @@ mod test {
 
                 _ => {
                     if data.mode == "s" {
-                        let i_delta = GenericArray::from_slice(&data.i_delta);
+                        let i_delta = Array::from_slice(&data.i_delta);
 
                         let res_commit = BAVC256Small::<GF256>::commit(&r, &iv);
 
@@ -915,7 +911,7 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        let i_delta = GenericArray::from_slice(&data.i_delta);
+                        let i_delta = Array::from_slice(&data.i_delta);
 
                         let res_commit = BAVC256Fast::<GF256>::commit(&r, &iv);
 
@@ -936,13 +932,13 @@ mod test {
 
     #[test]
     fn bavc_em_test() {
-        let r: GenericArray<u8, _> = GenericArray::from_array([
+        let r: Array<u8, _> = Array::from([
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
             0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b,
             0x1c, 0x1d, 0x1e, 0x1f,
         ]);
 
-        let iv: IV = GenericArray::from_array([
+        let iv: IV = Array::from([
             0x64, 0x2b, 0xb1, 0xf9, 0x7c, 0x5f, 0x97, 0x9a, 0x72, 0xb1, 0xee, 0x39, 0xbe, 0x4e,
             0x78, 0x22,
         ]);
@@ -951,10 +947,10 @@ mod test {
         for data in database {
             match data.lambda {
                 128 => {
-                    let r = GenericArray::from_slice(&r[..16]);
+                    let r = Array::from_slice(&r[..16]);
 
                     if data.mode == "s" {
-                        let i_delta = GenericArray::from_slice(&data.i_delta);
+                        let i_delta = Array::from_slice(&data.i_delta);
 
                         let res_commit = BAVC128SmallEM::<GF128>::commit(r, &iv);
 
@@ -969,7 +965,7 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        let i_delta = GenericArray::from_slice(&data.i_delta);
+                        let i_delta = Array::from_slice(&data.i_delta);
 
                         let res_commit = BAVC128FastEM::<GF128>::commit(r, &iv);
 
@@ -986,10 +982,10 @@ mod test {
                     }
                 }
                 192 => {
-                    let r = GenericArray::from_slice(&r[..24]);
+                    let r = Array::from_slice(&r[..24]);
 
                     if data.mode == "s" {
-                        let i_delta = GenericArray::from_slice(&data.i_delta);
+                        let i_delta = Array::from_slice(&data.i_delta);
 
                         let res_commit = BAVC192SmallEM::<GF192>::commit(r, &iv);
 
@@ -1004,7 +1000,7 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        let i_delta = GenericArray::from_slice(&data.i_delta);
+                        let i_delta = Array::from_slice(&data.i_delta);
 
                         let res_commit = BAVC192FastEM::<GF192>::commit(r, &iv);
 
@@ -1022,7 +1018,7 @@ mod test {
                 }
                 _ => {
                     if data.mode == "s" {
-                        let i_delta = GenericArray::from_slice(&data.i_delta);
+                        let i_delta = Array::from_slice(&data.i_delta);
 
                         let res_commit = BAVC256SmallEM::<GF256>::commit(&r, &iv);
 
@@ -1037,7 +1033,7 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        let i_delta = GenericArray::from_slice(&data.i_delta);
+                        let i_delta = Array::from_slice(&data.i_delta);
 
                         let res_commit = BAVC256FastEM::<GF256>::commit(&r, &iv);
 
