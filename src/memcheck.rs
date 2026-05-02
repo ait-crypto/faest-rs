@@ -16,7 +16,7 @@ pub trait Classifier {
     fn declassify(&self);
 }
 
- impl<T> Classifier for [T] {
+impl<T> Classifier for [T] {
     #[inline(always)]
     fn classify(&self) {
         unsafe {
