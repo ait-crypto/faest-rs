@@ -1,3 +1,6 @@
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
+
 use hybrid_array::{
     Array,
     typenum::{Prod, U8, Unsigned},

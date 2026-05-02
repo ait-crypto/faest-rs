@@ -1,5 +1,8 @@
 use core::iter::zip;
 
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
+
 use hybrid_array::{
     Array, ArraySize,
     typenum::{Quot, U2, U4, U8, Unsigned},

@@ -1,7 +1,7 @@
 use core::array;
 
 #[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 
 use hybrid_array::{Array, typenum::Unsigned};
 

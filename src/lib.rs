@@ -88,7 +88,10 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::{boxed::Box, vec::Vec};
 
-use hybrid_array::{Array, typenum::Unsigned};
+#[cfg(any(feature = "randomized-signer", feature = "capi"))]
+use hybrid_array::Array;
+
+use hybrid_array::typenum::Unsigned;
 use pastey::paste;
 use rand_core::CryptoRngCore;
 #[cfg(any(feature = "randomized-signer", feature = "capi"))]

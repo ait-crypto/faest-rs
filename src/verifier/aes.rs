@@ -1,7 +1,7 @@
 use core::{iter::zip, mem, ops::Mul};
 
 #[cfg(not(feature = "std"))]
-use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
 
 use hybrid_array::{
     Array, ArraySize,

@@ -1,7 +1,7 @@
 use hybrid_array::{Array, typenum::Unsigned};
 
 #[cfg(not(feature = "std"))]
-use alloc::{borrow::ToOwned, vec::Vec};
+use alloc::vec::Vec;
 
 use super::{
     ByteCommitsRef, FieldCommitDegThree, encryption::enc_cstrnts, key_expansion::key_exp_cstrnts,
