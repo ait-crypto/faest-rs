@@ -504,7 +504,10 @@ macro_rules! define_impl {
             #[doc = "Signature for " $param]
             #[derive(Debug, Clone, PartialEq, Eq)]
             #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-            pub struct [<$param Signature>]([u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE]);
+            pub struct [<$param Signature>](
+                #[cfg_attr(feature = "serde", serde(with = "serde_big_array::BigArray"))]
+                [u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE]
+            );
 
             impl Signer<[<$param Signature>]> for [<$param SigningKey>] {
                 fn try_sign(&self, msg: &[u8]) -> Result<[<$param Signature>], Error> {
