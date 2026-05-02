@@ -9,7 +9,7 @@ use crate::{
     parameter::{BaseParameters, OWFField, OWFParameters, QSProof},
     prover::{self, byte_commitments::ByteCommitsRef},
     universal_hashing::ZKHasherInit,
-    utils::get_bit,
+    utils::{array_ref, get_bit},
     verifier::{self, VoleCommitsRef},
 };
 
@@ -96,7 +96,7 @@ where
         }
     }
     let w = VoleCommitsRef {
-        scalars: Array::from_slice(&q[..O::L::USIZE]),
+        scalars: array_ref(&q[..O::L::USIZE]),
         delta: &delta,
     };
 

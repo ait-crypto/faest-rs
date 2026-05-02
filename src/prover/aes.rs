@@ -20,7 +20,7 @@ use crate::{
         large_fields::ByteCombineSquaredConstants,
     },
     parameter::{OWFField, OWFParameters, SecurityParameter},
-    utils::xor_arrays_inplace,
+    utils::{array_from_slice, array_ref, xor_arrays_inplace},
 };
 
 // Helper type aliases
@@ -111,7 +111,7 @@ where
     fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
         ByteCommits {
             keys: Box::new(zip(self.iter(), rhs.keys).map(|(a, b)| a ^ b).collect()),
-            tags: Box::new(Array::from_slice(&rhs.tags[..L::USIZE * 8]).to_owned()),
+            tags: Box::new(array_ref(&rhs.tags[..L::USIZE * 8]).to_owned()),
         }
     }
 }
@@ -249,7 +249,7 @@ where
 
         for c in 0..O::NSt::USIZE {
             // Save the 4 state's columns that will be modified in this round
-            let tmp = Array::<_, U4>::from_slice(&self[4 * c..4 * c + 4]).to_owned();
+            let tmp = array_from_slice::<_, U4>(&self[4 * c..4 * c + 4]);
 
             let i0 = 4 * c;
             let i1 = i0 + 1;
@@ -374,7 +374,7 @@ where
                 ^ self.keys[i].rotate_right(2)
                 ^ 0x5;
 
-            let xi_tags = Array::<_, U8>::from_slice(&self.tags[8 * i..8 * i + 8]).to_owned();
+            let xi_tags = array_from_slice::<_, U8>(&self.tags[8 * i..8 * i + 8]);
             for bit_i in 0..8 {
                 // ::6
                 self.tags[8 * i + bit_i] = xi_tags[(bit_i + 8 - 1) % 8]

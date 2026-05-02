@@ -407,11 +407,11 @@ where
 
     // ::4
     let mut r = Array::<u8, O::LambdaBytes>::default();
-    let iv_pre = Array::from_mut_slice(signature.iv_pre);
+    let iv_pre: &mut IV = signature.iv_pre.try_into().map_err(|_| Error::new())?;
     RO::<P>::hash_r_iv(&mut r, iv_pre, &sk.owf_key, &mu, rho);
 
     // ::5
-    let mut iv = Array::from_slice(iv_pre).to_owned();
+    let mut iv = iv_pre.to_owned();
     RO::<P>::hash_iv(&mut iv);
 
     // ::7
@@ -443,7 +443,9 @@ where
     let (a0_tilde, a1_tilde, a2_tilde) = P::OWF::prove(
         witness,
         // ::16
-        Array::from_slice(&u[O::LBytes::USIZE..O::LBytes::USIZE + O::LambdaBytesTimes2::USIZE]),
+        &u[O::LBytes::USIZE..O::LBytes::USIZE + O::LambdaBytesTimes2::USIZE]
+            .try_into()
+            .map_err(|_| Error::new())?,
         &v,
         &sk.pk,
         &chall2,
@@ -509,11 +511,12 @@ where
     RO::<P>::hash_mu(&mut mu, &pk.owf_input, &pk.owf_output, msg);
 
     // ::3
-    let mut iv = Array::from_slice(signature.iv_pre).to_owned();
+    let mut iv = signature.iv_pre.try_into().map_err(|_| Error::new())?;
     RO::<P>::hash_iv(&mut iv);
 
     // ::7-8
-    let chall3: &Array<u8, O::LambdaBytes> = Array::from_slice(signature.chall3);
+    let chall3: &Array<u8, O::LambdaBytes> =
+        signature.chall3.try_into().map_err(|_| Error::new())?;
     let decom_i = signature.parse_decom();
     let c = VoleCommitmentCRef::<O::LHatBytes>::new(signature.cs);
     let VoleReconstructResult { com, q } =
@@ -541,12 +544,12 @@ where
     // ::17
     let a0_tilde = P::OWF::verify(
         &q,
-        Array::from_slice(signature.d),
+        signature.d.try_into().map_err(|_| Error::new())?,
         pk,
         &chall2,
         chall3,
-        Array::from_slice(signature.a1_tilde),
-        Array::from_slice(signature.a2_tilde),
+        signature.a1_tilde.try_into().map_err(|_| Error::new())?,
+        signature.a2_tilde.try_into().map_err(|_| Error::new())?,
     );
 
     // ::18

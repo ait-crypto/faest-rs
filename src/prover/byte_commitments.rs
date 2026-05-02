@@ -9,7 +9,10 @@ use hybrid_array::{
 };
 
 use super::field_commitment::FieldCommitDegOne;
-use crate::fields::{BigGaloisField, GF8};
+use crate::{
+    fields::{BigGaloisField, GF8},
+    utils::array_ref,
+};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ByteCommitment<F>
@@ -77,8 +80,8 @@ where
         debug_assert!(start_byte + L2::USIZE <= L::USIZE);
 
         ByteCommitsRef {
-            keys: Array::from_slice(&self.keys[start_byte..start_byte + L2::USIZE]),
-            tags: Array::from_slice(&self.tags[start_byte * 8..(start_byte + L2::USIZE) * 8]),
+            keys: array_ref(&self.keys[start_byte..start_byte + L2::USIZE]),
+            tags: array_ref(&self.tags[start_byte * 8..(start_byte + L2::USIZE) * 8]),
         }
     }
 
@@ -92,7 +95,7 @@ where
     fn get(&self, idx: usize) -> ByteCommitment<F> {
         ByteCommitment {
             key: self.keys[idx],
-            tags: Array::from_slice(&self.tags[idx * 8..idx * 8 + 8]).to_owned(),
+            tags: array_ref(&self.tags[idx * 8..idx * 8 + 8]).to_owned(),
         }
     }
 
@@ -121,8 +124,8 @@ where
     /// Panics if the lengths of the keys is not equal to the length of the tags divided by 8.
     pub(crate) fn from_slices(keys: &'a [u8], tags: &'a [F]) -> Self {
         Self {
-            keys: Array::from_slice(keys),
-            tags: Array::from_slice(tags),
+            keys: array_ref(keys),
+            tags: array_ref(tags),
         }
     }
 
@@ -140,8 +143,8 @@ where
         debug_assert!(start_byte + L2::USIZE <= L::USIZE);
 
         ByteCommitsRef {
-            keys: Array::from_slice(&self.keys[start_byte..start_byte + L2::USIZE]),
-            tags: Array::from_slice(&self.tags[start_byte * 8..(start_byte + L2::USIZE) * 8]),
+            keys: array_ref(&self.keys[start_byte..start_byte + L2::USIZE]),
+            tags: array_ref(&self.tags[start_byte * 8..(start_byte + L2::USIZE) * 8]),
         }
     }
 }

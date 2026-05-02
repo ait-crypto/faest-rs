@@ -612,7 +612,7 @@ mod test {
         },
         prg::{IVSize, PRG128, PRG192, PRG256},
         universal_hashing::{LeafHasher128, LeafHasher192, LeafHasher256},
-        utils::test::read_test_data,
+        utils::{array_ref, test::read_test_data},
     };
 
     #[derive(Debug, Deserialize)]
@@ -725,15 +725,15 @@ mod test {
     fn leaf_commit_test() {
         let database: Vec<DataLeafCommit> = read_test_data("leaf_com.json");
         for data in database {
-            let iv = IV::from_slice(&data.iv);
+            let iv = array_ref(&data.iv);
 
             match data.lambda {
                 128 => {
                     let (sd, com) = LeafCommitment::<PRG128, LeafHasher128>::commit(
-                        Array::from_slice(&data.key),
+                        array_ref(&data.key),
                         iv,
                         data.tweak,
-                        Array::from_slice(&data.uhash),
+                        array_ref(&data.uhash),
                     );
                     assert_eq!(sd.as_slice(), data.expected_sd.as_slice());
                     assert_eq!(com.as_slice(), data.expected_com.as_slice());
@@ -741,10 +741,10 @@ mod test {
 
                 192 => {
                     let (sd, com) = LeafCommitment::<PRG192, LeafHasher192>::commit(
-                        Array::from_slice(&data.key),
+                        array_ref(&data.key),
                         iv,
                         data.tweak,
-                        Array::from_slice(&data.uhash),
+                        array_ref(&data.uhash),
                     );
                     assert_eq!(sd.as_slice(), data.expected_sd.as_slice());
                     assert_eq!(com.as_slice(), data.expected_com.as_slice());
@@ -752,10 +752,10 @@ mod test {
 
                 256 => {
                     let (sd, com) = LeafCommitment::<PRG256, LeafHasher256>::commit(
-                        Array::from_slice(&data.key),
+                        array_ref(&data.key),
                         iv,
                         data.tweak,
-                        Array::from_slice(&data.uhash),
+                        array_ref(&data.uhash),
                     );
                     assert_eq!(sd.as_slice(), data.expected_sd.as_slice());
                     assert_eq!(com.as_slice(), data.expected_com.as_slice());
@@ -770,12 +770,12 @@ mod test {
     fn leaf_commit_em_test() {
         let database: Vec<DataLeafCommitEM> = read_test_data("leaf_com_em.json");
         for data in database {
-            let iv = IV::from_slice(&data.iv);
+            let iv = array_ref(&data.iv);
 
             match data.lambda {
                 128 => {
                     let (sd, com) = LeafCommitment::<PRG128, LeafHasher128>::commit_em(
-                        Array::from_slice(&data.key),
+                        array_ref(&data.key),
                         iv,
                         data.tweak,
                     );
@@ -785,7 +785,7 @@ mod test {
 
                 192 => {
                     let (sd, com) = LeafCommitment::<PRG192, LeafHasher192>::commit_em(
-                        Array::from_slice(&data.key),
+                        array_ref(&data.key),
                         iv,
                         data.tweak,
                     );
@@ -795,7 +795,7 @@ mod test {
 
                 256 => {
                     let (sd, com) = LeafCommitment::<PRG256, LeafHasher256>::commit_em(
-                        Array::from_slice(&data.key),
+                        array_ref(&data.key),
                         iv,
                         data.tweak,
                     );
@@ -826,10 +826,10 @@ mod test {
         for data in database {
             match data.lambda {
                 128 => {
-                    let r = Array::from_slice(&r[..16]);
+                    let r = array_ref(&r[..16]);
 
                     if data.mode == "s" {
-                        let i_delta = Array::from_slice(&data.i_delta);
+                        let i_delta = array_ref(&data.i_delta);
 
                         let res_commit = BAVC128Small::<GF128>::commit(r, &iv);
 
@@ -844,7 +844,7 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        let i_delta = Array::from_slice(&data.i_delta);
+                        let i_delta = array_ref(&data.i_delta);
 
                         let res_commit = BAVC128Fast::<GF128>::commit(r, &iv);
 
@@ -861,10 +861,10 @@ mod test {
                     }
                 }
                 192 => {
-                    let r = Array::from_slice(&r[..24]);
+                    let r = array_ref(&r[..24]);
 
                     if data.mode == "s" {
-                        let i_delta = Array::from_slice(&data.i_delta);
+                        let i_delta = array_ref(&data.i_delta);
 
                         let res_commit = BAVC192Small::<GF192>::commit(r, &iv);
 
@@ -879,7 +879,7 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        let i_delta = Array::from_slice(&data.i_delta);
+                        let i_delta = array_ref(&data.i_delta);
 
                         let res_commit = BAVC192Fast::<GF192>::commit(r, &iv);
 
@@ -897,7 +897,7 @@ mod test {
 
                 _ => {
                     if data.mode == "s" {
-                        let i_delta = Array::from_slice(&data.i_delta);
+                        let i_delta = array_ref(&data.i_delta);
 
                         let res_commit = BAVC256Small::<GF256>::commit(&r, &iv);
 
@@ -911,7 +911,7 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        let i_delta = Array::from_slice(&data.i_delta);
+                        let i_delta = array_ref(&data.i_delta);
 
                         let res_commit = BAVC256Fast::<GF256>::commit(&r, &iv);
 
@@ -947,10 +947,10 @@ mod test {
         for data in database {
             match data.lambda {
                 128 => {
-                    let r = Array::from_slice(&r[..16]);
+                    let r = array_ref(&r[..16]);
 
                     if data.mode == "s" {
-                        let i_delta = Array::from_slice(&data.i_delta);
+                        let i_delta = array_ref(&data.i_delta);
 
                         let res_commit = BAVC128SmallEM::<GF128>::commit(r, &iv);
 
@@ -965,7 +965,7 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        let i_delta = Array::from_slice(&data.i_delta);
+                        let i_delta = array_ref(&data.i_delta);
 
                         let res_commit = BAVC128FastEM::<GF128>::commit(r, &iv);
 
@@ -982,10 +982,10 @@ mod test {
                     }
                 }
                 192 => {
-                    let r = Array::from_slice(&r[..24]);
+                    let r = array_ref(&r[..24]);
 
                     if data.mode == "s" {
-                        let i_delta = Array::from_slice(&data.i_delta);
+                        let i_delta = array_ref(&data.i_delta);
 
                         let res_commit = BAVC192SmallEM::<GF192>::commit(r, &iv);
 
@@ -1000,7 +1000,7 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        let i_delta = Array::from_slice(&data.i_delta);
+                        let i_delta = array_ref(&data.i_delta);
 
                         let res_commit = BAVC192FastEM::<GF192>::commit(r, &iv);
 
@@ -1018,7 +1018,7 @@ mod test {
                 }
                 _ => {
                     if data.mode == "s" {
-                        let i_delta = Array::from_slice(&data.i_delta);
+                        let i_delta = array_ref(&data.i_delta);
 
                         let res_commit = BAVC256SmallEM::<GF256>::commit(&r, &iv);
 
@@ -1033,7 +1033,7 @@ mod test {
                             (res_commit.clone(), res_open, res_reconstruct),
                         );
                     } else {
-                        let i_delta = Array::from_slice(&data.i_delta);
+                        let i_delta = array_ref(&data.i_delta);
 
                         let res_commit = BAVC256FastEM::<GF256>::commit(&r, &iv);
 

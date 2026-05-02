@@ -11,7 +11,7 @@ use hybrid_array::{
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
-use crate::utils::Reader;
+use crate::utils::{Reader, array_ref};
 
 type Aes128Ctr32LE = ctr::Ctr32LE<aes::Aes128>;
 type Aes192Ctr32LE = ctr::Ctr32LE<aes::Aes192>;
@@ -26,7 +26,7 @@ pub(crate) type Twk = u32;
 
 /// Add tweak to the IV
 fn add_tweak(iv: &IV, tweak: Twk) -> Array<u8, IVSize> {
-    let mut iv = Array::from_slice(iv.as_slice()).to_owned();
+    let mut iv = array_ref(iv.as_slice()).to_owned();
     let tweaked_word = u32::from_le_bytes([iv[12], iv[13], iv[14], iv[15]]).wrapping_add(tweak);
     iv[12..].copy_from_slice(&tweaked_word.to_le_bytes());
     iv
@@ -67,7 +67,7 @@ impl PseudoRandomGenerator for PRG128 {
 
     fn new_prg(k: &Array<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
         Self(Aes128Ctr32LE::new(
-            Array::from_slice(k.as_slice()),
+            array_ref(k.as_slice()),
             &add_tweak(iv, tweak),
         ))
     }
@@ -87,7 +87,7 @@ impl PseudoRandomGenerator for PRG192 {
 
     fn new_prg(k: &Array<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
         Self(Aes192Ctr32LE::new(
-            Array::from_slice(k.as_slice()),
+            array_ref(k.as_slice()),
             &add_tweak(iv, tweak),
         ))
     }
@@ -107,7 +107,7 @@ impl PseudoRandomGenerator for PRG256 {
 
     fn new_prg(k: &Array<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
         Self(Aes256Ctr32LE::new(
-            Array::from_slice(k.as_slice()),
+            array_ref(k.as_slice()),
             &add_tweak(iv, tweak),
         ))
     }
