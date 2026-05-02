@@ -6,8 +6,8 @@ use core::{
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
-use generic_array::{
-    ArrayLength, GenericArray,
+use hybrid_array::{
+    Array, ArraySize,
     typenum::{Prod, U3},
 };
 
@@ -62,21 +62,21 @@ pub(crate) trait Field:
     const ONE: Self;
 
     /// Length of the byte representation of the field
-    type Length: ArrayLength;
+    type Length: ArraySize;
 
     /// Obtain byte representation of the field element
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length>;
+    fn as_bytes(&self) -> Array<u8, Self::Length>;
 
     /*/
     /// Obtain a boxed byte representation of the field element
-    fn as_boxed_bytes(&self) -> Box<GenericArray<u8, Self::Length>>;
+    fn as_boxed_bytes(&self) -> Box<Array<u8, Self::Length>>;
     */
 }
 
 /// Marker trait denoting that the current field is the base field of some `ExtensionField`.
 ///
 /// For security, FAEST requires the extension field to have 3x the length of the base field.
-pub(crate) trait BaseField: Field<Length: Mul<U3, Output: ArrayLength>> {
+pub(crate) trait BaseField: Field<Length: Mul<U3, Output: ArraySize>> {
     type ExtenionField: ExtensionField<BaseField = Self, Length = Prod<Self::Length, U3>>;
 }
 
@@ -100,41 +100,41 @@ pub(crate) trait Square {
     fn square(self) -> Self::Output;
 }
 
-// blanket implementation for GenericArray
+// blanket implementation for Array
 
-impl<F, L> Square for GenericArray<F, L>
+impl<F, L> Square for Array<F, L>
 where
     F: Square,
-    L: ArrayLength,
+    L: ArraySize,
 {
-    type Output = GenericArray<F::Output, L>;
+    type Output = Array<F::Output, L>;
 
     fn square(self) -> Self::Output {
         self.into_iter().map(|x| x.square()).collect()
     }
 }
 
-impl<F, L> Square for &GenericArray<F, L>
+impl<F, L> Square for &Array<F, L>
 where
     F: Square + Clone,
-    L: ArrayLength,
+    L: ArraySize,
 {
-    type Output = GenericArray<F::Output, L>;
+    type Output = Array<F::Output, L>;
 
     fn square(self) -> Self::Output {
         self.iter().cloned().map(|x| x.square()).collect()
     }
 }
 
-impl<F, L> Square for &Box<GenericArray<F, L>>
+impl<F, L> Square for &Box<Array<F, L>>
 where
     F: Square + Clone,
-    L: ArrayLength,
+    L: ArraySize,
 {
-    type Output = Box<GenericArray<F::Output, L>>;
+    type Output = Box<Array<F::Output, L>>;
 
     fn square(self) -> Self::Output {
-        self.iter().cloned().map(|x| x.square()).collect()
+        Box::new(self.iter().cloned().map(|x| x.square()).collect())
     }
 }
 
@@ -160,11 +160,11 @@ pub(crate) trait ExtensionField:
     + Debug
 {
     /// Length of the byte representation of the field
-    type Length: ArrayLength;
+    type Length: ArraySize;
 
     /// Base field of the extension field
     type BaseField: Field;
 
     /// Obtain byte representation of the field element
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length>;
+    fn as_bytes(&self) -> Array<u8, Self::Length>;
 }

@@ -1,5 +1,5 @@
-use generic_array::{
-    GenericArray,
+use hybrid_array::{
+    Array,
     typenum::{Prod, U8, Unsigned},
 };
 use itertools::iproduct;
@@ -20,7 +20,7 @@ where
     O: OWFParameters,
 {
     // ::1
-    let mut y_tags = GenericArray::default_boxed();
+    let mut y_tags = Box::new(Array::default());
     y_tags[..O::Lambda::USIZE].copy_from_slice(&w.scalars[..O::Lambda::USIZE]);
 
     // ::2
@@ -55,7 +55,7 @@ pub(crate) fn key_exp_bkwd<'a, O>(
 where
     O: OWFParameters,
 {
-    let mut y_tag = GenericArray::default_boxed();
+    let mut y_tag = Box::new(Array::default());
 
     let mut iwd = 0;
 
@@ -64,7 +64,7 @@ where
     for j in 0..O::SKe::USIZE {
         // ::7
 
-        let xt_tag: GenericArray<OWFField<O>, U8> = (0..8)
+        let xt_tag: Array<OWFField<O>, U8> = (0..8)
             .map(|i| {
                 let mut x_tilde_i = x.scalars[8 * j + i] + xk.scalars[iwd + 8 * (j % 4) + i];
 
@@ -97,7 +97,7 @@ where
 
 pub fn inverse_affine_byte<O>(
     y_tag: &mut [OWFField<O>],
-    x_tag: &GenericArray<OWFField<O>, U8>,
+    x_tag: &Array<OWFField<O>, U8>,
     delta: &OWFField<O>,
 ) where
     O: OWFParameters,

@@ -3,8 +3,8 @@ use core::mem::size_of;
 #[cfg(not(feature = "std"))]
 use alloc::{borrow::ToOwned, boxed::Box};
 
-use generic_array::{
-    GenericArray,
+use hybrid_array::{
+    Array,
     typenum::{U3, Unsigned},
 };
 
@@ -18,17 +18,17 @@ use crate::{
 };
 
 pub(crate) fn aes_extendedwitness<O>(
-    owf_secret: &GenericArray<u8, O::LambdaBytes>,
-    owf_input: &GenericArray<u8, O::InputSize>,
-) -> Box<GenericArray<u8, O::LBytes>>
+    owf_secret: &Array<u8, O::LambdaBytes>,
+    owf_input: &Array<u8, O::InputSize>,
+) -> Box<Array<u8, O::LBytes>>
 where
     O: OWFParameters,
 {
     // Step 0
-    let mut input: GenericArray<u8, O::InputSize> = owf_input.to_owned();
+    let mut input: Array<u8, O::InputSize> = owf_input.to_owned();
 
     // Step 3
-    let mut witness = GenericArray::default_boxed();
+    let mut witness = Box::<Array<u8, O::LBytes>>::default();
 
     // Step 6
     // Note: for FAEST-LAMBDA-EM, SKE is set to the actual number of S-Boxes in Rijndael-LAMBDA.KeyExpansion.
@@ -77,7 +77,7 @@ where
     };
 
     for j in start_off..start_off + non_lin_blocks {
-        let inside = GenericArray::<_, U3>::from_iter(
+        let inside = Array::<_, U3>::from_iter(
             convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)])).take(3),
         );
 
@@ -183,7 +183,7 @@ mod test {
         utils::test::read_test_data,
     };
 
-    use generic_array::GenericArray;
+    use hybrid_array::Array;
     use serde::Deserialize;
 
     #[derive(Debug, Deserialize)]
@@ -207,22 +207,22 @@ mod test {
             match self.lambda {
                 128 => {
                     let wit = OWF128::<GF128>::extendwitness(
-                        GenericArray::from_slice(&self.key),
-                        GenericArray::from_slice(&self.input),
+                        Array::from_slice(&self.key),
+                        Array::from_slice(&self.input),
                     );
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 192 => {
                     let wit = OWF192::<GF192>::extendwitness(
-                        GenericArray::from_slice(&self.key),
-                        GenericArray::from_slice(&self.input),
+                        Array::from_slice(&self.key),
+                        Array::from_slice(&self.input),
                     );
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 _ => {
                     let wit = OWF256::<GF256>::extendwitness(
-                        GenericArray::from_slice(&self.key),
-                        GenericArray::from_slice(&self.input),
+                        Array::from_slice(&self.key),
+                        Array::from_slice(&self.input),
                     );
                     (*wit).as_slice() == self.w.as_slice()
                 }
@@ -233,22 +233,22 @@ mod test {
             match self.lambda {
                 128 => {
                     let wit = OWF128EM::<GF128>::extendwitness(
-                        GenericArray::from_slice(&self.key),
-                        GenericArray::from_slice(&self.input),
+                        Array::from_slice(&self.key),
+                        Array::from_slice(&self.input),
                     );
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 192 => {
                     let wit = OWF192EM::<GF192>::extendwitness(
-                        GenericArray::from_slice(&self.key),
-                        GenericArray::from_slice(&self.input),
+                        Array::from_slice(&self.key),
+                        Array::from_slice(&self.input),
                     );
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 _ => {
                     let wit = OWF256EM::<GF256>::extendwitness(
-                        GenericArray::from_slice(&self.key),
-                        GenericArray::from_slice(&self.input),
+                        Array::from_slice(&self.key),
+                        Array::from_slice(&self.input),
                     );
                     (*wit).as_slice() == self.w.as_slice()
                 }

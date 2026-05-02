@@ -1,4 +1,4 @@
-use generic_array::{GenericArray, typenum::Unsigned};
+use hybrid_array::{Array, typenum::Unsigned};
 
 #[cfg(not(feature = "std"))]
 use alloc::{borrow::ToOwned, vec::Vec};
@@ -48,7 +48,7 @@ pub(crate) fn owf_constraints<O>(
         // ::10
         let owf_input = w.get_commits_ref::<O::NStBytes>(0);
         // ::11
-        let owf_output_keys: GenericArray<u8, O::NStBytes> =
+        let owf_output_keys: Array<u8, O::NStBytes> =
             xor_arrays(owf_input.keys.as_slice(), y.as_slice()).collect();
         let owf_output = ByteCommitsRef::from_slices(&owf_output_keys, owf_input.tags);
         // ::19 - EM = true
@@ -63,7 +63,7 @@ pub(crate) fn owf_constraints<O>(
         );
     } else {
         // ::13
-        let mut owf_input = GenericArray::from_slice(x).to_owned();
+        let mut owf_input = Array::from_slice(x).to_owned();
 
         // ::16
         let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKeBytes>(0));
@@ -78,9 +78,8 @@ pub(crate) fn owf_constraints<O>(
             let w_tilde =
                 w.get_commits_ref::<O::LEncBytes>(O::LKeBytes::USIZE + b * O::LEncBytes::USIZE);
 
-            let owf_output = GenericArray::from_slice(
-                &y[O::InputSize::USIZE * b..O::InputSize::USIZE * (b + 1)],
-            );
+            let owf_output =
+                Array::from_slice(&y[O::InputSize::USIZE * b..O::InputSize::USIZE * (b + 1)]);
 
             // ::21 - EM = false
             enc_cstrnts::<O, _, _>(
@@ -98,7 +97,7 @@ pub(crate) fn owf_constraints<O>(
 }
 
 #[inline]
-fn key_schedule_bytes<O>(key: &GenericArray<u8, O::InputSize>) -> Vec<GenericArray<u8, O::NStBytes>>
+fn key_schedule_bytes<O>(key: &Array<u8, O::InputSize>) -> Vec<Array<u8, O::NStBytes>>
 where
     O: OWFParameters,
 {
@@ -110,7 +109,7 @@ where
                 .iter()
                 .copied()
                 .take(O::NStBytes::USIZE)
-                .collect::<GenericArray<u8, O::NStBytes>>()
+                .collect::<Array<u8, O::NStBytes>>()
         })
         .collect()
 }

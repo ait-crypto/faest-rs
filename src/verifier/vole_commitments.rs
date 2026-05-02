@@ -3,33 +3,30 @@ use core::ops::{Index, Mul, Range};
 #[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
 
-use generic_array::{ArrayLength, GenericArray, typenum::U8};
+use hybrid_array::{Array, ArraySize, typenum::U8};
 
 use crate::{fields::BigGaloisField, utils::get_bit};
 
 #[derive(Debug, Clone)]
-pub(crate) struct VoleCommits<'a, F: BigGaloisField, L: ArrayLength> {
-    pub(crate) scalars: Box<GenericArray<F, L>>,
+pub(crate) struct VoleCommits<'a, F: BigGaloisField, L: ArraySize> {
+    pub(crate) scalars: Box<Array<F, L>>,
     pub(crate) delta: &'a F,
 }
 
 impl<'a, F, L> VoleCommits<'a, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     /// Turns the input array into vole commitments using the challenge delta.
-    pub(crate) fn from_constant<L2>(
-        input: &GenericArray<u8, L>,
-        delta: &'a F,
-    ) -> VoleCommits<'a, F, L2>
+    pub(crate) fn from_constant<L2>(input: &Array<u8, L>, delta: &'a F) -> VoleCommits<'a, F, L2>
     where
-        L: ArrayLength + Mul<U8, Output = L2>,
-        L2: ArrayLength,
+        L: ArraySize + Mul<U8, Output = L2>,
+        L2: ArraySize,
     {
-        let scalars = <Box<GenericArray<F, L2>>>::from_iter(
+        let scalars = Box::new(<Array<F, L2>>::from_iter(
             (0..L2::USIZE).map(|i| *delta * get_bit(input, i)),
-        );
+        ));
 
         VoleCommits { scalars, delta }
     }
@@ -43,10 +40,10 @@ where
 
     pub(crate) fn get_commits_ref<L2>(&self, start_idx: usize) -> VoleCommitsRef<'_, F, L2>
     where
-        L2: ArrayLength,
+        L2: ArraySize,
     {
         VoleCommitsRef {
-            scalars: GenericArray::from_slice(&self.scalars[start_idx..start_idx + L2::USIZE]),
+            scalars: Array::from_slice(&self.scalars[start_idx..start_idx + L2::USIZE]),
             delta: self.delta,
         }
     }
@@ -63,22 +60,22 @@ where
 }
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct VoleCommitsRef<'a, F: BigGaloisField, L: ArrayLength> {
-    pub(crate) scalars: &'a GenericArray<F, L>,
+pub(crate) struct VoleCommitsRef<'a, F: BigGaloisField, L: ArraySize> {
+    pub(crate) scalars: &'a Array<F, L>,
     pub(crate) delta: &'a F,
 }
 
 impl<'a, F, L> VoleCommitsRef<'a, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     pub(crate) fn get_commits_ref<L2>(&self, start_idx: usize) -> VoleCommitsRef<'a, F, L2>
     where
-        L2: ArrayLength,
+        L2: ArraySize,
     {
         VoleCommitsRef {
-            scalars: GenericArray::from_slice(&self.scalars[start_idx..start_idx + L2::USIZE]),
+            scalars: Array::from_slice(&self.scalars[start_idx..start_idx + L2::USIZE]),
             delta: self.delta,
         }
     }
@@ -87,7 +84,7 @@ where
 impl<F, L> Index<usize> for VoleCommits<'_, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     type Output = F;
 
@@ -99,7 +96,7 @@ where
 impl<F, L> Index<Range<usize>> for VoleCommits<'_, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     type Output = [F];
 
@@ -111,7 +108,7 @@ where
 impl<F, L> Index<usize> for VoleCommitsRef<'_, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     type Output = F;
 
@@ -123,7 +120,7 @@ where
 impl<F, L> Index<Range<usize>> for VoleCommitsRef<'_, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     type Output = [F];
 
@@ -132,12 +129,12 @@ where
     }
 }
 
-impl<F, L> AsRef<GenericArray<F, L>> for VoleCommits<'_, F, L>
+impl<F, L> AsRef<Array<F, L>> for VoleCommits<'_, F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
-    fn as_ref(&self) -> &GenericArray<F, L> {
+    fn as_ref(&self) -> &Array<F, L> {
         &self.scalars
     }
 }

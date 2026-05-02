@@ -1,7 +1,7 @@
 #[cfg(not(feature = "std"))]
 use alloc::{vec, vec::Vec};
 
-use generic_array::{GenericArray, typenum::Unsigned};
+use hybrid_array::{Array, typenum::Unsigned};
 
 use crate::{
     fields::{Square, SumPoly},
@@ -13,17 +13,15 @@ use crate::{
     verifier::{self, VoleCommitsRef},
 };
 
-pub(crate) type CstrntsVal<'a, O> = &'a GenericArray<
-    GenericArray<u8, <O as OWFParameters>::LHatBytes>,
-    <O as OWFParameters>::Lambda,
->;
+pub(crate) type CstrntsVal<'a, O> =
+    &'a Array<Array<u8, <O as OWFParameters>::LHatBytes>, <O as OWFParameters>::Lambda>;
 
 // // Reshapes a matrix of size (l_hat/8) x lambda into a matrix of size l_hat x (lambda/8).
 // // Then, it converts all rows in the interval [row_start, rowstart + nrows) to field elements.
 fn reshape_and_to_field<O: OWFParameters>(m: CstrntsVal<O>) -> Vec<OWFField<O>> {
     (0..O::LBytes::USIZE + O::LambdaBytesTimes2::USIZE)
         .flat_map(|col| {
-            let mut ret = vec![GenericArray::<u8, O::LambdaBytes>::default(); 8];
+            let mut ret = vec![Array::<u8, O::LambdaBytes>::default(); 8];
             for row in 0..O::Lambda::USIZE {
                 for (i, ret_i) in ret.iter_mut().enumerate() {
                     ret_i[row / 8] |= get_bit(&[m[row][col]], i) << (row % 8);
@@ -37,11 +35,11 @@ fn reshape_and_to_field<O: OWFParameters>(m: CstrntsVal<O>) -> Vec<OWFField<O>> 
 }
 
 pub(crate) fn aes_prove<O>(
-    w: &GenericArray<u8, O::LBytes>,
-    u: &GenericArray<u8, O::LambdaBytesTimes2>,
+    w: &Array<u8, O::LBytes>,
+    u: &Array<u8, O::LambdaBytesTimes2>,
     v: CstrntsVal<O>,
     pk: &PublicKey<O>,
-    chall_2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
+    chall_2: &Array<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
 ) -> QSProof<O>
 where
     O: OWFParameters,
@@ -75,12 +73,12 @@ where
 
 pub(crate) fn aes_verify<O>(
     q: CstrntsVal<O>,
-    d: &GenericArray<u8, O::LBytes>,
+    d: &Array<u8, O::LBytes>,
     pk: &PublicKey<O>,
-    chall_2: &GenericArray<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
-    chall_3: &GenericArray<u8, O::LambdaBytes>,
-    a1_tilde: &GenericArray<u8, O::LambdaBytes>,
-    a2_tilde: &GenericArray<u8, O::LambdaBytes>,
+    chall_2: &Array<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>,
+    chall_3: &Array<u8, O::LambdaBytes>,
+    a1_tilde: &Array<u8, O::LambdaBytes>,
+    a2_tilde: &Array<u8, O::LambdaBytes>,
 ) -> OWFField<O>
 where
     O: OWFParameters,
@@ -98,7 +96,7 @@ where
         }
     }
     let w = VoleCommitsRef {
-        scalars: GenericArray::from_slice(&q[..O::L::USIZE]),
+        scalars: Array::from_slice(&q[..O::L::USIZE]),
         delta: &delta,
     };
 

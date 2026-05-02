@@ -3,9 +3,9 @@
 #[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
 
-use aes::cipher::{KeyIvInit, StreamCipher, array::Array as GenericArray_0_14};
-use generic_array::{
-    ArrayLength, GenericArray,
+use aes::cipher::{KeyIvInit, StreamCipher};
+use hybrid_array::{
+    Array, ArraySize,
     typenum::{U16, U24, U32},
 };
 #[cfg(feature = "zeroize")]
@@ -20,13 +20,13 @@ type Aes256Ctr32LE = ctr::Ctr32LE<aes::Aes256>;
 /// Size of the IV
 pub(crate) type IVSize = U16;
 /// IV of the PRG
-pub(crate) type IV = GenericArray<u8, IVSize>;
+pub(crate) type IV = Array<u8, IVSize>;
 /// TWEAK of the PRG
 pub(crate) type Twk = u32;
 
 /// Add tweak to the IV
-fn add_tweak(iv: &IV, tweak: Twk) -> GenericArray_0_14<u8, IVSize> {
-    let mut iv = GenericArray_0_14::from_slice(iv.as_slice()).to_owned();
+fn add_tweak(iv: &IV, tweak: Twk) -> Array<u8, IVSize> {
+    let mut iv = Array::from_slice(iv.as_slice()).to_owned();
     let tweaked_word = u32::from_le_bytes([iv[12], iv[13], iv[14], iv[15]]).wrapping_add(tweak);
     iv[12..].copy_from_slice(&tweaked_word.to_le_bytes());
     iv
@@ -53,10 +53,10 @@ fn read_from_stream<S: StreamCipher>(stream: &mut S, dst: &mut [u8]) {
 /// Interface for the PRG
 pub(crate) trait PseudoRandomGenerator: Sized + Reader {
     /// Size of the PRG key
-    type KeySize: ArrayLength;
+    type KeySize: ArraySize;
 
     /// Instantiate new PRG instance
-    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self;
+    fn new_prg(k: &Array<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self;
 }
 
 #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]
@@ -65,9 +65,9 @@ pub(crate) struct PRG128(Aes128Ctr32LE);
 impl PseudoRandomGenerator for PRG128 {
     type KeySize = U16;
 
-    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
+    fn new_prg(k: &Array<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
         Self(Aes128Ctr32LE::new(
-            GenericArray_0_14::from_slice(k.as_slice()),
+            Array::from_slice(k.as_slice()),
             &add_tweak(iv, tweak),
         ))
     }
@@ -85,9 +85,9 @@ pub(crate) struct PRG192(Aes192Ctr32LE);
 impl PseudoRandomGenerator for PRG192 {
     type KeySize = U24;
 
-    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
+    fn new_prg(k: &Array<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
         Self(Aes192Ctr32LE::new(
-            GenericArray_0_14::from_slice(k.as_slice()),
+            Array::from_slice(k.as_slice()),
             &add_tweak(iv, tweak),
         ))
     }
@@ -105,9 +105,9 @@ pub(crate) struct PRG256(Aes256Ctr32LE);
 impl PseudoRandomGenerator for PRG256 {
     type KeySize = U32;
 
-    fn new_prg(k: &GenericArray<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
+    fn new_prg(k: &Array<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self {
         Self(Aes256Ctr32LE::new(
-            GenericArray_0_14::from_slice(k.as_slice()),
+            Array::from_slice(k.as_slice()),
             &add_tweak(iv, tweak),
         ))
     }
@@ -125,11 +125,11 @@ mod test {
 
     #[test]
     fn test_prg128() {
-        let key = GenericArray::from_array([
+        let key = Array::from([
             0xe1, 0x52, 0x3a, 0x89, 0x80, 0xc1, 0x62, 0x83, 0xcb, 0xc8, 0x5e, 0x71, 0x70, 0x3a,
             0x04, 0xd1,
         ]);
-        let iv = IV::from_array([
+        let iv = IV::from([
             0xd2, 0x33, 0x1c, 0x8b, 0xd9, 0x1b, 0x1e, 0x01, 0x56, 0x59, 0x09, 0x44, 0x47, 0x2d,
             0x2d, 0xd3,
         ]);
@@ -162,11 +162,11 @@ mod test {
 
     #[test]
     fn test_prg192() {
-        let key = GenericArray::from_array([
+        let key = Array::from([
             0x2c, 0x15, 0x0b, 0x96, 0xcb, 0x0e, 0xc4, 0x07, 0x1a, 0x05, 0x46, 0x74, 0xcd, 0x35,
             0x2e, 0xd4, 0xda, 0x35, 0x33, 0x8b, 0xea, 0x59, 0xad, 0x66,
         ]);
-        let iv = IV::from_array([
+        let iv = IV::from([
             0x06, 0x08, 0xc1, 0x2f, 0x86, 0xe8, 0xeb, 0x59, 0x47, 0x75, 0xa7, 0x31, 0xdf, 0x92,
             0x8c, 0x81,
         ]);
@@ -199,12 +199,12 @@ mod test {
 
     #[test]
     fn test_prg256() {
-        let key = GenericArray::from_array([
+        let key = Array::from([
             0x2d, 0x2a, 0xe2, 0xd8, 0x95, 0x9c, 0x2a, 0x52, 0xca, 0x6f, 0x92, 0xb7, 0xb1, 0x8e,
             0x4c, 0x58, 0x01, 0xda, 0x83, 0xd0, 0x6d, 0x44, 0x1a, 0x84, 0x89, 0xec, 0xb9, 0xb9,
             0xe0, 0xb0, 0xd2, 0xe1,
         ]);
-        let iv = IV::from_array([
+        let iv = IV::from([
             0x15, 0x79, 0x77, 0x10, 0x74, 0xf1, 0xab, 0x33, 0x81, 0x46, 0x57, 0xc2, 0xb4, 0x39,
             0x53, 0x43,
         ]);

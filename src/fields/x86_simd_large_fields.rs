@@ -19,8 +19,8 @@ use x86_64::{
     _mm256_storeu_si256, _mm256_testz_si256, _mm256_xor_si256,
 };
 
-use generic_array::{
-    GenericArray,
+use hybrid_array::{
+    Array,
     typenum::{U16, U24, U32, U48, U72, U96, Unsigned},
 };
 
@@ -714,8 +714,8 @@ impl Field for GF128 {
 
     type Length = U16;
 
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        let mut ret = GenericArray::<u8, Self::Length>::default();
+    fn as_bytes(&self) -> Array<u8, Self::Length> {
+        let mut ret = Array::<u8, Self::Length>::default();
         unsafe { _mm_storeu_si128(ret.as_mut_ptr().cast(), self.0) };
         ret
     }
@@ -1221,8 +1221,8 @@ impl Field for GF192 {
 
     type Length = U24;
 
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        let mut ret = GenericArray::<u8, Self::Length>::default();
+    fn as_bytes(&self) -> Array<u8, Self::Length> {
+        let mut ret = Array::<u8, Self::Length>::default();
         unsafe {
             _mm256_maskstore_epi64(
                 ret.as_mut_ptr().cast(),
@@ -1712,8 +1712,8 @@ impl Field for GF256 {
 
     type Length = U32;
 
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        let mut ret = GenericArray::<u8, Self::Length>::default();
+    fn as_bytes(&self) -> Array<u8, Self::Length> {
+        let mut ret = Array::<u8, Self::Length>::default();
         unsafe { _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0) };
         ret
     }
@@ -2101,8 +2101,8 @@ impl ExtensionField for GF384 {
 
     type BaseField = GF128;
 
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        let mut ret = GenericArray::<u8, Self::Length>::default();
+    fn as_bytes(&self) -> Array<u8, Self::Length> {
+        let mut ret = Array::<u8, Self::Length>::default();
         unsafe {
             _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0);
             _mm_storeu_si128(ret.as_mut_ptr().add(32).cast(), self.1);
@@ -2394,8 +2394,8 @@ impl ExtensionField for GF576 {
 
     type BaseField = GF192;
 
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        let mut ret = GenericArray::<u8, Self::Length>::default();
+    fn as_bytes(&self) -> Array<u8, Self::Length> {
+        let mut ret = Array::<u8, Self::Length>::default();
         unsafe {
             _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0);
             _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1);
@@ -2720,8 +2720,8 @@ impl ExtensionField for GF768 {
 
     type BaseField = GF256;
 
-    fn as_bytes(&self) -> GenericArray<u8, Self::Length> {
-        let mut ret = GenericArray::<u8, Self::Length>::default();
+    fn as_bytes(&self) -> Array<u8, Self::Length> {
+        let mut ret = Array::<u8, Self::Length>::default();
         unsafe {
             _mm256_storeu_si256(ret.as_mut_ptr().cast(), self.0);
             _mm256_storeu_si256(ret.as_mut_ptr().add(32).cast(), self.1);

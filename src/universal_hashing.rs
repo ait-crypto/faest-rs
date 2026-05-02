@@ -5,8 +5,8 @@ use core::{
     ops::{Add, Mul},
 };
 
-use generic_array::{
-    ArrayLength, GenericArray,
+use hybrid_array::{
+    Array, ArraySize,
     typenum::{Prod, Quot, Sum, U2, U3, U4, U5, U8, U16, Unsigned},
 };
 use itertools::chain;
@@ -27,11 +27,11 @@ pub(crate) trait VoleHasherInit<F>
 where
     F: BigGaloisField,
 {
-    type SDLength: ArrayLength;
-    type OutputLength: ArrayLength;
+    type SDLength: ArraySize;
+    type OutputLength: ArraySize;
     type Hasher: VoleHasherProcess<F, Self::OutputLength>;
 
-    fn new_vole_hasher(sd: &GenericArray<u8, Self::SDLength>) -> Self::Hasher {
+    fn new_vole_hasher(sd: &Array<u8, Self::SDLength>) -> Self::Hasher {
         let r = array::from_fn(|i| F::from(&sd[i * F::Length::USIZE..(i + 1) * F::Length::USIZE]));
         let s = F::from(&sd[4 * F::Length::USIZE..5 * F::Length::USIZE]);
         let t = GF64::from(
@@ -47,19 +47,15 @@ pub(crate) trait VoleHasherProcess<F, OutputLength>
 where
     Self: Clone + Sized,
     F: BigGaloisField,
-    OutputLength: ArrayLength,
+    OutputLength: ArraySize,
 {
-    fn process_split(
-        &self,
-        x0: &[u8],
-        x1: &GenericArray<u8, OutputLength>,
-    ) -> GenericArray<u8, OutputLength>;
+    fn process_split(&self, x0: &[u8], x1: &Array<u8, OutputLength>) -> Array<u8, OutputLength>;
 
-    fn process(&self, x: &[u8]) -> GenericArray<u8, OutputLength> {
+    fn process(&self, x: &[u8]) -> Array<u8, OutputLength> {
         debug_assert!(x.len() > OutputLength::USIZE);
 
         let (x0, x1) = x.split_at(x.len() - OutputLength::USIZE);
-        self.process_split(x0, GenericArray::from_slice(x1))
+        self.process_split(x0, Array::from_slice(x1))
     }
 
     fn from_r_s_t(r: [F; 4], s: F, t: GF64) -> Self;
@@ -80,7 +76,7 @@ impl<F> VoleHasherInit<F> for VoleHasher<F>
 where
     F: BigGaloisField<Length: SecurityParameter>,
     <F as Field>::Length:
-        Mul<U5, Output: ArrayLength + Add<U8, Output: ArrayLength>> + Add<U2, Output: ArrayLength>,
+        Mul<U5, Output: ArraySize + Add<U8, Output: ArraySize>> + Add<U2, Output: ArraySize>,
 {
     type SDLength = Sum<Prod<<F as Field>::Length, U5>, <GF64 as Field>::Length>;
     type OutputLength = Sum<<F as Field>::Length, B>;
@@ -95,8 +91,8 @@ where
     fn process_split(
         &self,
         x0: &[u8],
-        x1: &GenericArray<u8, <Self as VoleHasherInit<F>>::OutputLength>,
-    ) -> GenericArray<u8, <Self as VoleHasherInit<F>>::OutputLength> {
+        x1: &Array<u8, <Self as VoleHasherInit<F>>::OutputLength>,
+    ) -> Array<u8, <Self as VoleHasherInit<F>>::OutputLength> {
         let mut h0 = F::ZERO;
         let mut h1 = GF64::ZERO;
 
@@ -137,7 +133,7 @@ where
     }
 
     fn process_unpadded_block(&self, h0: &mut F, h1: &mut GF64, data: &[u8]) {
-        let mut buf = GenericArray::<u8, F::Length>::default();
+        let mut buf = Array::<u8, F::Length>::default();
         buf[..data.len()].copy_from_slice(data);
         self.process_block(h0, h1, &buf);
     }
@@ -148,9 +144,9 @@ pub(crate) trait ZKHasherInit<F>
 where
     F: BigGaloisField + Debug,
 {
-    type SDLength: ArrayLength;
+    type SDLength: ArraySize;
 
-    fn new_zk_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKHasher<F> {
+    fn new_zk_hasher(sd: &Array<u8, Self::SDLength>) -> ZKHasher<F> {
         let r0 = F::from(&sd[..F::Length::USIZE]);
         let r1 = F::from(&sd[F::Length::USIZE..2 * F::Length::USIZE]);
         let s = F::from(&sd[2 * F::Length::USIZE..3 * F::Length::USIZE]);
@@ -168,12 +164,12 @@ where
         }
     }
 
-    fn new_zk_proof_hasher(sd: &GenericArray<u8, Self::SDLength>) -> ZKProofHasher<F> {
+    fn new_zk_proof_hasher(sd: &Array<u8, Self::SDLength>) -> ZKProofHasher<F> {
         let hasher = Self::new_zk_hasher(sd);
         ZKProofHasher::new(hasher.clone(), hasher.clone(), hasher)
     }
 
-    fn new_zk_verify_hasher(sd: &GenericArray<u8, Self::SDLength>, delta: F) -> ZKVerifyHasher<F> {
+    fn new_zk_verify_hasher(sd: &Array<u8, Self::SDLength>, delta: F) -> ZKVerifyHasher<F> {
         ZKVerifyHasher::new(Self::new_zk_hasher(sd), delta)
     }
 }
@@ -206,7 +202,7 @@ impl<F> ZKHasherInit<F> for ZKHasher<F>
 where
     F: BigGaloisField<Length: SecurityParameter>,
     <F as Field>::Length:
-        Mul<U3, Output: ArrayLength + Add<U8, Output: ArrayLength>> + Add<U2, Output: ArrayLength>,
+        Mul<U3, Output: ArraySize + Add<U8, Output: ArraySize>> + Add<U2, Output: ArraySize>,
 {
     type SDLength = Sum<Prod<<F as Field>::Length, U3>, <GF64 as Field>::Length>;
 }
@@ -359,27 +355,24 @@ where
     }
 }
 
-pub(crate) trait LeafHasher
-where
-    Self::LambdaBytes: Mul<U2, Output: ArrayLength>
-        + Mul<U3, Output: ArrayLength>
-        + Mul<U4, Output: ArrayLength>
-        + Mul<U8, Output = Self::Lambda>
-        + PartialEq,
-    Self::ExtensionField: ExtensionField<BaseField = Self::F>,
-{
+pub(crate) trait LeafHasher {
     type F: BigGaloisField<Length = Self::LambdaBytes>;
     type ExtensionField: ExtensionField<Length = Prod<Self::LambdaBytes, U3>, BaseField = Self::F>;
-    type Lambda: ArrayLength;
-    type LambdaBytes: ArrayLength;
+    type Lambda: ArraySize;
+    type LambdaBytes: ArraySize
+        + Mul<U2, Output: ArraySize>
+        + Mul<U3, Output: ArraySize>
+        + Mul<U4, Output: ArraySize>
+        + Mul<U8, Output = Self::Lambda>
+        + PartialEq;
 
     fn hash(
-        uhash: &GenericArray<u8, Prod<Self::LambdaBytes, U3>>,
-        x: &GenericArray<u8, Prod<Self::LambdaBytes, U4>>,
-    ) -> GenericArray<u8, Prod<Self::LambdaBytes, U3>>;
+        uhash: &Array<u8, Prod<Self::LambdaBytes, U3>>,
+        x: &Array<u8, Prod<Self::LambdaBytes, U4>>,
+    ) -> Array<u8, Prod<Self::LambdaBytes, U3>>;
 }
 use core::marker::PhantomData;
-use generic_array::typenum::{U24, U32, U48, U72, U96};
+use hybrid_array::typenum::{U24, U32, U48, U72, U96};
 
 pub(crate) struct LeafHasher128<F = GF128>(PhantomData<F>);
 impl<F> LeafHasher for LeafHasher128<F>
@@ -393,9 +386,9 @@ where
     type Lambda = Prod<Self::LambdaBytes, U8>;
 
     fn hash(
-        uhash: &GenericArray<u8, Prod<Self::LambdaBytes, U3>>,
-        x: &GenericArray<u8, Prod<Self::LambdaBytes, U4>>,
-    ) -> GenericArray<u8, Prod<Self::LambdaBytes, U3>> {
+        uhash: &Array<u8, Prod<Self::LambdaBytes, U3>>,
+        x: &Array<u8, Prod<Self::LambdaBytes, U4>>,
+    ) -> Array<u8, Prod<Self::LambdaBytes, U3>> {
         let u = <Self as LeafHasher>::ExtensionField::from(uhash.as_slice());
         let x0 =
             <Self as LeafHasher>::F::from(&x[..<<Self as LeafHasher>::F as Field>::Length::USIZE]);
@@ -420,9 +413,9 @@ where
     type Lambda = Prod<Self::LambdaBytes, U8>;
 
     fn hash(
-        uhash: &GenericArray<u8, Prod<Self::LambdaBytes, U3>>,
-        x: &GenericArray<u8, Prod<Self::LambdaBytes, U4>>,
-    ) -> GenericArray<u8, Prod<Self::LambdaBytes, U3>> {
+        uhash: &Array<u8, Prod<Self::LambdaBytes, U3>>,
+        x: &Array<u8, Prod<Self::LambdaBytes, U4>>,
+    ) -> Array<u8, Prod<Self::LambdaBytes, U3>> {
         let u = <Self as LeafHasher>::ExtensionField::from(uhash.as_slice());
         let x0 =
             <Self as LeafHasher>::F::from(&x[..<<Self as LeafHasher>::F as Field>::Length::USIZE]);
@@ -447,9 +440,9 @@ where
     type Lambda = Prod<Self::LambdaBytes, U8>;
 
     fn hash(
-        uhash: &GenericArray<u8, Prod<Self::LambdaBytes, U3>>,
-        x: &GenericArray<u8, Prod<Self::LambdaBytes, U4>>,
-    ) -> GenericArray<u8, Prod<Self::LambdaBytes, U3>> {
+        uhash: &Array<u8, Prod<Self::LambdaBytes, U3>>,
+        x: &Array<u8, Prod<Self::LambdaBytes, U4>>,
+    ) -> Array<u8, Prod<Self::LambdaBytes, U3>> {
         let u = <Self as LeafHasher>::ExtensionField::from(uhash.as_slice());
         let x0 =
             <Self as LeafHasher>::F::from(&x[..<<Self as LeafHasher>::F as Field>::Length::USIZE]);
@@ -469,7 +462,7 @@ mod test {
     #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
 
-    use generic_array::GenericArray;
+    use hybrid_array::Array;
     use serde::{Deserialize, de::DeserializeOwned};
 
     use crate::{
@@ -504,8 +497,8 @@ mod test {
     fn test_volehash_128() {
         let database: Vec<VoleHashDatabaseEntry> = read_test_data("volehash_128.json");
         for data in database {
-            let sd = GenericArray::from_slice(&data.sd);
-            let h = *GenericArray::from_slice(&data.h);
+            let sd = Array::from_slice(&data.sd);
+            let h = *Array::from_slice(&data.h);
 
             let hasher = VoleHasher::<GF128>::new_vole_hasher(sd);
             let res = hasher.process(&data.xs);
@@ -517,8 +510,8 @@ mod test {
     fn test_volehash_192() {
         let database: Vec<VoleHashDatabaseEntry> = read_test_data("volehash_192.json");
         for data in database {
-            let sd = GenericArray::from_slice(&data.sd);
-            let h = *GenericArray::from_slice(&data.h);
+            let sd = Array::from_slice(&data.sd);
+            let h = *Array::from_slice(&data.h);
 
             let hasher = VoleHasher::<GF192>::new_vole_hasher(sd);
             let res = hasher.process(&data.xs);
@@ -531,8 +524,8 @@ mod test {
         let database: Vec<VoleHashDatabaseEntry> = read_test_data("volehash_256.json");
 
         for data in database {
-            let sd = GenericArray::from_slice(&data.sd);
-            let h = *GenericArray::from_slice(&data.h);
+            let sd = Array::from_slice(&data.sd);
+            let h = *Array::from_slice(&data.h);
 
             let hasher = VoleHasher::<GF256>::new_vole_hasher(sd);
             let res = hasher.process(&data.xs);
@@ -545,7 +538,7 @@ mod test {
         let database: Vec<ZKHashDatabaseEntry<GF128>> = read_test_data("zkhash_128.json");
 
         for data in database {
-            let sd = GenericArray::from_slice(&data.sd);
+            let sd = Array::from_slice(&data.sd);
 
             let mut hasher = ZKHasher::<GF128>::new_zk_hasher(sd);
             for v in &data.x0 {
@@ -561,7 +554,7 @@ mod test {
         let database: Vec<ZKHashDatabaseEntry<GF192>> = read_test_data("zkhash_192.json");
 
         for data in database {
-            let sd = GenericArray::from_slice(&data.sd);
+            let sd = Array::from_slice(&data.sd);
 
             let mut hasher = ZKHasher::<GF192>::new_zk_hasher(sd);
             for v in &data.x0 {
@@ -577,7 +570,7 @@ mod test {
         let database: Vec<ZKHashDatabaseEntry<GF256>> = read_test_data("zkhash_256.json");
 
         for data in database {
-            let sd = GenericArray::from_slice(&data.sd);
+            let sd = Array::from_slice(&data.sd);
 
             let mut hasher = ZKHasher::<GF256>::new_zk_hasher(sd);
             for v in &data.x0 {
@@ -593,8 +586,8 @@ mod test {
         let database: Vec<LeafHashDatabaseEntry> = read_test_data("leafhash_128.json");
 
         for data in database {
-            let x = GenericArray::from_slice(&data.x);
-            let uhash = GenericArray::from_slice(&data.uhash);
+            let x = Array::from_slice(&data.x);
+            let uhash = Array::from_slice(&data.uhash);
 
             let h = LeafHasher128::<GF128>::hash(uhash, x);
             assert_eq!(h.as_slice(), &data.expected_h)
@@ -606,8 +599,8 @@ mod test {
         let database: Vec<LeafHashDatabaseEntry> = read_test_data("leafhash_192.json");
 
         for data in database {
-            let x = GenericArray::from_slice(&data.x);
-            let uhash = GenericArray::from_slice(&data.uhash);
+            let x = Array::from_slice(&data.x);
+            let uhash = Array::from_slice(&data.uhash);
 
             let h = LeafHasher192::<GF192>::hash(uhash, x);
             assert_eq!(h.as_slice(), &data.expected_h)
@@ -619,8 +612,8 @@ mod test {
         let database: Vec<LeafHashDatabaseEntry> = read_test_data("leafhash_256.json");
 
         for data in database {
-            let x = GenericArray::from_slice(&data.x);
-            let uhash = GenericArray::from_slice(&data.uhash);
+            let x = Array::from_slice(&data.x);
+            let uhash = Array::from_slice(&data.uhash);
 
             let h = LeafHasher256::<GF256>::hash(uhash, x);
 

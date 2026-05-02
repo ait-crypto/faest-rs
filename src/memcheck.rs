@@ -1,4 +1,4 @@
-use generic_array::{ArrayLength, GenericArray};
+use hybrid_array::{Array, ArraySize};
 use vgzzq::memcheck::{make_mem_defined, make_mem_undefined};
 
 /// Defines valgrind wrappers that allow checking constant-time implementation.
@@ -64,9 +64,9 @@ impl<T> Classifier for Vec<T> {
     }
 }
 
-impl<T, S> Classifier for GenericArray<T, S>
+impl<T, S> Classifier for Array<T, S>
 where
-    S: ArrayLength,
+    S: ArraySize,
 {
     #[inline(always)]
     fn classify(&self) {
@@ -83,9 +83,9 @@ where
     }
 }
 
-impl<T, S> Classifier for &GenericArray<T, S>
+impl<T, S> Classifier for &Array<T, S>
 where
-    S: ArrayLength,
+    S: ArraySize,
 {
     #[inline(always)]
     fn classify(&self) {

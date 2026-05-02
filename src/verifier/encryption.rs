@@ -1,7 +1,7 @@
 use core::iter::zip;
 
-use generic_array::{
-    ArrayLength, GenericArray,
+use hybrid_array::{
+    Array, ArraySize,
     typenum::{Quot, U2, U4, U8, Unsigned},
 };
 
@@ -24,7 +24,7 @@ pub(crate) fn enc_cstrnts<'a, O, K>(
     extended_key: &'a [K],
 ) where
     O: OWFParameters,
-    K: StateToBytes<O, Output = GenericArray<OWFField<O>, O::NStBytes>>,
+    K: StateToBytes<O, Output = Array<OWFField<O>, O::NStBytes>>,
     VoleCommits<'a, OWFField<O>, O::NStBits>: AddRoundKeyAssign<&'a K>,
     VoleCommitsRef<'a, OWFField<O>, O::NStBits>:
         BytewiseMixColumns<O, Output = VoleCommits<'a, OWFField<O>, O::NStBits>>,
@@ -73,7 +73,7 @@ pub(crate) fn enc_cstrnts<'a, O, K>(
 
 fn aes_round<'a, O, T>(
     state: &VoleCommits<'a, OWFField<O>, O::NStBits>,
-    key_bytes: &GenericArray<T, O::NStBytes>,
+    key_bytes: &Array<T, O::NStBytes>,
     sq: bool,
 ) -> VoleCommits<'a, OWFField<O>, O::NStBytes>
 where
@@ -81,8 +81,7 @@ where
     VoleCommits<'a, OWFField<O>, O::NStBits>:
         SBoxAffine<O, Output = VoleCommits<'a, OWFField<O>, O::NStBytes>>,
     VoleCommits<'a, OWFField<O>, O::NStBytes>: MixColumns<O>,
-    VoleCommits<'a, OWFField<O>, O::NStBytes>:
-        for<'b> AddRoundKeyBytes<&'b GenericArray<T, O::NStBytes>>,
+    VoleCommits<'a, OWFField<O>, O::NStBytes>: for<'b> AddRoundKeyBytes<&'b Array<T, O::NStBytes>>,
 {
     // ::19-22
     let mut st = state.s_box_affine(sq);
@@ -103,7 +102,7 @@ where
     // ::4
     let state_conj = f256_f2_conjugates(&state.scalars);
 
-    let mut state_prime = GenericArray::default_boxed();
+    let mut state_prime = Box::new(Array::default());
 
     // ::7
     for i in 0..O::NStBytes::USIZE {
@@ -145,7 +144,7 @@ fn enc_cstrnts_odd<'a, O>(
     }
 }
 
-fn invnorm_to_conjugates<F>(x: &[F]) -> GenericArray<F, U4>
+fn invnorm_to_conjugates<F>(x: &[F]) -> Array<F, U4>
 where
     F: BigGaloisField,
 {
@@ -158,18 +157,18 @@ where
         .collect()
 }
 
-pub(crate) fn f256_f2_conjugates<F, L>(state: &GenericArray<F, L>) -> GenericArray<F, L>
+pub(crate) fn f256_f2_conjugates<F, L>(state: &Array<F, L>) -> Array<F, L>
 where
     F: BigGaloisField,
-    L: ArrayLength,
+    L: ArraySize,
 {
     state
         .chunks_exact(8)
         .flat_map(|x| {
-            let mut x0 = *GenericArray::<_, U8>::from_slice(x);
+            let mut x0 = *Array::<_, U8>::from_slice(x);
 
             // ::4-8
-            let mut y: GenericArray<_, U8> = GenericArray::default();
+            let mut y: Array<_, U8> = Array::default();
             for j in 0..7 {
                 y[j] = F::byte_combine_slice(&x0);
 

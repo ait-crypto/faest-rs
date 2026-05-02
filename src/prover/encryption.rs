@@ -3,8 +3,8 @@ use core::{iter::zip, ops::AddAssign};
 #[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
 
-use generic_array::{
-    GenericArray,
+use hybrid_array::{
+    Array,
     typenum::{Quot, U2, U4, U8, Unsigned},
 };
 
@@ -28,7 +28,7 @@ pub(crate) fn enc_cstrnts<O, K, S>(
     extended_key: &[K],
 ) where
     O: OWFParameters,
-    K: StateToBytes<O, Output = Box<GenericArray<S, O::NStBytes>>>,
+    K: StateToBytes<O, Output = Box<Array<S, O::NStBytes>>>,
     S: Square + Clone,
     for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a S>,
     for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a <S as Square>::Output>,
@@ -88,7 +88,7 @@ where
 {
     // ::4
     let mut state_prime = StateBitsSquaredCommits::<O>::default();
-    let mut state_conj = GenericArray::default();
+    let mut state_conj = Array::default();
 
     // ::7
     for (i, (state_prime, mut commit_i)) in
@@ -141,7 +141,7 @@ fn enc_cstrnts_odd<O>(
 
 fn aes_round<O, T>(
     state: &StateBitsSquaredCommits<O>,
-    key_bytes: &GenericArray<T, O::NStBytes>,
+    key_bytes: &Array<T, O::NStBytes>,
     sq: bool,
 ) -> StateBytesSquaredCommits<O>
 where
@@ -158,7 +158,7 @@ where
     st
 }
 
-fn invnorm_to_conjugates<F>(x_val: u8, x_tag: &[F]) -> GenericArray<FieldCommitDegOne<F>, U4>
+fn invnorm_to_conjugates<F>(x_val: u8, x_tag: &[F]) -> Array<FieldCommitDegOne<F>, U4>
 where
     F: BigGaloisField,
 {
@@ -179,7 +179,7 @@ where
 }
 
 pub(crate) fn f256_f2_conjugates<F>(
-    state_conj: &mut GenericArray<FieldCommitDegOne<F>, U8>,
+    state_conj: &mut Array<FieldCommitDegOne<F>, U8>,
     commit: &mut ByteCommitment<F>,
 ) where
     F: BigGaloisField,

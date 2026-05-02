@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 #[cfg(not(feature = "std"))]
 use alloc::borrow::ToOwned;
 
-use generic_array::{GenericArray, typenum::Unsigned};
+use hybrid_array::{Array, typenum::Unsigned};
 use rand_core::CryptoRngCore;
 
 use crate::{
@@ -45,12 +45,12 @@ where
     pd: PhantomData<(P, O)>,
 }
 
-impl<'a, P, O> From<&'a mut GenericArray<u8, P::SignatureSize>> for SignatureRefMut<'a, P, O>
+impl<'a, P, O> From<&'a mut [u8]> for SignatureRefMut<'a, P, O>
 where
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
-    fn from(value: &'a mut GenericArray<u8, P::SignatureSize>) -> Self {
+    fn from(value: &'a mut [u8]) -> Self {
         let (cs, value) =
             value.split_at_mut(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
         let (u_tilde, value) =
@@ -129,14 +129,14 @@ where
     pd: PhantomData<(P, O)>,
 }
 
-impl<'a, P, O> TryFrom<&'a GenericArray<u8, P::SignatureSize>> for SignatureRef<'a, P, O>
+impl<'a, P, O> TryFrom<&'a [u8]> for SignatureRef<'a, P, O>
 where
     P: FAESTParameters<OWF = O>,
     O: OWFParameters,
 {
     type Error = Error;
 
-    fn try_from(value: &'a GenericArray<u8, P::SignatureSize>) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
         let (cs, value) =
             value.split_at(O::LHatBytes::USIZE * (<P::Tau as TauParameters>::Tau::USIZE - 1));
         let (u_tilde, value) =
@@ -362,7 +362,7 @@ pub(crate) fn faest_sign<P>(
     msg: &[u8],
     sk: &SecretKey<P::OWF>,
     rho: &[u8],
-    signature: &mut GenericArray<u8, P::SignatureSize>,
+    signature: &mut [u8],
 ) -> Result<(), Error>
 where
     P: FAESTParameters,
@@ -380,7 +380,7 @@ pub(crate) fn faest_unpacked_sign<P>(
     msg: &[u8],
     sk_unpacked: &UnpackedSecretKey<P::OWF>,
     rho: &[u8],
-    signature: &mut GenericArray<u8, P::SignatureSize>,
+    signature: &mut [u8],
 ) -> Result<(), Error>
 where
     P: FAESTParameters,
@@ -402,16 +402,16 @@ where
     O: OWFParameters,
 {
     // ::3
-    let mut mu = GenericArray::<u8, O::LambdaBytesTimes2>::default();
+    let mut mu = Array::<u8, O::LambdaBytesTimes2>::default();
     RO::<P>::hash_mu(&mut mu, &sk.pk.owf_input, &sk.pk.owf_output, msg);
 
     // ::4
-    let mut r = GenericArray::<u8, O::LambdaBytes>::default();
-    let iv_pre = GenericArray::from_mut_slice(signature.iv_pre);
+    let mut r = Array::<u8, O::LambdaBytes>::default();
+    let iv_pre = Array::from_mut_slice(signature.iv_pre);
     RO::<P>::hash_r_iv(&mut r, iv_pre, &sk.owf_key, &mu, rho);
 
     // ::5
-    let mut iv = GenericArray::from_slice(iv_pre).to_owned();
+    let mut iv = Array::from_slice(iv_pre).to_owned();
     RO::<P>::hash_iv(&mut iv);
 
     // ::7
@@ -420,7 +420,7 @@ where
 
     // ::8
     //Contrarly to specification, faest-ref uses iv instead of iv_pre
-    let mut chall1 = GenericArray::default();
+    let mut chall1 = Array::default();
     RO::<P>::hash_challenge_1(&mut chall1, &mu, &com, signature.cs, iv.as_slice());
 
     // ::10
@@ -437,15 +437,13 @@ where
     signature.mask_witness(witness, &u[..<O as OWFParameters>::LBytes::USIZE]);
 
     // ::14
-    let mut chall2 = GenericArray::default();
+    let mut chall2 = Array::default();
     RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, signature.d);
     // ::18
     let (a0_tilde, a1_tilde, a2_tilde) = P::OWF::prove(
         witness,
         // ::16
-        GenericArray::from_slice(
-            &u[O::LBytes::USIZE..O::LBytes::USIZE + O::LambdaBytesTimes2::USIZE],
-        ),
+        Array::from_slice(&u[O::LBytes::USIZE..O::LBytes::USIZE + O::LambdaBytesTimes2::USIZE]),
         &v,
         &sk.pk,
         &chall2,
@@ -488,7 +486,7 @@ where
 pub(crate) fn faest_verify<P>(
     msg: &[u8],
     pk: &PublicKey<P::OWF>,
-    signature: &GenericArray<u8, P::SignatureSize>,
+    signature: &[u8],
 ) -> Result<(), Error>
 where
     P: FAESTParameters,
@@ -507,22 +505,22 @@ where
     let ctr = signature.parse_ctr();
 
     // ::2
-    let mut mu = GenericArray::<u8, O::LambdaBytesTimes2>::default();
+    let mut mu = Array::<u8, O::LambdaBytesTimes2>::default();
     RO::<P>::hash_mu(&mut mu, &pk.owf_input, &pk.owf_output, msg);
 
     // ::3
-    let mut iv = GenericArray::from_slice(signature.iv_pre).to_owned();
+    let mut iv = Array::from_slice(signature.iv_pre).to_owned();
     RO::<P>::hash_iv(&mut iv);
 
     // ::7-8
-    let chall3: &GenericArray<u8, O::LambdaBytes> = GenericArray::from_slice(signature.chall3);
+    let chall3: &Array<u8, O::LambdaBytes> = Array::from_slice(signature.chall3);
     let decom_i = signature.parse_decom();
     let c = VoleCommitmentCRef::<O::LHatBytes>::new(signature.cs);
     let VoleReconstructResult { com, q } =
         volereconstruct::<P::BAVC, O::LHatBytes>(chall3, &decom_i, c, &iv).ok_or(Error::new())?;
 
     // ::10
-    let mut chall1 = GenericArray::default();
+    let mut chall1 = Array::default();
     RO::<P>::hash_challenge_1(&mut chall1, &mu, com.as_slice(), c.as_slice(), &iv);
 
     let mut h2_hasher = RO::<P>::hash_challenge_2_init(chall1.as_slice(), signature.u_tilde);
@@ -537,22 +535,22 @@ where
     );
 
     // ::15
-    let mut chall2 = GenericArray::default();
+    let mut chall2 = Array::default();
     RO::<P>::hash_challenge_2_finalize(h2_hasher, &mut chall2, signature.d);
 
     // ::17
     let a0_tilde = P::OWF::verify(
         &q,
-        GenericArray::from_slice(signature.d),
+        Array::from_slice(signature.d),
         pk,
         &chall2,
         chall3,
-        GenericArray::from_slice(signature.a1_tilde),
-        GenericArray::from_slice(signature.a2_tilde),
+        Array::from_slice(signature.a1_tilde),
+        Array::from_slice(signature.a2_tilde),
     );
 
     // ::18
-    let mut chall3_prime = GenericArray::default();
+    let mut chall3_prime = Array::default();
     RO::<P>::hash_challenge_3(
         &mut chall3_prime,
         &chall2,
@@ -574,7 +572,6 @@ where
 mod test {
     use super::*;
 
-    use generic_array::GenericArray;
     use rand::RngCore;
     #[cfg(feature = "serde")]
     use serde::{Deserialize, Serialize};
@@ -614,7 +611,7 @@ mod test {
             for _i in 0..RUNS {
                 let sk = P::OWF::keygen_with_rng(&mut rng);
                 let msg = random_message(&mut rng);
-                let mut sigma = GenericArray::default_boxed();
+                let mut sigma = vec![0u8; P::SIGNATURE_SIZE];
                 assert!(faest_sign::<P>(&msg, &sk, &[], &mut sigma).is_ok());
                 let pk = sk.as_public_key();
                 let res = faest_verify::<P>(&msg, &pk, &sigma);
@@ -740,14 +737,14 @@ mod test {
                 let pk = sk.as_public_key();
 
                 // Sign and compare with tvs
-                let mut signature_s = GenericArray::default_boxed();
+                let mut signature_s = vec![0u8; FAESTSmall::SIGNATURE_SIZE];
                 assert!(faest_sign::<FAESTSmall>(&MSG, &sk, &RHO, &mut signature_s).is_ok());
                 assert_eq!(
                     data.hashed_sig_s,
                     hash_array(signature_s.as_slice()).as_slice()
                 );
 
-                let mut signature_f = GenericArray::default_boxed();
+                let mut signature_f = vec![0u8; FAESTFast::SIGNATURE_SIZE];
                 assert!(faest_sign::<FAESTFast>(&MSG, &sk, &RHO, &mut signature_f).is_ok());
                 assert_eq!(
                     data.hashed_sig_f,

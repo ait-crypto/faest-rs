@@ -24,9 +24,6 @@ serde = { version = "1", optional = true, default-features = false, features = [
 ] }
 sha3 = { version = "0.10", default-features = false, features = ["asm"] }
 signature = { version = "2", default-features = false, features = ["alloc"] }
-generic-array = { version = "1", default-features = false, features = [
-  "alloc",
-] }
 rand_core = { version = "0.6", default-features = false }
 rand = { version = "0.8", optional = true, default-features = false }
 zeroize = { version = "1.2", optional = true, default-features = false, features = [
@@ -37,6 +34,7 @@ itertools = { version = "0.14", default-features = false }
 libc = { version = "0.2", optional = true, default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 cmov = "0.5.3"
+hybrid-array = {version = "0.4.11", default-features = true, features = ["extra-sizes"]}
 
 [target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
 cpufeatures = "0.3.0"
@@ -61,7 +59,7 @@ zeroize = ["dep:zeroize", "aes/zeroize", "ctr/zeroize"]
 # implement randomized signer interfaces of the signature crate
 randomized-signer = ["signature/rand_core"]
 # provide serialization via serde
-serde = ["dep:serde", "generic-array/serde"]
+serde = ["dep:serde"]
 # enable SIMD optimization implementations
 # (opt-simd currently implies an x86(-64) machine, so no_std doesn't make too much sense)
 opt-simd = ["std"]

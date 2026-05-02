@@ -18,8 +18,8 @@ use aes::{
     Block,
     cipher::{BlockCipherEncrypt, BlockSizeUser, KeyInit, KeySizeUser},
 };
-use generic_array::{
-    GenericArray,
+use hybrid_array::{
+    Array,
     typenum::{U2, U6, U8, U12, U14, U24, U32, Unsigned},
 };
 #[cfg(feature = "zeroize")]
@@ -28,7 +28,7 @@ use zeroize::ZeroizeOnDrop;
 /// AES block batch size for this implementation
 pub(crate) type FixsliceBlocks = U2;
 
-pub(crate) type BatchBlocks = GenericArray<Block, FixsliceBlocks>;
+pub(crate) type BatchBlocks = Array<Block, FixsliceBlocks>;
 
 /// 256-bit internal state
 pub(crate) type State = [u32; 8];
@@ -761,7 +761,7 @@ mod test {
     use core::cmp::max;
 
     use aes::cipher::array::Array;
-    use generic_array::typenum::{U4, U6, U8, U10, U12, U14};
+    use hybrid_array::typenum::{U4, U6, U8, U10, U12, U14};
     use serde::Deserialize;
 
     use crate::utils::test::read_test_data;

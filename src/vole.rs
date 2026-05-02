@@ -7,8 +7,8 @@ use core::{
 #[cfg(not(feature = "std"))]
 use alloc::{boxed::Box, vec, vec::Vec};
 
-use generic_array::{
-    ArrayLength, GenericArray,
+use hybrid_array::{
+    Array, ArraySize,
     typenum::{Prod, U2, U8, Unsigned},
 };
 use itertools::izip;
@@ -27,28 +27,28 @@ const TWEAK_OFFSET: u32 = 1 << 31;
 #[derive(Clone, Debug, Default)]
 pub struct VoleCommitResult<LambdaBytes, NLeafCommit, LHatBytes>
 where
-    LambdaBytes: ArrayLength
-        + Mul<U2, Output: ArrayLength>
-        + Mul<U8, Output: ArrayLength>
-        + Mul<NLeafCommit, Output: ArrayLength>,
-    NLeafCommit: ArrayLength,
-    LHatBytes: ArrayLength,
+    LambdaBytes: ArraySize
+        + Mul<U2, Output: ArraySize>
+        + Mul<U8, Output: ArraySize>
+        + Mul<NLeafCommit, Output: ArraySize>,
+    NLeafCommit: ArraySize,
+    LHatBytes: ArraySize,
 {
-    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
+    pub com: Array<u8, Prod<LambdaBytes, U2>>,
     pub decom: BavcDecommitment<LambdaBytes, NLeafCommit>,
-    pub u: Box<GenericArray<u8, LHatBytes>>,
-    pub v: Box<GenericArray<GenericArray<u8, LHatBytes>, Prod<LambdaBytes, U8>>>,
+    pub u: Box<Array<u8, LHatBytes>>,
+    pub v: Box<Array<Array<u8, LHatBytes>, Prod<LambdaBytes, U8>>>,
 }
 
 /// Result of VOLE reconstruction
 #[derive(Clone, Debug, Default)]
 pub struct VoleReconstructResult<LambdaBytes, LHatBytes>
 where
-    LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<U8, Output: ArrayLength>,
-    LHatBytes: ArrayLength,
+    LambdaBytes: ArraySize + Mul<U2, Output: ArraySize> + Mul<U8, Output: ArraySize>,
+    LHatBytes: ArraySize,
 {
-    pub com: GenericArray<u8, Prod<LambdaBytes, U2>>,
-    pub q: Box<GenericArray<GenericArray<u8, LHatBytes>, Prod<LambdaBytes, U8>>>,
+    pub com: Array<u8, Prod<LambdaBytes, U2>>,
+    pub q: Box<Array<Array<u8, LHatBytes>, Prod<LambdaBytes, U8>>>,
 }
 
 /// Immutable reference to storage area in signature for all `c`s.
@@ -57,7 +57,7 @@ pub(crate) struct VoleCommitmentCRef<'a, LHatBytes>(&'a [u8], PhantomData<LHatBy
 
 impl<LHatBytes> Index<usize> for VoleCommitmentCRef<'_, LHatBytes>
 where
-    LHatBytes: ArrayLength,
+    LHatBytes: ArraySize,
 {
     type Output = [u8];
 
@@ -68,7 +68,7 @@ where
 
 impl<'a, LHatBytes> VoleCommitmentCRef<'a, LHatBytes>
 where
-    LHatBytes: ArrayLength,
+    LHatBytes: ArraySize,
 {
     pub(crate) fn new(buffer: &'a [u8]) -> Self {
         Self(buffer, PhantomData)
@@ -85,7 +85,7 @@ pub(crate) struct VoleCommitmentCRefMut<'a, LHatBytes>(&'a mut [u8], PhantomData
 
 impl<'a, LHatBytes> VoleCommitmentCRefMut<'a, LHatBytes>
 where
-    LHatBytes: ArrayLength,
+    LHatBytes: ArraySize,
 {
     pub(crate) fn new(buffer: &'a mut [u8]) -> Self {
         Self(buffer, PhantomData)
@@ -94,7 +94,7 @@ where
 
 impl<LHatBytes> Index<usize> for VoleCommitmentCRefMut<'_, LHatBytes>
 where
-    LHatBytes: ArrayLength,
+    LHatBytes: ArraySize,
 {
     type Output = [u8];
 
@@ -105,7 +105,7 @@ where
 
 impl<LHatBytes> IndexMut<usize> for VoleCommitmentCRefMut<'_, LHatBytes>
 where
-    LHatBytes: ArrayLength,
+    LHatBytes: ArraySize,
 {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.0[index * LHatBytes::USIZE..(index + 1) * LHatBytes::USIZE]
@@ -113,14 +113,14 @@ where
 }
 
 pub(crate) fn convert_to_vole<'a, 'b, BAVC, LHatBytes>(
-    v: &'a mut [GenericArray<u8, LHatBytes>],
-    mut sd: impl ExactSizeIterator<Item = &'a GenericArray<u8, BAVC::LambdaBytes>>,
+    v: &'a mut [Array<u8, LHatBytes>],
+    mut sd: impl ExactSizeIterator<Item = &'a Array<u8, BAVC::LambdaBytes>>,
     iv: &IV,
     round: u32,
-) -> Box<GenericArray<u8, LHatBytes>>
+) -> Box<Array<u8, LHatBytes>>
 where
     BAVC: BatchVectorCommitment,
-    LHatBytes: ArrayLength,
+    LHatBytes: ArraySize,
 {
     let twk = round + TWEAK_OFFSET;
 
@@ -128,9 +128,9 @@ where
     debug_assert!(sd.len() == ni);
 
     // Init auxiliary memory
-    let mut rj: Vec<Box<GenericArray<u8, LHatBytes>>> =
-        vec![GenericArray::default_boxed(); BAVC::TAU::vole_array_length(round as usize)];
-    let mut right_leaf: GenericArray<u8, LHatBytes> = GenericArray::default();
+    let mut rj: Vec<Box<Array<u8, LHatBytes>>> =
+        vec![Box::default(); BAVC::TAU::vole_array_length(round as usize)];
+    let mut right_leaf: Array<u8, LHatBytes> = Array::default();
 
     let mut next = 0;
     for i in 0..ni / 2 {
@@ -183,7 +183,7 @@ where
 
 pub fn volecommit<BAVC, LHatBytes>(
     mut c: VoleCommitmentCRefMut<LHatBytes>,
-    r: &GenericArray<u8, BAVC::LambdaBytes>,
+    r: &Array<u8, BAVC::LambdaBytes>,
     iv: &IV,
 ) -> VoleCommitResult<
     <BAVC as BatchVectorCommitment>::LambdaBytes,
@@ -192,12 +192,14 @@ pub fn volecommit<BAVC, LHatBytes>(
 >
 where
     BAVC: BatchVectorCommitment,
-    LHatBytes: ArrayLength,
+    LHatBytes: ArraySize,
 {
     // ::2
     let BavcCommitResult { com, decom, seeds } = BAVC::commit(r, iv);
 
-    let mut v = GenericArray::default_boxed();
+    let mut v = Box::<
+        Array<Array<u8, LHatBytes>, Prod<<BAVC as BatchVectorCommitment>::LambdaBytes, U8>>,
+    >::default();
 
     let mut seeds_iter = seeds.iter();
 
@@ -230,13 +232,13 @@ where
 }
 
 pub fn volereconstruct<BAVC, LHatBytes>(
-    chall: &GenericArray<u8, BAVC::LambdaBytes>,
+    chall: &Array<u8, BAVC::LambdaBytes>,
     decom_i: &BavcOpenResult,
     c: VoleCommitmentCRef<LHatBytes>,
     iv: &IV,
 ) -> Option<VoleReconstructResult<BAVC::LambdaBytes, LHatBytes>>
 where
-    LHatBytes: ArrayLength,
+    LHatBytes: ArraySize,
     BAVC: BatchVectorCommitment,
 {
     // ::1
@@ -247,16 +249,15 @@ where
     // ::4
     let rec = BAVC::reconstruct(decom_i, &i_delta, iv)?;
 
-    let mut q: Box<
-        GenericArray<GenericArray<u8, LHatBytes>, <BAVC as BatchVectorCommitment>::Lambda>,
-    > = GenericArray::default_boxed();
+    let mut q =
+        Box::<Array<Array<u8, LHatBytes>, <BAVC as BatchVectorCommitment>::Lambda>>::default();
     let mut q_ref = q.as_mut_slice();
 
     // At round i, seeds_i has offset \sum_{j=0}^{i-1} N_j in the seeds vector
     let mut sdi_off = 0;
 
     // ::7
-    let zero_arr = GenericArray::default();
+    let zero_arr = Array::default();
     for i in 0..BAVC::Tau::U32 {
         // ::8
         let delta_i = i_delta[i as usize];
@@ -317,7 +318,7 @@ mod test {
     #[cfg(not(feature = "std"))]
     use alloc::{borrow::ToOwned, string::String, vec::Vec};
 
-    use generic_array::GenericArray;
+    use hybrid_array::Array;
     use serde::Deserialize;
 
     use crate::{
@@ -333,12 +334,12 @@ mod test {
 
     impl<LambdaBytes, NLeafCommit, LHatBytes> VoleCommitResult<LambdaBytes, NLeafCommit, LHatBytes>
     where
-        LambdaBytes: ArrayLength
-            + Mul<U2, Output: ArrayLength>
-            + Mul<U8, Output: ArrayLength>
-            + Mul<NLeafCommit, Output: ArrayLength>,
-        NLeafCommit: ArrayLength,
-        LHatBytes: ArrayLength,
+        LambdaBytes: ArraySize
+            + Mul<U2, Output: ArraySize>
+            + Mul<U8, Output: ArraySize>
+            + Mul<NLeafCommit, Output: ArraySize>,
+        NLeafCommit: ArraySize,
+        LHatBytes: ArraySize,
     {
         pub fn check_commitment(&self, expected_com: &[u8]) -> bool {
             self.com.as_slice() == expected_com
@@ -377,8 +378,8 @@ mod test {
 
     impl<LambdaBytes, LHatBytes> VoleReconstructResult<LambdaBytes, LHatBytes>
     where
-        LambdaBytes: ArrayLength + Mul<U2, Output: ArrayLength> + Mul<U8, Output: ArrayLength>,
-        LHatBytes: ArrayLength,
+        LambdaBytes: ArraySize + Mul<U2, Output: ArraySize> + Mul<U8, Output: ArraySize>,
+        LHatBytes: ArraySize,
     {
         pub fn check_commitment(&self, expected_com: &[u8]) -> bool {
             self.com.as_slice() == expected_com
@@ -413,9 +414,9 @@ mod test {
 
     fn vole_check<OWF: OWFParameters, BAVC: BatchVectorCommitment>(
         test_vector: DataVOLE,
-        r: &GenericArray<u8, BAVC::LambdaBytes>,
+        r: &Array<u8, BAVC::LambdaBytes>,
     ) {
-        let iv = GenericArray::default();
+        let iv = Array::default();
 
         let DataVOLE {
             lambda: _,
@@ -442,7 +443,7 @@ mod test {
         let decom_i = BAVC::open(&res_commit.decom, &i_delta).unwrap();
 
         let res_rec = volereconstruct::<BAVC, OWF::LHatBytes>(
-            GenericArray::from_slice(&chall),
+            (chall.as_slice()).try_into().unwrap(),
             &decom_i,
             VoleCommitmentCRef::new(&c),
             &iv,
@@ -455,7 +456,7 @@ mod test {
 
     #[test]
     fn vole_test() {
-        let r = GenericArray::from_array([
+        let r = Array::from([
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
             0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b,
             0x1c, 0x1d, 0x1e, 0x1f,
@@ -466,17 +467,17 @@ mod test {
         for data in datatabase {
             match data.lambda {
                 128 => {
-                    let r = GenericArray::from_slice(&r[..16]);
+                    let r = (&r[..16]).try_into().unwrap();
 
                     if data.mode == "s" {
-                        vole_check::<OWF128, BAVC128Small<GF128>>(data, r);
+                        vole_check::<OWF128, BAVC128Small<GF128>>(data, &r);
                     } else {
-                        vole_check::<OWF128, BAVC128Fast<GF128>>(data, r);
+                        vole_check::<OWF128, BAVC128Fast<GF128>>(data, &r);
                     }
                 }
 
                 192 => {
-                    let r = GenericArray::from_slice(&r[..24]);
+                    let r = (&r[..24]).try_into().unwrap();
 
                     if data.mode == "s" {
                         vole_check::<OWF192, BAVC192Small<GF192>>(data, r);
@@ -498,7 +499,7 @@ mod test {
 
     #[test]
     fn vole_em_test() {
-        let r = GenericArray::from_array([
+        let r = Array::from([
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
             0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b,
             0x1c, 0x1d, 0x1e, 0x1f,
@@ -509,7 +510,7 @@ mod test {
         for data in datatabase {
             match data.lambda {
                 128 => {
-                    let r = GenericArray::from_slice(&r[..16]);
+                    let r = (&r[..16]).try_into().unwrap();
 
                     if data.mode == "s" {
                         vole_check::<OWF128EM, BAVC128SmallEM<GF128>>(data, r);
@@ -519,7 +520,7 @@ mod test {
                 }
 
                 192 => {
-                    let r = GenericArray::from_slice(&r[..24]);
+                    let r = (&r[..24]).try_into().unwrap();
 
                     if data.mode == "s" {
                         vole_check::<OWF192EM, BAVC192SmallEM<GF192>>(data, r);

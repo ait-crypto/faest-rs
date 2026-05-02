@@ -7,7 +7,7 @@ use core::fmt::{self, Debug};
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
-use generic_array::{GenericArray, typenum::Unsigned};
+use hybrid_array::{Array, typenum::Unsigned};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
@@ -23,7 +23,7 @@ pub(crate) struct SecretKey<O>
 where
     O: OWFParameters,
 {
-    pub(crate) owf_key: GenericArray<u8, O::LambdaBytes>,
+    pub(crate) owf_key: Array<u8, O::LambdaBytes>,
     pub(crate) pk: PublicKey<O>,
 }
 
@@ -67,10 +67,10 @@ where
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() == O::SK::USIZE {
-            let owf_input = GenericArray::from_slice(&bytes[..O::InputSize::USIZE]);
-            let owf_key = GenericArray::from_slice(&bytes[O::InputSize::USIZE..]);
+            let owf_input = Array::from_slice(&bytes[..O::InputSize::USIZE]);
+            let owf_key = Array::from_slice(&bytes[O::InputSize::USIZE..]);
 
-            let mut owf_output = GenericArray::default();
+            let mut owf_output = Array::default();
             O::evaluate_owf(owf_key, owf_input, &mut owf_output);
 
             if owf_key[0] & 0b11 == 0b11 {
@@ -94,7 +94,7 @@ where
     }
 }
 
-impl<O> From<SecretKey<O>> for GenericArray<u8, O::SK>
+impl<O> From<SecretKey<O>> for Array<u8, O::SK>
 where
     O: OWFParameters,
 {
@@ -107,10 +107,10 @@ impl<O> ByteEncoding for SecretKey<O>
 where
     O: OWFParameters,
 {
-    type Repr = GenericArray<u8, O::SK>;
+    type Repr = Array<u8, O::SK>;
 
     fn to_bytes(&self) -> Self::Repr {
-        let mut buf = GenericArray::default();
+        let mut buf = Array::default();
         buf[..O::InputSize::USIZE].copy_from_slice(&self.pk.owf_input);
         buf[O::InputSize::USIZE..].copy_from_slice(&self.owf_key);
         classify!(buf);
@@ -185,7 +185,7 @@ where
     where
         D: Deserializer<'de>,
     {
-        GenericArray::<u8, O::SK>::deserialize(deserializer).and_then(|bytes| {
+        Array::<u8, O::SK>::deserialize(deserializer).and_then(|bytes| {
             Self::try_from(bytes.as_slice())
                 .map_err(|_| serde::de::Error::custom("expected a valid secret key"))
         })
@@ -240,7 +240,7 @@ where
     }
 }
 
-impl<O> From<UnpackedSecretKey<O>> for GenericArray<u8, O::SK>
+impl<O> From<UnpackedSecretKey<O>> for Array<u8, O::SK>
 where
     O: OWFParameters,
 {
@@ -253,7 +253,7 @@ impl<O> ByteEncoding for UnpackedSecretKey<O>
 where
     O: OWFParameters,
 {
-    type Repr = GenericArray<u8, O::SK>;
+    type Repr = Array<u8, O::SK>;
 
     fn to_bytes(&self) -> Self::Repr {
         self.sk.to_bytes()
@@ -324,7 +324,7 @@ where
     where
         D: Deserializer<'de>,
     {
-        GenericArray::<u8, O::SK>::deserialize(deserializer).and_then(|bytes| {
+        Array::<u8, O::SK>::deserialize(deserializer).and_then(|bytes| {
             Self::try_from(bytes.as_slice())
                 .map_err(|_| serde::de::Error::custom("expected a valid secret key"))
         })
@@ -336,8 +336,8 @@ pub(crate) struct PublicKey<O>
 where
     O: OWFParameters,
 {
-    pub(crate) owf_input: GenericArray<u8, O::InputSize>,
-    pub(crate) owf_output: GenericArray<u8, O::OutputSize>,
+    pub(crate) owf_input: Array<u8, O::InputSize>,
+    pub(crate) owf_output: Array<u8, O::OutputSize>,
 }
 
 impl<O> Clone for PublicKey<O>
@@ -360,8 +360,8 @@ where
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() == O::PK::USIZE {
-            let owf_input = GenericArray::from_slice(&bytes[..O::InputSize::USIZE]);
-            let owf_output = GenericArray::from_slice(&bytes[O::InputSize::USIZE..]);
+            let owf_input = Array::from_slice(&bytes[..O::InputSize::USIZE]);
+            let owf_output = Array::from_slice(&bytes[O::InputSize::USIZE..]);
             Ok(Self {
                 owf_input: owf_input.clone(),
                 owf_output: owf_output.clone(),
@@ -372,7 +372,7 @@ where
     }
 }
 
-impl<O> From<PublicKey<O>> for GenericArray<u8, O::PK>
+impl<O> From<PublicKey<O>> for Array<u8, O::PK>
 where
     O: OWFParameters,
 {
@@ -385,10 +385,10 @@ impl<O> ByteEncoding for PublicKey<O>
 where
     O: OWFParameters,
 {
-    type Repr = GenericArray<u8, O::PK>;
+    type Repr = Array<u8, O::PK>;
 
     fn to_bytes(&self) -> Self::Repr {
-        let mut buf = GenericArray::default();
+        let mut buf = Array::default();
         buf[..O::InputSize::USIZE].copy_from_slice(&self.owf_input);
         buf[O::InputSize::USIZE..].copy_from_slice(&self.owf_output);
         buf
@@ -451,7 +451,7 @@ where
     where
         D: Deserializer<'de>,
     {
-        GenericArray::<u8, O::PK>::deserialize(deserializer).and_then(|bytes| {
+        Array::<u8, O::PK>::deserialize(deserializer).and_then(|bytes| {
             Self::try_from(bytes.as_slice())
                 .map_err(|_| serde::de::Error::custom("expected a valid public key"))
         })

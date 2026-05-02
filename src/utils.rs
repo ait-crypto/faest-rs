@@ -1,6 +1,6 @@
 use core::iter::zip;
 
-use generic_array::{ArrayLength, GenericArray, typenum::Unsigned};
+use hybrid_array::{Array, ArraySize, typenum::Unsigned};
 use itertools::izip;
 
 use crate::parameter::TauParameters;
@@ -11,11 +11,11 @@ pub(crate) trait Reader {
     fn read(&mut self, dst: &mut [u8]);
 
     /// Read into array and consume the reader
-    fn read_into<Length: ArrayLength>(mut self) -> GenericArray<u8, Length>
+    fn read_into<Length: ArraySize>(mut self) -> Array<u8, Length>
     where
         Self: Sized,
     {
-        let mut dst = GenericArray::default();
+        let mut dst = Array::default();
         self.read(&mut dst);
         dst
     }
@@ -76,7 +76,7 @@ const fn chall_to_u16(chall: &[u8], start_bit: usize, k: usize) -> u16 {
         << (nbits_first_byte + 8)
 }
 
-pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> GenericArray<u16, TAU::Tau> {
+pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> Array<u16, TAU::Tau> {
     let k = TAU::K::USIZE;
 
     // Compute Delta_i[0...Tau1)
