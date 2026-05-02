@@ -694,7 +694,7 @@ mod test {
         use crate::utils::test::{hash_array, read_test_data};
 
         #[cfg(not(feature = "std"))]
-        use alloc::vec::Vec;
+        use alloc::{vec, vec::Vec};
 
         use serde::Deserialize;
 
