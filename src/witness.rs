@@ -180,10 +180,9 @@ mod test {
     use crate::{
         fields::{GF128, GF192, GF256},
         parameter::{OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM, OWFParameters},
-        utils::test::read_test_data,
+        utils::{array_ref, test::read_test_data},
     };
 
-    use hybrid_array::Array;
     use serde::Deserialize;
 
     #[derive(Debug, Deserialize)]
@@ -207,22 +206,22 @@ mod test {
             match self.lambda {
                 128 => {
                     let wit = OWF128::<GF128>::extendwitness(
-                        Array::from_slice(&self.key),
-                        Array::from_slice(&self.input),
+                        array_ref(&self.key),
+                        array_ref(&self.input),
                     );
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 192 => {
                     let wit = OWF192::<GF192>::extendwitness(
-                        Array::from_slice(&self.key),
-                        Array::from_slice(&self.input),
+                        array_ref(&self.key),
+                        array_ref(&self.input),
                     );
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 _ => {
                     let wit = OWF256::<GF256>::extendwitness(
-                        Array::from_slice(&self.key),
-                        Array::from_slice(&self.input),
+                        array_ref(&self.key),
+                        array_ref(&self.input),
                     );
                     (*wit).as_slice() == self.w.as_slice()
                 }
@@ -233,22 +232,22 @@ mod test {
             match self.lambda {
                 128 => {
                     let wit = OWF128EM::<GF128>::extendwitness(
-                        Array::from_slice(&self.key),
-                        Array::from_slice(&self.input),
+                        array_ref(&self.key),
+                        array_ref(&self.input),
                     );
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 192 => {
                     let wit = OWF192EM::<GF192>::extendwitness(
-                        Array::from_slice(&self.key),
-                        Array::from_slice(&self.input),
+                        array_ref(&self.key),
+                        array_ref(&self.input),
                     );
                     (*wit).as_slice() == self.w.as_slice()
                 }
                 _ => {
                     let wit = OWF256EM::<GF256>::extendwitness(
-                        Array::from_slice(&self.key),
-                        Array::from_slice(&self.input),
+                        array_ref(&self.key),
+                        array_ref(&self.input),
                     );
                     (*wit).as_slice() == self.w.as_slice()
                 }

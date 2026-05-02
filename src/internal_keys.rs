@@ -16,6 +16,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 use crate::{
     ByteEncoding, Error, classify, declassify,
     parameter::{OWFParameters, Witness},
+    utils::array_ref,
 };
 
 /// Internal representation of a secret key.
@@ -67,8 +68,8 @@ where
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() == O::SK::USIZE {
-            let owf_input = Array::from_slice(&bytes[..O::InputSize::USIZE]);
-            let owf_key = Array::from_slice(&bytes[O::InputSize::USIZE..]);
+            let owf_input = array_ref(&bytes[..O::InputSize::USIZE]);
+            let owf_key = array_ref(&bytes[O::InputSize::USIZE..]);
 
             let mut owf_output = Array::default();
             O::evaluate_owf(owf_key, owf_input, &mut owf_output);
@@ -360,8 +361,8 @@ where
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() == O::PK::USIZE {
-            let owf_input = Array::from_slice(&bytes[..O::InputSize::USIZE]);
-            let owf_output = Array::from_slice(&bytes[O::InputSize::USIZE..]);
+            let owf_input = array_ref(&bytes[..O::InputSize::USIZE]);
+            let owf_output = array_ref(&bytes[O::InputSize::USIZE..]);
             Ok(Self {
                 owf_input: owf_input.clone(),
                 owf_output: owf_output.clone(),

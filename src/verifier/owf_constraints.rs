@@ -18,6 +18,7 @@ use crate::{
     parameter::{OWFField, OWFParameters},
     rijndael_32::rijndael_key_schedule_unbitsliced,
     universal_hashing::ZKVerifyHasher,
+    utils::array_ref,
 };
 
 pub(crate) fn owf_constraints<O>(
@@ -44,7 +45,7 @@ pub(crate) fn owf_constraints<O>(
         // ::10
         let owf_input = w.get_commits_ref::<O::NStBits>(0);
         // ::11
-        let owf_output = owf_input.add_round_key(Array::<u8, O::NStBytes>::from_slice(y));
+        let owf_output = owf_input.add_round_key(array_ref::<u8, O::NStBytes>(y));
         // ::19 - EM = true
         let w_tilde = w.get_commits_ref::<O::LEnc>(O::LKe::USIZE);
         // ::21 - EM = true
@@ -58,7 +59,7 @@ pub(crate) fn owf_constraints<O>(
     } else {
         // ::13
         let mut owf_input: VoleCommits<_, O::NStBits> =
-            VoleCommits::from_constant(Array::<u8, O::NStBytes>::from_slice(x.as_slice()), delta);
+            VoleCommits::from_constant(array_ref::<u8, O::NStBytes>(x.as_slice()), delta);
 
         // ::16
         let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKe>(0));
@@ -70,7 +71,7 @@ pub(crate) fn owf_constraints<O>(
         for b in 0..O::Beta::USIZE {
             // ::19 - EM = false
             let w_tilde = w.get_commits_ref::<O::LEnc>(O::LKe::USIZE + b * O::LEnc::USIZE);
-            let owf_output = Array::<u8, O::NStBytes>::from_slice(
+            let owf_output = array_ref::<u8, O::NStBytes>(
                 &y[O::InputSize::USIZE * b..O::InputSize::USIZE * (b + 1)],
             );
             let owf_output = VoleCommits::from_constant(owf_output, delta);

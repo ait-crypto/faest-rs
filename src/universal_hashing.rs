@@ -15,6 +15,7 @@ use crate::{
     fields::{BaseField, BigGaloisField, ExtensionField, Field, GF64, GF128, GF192, GF256},
     parameter::SecurityParameter,
     prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo},
+    utils::array_ref,
 };
 
 /// Additional bits returned by VOLE hash
@@ -55,7 +56,7 @@ where
         debug_assert!(x.len() > OutputLength::USIZE);
 
         let (x0, x1) = x.split_at(x.len() - OutputLength::USIZE);
-        self.process_split(x0, Array::from_slice(x1))
+        self.process_split(x0, array_ref(x1))
     }
 
     fn from_r_s_t(r: [F; 4], s: F, t: GF64) -> Self;
@@ -462,12 +463,11 @@ mod test {
     #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
 
-    use hybrid_array::Array;
     use serde::{Deserialize, de::DeserializeOwned};
 
     use crate::{
         fields::{GF128, GF192, GF256},
-        utils::test::read_test_data,
+        utils::{array_from_slice, test::read_test_data},
     };
 
     #[derive(Debug, Deserialize)]
@@ -497,8 +497,8 @@ mod test {
     fn test_volehash_128() {
         let database: Vec<VoleHashDatabaseEntry> = read_test_data("volehash_128.json");
         for data in database {
-            let sd = Array::from_slice(&data.sd);
-            let h = *Array::from_slice(&data.h);
+            let sd = array_ref(&data.sd);
+            let h = array_from_slice(&data.h);
 
             let hasher = VoleHasher::<GF128>::new_vole_hasher(sd);
             let res = hasher.process(&data.xs);
@@ -510,8 +510,8 @@ mod test {
     fn test_volehash_192() {
         let database: Vec<VoleHashDatabaseEntry> = read_test_data("volehash_192.json");
         for data in database {
-            let sd = Array::from_slice(&data.sd);
-            let h = *Array::from_slice(&data.h);
+            let sd = array_ref(&data.sd);
+            let h = array_from_slice(&data.h);
 
             let hasher = VoleHasher::<GF192>::new_vole_hasher(sd);
             let res = hasher.process(&data.xs);
@@ -524,8 +524,8 @@ mod test {
         let database: Vec<VoleHashDatabaseEntry> = read_test_data("volehash_256.json");
 
         for data in database {
-            let sd = Array::from_slice(&data.sd);
-            let h = *Array::from_slice(&data.h);
+            let sd = array_ref(&data.sd);
+            let h = array_from_slice(&data.h);
 
             let hasher = VoleHasher::<GF256>::new_vole_hasher(sd);
             let res = hasher.process(&data.xs);
@@ -538,7 +538,7 @@ mod test {
         let database: Vec<ZKHashDatabaseEntry<GF128>> = read_test_data("zkhash_128.json");
 
         for data in database {
-            let sd = Array::from_slice(&data.sd);
+            let sd = array_ref(&data.sd);
 
             let mut hasher = ZKHasher::<GF128>::new_zk_hasher(sd);
             for v in &data.x0 {
@@ -554,7 +554,7 @@ mod test {
         let database: Vec<ZKHashDatabaseEntry<GF192>> = read_test_data("zkhash_192.json");
 
         for data in database {
-            let sd = Array::from_slice(&data.sd);
+            let sd = array_ref(&data.sd);
 
             let mut hasher = ZKHasher::<GF192>::new_zk_hasher(sd);
             for v in &data.x0 {
@@ -570,7 +570,7 @@ mod test {
         let database: Vec<ZKHashDatabaseEntry<GF256>> = read_test_data("zkhash_256.json");
 
         for data in database {
-            let sd = Array::from_slice(&data.sd);
+            let sd = array_ref(&data.sd);
 
             let mut hasher = ZKHasher::<GF256>::new_zk_hasher(sd);
             for v in &data.x0 {
@@ -586,8 +586,8 @@ mod test {
         let database: Vec<LeafHashDatabaseEntry> = read_test_data("leafhash_128.json");
 
         for data in database {
-            let x = Array::from_slice(&data.x);
-            let uhash = Array::from_slice(&data.uhash);
+            let x = array_ref(&data.x);
+            let uhash = array_ref(&data.uhash);
 
             let h = LeafHasher128::<GF128>::hash(uhash, x);
             assert_eq!(h.as_slice(), &data.expected_h)
@@ -599,8 +599,8 @@ mod test {
         let database: Vec<LeafHashDatabaseEntry> = read_test_data("leafhash_192.json");
 
         for data in database {
-            let x = Array::from_slice(&data.x);
-            let uhash = Array::from_slice(&data.uhash);
+            let x = array_ref(&data.x);
+            let uhash = array_ref(&data.uhash);
 
             let h = LeafHasher192::<GF192>::hash(uhash, x);
             assert_eq!(h.as_slice(), &data.expected_h)
@@ -612,8 +612,8 @@ mod test {
         let database: Vec<LeafHashDatabaseEntry> = read_test_data("leafhash_256.json");
 
         for data in database {
-            let x = Array::from_slice(&data.x);
-            let uhash = Array::from_slice(&data.uhash);
+            let x = array_ref(&data.x);
+            let uhash = array_ref(&data.uhash);
 
             let h = LeafHasher256::<GF256>::hash(uhash, x);
 

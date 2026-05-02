@@ -5,7 +5,10 @@ use alloc::boxed::Box;
 
 use hybrid_array::{Array, ArraySize, typenum::U8};
 
-use crate::{fields::BigGaloisField, utils::get_bit};
+use crate::{
+    fields::BigGaloisField,
+    utils::{array_ref, get_bit},
+};
 
 #[derive(Debug, Clone)]
 pub(crate) struct VoleCommits<'a, F: BigGaloisField, L: ArraySize> {
@@ -43,7 +46,7 @@ where
         L2: ArraySize,
     {
         VoleCommitsRef {
-            scalars: Array::from_slice(&self.scalars[start_idx..start_idx + L2::USIZE]),
+            scalars: array_ref(&self.scalars[start_idx..start_idx + L2::USIZE]),
             delta: self.delta,
         }
     }
@@ -75,7 +78,7 @@ where
         L2: ArraySize,
     {
         VoleCommitsRef {
-            scalars: Array::from_slice(&self.scalars[start_idx..start_idx + L2::USIZE]),
+            scalars: array_ref(&self.scalars[start_idx..start_idx + L2::USIZE]),
             delta: self.delta,
         }
     }

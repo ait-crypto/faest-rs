@@ -121,6 +121,53 @@ pub(crate) const fn get_bit(input: &[u8], index: usize) -> u8 {
     (input[byte_index] >> bit_offset) & 1
 }
 
+/// Converts a slice into a shared `Array` reference.
+///
+/// This is a small replacement for the deprecated `Array::from_slice`.
+/// It panics if the slice length does not exactly match the array size,
+/// so it should only be used when the length is an internal invariant
+#[inline]
+pub(crate) fn array_ref<T, N>(slice: &[T]) -> &Array<T, N>
+where
+    N: ArraySize,
+{
+    slice
+        .try_into()
+        .expect("slice length must match Array size")
+}
+
+/// Converts a mutable slice into a mutable `Array` reference.
+///
+/// This is a small replacement for the deprecated `Array::from_mut_slice`.
+/// It panics if the slice length does not exactly match the array size,
+/// so it should only be used when the length is an internal invariant.
+#[inline]
+pub(crate) fn array_mut<T, N>(slice: &mut [T]) -> &mut Array<T, N>
+where
+    N: ArraySize,
+{
+    slice
+        .try_into()
+        .expect("slice length must match Array size")
+}
+
+/// Clones a slice into an owned `Array`.
+///
+/// This is useful when an owned `Array<T, U>` is needed rather than an
+/// `&Array<T, U>`. It panics if the slice length does not exactly match
+/// the array size, so it should only be used when the length is an
+/// internal invariant.
+#[inline]
+pub fn array_from_slice<T, U>(slice: &[T]) -> Array<T, U>
+where
+    T: Clone,
+    U: ArraySize,
+{
+    slice
+        .try_into()
+        .expect("slice length must match Array size")
+}
+
 #[cfg(test)]
 pub(crate) mod test {
     #[cfg(not(feature = "std"))]

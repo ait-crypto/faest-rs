@@ -18,6 +18,7 @@ use crate::{
         Square,
     },
     parameter::{OWFField, OWFParameters},
+    utils::array_from_slice,
     verifier::{VoleCommits, VoleCommitsRef},
 };
 
@@ -363,8 +364,7 @@ where
         let nst_bytes = L::USIZE / 8;
 
         for i in 0..nst_bytes {
-            let xi_tags: Array<_, U8> =
-                Array::from_slice(&self.scalars[8 * i..8 * i + 8]).to_owned();
+            let xi_tags: Array<_, U8> = array_from_slice(&self.scalars[8 * i..8 * i + 8]);
             for bit_i in 0..8 {
                 // ::6
                 self.scalars[8 * i + bit_i] = xi_tags[(bit_i + 8 - 1) % 8]
@@ -398,7 +398,7 @@ where
 
         for c in 0..O::NSt::USIZE {
             // Save the 4 state's columns that will be modified in this round
-            let tmp = Array::<_, U4>::from_slice(&self.scalars[4 * c..4 * c + 4]).to_owned();
+            let tmp = array_from_slice::<_, U4>(&self.scalars[4 * c..4 * c + 4]);
 
             let i0 = 4 * c;
             let i1 = i0 + 1;
