@@ -922,7 +922,7 @@ impl Field for BigGF<u128, 1, 128> {
     type Length = U16;
 
     fn as_bytes(&self) -> Array<u8, Self::Length> {
-        Array::from(self.0[0].to_le_bytes())
+        Array(self.0[0].to_le_bytes())
     }
 }
 
