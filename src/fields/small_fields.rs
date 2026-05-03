@@ -286,7 +286,7 @@ impl Field for GF64 {
     type Length = U8;
 
     fn as_bytes(&self) -> Array<u8, Self::Length> {
-        Array::from(self.0.to_le_bytes())
+        Array(self.0.to_le_bytes())
     }
 
     /*
