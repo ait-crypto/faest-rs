@@ -17,7 +17,6 @@ use crate::{
     fields::{BigGaloisField, Square},
     parameter::{OWFField, OWFParameters},
     universal_hashing::ZKVerifyHasher,
-    utils::array_from_slice,
 };
 
 pub(crate) fn enc_cstrnts<'a, O, K>(
@@ -166,11 +165,14 @@ where
     F: BigGaloisField,
     L: ArraySize,
 {
-    state
-        .chunks_exact(8)
-        .flat_map(|x| {
-            let mut x0 = array_from_slice::<_, U8>(x);
+    debug_assert_eq!(L::USIZE % 8, 0);
 
+    state
+        .as_chunks::<8>()
+        .0
+        .iter()
+        .copied()
+        .flat_map(|mut x0| {
             // ::4-8
             let mut y: Array<_, U8> = Array::default();
             for j in 0..7 {
