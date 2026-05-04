@@ -75,12 +75,11 @@ where
                 return Err(Error::new());
             };
 
-            let mut owf_output = Array::default();
-            O::evaluate_owf(&owf_key, &owf_input, &mut owf_output);
-
             if owf_key[0] & 0b11 == 0b11 {
                 return Err(Error::new());
             }
+
+            let owf_output = O::evaluate_owf(&owf_key, &owf_input);
 
             classify!(owf_key);
             declassify!(&owf_output);

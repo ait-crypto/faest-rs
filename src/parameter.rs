@@ -18,7 +18,7 @@ use crate::{
         B, LeafHasher128, LeafHasher192, LeafHasher256, VoleHasher, VoleHasherInit,
         VoleHasherProcess, ZKHasher, ZKHasherInit,
     },
-    utils::{array_mut, array_ref, xor_arrays_inplace},
+    utils::xor_arrays_inplace,
     witness::aes_extendedwitness,
     zk_constraints::{CstrntsVal, aes_prove, aes_verify},
 };
@@ -306,7 +306,10 @@ pub(crate) trait OWFParameters: Sized {
     const IS_EM: bool;
 
     /// Applies the OWF using the secret key `key` to `input` and writes the result in the `output` slice
-    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]);
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize>;
 
     /// Compute the extended witness from `owf_key` and `owf_input`
     fn extendwitness(
@@ -357,8 +360,7 @@ pub(crate) trait OWFParameters: Sized {
         let mut owf_input = Array::default();
         rng.fill_bytes(&mut owf_input);
 
-        let mut owf_output = Array::default();
-        Self::evaluate_owf(&owf_key, &owf_input, &mut owf_output);
+        let owf_output = Self::evaluate_owf(&owf_key, &owf_input);
 
         SecretKey {
             owf_key,
@@ -414,9 +416,14 @@ where
 
     const IS_EM: bool = false;
 
-    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
-        let aes = Aes128Enc::new(array_ref(key));
-        aes.encrypt_block_b2b(array_ref(input), array_mut(output));
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize> {
+        let aes = Aes128Enc::new(key);
+        let mut output = Array::default();
+        aes.encrypt_block_b2b(input, &mut output);
+        output
     }
 
     #[inline]
@@ -472,14 +479,20 @@ where
 
     const IS_EM: bool = false;
 
-    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
-        let aes = Aes192Enc::new(array_ref(key));
-        aes.encrypt_block_b2b(array_ref(input), array_mut(&mut output[..16]));
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize> {
+        let aes = Aes192Enc::new(key);
+        let mut output1 = Array::default();
+        aes.encrypt_block_b2b(input, &mut output1);
 
-        let mut input = array_ref(input).to_owned();
+        let mut input = *input;
         input[0] ^= 1;
 
-        aes.encrypt_block_b2b(&input, array_mut(&mut output[16..]));
+        let mut output2 = Array::default();
+        aes.encrypt_block_b2b(&input, &mut output2);
+        output1.concat(output2)
     }
 
     #[inline]
@@ -535,14 +548,20 @@ where
 
     const IS_EM: bool = false;
 
-    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
-        let aes = Aes256Enc::new(array_ref(key));
-        aes.encrypt_block_b2b(array_ref(input), array_mut(&mut output[..16]));
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize> {
+        let aes = Aes256Enc::new(key);
+        let mut output1 = Array::default();
+        aes.encrypt_block_b2b(input, &mut output1);
 
-        let mut input = array_ref(input).to_owned();
+        let mut input = *input;
         input[0] ^= 1;
 
-        aes.encrypt_block_b2b(&input, array_mut(&mut output[16..]));
+        let mut output2 = Array::default();
+        aes.encrypt_block_b2b(&input, &mut output2);
+        output1.concat(output2)
     }
 
     #[inline]
@@ -598,12 +617,17 @@ where
 
     const IS_EM: bool = true;
 
-    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
-        let aes = Aes128Enc::new(array_ref(input));
-        aes.encrypt_block_b2b(array_ref(key), array_mut(output));
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize> {
+        let aes = Aes128Enc::new(input);
+        let mut output = Array::default();
+        aes.encrypt_block_b2b(key, &mut output);
         for idx in 0..Self::InputSize::USIZE {
             output[idx] ^= key[idx];
         }
+        output
     }
 
     #[inline]
@@ -663,12 +687,17 @@ where
 
     const IS_EM: bool = true;
 
-    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
-        let aes = Rijndael192::new(array_ref(input));
-        aes.encrypt_block_b2b(array_ref(key), array_mut(output));
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize> {
+        let aes = Rijndael192::new(input);
+        let mut output = Array::default();
+        aes.encrypt_block_b2b(key, &mut output);
         for idx in 0..Self::InputSize::USIZE {
             output[idx] ^= key[idx];
         }
+        output
     }
 
     #[inline]
@@ -726,12 +755,17 @@ where
 
     const IS_EM: bool = true;
 
-    fn evaluate_owf(key: &[u8], input: &[u8], output: &mut [u8]) {
-        let aes = Rijndael256::new(array_ref(input));
-        aes.encrypt_block_b2b(array_ref(key), array_mut(output));
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize> {
+        let aes = Rijndael256::new(input);
+        let mut output = Array::default();
+        aes.encrypt_block_b2b(key, &mut output);
         for idx in 0..Self::InputSize::USIZE {
             output[idx] ^= key[idx];
         }
+        output
     }
 
     #[inline]
