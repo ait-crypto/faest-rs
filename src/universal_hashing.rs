@@ -15,7 +15,6 @@ use crate::{
     fields::{BaseField, BigGaloisField, ExtensionField, Field, GF64, GF128, GF192, GF256},
     parameter::SecurityParameter,
     prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo},
-    utils::array_ref,
 };
 
 /// Additional bits returned by VOLE hash
@@ -50,13 +49,13 @@ where
     F: BigGaloisField,
     OutputLength: ArraySize,
 {
-    fn process_split(&self, x0: &[u8], x1: &Array<u8, OutputLength>) -> Array<u8, OutputLength>;
+    fn process_split(&self, x0: &[u8], x1: &[u8]) -> Array<u8, OutputLength>;
 
     fn process(&self, x: &[u8]) -> Array<u8, OutputLength> {
         debug_assert!(x.len() > OutputLength::USIZE);
 
         let (x0, x1) = x.split_at(x.len() - OutputLength::USIZE);
-        self.process_split(x0, array_ref(x1))
+        self.process_split(x0, x1)
     }
 
     fn from_r_s_t(r: [F; 4], s: F, t: GF64) -> Self;
@@ -92,7 +91,7 @@ where
     fn process_split(
         &self,
         x0: &[u8],
-        x1: &Array<u8, <Self as VoleHasherInit<F>>::OutputLength>,
+        x1: &[u8],
     ) -> Array<u8, <Self as VoleHasherInit<F>>::OutputLength> {
         let mut h0 = F::ZERO;
         let mut h1 = GF64::ZERO;
@@ -467,7 +466,7 @@ mod test {
 
     use crate::{
         fields::{GF128, GF192, GF256},
-        utils::{array_from_slice, test::read_test_data},
+        utils::{array_from_slice, array_ref, test::read_test_data},
     };
 
     #[derive(Debug, Deserialize)]
