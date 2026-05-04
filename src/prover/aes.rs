@@ -9,7 +9,7 @@ use alloc::{borrow::ToOwned, boxed::Box};
 
 use hybrid_array::{
     Array, ArraySize,
-    typenum::{U4, U8, Unsigned},
+    typenum::{U8, Unsigned},
 };
 
 use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
@@ -20,7 +20,7 @@ use crate::{
         large_fields::ByteCombineSquaredConstants,
     },
     parameter::{OWFField, OWFParameters, SecurityParameter},
-    utils::{array_from_slice, array_ref, xor_arrays_inplace},
+    utils::{array_ref, xor_arrays_inplace},
 };
 
 // Helper type aliases
@@ -247,24 +247,18 @@ where
             &OWFField::<O>::BYTE_COMBINE_3
         };
 
-        for c in 0..O::NSt::USIZE {
+        for scalars in self.as_chunks_mut::<4>().0 {
             // Save the 4 state's columns that will be modified in this round
-            let tmp = array_from_slice::<_, U4>(&self[4 * c..4 * c + 4]);
-
-            let i0 = 4 * c;
-            let i1 = i0 + 1;
-            let i2 = i0 + 2;
-            let i3 = i0 + 3;
+            let tmp = scalars.clone();
 
             // ::7
-            self[i0] = &tmp[0] * v2 + &tmp[1] * v3 + &tmp[2] + &tmp[3];
+            scalars[0] = &tmp[0] * v2 + &tmp[1] * v3 + &tmp[2] + &tmp[3];
             // ::8
-            self[i1] = &tmp[1] * v2 + &tmp[2] * v3 + &tmp[0] + &tmp[3];
+            scalars[1] = &tmp[1] * v2 + &tmp[2] * v3 + &tmp[0] + &tmp[3];
             // ::9
-            self[i2] = &tmp[2] * v2 + &tmp[3] * v3 + &tmp[0] + &tmp[1];
+            scalars[2] = &tmp[2] * v2 + &tmp[3] * v3 + &tmp[0] + &tmp[1];
             // ::10
-            let Array([tmp0, tmp1, tmp2, tmp3]) = tmp;
-            self[i3] = tmp0 * v3 + tmp3 * v2 + &tmp1 + &tmp2;
+            scalars[3] = &tmp[0] * v3 + &tmp[3] * v2 + &tmp[1] + &tmp[2];
         }
     }
 }
@@ -373,11 +367,14 @@ where
                 ^ self.keys[i].rotate_right(5)
                 ^ self.keys[i].rotate_right(2)
                 ^ 0x5;
+        }
 
-            let xi_tags = array_from_slice::<_, U8>(&self.tags[8 * i..8 * i + 8]);
+        for scalars in self.tags.as_chunks_mut::<8>().0 {
+            // 6
+            let xi_tags = *scalars;
             for bit_i in 0..8 {
                 // ::6
-                self.tags[8 * i + bit_i] = xi_tags[(bit_i + 8 - 1) % 8]
+                scalars[bit_i] = xi_tags[(bit_i + 8 - 1) % 8]
                     + xi_tags[(bit_i + 8 - 3) % 8]
                     + xi_tags[(bit_i + 8 - 6) % 8];
             }
