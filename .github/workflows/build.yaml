@@ -105,4 +105,5 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+      - run: clippy --all --all-features -- -D warnings
       - run: RUSTFLAGS="--cfg=valgrind=\"enabled\"" cargo clippy --all --all-features -- -D warnings
