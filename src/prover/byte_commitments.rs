@@ -95,7 +95,7 @@ where
     fn get(&self, idx: usize) -> ByteCommitment<F> {
         ByteCommitment {
             key: self.keys[idx],
-            tags: array_ref(&self.tags[idx * 8..idx * 8 + 8]).to_owned(),
+            tags: self.tags[idx * 8..idx * 8 + 8].iter().cloned().collect(),
         }
     }
 

@@ -20,7 +20,7 @@ use crate::{
         large_fields::ByteCombineSquaredConstants,
     },
     parameter::{OWFField, OWFParameters, SecurityParameter},
-    utils::{array_ref, xor_arrays_inplace},
+    utils::xor_arrays_inplace,
 };
 
 // Helper type aliases
@@ -111,7 +111,7 @@ where
     fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
         ByteCommits {
             keys: Box::new(zip(self.iter(), rhs.keys).map(|(a, b)| a ^ b).collect()),
-            tags: Box::new(array_ref(&rhs.tags[..L::USIZE * 8]).to_owned()),
+            tags: Box::new(rhs.tags[..L::USIZE * 8].iter().cloned().collect()),
         }
     }
 }

@@ -11,7 +11,7 @@ jobs:
       matrix:
         toolchain:
           - stable
-          - "1.85"
+          - "1.88"
         runner:
           - ubuntu-latest
           - ubuntu-24.04-arm
