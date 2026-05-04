@@ -16,7 +16,6 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 use crate::{
     ByteEncoding, Error, classify, declassify,
     parameter::{OWFParameters, Witness},
-    utils::array_ref,
 };
 
 /// Internal representation of a secret key.
@@ -68,11 +67,16 @@ where
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() == O::SK::USIZE {
-            let owf_input = array_ref(&bytes[..O::InputSize::USIZE]);
-            let owf_key = array_ref(&bytes[O::InputSize::USIZE..]);
+            let (owf_input, owf_key) = bytes.split_at(O::InputSize::USIZE);
+            let Ok(owf_input) = Array::try_from(owf_input) else {
+                return Err(Error::new());
+            };
+            let Ok(owf_key) = Array::try_from(owf_key) else {
+                return Err(Error::new());
+            };
 
             let mut owf_output = Array::default();
-            O::evaluate_owf(owf_key, owf_input, &mut owf_output);
+            O::evaluate_owf(&owf_key, &owf_input, &mut owf_output);
 
             if owf_key[0] & 0b11 == 0b11 {
                 return Err(Error::new());
@@ -83,9 +87,9 @@ where
             declassify!(&owf_input);
 
             Ok(Self {
-                owf_key: owf_key.clone(),
+                owf_key,
                 pk: PublicKey {
-                    owf_input: owf_input.clone(),
+                    owf_input,
                     owf_output,
                 },
             })
@@ -361,11 +365,17 @@ where
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() == O::PK::USIZE {
-            let owf_input = array_ref(&bytes[..O::InputSize::USIZE]);
-            let owf_output = array_ref(&bytes[O::InputSize::USIZE..]);
+            let (owf_input, owf_output) = bytes.split_at(O::InputSize::USIZE);
+            let Ok(owf_input) = Array::try_from(owf_input) else {
+                return Err(Error::new());
+            };
+            let Ok(owf_output) = Array::try_from(owf_output) else {
+                return Err(Error::new());
+            };
+
             Ok(Self {
-                owf_input: owf_input.clone(),
-                owf_output: owf_output.clone(),
+                owf_input,
+                owf_output,
             })
         } else {
             Err(Error::new())
