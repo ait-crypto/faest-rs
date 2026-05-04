@@ -313,7 +313,7 @@ impl From<&[u8]> for GF64 {
 
 #[cfg(test)]
 mod test {
-    use rand::Rng;
+    use rand::RngExt;
     use rand_core::SeedableRng;
 
     use super::*;
@@ -322,7 +322,7 @@ mod test {
     fn gf64_test_mul() {
         let mut rng = nist_pqc_seeded_rng::NistPqcAes256CtrRng::seed_from_u64(1234);
 
-        let anything: u64 = rng.r#gen();
+        let anything: u64 = rng.random();
         let pol_anything = GF64::from(anything);
         let pol_0 = GF64::from(0u64);
         let pol_1 = GF64::from(1u64);

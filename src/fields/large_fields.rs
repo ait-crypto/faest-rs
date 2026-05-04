@@ -17,7 +17,7 @@ use hybrid_array::{
 #[cfg(test)]
 use rand::{
     Rng,
-    distributions::{Distribution, Standard},
+    distr::{Distribution, StandardUniform},
 };
 
 use crate::fields::BaseField;
@@ -970,9 +970,9 @@ impl BaseField for GF128 {
 }
 
 #[cfg(test)]
-impl Distribution<GF128> for Standard {
+impl Distribution<GF128> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF128 {
-        BigGF([rng.sample(self)])
+        BigGF([self.sample(rng)])
     }
 }
 
@@ -1139,9 +1139,9 @@ impl BaseField for GF256 {
 }
 
 #[cfg(test)]
-impl Distribution<GF192> for Standard {
+impl Distribution<GF192> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF192 {
-        BigGF([rng.sample(self), rng.sample::<u64, _>(self) as u128])
+        BigGF([self.sample(rng), rng.next_u64() as u128])
     }
 }
 
@@ -1285,9 +1285,9 @@ impl<'de> serde::Deserialize<'de> for BigGF<u128, 2, 256> {
 }
 
 #[cfg(test)]
-impl Distribution<GF256> for Standard {
+impl Distribution<GF256> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF256 {
-        BigGF([rng.sample(self), rng.sample(self)])
+        BigGF([self.sample(rng), self.sample(rng)])
     }
 }
 
@@ -1346,9 +1346,9 @@ impl Mul<&GF128> for GF384 {
 }
 
 #[cfg(test)]
-impl Distribution<GF384> for Standard {
+impl Distribution<GF384> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF384 {
-        BigGF([rng.sample(self), rng.sample(self), rng.sample(self)])
+        BigGF([self.sample(rng), self.sample(rng), self.sample(rng)])
     }
 }
 
@@ -1414,14 +1414,14 @@ impl From<&[u8]> for GF576 {
 }
 
 #[cfg(test)]
-impl Distribution<GF576> for Standard {
+impl Distribution<GF576> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF576 {
         BigGF([
-            rng.sample(self),
-            rng.sample(self),
-            rng.sample(self),
-            rng.sample(self),
-            rng.sample::<u64, _>(self) as u128,
+            self.sample(rng),
+            self.sample(rng),
+            self.sample(rng),
+            self.sample(rng),
+            rng.next_u64() as u128,
         ])
     }
 }
@@ -1479,15 +1479,15 @@ impl Mul<&GF256> for GF768 {
 }
 
 #[cfg(test)]
-impl Distribution<GF768> for Standard {
+impl Distribution<GF768> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> GF768 {
         BigGF([
-            rng.sample(self),
-            rng.sample(self),
-            rng.sample(self),
-            rng.sample(self),
-            rng.sample(self),
-            rng.sample(self),
+            self.sample(rng),
+            self.sample(rng),
+            self.sample(rng),
+            self.sample(rng),
+            self.sample(rng),
+            self.sample(rng),
         ])
     }
 }
@@ -1538,7 +1538,7 @@ mod test {
 
         use hybrid_array::typenum::Unsigned;
         use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
-        use rand::RngCore;
+        use rand::RngExt;
         use rand_core::SeedableRng;
 
         #[test]
@@ -1552,13 +1552,13 @@ mod test {
         #[test]
         fn add<F: BigGaloisField>()
         where
-            Standard: Distribution<F>,
+            StandardUniform: Distribution<F>,
         {
             let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             for _ in 0..RUNS {
-                let mut random_1: F = rng.r#gen();
-                let random_2: F = rng.r#gen();
+                let mut random_1: F = rng.random();
+                let random_2: F = rng.random();
                 let res = random_1 + random_2;
 
                 let res_bytes = res.as_bytes();
@@ -1581,12 +1581,12 @@ mod test {
         #[test]
         fn mul_64<F: BigGaloisField>()
         where
-            Standard: Distribution<F>,
+            StandardUniform: Distribution<F>,
         {
             let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             for _ in 0..RUNS {
-                let lhs: F = rng.r#gen();
+                let lhs: F = rng.random();
                 let mut rhs = Array::<u8, F::Length>::default();
                 rng.fill_bytes(&mut rhs[..8]);
 
@@ -1600,19 +1600,19 @@ mod test {
         #[test]
         fn mul_bit<F: BigGaloisField>()
         where
-            Standard: Distribution<F>,
+            StandardUniform: Distribution<F>,
         {
             let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
             for _ in 0..RUNS {
-                let anything: F = rng.r#gen();
+                let anything: F = rng.random();
                 #[allow(clippy::erasing_op)]
                 let res = anything * 0u8;
                 assert_eq!(res, F::ZERO);
                 let res = anything * 1u8;
                 assert_eq!(res, anything);
 
-                let anything: F = rng.r#gen();
+                let anything: F = rng.random();
                 let res = anything * F::ZERO;
                 assert_eq!(res, F::ZERO);
                 let res = anything * F::ONE;
@@ -1668,22 +1668,22 @@ mod test {
         #[test]
         fn byte_combine_slice<F: BigGaloisField>()
         where
-            Standard: Distribution<F>,
+            StandardUniform: Distribution<F>,
         {
             let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
-            let elements = array::from_fn(|_| rng.r#gen());
+            let elements = array::from_fn(|_| rng.random());
             assert_eq!(F::byte_combine(&elements), F::byte_combine_slice(&elements));
         }
 
         #[test]
         fn byte_conversions<F: BigGaloisField>()
         where
-            Standard: Distribution<F>,
+            StandardUniform: Distribution<F>,
         {
             let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
-            let element = rng.r#gen();
+            let element = rng.random();
             let bytes = element.as_bytes();
             assert_eq!(element, F::from(&bytes));
             assert_eq!(element, F::from(bytes.as_slice()));
@@ -1737,11 +1737,11 @@ mod test {
         #[test]
         fn square<F: BigGaloisField>()
         where
-            Standard: Distribution<F>,
+            StandardUniform: Distribution<F>,
         {
             let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
-            let element = rng.r#gen();
+            let element = rng.random();
             assert_eq!(element * element, element.square());
         }
 
@@ -1777,6 +1777,7 @@ mod test {
 
         use hybrid_array::typenum::Unsigned;
         use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
+        use rand::RngExt;
         use rand_core::SeedableRng;
 
         #[test]
@@ -1803,11 +1804,11 @@ mod test {
         #[test]
         fn byte_conversions<F: ExtensionField>()
         where
-            Standard: Distribution<F>,
+            StandardUniform: Distribution<F>,
         {
             let mut rng = NistPqcAes256CtrRng::seed_from_u64(1234);
 
-            let element = rng.r#gen();
+            let element = rng.random();
             let bytes = element.as_bytes();
             assert_eq!(element, F::from(&bytes));
             assert_eq!(element, F::from(bytes.as_slice()));

@@ -70,7 +70,8 @@ macro_rules! define_capi_impl {
                     let sk = unsafe { slice::from_raw_parts_mut(sk, Params::SK_SIZE) };
                     let pk = unsafe { slice::from_raw_parts_mut(pk, Params::PK_SIZE) };
 
-                    let key = SigningKey::generate(rand::thread_rng());
+                    let mut rng = rand::rng();
+                    let key = SigningKey::generate(&mut rng);
                     sk.copy_from_slice(&key.to_bytes());
                     pk.copy_from_slice(&key.verifying_key().to_bytes());
                     0
@@ -100,8 +101,9 @@ macro_rules! define_capi_impl {
                     };
                     let signature = unsafe { &mut *(signature as *mut [u8; Params::SIGNATURE_SIZE]) };
 
+                    let Ok(rho) = Params::sample_rho(&mut rand::rng()) else { return -1; };
+
                     SigningKey::try_from(sk).map(|sk| {
-                        let rho = Params::sample_rho(rand::thread_rng());
                         Params::sign(
                             msg,
                             &sk.0,

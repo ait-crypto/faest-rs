@@ -35,7 +35,7 @@ use hybrid_array::{
         U832, U1024, U2048, Unsigned,
     },
 };
-use rand_core::RngCore;
+use rand_core::Rng;
 
 #[cfg(all(
     feature = "opt-simd",
@@ -344,7 +344,7 @@ pub(crate) trait OWFParameters: Sized {
     }
 
     /// Generates the prover's secret key using the input generator
-    fn keygen_with_rng(mut rng: impl RngCore) -> SecretKey<Self> {
+    fn keygen_with_rng<R: Rng + ?Sized>(rng: &mut R) -> SecretKey<Self> {
         let mut owf_key = Array::default();
 
         loop {

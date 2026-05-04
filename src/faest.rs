@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use alloc::borrow::ToOwned;
 
 use hybrid_array::{Array, typenum::Unsigned};
-use rand_core::CryptoRngCore;
+use rand_core::CryptoRng;
 
 use crate::{
     Error, UnpackedSecretKey,
@@ -332,10 +332,10 @@ where
 }
 
 #[inline]
-pub(crate) fn faest_keygen<O, R>(rng: R) -> SecretKey<O>
+pub(crate) fn faest_keygen<O, R>(rng: &mut R) -> SecretKey<O>
 where
     O: OWFParameters,
-    R: CryptoRngCore,
+    R: CryptoRng + ?Sized,
 {
     O::keygen_with_rng(rng)
 }
@@ -575,7 +575,7 @@ where
 mod test {
     use super::*;
 
-    use rand::RngCore;
+    use rand::Rng;
     #[cfg(feature = "serde")]
     use serde::{Deserialize, Serialize};
 
@@ -598,7 +598,7 @@ mod test {
         use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
         use rand_core::SeedableRng;
 
-        fn random_message(mut rng: impl RngCore) -> Vec<u8> {
+        fn random_message(mut rng: impl Rng) -> Vec<u8> {
             let mut length = [0];
             while length[0] == 0 {
                 rng.fill_bytes(&mut length);

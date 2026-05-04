@@ -8,7 +8,7 @@ where
     KP: KeypairGenerator + Signer<Box<S>> + RandomizedSigner<Box<S>>,
     KP::VerifyingKey: Verifier<S>,
 {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     println!("Generating {name} key ...");
     let keypair = KP::generate(&mut rng);

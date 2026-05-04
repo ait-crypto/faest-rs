@@ -90,12 +90,11 @@ use alloc::{boxed::Box, vec::Vec};
 
 #[cfg(any(feature = "randomized-signer", feature = "capi"))]
 use hybrid_array::Array;
-
 use hybrid_array::typenum::Unsigned;
 use pastey::paste;
-use rand_core::CryptoRngCore;
+use rand_core::CryptoRng;
 #[cfg(any(feature = "randomized-signer", feature = "capi"))]
-use rand_core::RngCore;
+use rand_core::TryCryptoRng;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "randomized-signer")]
@@ -189,9 +188,9 @@ macro_rules! declassify {
 /// Generate a key pair from a cryptographically secure RNG
 pub trait KeypairGenerator: Keypair {
     /// Generate a new keypair
-    fn generate<R>(rng: R) -> Self
+    fn generate<R>(rng: &mut R) -> Self
     where
-        R: CryptoRngCore;
+        R: CryptoRng + ?Sized;
 }
 
 /// Workaround to verify signatures available as slice
@@ -241,12 +240,11 @@ macro_rules! define_impl {
                 const PK_SIZE: usize = <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::PK::USIZE;
 
                 #[cfg(any(feature="randomized-signer", feature="capi"))]
-                fn sample_rho<R: RngCore>(mut rng: R) -> Array<
+                fn sample_rho<R: TryCryptoRng + ?Sized>(rng: &mut R) -> Result<Array<
                         u8,
-                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LambdaBytes> {
+                        <<[<$param Parameters>] as FAESTParameters>::OWF as OWFParameters>::LambdaBytes>, Error> {
                     let mut rho = Array::default();
-                    rng.fill_bytes(&mut rho);
-                    rho
+                    rng.try_fill_bytes(&mut rho).map(|_| rho).map_err(|_| Error::new())
                 }
 
                 #[inline]
@@ -479,9 +477,9 @@ macro_rules! define_impl {
             }
 
             impl KeypairGenerator for [<$param SigningKey>] {
-                fn generate<R>(rng: R) -> Self
+                fn generate<R>(rng: &mut R) -> Self
                 where
-                    R: CryptoRngCore,
+                    R: CryptoRng + ?Sized,
                 {
                     Self(faest_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng))
                 }
@@ -496,9 +494,9 @@ macro_rules! define_impl {
             }
 
             impl KeypairGenerator for [<$param UnpackedSigningKey>] {
-                fn generate<R>(rng: R) -> Self
+                fn generate<R>(rng: &mut R) -> Self
                 where
-                    R: CryptoRngCore,
+                    R: CryptoRng + ?Sized,
                 {
                     Self(faest_keygen::<<[<$param Parameters>] as FAESTParameters>::OWF, R>(rng).into())
                 }
@@ -595,12 +593,12 @@ macro_rules! define_impl {
 
             #[cfg(feature = "randomized-signer")]
             impl RandomizedSigner<[<$param Signature>]> for [<$param SigningKey>] {
-                fn try_sign_with_rng(
+                fn try_sign_with_rng<R>(
                     &self,
-                    rng: &mut impl CryptoRngCore,
+                    rng: &mut R,
                     msg: &[u8],
-                ) -> Result<[<$param Signature>], Error> {
-                    let rho = $param::sample_rho(rng);
+                ) -> Result<[<$param Signature>], Error> where R: TryCryptoRng + ?Sized {
+                    let rho = $param::sample_rho(rng)?;
                     let mut signature = [0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE];
                     $param::sign(msg, &self.0, &rho, &mut signature).map(|_| { declassify!(&signature); [<$param Signature>](signature) })
                 }
@@ -608,12 +606,12 @@ macro_rules! define_impl {
 
             #[cfg(feature = "randomized-signer")]
             impl RandomizedSigner<Box<[<$param Signature>]>> for [<$param SigningKey>] {
-                fn try_sign_with_rng(
+                fn try_sign_with_rng<R>(
                     &self,
-                    rng: &mut impl CryptoRngCore,
+                    rng: &mut R,
                     msg: &[u8],
-                ) -> Result<Box<[<$param Signature>]>, Error> {
-                    let rho = $param::sample_rho(rng);
+                ) -> Result<Box<[<$param Signature>]>, Error> where R: TryCryptoRng + ?Sized {
+                    let rho = $param::sample_rho(rng)?;
                     let mut signature = Box::new([<$param Signature>]([0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE]));
                     $param::sign(msg, &self.0, &rho, &mut signature.0).map(|_| { declassify!(&signature.0); signature })
                 }
@@ -621,12 +619,12 @@ macro_rules! define_impl {
 
             #[cfg(feature = "randomized-signer")]
             impl RandomizedSigner<[<$param Signature>]> for [<$param UnpackedSigningKey>] {
-                fn try_sign_with_rng(
+                fn try_sign_with_rng<R>(
                     &self,
-                    rng: &mut impl CryptoRngCore,
+                    rng: &mut R,
                     msg: &[u8],
-                ) -> Result<[<$param Signature>], Error> {
-                    let rho = $param::sample_rho(rng);
+                ) -> Result<[<$param Signature>], Error> where R: TryCryptoRng + ?Sized {
+                    let rho = $param::sample_rho(rng)?;
                     let mut signature = [0u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE];
                     $param::unpacked_sign(msg, &self.0, &rho, &mut signature).map(|_| { declassify!(&signature); [<$param Signature>](signature) })
                 }
@@ -710,7 +708,7 @@ mod tests {
         KP::VerifyingKey: Verifier<S> + for<'a> Verifier<SignatureRef<'a>>,
         S: AsRef<[u8]>,
     {
-        let kp = KP::generate(NistPqcAes256CtrRng::seed_from_u64(1234));
+        let kp = KP::generate(&mut NistPqcAes256CtrRng::seed_from_u64(1234));
         let vk = kp.verifying_key();
         let signature = kp.sign(TEST_MESSAGE);
         vk.verify(TEST_MESSAGE, &signature)
@@ -728,7 +726,7 @@ mod tests {
         KP::VerifyingKey: Verifier<S> + for<'a> Verifier<SignatureRef<'a>>,
         S: AsRef<[u8]>,
     {
-        let kp = KP::generate(NistPqcAes256CtrRng::seed_from_u64(1234));
+        let kp = KP::generate(&mut NistPqcAes256CtrRng::seed_from_u64(1234));
         let vk = kp.verifying_key();
         let signature = kp.sign(&[]);
         vk.verify(&[], &signature).expect("signatures verifies");
@@ -765,7 +763,7 @@ mod tests {
         KP::VerifyingKey: Verifier<S> + for<'a> Verifier<SignatureRef<'a>>,
         S: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = Error>,
     {
-        let kp = KP::generate(NistPqcAes256CtrRng::seed_from_u64(1234));
+        let kp = KP::generate(&mut NistPqcAes256CtrRng::seed_from_u64(1234));
         let vk = kp.verifying_key();
         let signature = kp.sign(TEST_MESSAGE);
         let signature2 = S::try_from(signature.as_ref()).expect("signature deserializes");
@@ -781,7 +779,7 @@ mod tests {
         for<'a> <KP as TryFrom<&'a [u8]>>::Error: Debug,
         for<'a> <KP::VerifyingKey as TryFrom<&'a [u8]>>::Error: Debug,
     {
-        let kp = KP::generate(NistPqcAes256CtrRng::seed_from_u64(1234));
+        let kp = KP::generate(&mut NistPqcAes256CtrRng::seed_from_u64(1234));
         let vk = kp.verifying_key();
         let signature = kp.sign(TEST_MESSAGE);
 
@@ -807,7 +805,7 @@ mod tests {
         let mut out = vec![];
         let mut ser = serde_json::Serializer::new(&mut out);
 
-        let kp = KP::generate(NistPqcAes256CtrRng::seed_from_u64(1234));
+        let kp = KP::generate(&mut NistPqcAes256CtrRng::seed_from_u64(1234));
         kp.serialize(&mut ser).expect("serialize key pair");
         let serialized = String::from_utf8(out).expect("serialize to string");
 

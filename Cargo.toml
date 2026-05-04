@@ -23,9 +23,9 @@ serde = { version = "1", optional = true, default-features = false, features = [
   "derive",
 ] }
 sha3 = { version = "0.11", default-features = false }
-signature = { version = "2", default-features = false, features = ["alloc"] }
-rand_core = { version = "0.6", default-features = false }
-rand = { version = "0.8", optional = true, default-features = false }
+signature = { version = "3", default-features = false, features = ["alloc"] }
+rand_core = { version = "0.10", default-features = false }
+rand = { version = "0.10", optional = true, default-features = false }
 zeroize = { version = "1.2", optional = true, default-features = false, features = [
   "derive",
 ] }
@@ -48,8 +48,8 @@ vgzzq = "1"
 [dev-dependencies]
 generic-tests = "0.1"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
-nist-pqc-seeded-rng = { version = "0.2.1", default-features = false }
-rand = { version = "0.8", default-features = false }
+nist-pqc-seeded-rng = { version = "0.4", default-features = false }
+rand = { version = "0.10", default-features = false, features = ["thread_rng"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 cfg-if = "1"
@@ -67,7 +67,14 @@ serde = ["dep:serde", "dep:serde-big-array", "hybrid-array/serde"]
 # (opt-simd currently implies an x86(-64) machine, so no_std doesn't make too much sense)
 opt-simd = ["std"]
 # provide C interface via cargo-c
-capi = ["dep:rand", "dep:libc", "dep:zeroize", "rand/std_rng", "rand/std"]
+capi = [
+  "dep:rand",
+  "dep:libc",
+  "dep:zeroize",
+  "rand/std_rng",
+  "rand/std",
+  "rand/thread_rng",
+]
 
 [[example]]
 name = "simple"

@@ -3,12 +3,12 @@ use std::hint::black_box;
 use criterion::{Criterion, criterion_group, criterion_main};
 use faest::*;
 use nist_pqc_seeded_rng::{NistPqcAes256CtrRng, Seed};
-use rand::{RngCore, SeedableRng};
+use rand::{Rng, SeedableRng};
 use signature::{RandomizedSigner, Signer, Verifier};
 
 type Message = [u8; 32];
 
-fn random_message(mut rng: impl RngCore) -> Message {
+fn random_message(mut rng: impl Rng) -> Message {
     let mut ret = Message::default();
     rng.fill_bytes(&mut ret);
     ret

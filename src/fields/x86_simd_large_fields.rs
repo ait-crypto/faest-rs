@@ -2741,21 +2741,21 @@ mod test {
         use super::*;
 
         use rand::{
-            Rng, RngCore,
-            distributions::{Distribution, Standard},
+            Rng, RngExt,
+            distr::{Distribution, StandardUniform},
         };
 
         #[test]
         fn add<Fu, F: BigGaloisField>()
         where
-            Standard: Distribution<Fu>,
+            StandardUniform: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
 
             for _ in 0..RUNS {
-                let r1: Fu = rng.r#gen();
-                let r2: Fu = rng.r#gen();
+                let r1: Fu = rng.random();
+                let r2: Fu = rng.random();
                 let r3 = r1 + r2;
 
                 let v1 = F::from(r1.as_bytes().as_slice());
@@ -2776,14 +2776,14 @@ mod test {
         #[test]
         fn mul<Fu, F: BigGaloisField>()
         where
-            Standard: Distribution<Fu>,
+            StandardUniform: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
 
             for _ in 0..RUNS {
-                let r1: Fu = rng.r#gen();
-                let r2: Fu = rng.r#gen();
+                let r1: Fu = rng.random();
+                let r2: Fu = rng.random();
                 let r3 = r1 * r2;
 
                 let v1 = F::from(r1.as_bytes().as_slice());
@@ -2807,17 +2807,17 @@ mod test {
         #[test]
         fn mul_u64<Fu, F: BigGaloisField>()
         where
-            Standard: Distribution<Fu>,
+            StandardUniform: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
 
-            let v: Fu = rng.r#gen();
+            let v: Fu = rng.random();
             let v = F::from(v.as_bytes().as_slice());
             assert_eq!(v * GF64::ONE, v);
 
             for _ in 0..RUNS {
-                let r1: Fu = rng.r#gen();
+                let r1: Fu = rng.random();
                 let r2 = GF64::from(rng.next_u64());
                 let r3 = r1 * r2;
 
@@ -2833,14 +2833,14 @@ mod test {
         #[test]
         fn mul_u8<Fu, F: BigGaloisField>()
         where
-            Standard: Distribution<Fu>,
+            StandardUniform: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
 
             for _ in 0..RUNS {
-                let r1: Fu = rng.r#gen();
-                let r2 = rng.r#gen::<u8>() & 1;
+                let r1: Fu = rng.random();
+                let r2 = rng.random::<u8>() & 1;
                 let r3 = r1 * r2;
 
                 let v1 = F::from(r1.as_bytes().as_slice());
@@ -2855,13 +2855,13 @@ mod test {
         #[test]
         fn double<Fu, F: BigGaloisField>()
         where
-            Standard: Distribution<Fu>,
+            StandardUniform: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
 
             for _ in 0..RUNS {
-                let r1: Fu = rng.r#gen();
+                let r1: Fu = rng.random();
                 let r3 = r1.double();
 
                 let v1 = F::from(r1.as_bytes().as_slice());
@@ -2890,22 +2890,22 @@ mod test {
         use core::iter::zip;
 
         use rand::{
-            Rng,
-            distributions::{Distribution, Standard},
+            RngExt,
+            distr::{Distribution, StandardUniform},
         };
 
         #[test]
         fn byte_combine_sq<Fu, F: BigGaloisField>()
         where
-            Standard: Distribution<Fu>,
+            StandardUniform: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length>,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
 
             for _ in 0..RUNS {
-                let byte1: [Fu; 8] = std::array::from_fn(|_| rng.r#gen());
+                let byte1: [Fu; 8] = std::array::from_fn(|_| rng.random());
                 let byte2: [F; 8] = std::array::from_fn(|i| F::from(&byte1[i].as_bytes()));
-                let byte3 = rand::thread_rng().r#gen::<u8>();
+                let byte3 = rand::rng().random::<u8>();
 
                 let v1 = Fu::byte_combine(&byte1);
                 let v2 = F::byte_combine(&byte2);
@@ -2932,7 +2932,7 @@ mod test {
         #[test]
         fn constants<Fu, F: BigGaloisField + Alphas>()
         where
-            Standard: Distribution<Fu>,
+            StandardUniform: Distribution<Fu>,
             Fu: BigGaloisField<Length = F::Length> + Alphas,
         {
             for (x, y) in zip(F::ALPHA, Fu::ALPHA) {
@@ -2967,8 +2967,8 @@ mod test {
         use super::*;
 
         use rand::{
-            Rng,
-            distributions::{Distribution, Standard},
+            RngExt,
+            distr::{Distribution, StandardUniform},
         };
 
         use crate::fields::large_fields::{GF384 as UnoptimizedGF384, GF576 as UnoptimizedGF576};
@@ -2976,15 +2976,15 @@ mod test {
         #[test]
         fn add<Fu, F>()
         where
-            Standard: Distribution<Fu>,
+            StandardUniform: Distribution<Fu>,
             Fu: ExtensionField + Copy,
             for<'a> F: ExtensionField<Length = Fu::Length> + From<&'a [u8]> + Copy,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
 
             for _ in 0..RUNS {
-                let mut lhs1: Fu = rng.r#gen();
-                let rhs1: Fu = rng.r#gen();
+                let mut lhs1: Fu = rng.random();
+                let rhs1: Fu = rng.random();
 
                 let mut lhs2 = F::from(lhs1.as_bytes().as_slice());
                 let rhs2 = F::from(rhs1.as_bytes().as_slice());
@@ -3002,17 +3002,17 @@ mod test {
         #[test]
         fn mul<Fu, F>()
         where
-            Standard: Distribution<Fu> + Distribution<Fu::BaseField>,
+            StandardUniform: Distribution<Fu> + Distribution<Fu::BaseField>,
             Fu: ExtensionField + Copy,
             for<'a> F: ExtensionField<Length = Fu::Length, BaseField: From<&'a [u8]>>
                 + From<&'a [u8]>
                 + Copy,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
 
             for _ in 0..RUNS {
-                let lhs1: Fu = rng.r#gen();
-                let rhs1: Fu::BaseField = rng.r#gen::<Fu::BaseField>();
+                let lhs1: Fu = rng.random();
+                let rhs1: Fu::BaseField = rng.random::<Fu::BaseField>();
 
                 let lhs2 = F::from(lhs1.as_bytes().as_slice());
                 let rhs2 = F::BaseField::from(rhs1.as_bytes().as_slice());
@@ -3026,15 +3026,15 @@ mod test {
         #[test]
         fn serialization<Fu, F>()
         where
-            Standard: Distribution<Fu> + Distribution<Fu::BaseField>,
+            StandardUniform: Distribution<Fu> + Distribution<Fu::BaseField>,
             Fu: ExtensionField + Copy,
             for<'a> F: ExtensionField<Length = Fu::Length, BaseField: From<&'a [u8]>>
                 + From<&'a [u8]>
                 + Copy,
         {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             for _ in 0..RUNS {
-                let bytes: Fu = rng.r#gen();
+                let bytes: Fu = rng.random();
 
                 let elem = F::from(bytes.as_bytes().as_slice());
                 assert_eq!(elem.as_bytes(), bytes.as_bytes());
