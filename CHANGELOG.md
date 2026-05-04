@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3 (2026-05-04)
+
+* Upgrade to `signature` version 0.3.
+* Upgrade to `rand` and `rand_core` version 0.10.
+* Upgrade to `sha3`, `aes`, and `ctr`.
+* Remove use of `generic_array`.
+* Improve timing side-channel resistance.
+* Bump MSRV to 1.88.
+
 ## 0.2.2 (2025-12-17)
 
 * Improve dynamic dispatch of AVX2 optimized codepaths.
@@ -12,7 +21,7 @@
   runtime/memory trade-off.
 * Internal refactoring.
 
-## 0.2.0 (2025-05-03)
+## 0.2 (2025-05-03)
 
 * Implement version 2 of the FAEST specification.
 * Bump edition to 2024.
