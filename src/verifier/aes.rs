@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 
 use hybrid_array::{
     Array, ArraySize,
-    typenum::{U4, U8, marker_traits::Unsigned},
+    typenum::{U8, marker_traits::Unsigned},
 };
 
 use crate::{
@@ -18,7 +18,6 @@ use crate::{
         Square,
     },
     parameter::{OWFField, OWFParameters},
-    utils::array_from_slice,
     verifier::{VoleCommits, VoleCommitsRef},
 };
 
@@ -361,18 +360,16 @@ where
     L: ArraySize,
 {
     fn inverse_affine(&mut self) {
-        let nst_bytes = L::USIZE / 8;
-
-        for i in 0..nst_bytes {
-            let xi_tags: Array<_, U8> = array_from_slice(&self.scalars[8 * i..8 * i + 8]);
+        for scalars in self.scalars.as_chunks_mut::<8>().0 {
+            let xi_tags = *scalars;
             for bit_i in 0..8 {
                 // ::6
-                self.scalars[8 * i + bit_i] = xi_tags[(bit_i + 8 - 1) % 8]
+                scalars[bit_i] = xi_tags[(bit_i + 8 - 1) % 8]
                     + xi_tags[(bit_i + 8 - 3) % 8]
                     + xi_tags[(bit_i + 8 - 6) % 8];
 
                 if bit_i == 0 || bit_i == 2 {
-                    self.scalars[8 * i + bit_i] += self.delta;
+                    scalars[bit_i] += self.delta;
                 }
             }
         }
@@ -396,24 +393,18 @@ where
             )
         };
 
-        for c in 0..O::NSt::USIZE {
+        for scalars in self.scalars.as_chunks_mut::<4>().0 {
             // Save the 4 state's columns that will be modified in this round
-            let tmp = array_from_slice::<_, U4>(&self.scalars[4 * c..4 * c + 4]);
-
-            let i0 = 4 * c;
-            let i1 = i0 + 1;
-            let i2 = i0 + 2;
-            let i3 = i0 + 3;
+            let tmp = *scalars;
 
             // ::7
-            self.scalars[i0] = tmp[0] * v2 + tmp[1] * v3 + tmp[2] + tmp[3];
+            scalars[0] = tmp[0] * v2 + tmp[1] * v3 + tmp[2] + tmp[3];
             // ::8
-            self.scalars[i1] = tmp[1] * v2 + tmp[2] * v3 + tmp[0] + tmp[3];
+            scalars[1] = tmp[1] * v2 + tmp[2] * v3 + tmp[0] + tmp[3];
             // ::9
-            self.scalars[i2] = tmp[2] * v2 + tmp[3] * v3 + tmp[0] + tmp[1];
+            scalars[2] = tmp[2] * v2 + tmp[3] * v3 + tmp[0] + tmp[1];
             // ::10
-            let Array([tmp0, tmp1, tmp2, tmp3]) = tmp;
-            self.scalars[i3] = tmp0 * v3 + tmp3 * v2 + tmp1 + tmp2;
+            scalars[3] = tmp[0] * v3 + tmp[3] * v2 + tmp[1] + tmp[2];
         }
     }
 }
