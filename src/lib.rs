@@ -13,7 +13,7 @@
 //! use faest::{FAEST128fSigningKey, FAEST128fSignature};
 //! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
 //!
-//! let sk = FAEST128fSigningKey::generate(rand::thread_rng());
+//! let sk = FAEST128fSigningKey::generate(&mut rand::rng());
 //! let msg = "some message".as_bytes();
 //! let signature: FAEST128fSignature = sk.sign(msg);
 //!
@@ -28,7 +28,7 @@
 //! use faest::{FAEST128fSigningKey, FAEST128fSignature};
 //! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
 //!
-//! let sk = FAEST128fSigningKey::generate(rand::thread_rng());
+//! let sk = FAEST128fSigningKey::generate(&mut rand::rng());
 //! let msg = "some message".as_bytes();
 //! let signature: Box<FAEST128fSignature> = sk.sign(msg);
 //!
@@ -46,7 +46,7 @@
 //! use faest::{FAEST128fSigningKey, FAEST128fSignature};
 //! use faest::{signature::{RandomizedSigner, Verifier, Keypair}, KeypairGenerator};
 //!
-//! let mut rng = rand::thread_rng();
+//! let mut rng = rand::rng();
 //! let sk = FAEST128fSigningKey::generate(&mut rng);
 //! let msg = "some message".as_bytes();
 //! let signature: FAEST128fSignature = sk.sign_with_rng(&mut rng, msg);
@@ -66,7 +66,7 @@
 //! use faest::{FAEST128fSigningKey, FAEST128fUnpackedSigningKey, FAEST128fSignature, ByteEncoding};
 //! use faest::{signature::{Signer, Verifier, Keypair}, KeypairGenerator};
 //!
-//! let sk = FAEST128fSigningKey::generate(rand::thread_rng());
+//! let sk = FAEST128fSigningKey::generate(&mut rand::rng());
 //! let unpacked_sk = FAEST128fUnpackedSigningKey::from(&sk);
 //! assert_eq!(sk.to_bytes(), unpacked_sk.to_bytes());
 //!
@@ -311,7 +311,7 @@ macro_rules! define_impl {
             #[doc = "use faest::{" $param "SigningKey as SK, " $param "Signature as Sig};"]
             /// use faest::{Signer, Verifier, Keypair, KeypairGenerator};
             ///
-            /// let sk = SK::generate(rand::thread_rng());
+            /// let sk = SK::generate(&mut rand::rng());
             /// let msg = "some message".as_bytes();
             /// let signature: Sig = sk.sign(msg);
             ///
@@ -370,7 +370,7 @@ macro_rules! define_impl {
             /// use faest::{Signer, Verifier, Keypair, KeypairGenerator};
             ///
             /// // secret key also contains a witness that can be reused to sign multiple messages
-            /// let unpacked_sk = UnpackedSK::generate(rand::thread_rng());
+            /// let unpacked_sk = UnpackedSK::generate(&mut rand::rng());
             /// let msg = "some message".as_bytes();
             /// let signature: Sig = unpacked_sk.sign(msg);
             ///
