@@ -12,7 +12,7 @@ use crate::{
     parameter::{OWFField, OWFParameters},
     rijndael_32::rijndael_key_schedule_unbitsliced,
     universal_hashing::ZKProofHasher,
-    utils::{array_from_slice, array_ref, xor_arrays},
+    utils::{array_ref, xor_arrays},
 };
 
 pub(crate) fn owf_constraints<O>(
@@ -63,7 +63,8 @@ pub(crate) fn owf_constraints<O>(
         );
     } else {
         // ::13
-        let mut owf_input = array_from_slice(x);
+        let mut owf_input = Array::default();
+        owf_input.copy_from_slice(x);
 
         // ::16
         let k = key_exp_cstrnts::<O>(zk_hasher, w.get_commits_ref::<O::LKeBytes>(0));

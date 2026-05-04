@@ -466,7 +466,10 @@ mod test {
 
     use crate::{
         fields::{GF128, GF192, GF256},
-        utils::{array_from_slice, array_ref, test::read_test_data},
+        utils::{
+            array_ref,
+            test::{array_from_slice, read_test_data},
+        },
     };
 
     #[derive(Debug, Deserialize)]

@@ -136,25 +136,10 @@ where
         .expect("slice length must match Array size")
 }
 
-/// Clones a slice into an owned `Array`.
-///
-/// This is useful when an owned `Array<T, U>` is needed rather than an
-/// `&Array<T, U>`. It panics if the slice length does not exactly match
-/// the array size, so it should only be used when the length is an
-/// internal invariant.
-#[inline]
-pub fn array_from_slice<T, U>(slice: &[T]) -> Array<T, U>
-where
-    T: Clone,
-    U: ArraySize,
-{
-    slice
-        .try_into()
-        .expect("slice length must match Array size")
-}
-
 #[cfg(test)]
 pub(crate) mod test {
+    use super::*;
+
     #[cfg(not(feature = "std"))]
     use alloc::{vec, vec::Vec};
 
@@ -192,5 +177,22 @@ pub(crate) mod test {
         let mut ret = vec![0; 64];
         reader.read(&mut ret);
         ret
+    }
+
+    /// Clones a slice into an owned `Array`.
+    ///
+    /// This is useful when an owned `Array<T, U>` is needed rather than an
+    /// `&Array<T, U>`. It panics if the slice length does not exactly match
+    /// the array size, so it should only be used when the length is an
+    /// internal invariant.
+    #[inline]
+    pub fn array_from_slice<T, U>(slice: &[T]) -> Array<T, U>
+    where
+        T: Clone,
+        U: ArraySize,
+    {
+        slice
+            .try_into()
+            .expect("slice length must match Array size")
     }
 }
