@@ -81,7 +81,7 @@ where
 
             let owf_output = O::evaluate_owf(&owf_key, &owf_input);
 
-            classify!(owf_key);
+            classify!(&owf_key);
             declassify!(&owf_output);
             declassify!(&owf_input);
 

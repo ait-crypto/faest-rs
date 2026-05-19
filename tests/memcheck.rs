@@ -23,7 +23,7 @@ where
     KP::VerifyingKey: Verifier<S>,
 {
     // Generate key pair
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let keypair = KP::generate(&mut rng);
     let verification_key = keypair.verifying_key();
 
