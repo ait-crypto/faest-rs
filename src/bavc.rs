@@ -710,9 +710,12 @@ mod test {
     }
 
     fn hash_array(data: &[u8]) -> Vec<u8> {
-        use sha3::digest::{ExtendableOutput, Update, XofReader};
+        use shake::{
+            Shake256,
+            digest::{ExtendableOutput, Update, XofReader},
+        };
 
-        let mut hasher = sha3::Shake256::default();
+        let mut hasher = Shake256::default();
         hasher.update(data);
         let mut reader = hasher.finalize_xof();
         let mut ret = [0u8; 64];

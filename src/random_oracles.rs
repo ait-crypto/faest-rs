@@ -1,4 +1,4 @@
-use sha3::{
+use shake::{
     Shake128, Shake128Reader, Shake256, Shake256Reader,
     digest::{ExtendableOutput, Update, XofReader},
 };

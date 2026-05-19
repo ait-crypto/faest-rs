@@ -144,7 +144,7 @@ pub(crate) mod test {
     use alloc::{vec, vec::Vec};
 
     use serde::de::DeserializeOwned;
-    use sha3::digest::{ExtendableOutput, Update, XofReader};
+    use shake::digest::{ExtendableOutput, Update, XofReader};
 
     #[cfg(feature = "std")]
     pub(crate) fn read_test_data<T: DeserializeOwned>(path: &str) -> Vec<T> {
@@ -171,7 +171,7 @@ pub(crate) mod test {
     }
 
     pub(crate) fn hash_array(data: &[u8]) -> Vec<u8> {
-        let mut hasher = sha3::Shake256::default();
+        let mut hasher = shake::Shake256::default();
         hasher.update(data);
         let mut reader = hasher.finalize_xof();
         let mut ret = vec![0; 64];
