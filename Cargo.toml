@@ -30,7 +30,7 @@ zeroize = { version = "1.2", optional = true, default-features = false, features
   "derive",
 ] }
 pastey = "0.2"
-itertools = { version = "0.14", default-features = false }
+itertools = { version = "0.15", default-features = false }
 libc = { version = "0.2", optional = true, default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 cmov = "0.5.3"
