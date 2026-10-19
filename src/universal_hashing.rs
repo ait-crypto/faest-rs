@@ -14,7 +14,7 @@ use itertools::chain;
 use crate::{
     fields::{BaseField, BigGaloisField, ExtensionField, Field, GF64, GF128, GF192, GF256},
     parameter::SecurityParameter,
-    prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo},
+    // prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo},
 };
 
 /// Additional bits returned by VOLE hash
@@ -164,14 +164,14 @@ where
         }
     }
 
-    fn new_zk_proof_hasher(sd: &Array<u8, Self::SDLength>) -> ZKProofHasher<F> {
-        let hasher = Self::new_zk_hasher(sd);
-        ZKProofHasher::new(hasher.clone(), hasher.clone(), hasher)
-    }
+    // fn new_zk_proof_hasher(sd: &Array<u8, Self::SDLength>) -> ZKProofHasher<F> {
+    //     let hasher = Self::new_zk_hasher(sd);
+    //     ZKProofHasher::new(hasher.clone(), hasher.clone(), hasher)
+    // }
 
-    fn new_zk_verify_hasher(sd: &Array<u8, Self::SDLength>, delta: F) -> ZKVerifyHasher<F> {
-        ZKVerifyHasher::new(Self::new_zk_hasher(sd), delta)
-    }
+    // fn new_zk_verify_hasher(sd: &Array<u8, Self::SDLength>, delta: F) -> ZKVerifyHasher<F> {
+    //     ZKVerifyHasher::new(Self::new_zk_hasher(sd), delta)
+    // }
 }
 
 /// Interface for Init-Update-Finalize-style implementations of ZK-Hash covering the Update and Finalize part
@@ -221,139 +221,139 @@ where
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct ZKProofHasher<F>
-where
-    F: BigGaloisField,
-{
-    a0_hasher: ZKHasher<F>,
-    a1_hasher: ZKHasher<F>,
-    a2_hasher: ZKHasher<F>,
-}
+// #[derive(Debug)]
+// pub(crate) struct ZKProofHasher<F>
+// where
+//     F: BigGaloisField,
+// {
+//     a0_hasher: ZKHasher<F>,
+//     a1_hasher: ZKHasher<F>,
+//     a2_hasher: ZKHasher<F>,
+// }
 
-impl<F> ZKProofHasher<F>
-where
-    F: BigGaloisField + PartialEq + Debug,
-{
-    pub(crate) const fn new(
-        a0_hasher: ZKHasher<F>,
-        a1_hasher: ZKHasher<F>,
-        a2_hasher: ZKHasher<F>,
-    ) -> Self {
-        Self {
-            a0_hasher,
-            a1_hasher,
-            a2_hasher,
-        }
-    }
+// impl<F> ZKProofHasher<F>
+// where
+//     F: BigGaloisField + PartialEq + Debug,
+// {
+//     pub(crate) const fn new(
+//         a0_hasher: ZKHasher<F>,
+//         a1_hasher: ZKHasher<F>,
+//         a2_hasher: ZKHasher<F>,
+//     ) -> Self {
+//         Self {
+//             a0_hasher,
+//             a1_hasher,
+//             a2_hasher,
+//         }
+//     }
 
-    pub(crate) fn update(&mut self, val: &FieldCommitDegThree<F>) {
-        // Degree 0
-        self.a0_hasher.update(&val.tag[0]);
-        // Degree 1
-        self.a1_hasher.update(&val.tag[1]);
-        // Degree 2
-        self.a2_hasher.update(&val.tag[2]);
+//     pub(crate) fn update(&mut self, val: &FieldCommitDegThree<F>) {
+//         // Degree 0
+//         self.a0_hasher.update(&val.tag[0]);
+//         // Degree 1
+//         self.a1_hasher.update(&val.tag[1]);
+//         // Degree 2
+//         self.a2_hasher.update(&val.tag[2]);
 
-        // Should be a commitment to 0
-        debug_assert_eq!(val.key, F::ZERO);
-    }
+//         // Should be a commitment to 0
+//         debug_assert_eq!(val.key, F::ZERO);
+//     }
 
-    /// Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
-    pub(crate) fn lift_and_process(
-        &mut self,
-        a: &FieldCommitDegOne<F>,
-        a_sq: &FieldCommitDegOne<F>,
-        b: &FieldCommitDegOne<F>,
-        b_sq: &FieldCommitDegOne<F>,
-    ) {
-        // Degree 1
-        self.a1_hasher.update(&(a_sq.tag[0] * b.tag[0]));
-        self.a1_hasher.update(&(b_sq.tag[0] * a.tag[0]));
+//     /// Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
+//     pub(crate) fn lift_and_process(
+//         &mut self,
+//         a: &FieldCommitDegOne<F>,
+//         a_sq: &FieldCommitDegOne<F>,
+//         b: &FieldCommitDegOne<F>,
+//         b_sq: &FieldCommitDegOne<F>,
+//     ) {
+//         // Degree 1
+//         self.a1_hasher.update(&(a_sq.tag[0] * b.tag[0]));
+//         self.a1_hasher.update(&(b_sq.tag[0] * a.tag[0]));
 
-        // Degree 2
-        self.a2_hasher
-            .update(&(a_sq.key * b.tag[0] + a_sq.tag[0] * b.key - a.tag[0]));
-        self.a2_hasher
-            .update(&(b_sq.key * a.tag[0] + b_sq.tag[0] * a.key - b.tag[0]));
+//         // Degree 2
+//         self.a2_hasher
+//             .update(&(a_sq.key * b.tag[0] + a_sq.tag[0] * b.key - a.tag[0]));
+//         self.a2_hasher
+//             .update(&(b_sq.key * a.tag[0] + b_sq.tag[0] * a.key - b.tag[0]));
 
-        // Degree 3 (i.e., commitments) should be zero
-        debug_assert_eq!(a_sq.key * b.key - a.key, F::ZERO);
-        debug_assert_eq!(b_sq.key * a.key - b.key, F::ZERO);
-    }
+//         // Degree 3 (i.e., commitments) should be zero
+//         debug_assert_eq!(a_sq.key * b.key - a.key, F::ZERO);
+//         debug_assert_eq!(b_sq.key * a.key - b.key, F::ZERO);
+//     }
 
-    pub(crate) fn odd_round_cstrnts(
-        &mut self,
-        si: &FieldCommitDegOne<F>,
-        si_sq: &FieldCommitDegOne<F>,
-        st0_i: &FieldCommitDegTwo<F>,
-        st1_i: &FieldCommitDegTwo<F>,
-    ) where
-        F: BigGaloisField,
-    {
-        self.update(&(si_sq * st0_i + si));
-        self.update(&(si * st1_i + st0_i));
-    }
+//     pub(crate) fn odd_round_cstrnts(
+//         &mut self,
+//         si: &FieldCommitDegOne<F>,
+//         si_sq: &FieldCommitDegOne<F>,
+//         st0_i: &FieldCommitDegTwo<F>,
+//         st1_i: &FieldCommitDegTwo<F>,
+//     ) where
+//         F: BigGaloisField,
+//     {
+//         self.update(&(si_sq * st0_i + si));
+//         self.update(&(si * st1_i + st0_i));
+//     }
 
-    pub(crate) fn finalize(self, u: &F, u_plus_v: &F, v: &F) -> (F, F, F) {
-        let a0 = self.a0_hasher.finalize(u);
-        let a1 = self.a1_hasher.finalize(u_plus_v);
-        let a2 = self.a2_hasher.finalize(v);
+//     pub(crate) fn finalize(self, u: &F, u_plus_v: &F, v: &F) -> (F, F, F) {
+//         let a0 = self.a0_hasher.finalize(u);
+//         let a1 = self.a1_hasher.finalize(u_plus_v);
+//         let a2 = self.a2_hasher.finalize(v);
 
-        (a0, a1, a2)
-    }
-}
+//         (a0, a1, a2)
+//     }
+// }
 
-pub(crate) struct ZKVerifyHasher<F>
-where
-    F: BigGaloisField,
-{
-    pub(crate) b_hasher: ZKHasher<F>,
-    pub(crate) delta: F,
-    pub(crate) delta_squared: F,
-}
+// pub(crate) struct ZKVerifyHasher<F>
+// where
+//     F: BigGaloisField,
+// {
+//     pub(crate) b_hasher: ZKHasher<F>,
+//     pub(crate) delta: F,
+//     pub(crate) delta_squared: F,
+// }
 
-impl<F> ZKVerifyHasher<F>
-where
-    F: BigGaloisField,
-{
-    pub(crate) fn new(b_hasher: ZKHasher<F>, delta: F) -> Self {
-        Self {
-            b_hasher,
-            delta,
-            delta_squared: delta.square(),
-        }
-    }
+// impl<F> ZKVerifyHasher<F>
+// where
+//     F: BigGaloisField,
+// {
+//     pub(crate) fn new(b_hasher: ZKHasher<F>, delta: F) -> Self {
+//         Self {
+//             b_hasher,
+//             delta,
+//             delta_squared: delta.square(),
+//         }
+//     }
 
-    pub(crate) fn update(&mut self, val: &F) {
-        self.b_hasher.update(val);
-    }
+//     pub(crate) fn update(&mut self, val: &F) {
+//         self.b_hasher.update(val);
+//     }
 
-    pub(crate) fn mul_and_update(&mut self, a: &F, b: &F) {
-        self.b_hasher.update(&(self.delta * a * b));
-    }
+//     pub(crate) fn mul_and_update(&mut self, a: &F, b: &F) {
+//         self.b_hasher.update(&(self.delta * a * b));
+//     }
 
-    pub(crate) fn inv_norm_constraints(&mut self, conjugates: &[F], y: &F) {
-        let cnstr = *y * conjugates[1] * conjugates[4] + self.delta_squared * conjugates[0];
-        self.b_hasher.update(&cnstr);
-    }
+//     pub(crate) fn inv_norm_constraints(&mut self, conjugates: &[F], y: &F) {
+//         let cnstr = *y * conjugates[1] * conjugates[4] + self.delta_squared * conjugates[0];
+//         self.b_hasher.update(&cnstr);
+//     }
 
-    pub(crate) fn odd_round_cstrnts(&mut self, si: &F, si_sq: &F, st0_i: &F, st1_i: &F) {
-        self.update(&(self.delta_squared * si + *si_sq * st0_i));
-        self.update(&(self.delta * st0_i + *si * st1_i));
-    }
+//     pub(crate) fn odd_round_cstrnts(&mut self, si: &F, si_sq: &F, st0_i: &F, st1_i: &F) {
+//         self.update(&(self.delta_squared * si + *si_sq * st0_i));
+//         self.update(&(self.delta * st0_i + *si * st1_i));
+//     }
 
-    /// Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
-    pub(crate) fn lift_and_process(&mut self, a: &F, a_sq: &F, b: &F, b_sq: &F) {
-        // Raise to degree 3 and update
-        self.update(&(self.delta * (*a_sq * b - self.delta * a)));
-        self.update(&(self.delta * (*a * b_sq - self.delta * b)));
-    }
+//     /// Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
+//     pub(crate) fn lift_and_process(&mut self, a: &F, a_sq: &F, b: &F, b_sq: &F) {
+//         // Raise to degree 3 and update
+//         self.update(&(self.delta * (*a_sq * b - self.delta * a)));
+//         self.update(&(self.delta * (*a * b_sq - self.delta * b)));
+//     }
 
-    pub(crate) fn finalize(self, v: &F) -> F {
-        self.b_hasher.finalize(v)
-    }
-}
+//     pub(crate) fn finalize(self, v: &F) -> F {
+//         self.b_hasher.finalize(v)
+//     }
+// }
 
 pub(crate) trait LeafHasher {
     type F: BigGaloisField<Length = Self::LambdaBytes>;

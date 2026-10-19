@@ -3,7 +3,7 @@ use core::iter::zip;
 use hybrid_array::{Array, ArraySize, typenum::Unsigned};
 use itertools::izip;
 
-use crate::parameter::TauParameters;
+// use crate::parameter::TauParameters;
 
 /// Reader interface for PRGs and random oracles
 pub(crate) trait Reader {
@@ -76,19 +76,19 @@ const fn chall_to_u16(chall: &[u8], start_bit: usize, k: usize) -> u16 {
         << (nbits_first_byte + 8)
 }
 
-pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> Array<u16, TAU::Tau> {
-    let k = TAU::K::USIZE;
+// pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> Array<u16, TAU::Tau> {
+//     let k = TAU::K::USIZE;
 
-    // Compute Delta_i[0...Tau1)
-    let first_half =
-        (0..TAU::Tau1::USIZE).map(|i| chall_to_u16(chall, TAU::tau1_offset_unchecked(i), k));
+//     // Compute Delta_i[0...Tau1)
+//     let first_half =
+//         (0..TAU::Tau1::USIZE).map(|i| chall_to_u16(chall, TAU::tau1_offset_unchecked(i), k));
 
-    // Compute Delta_i[Tau1..Tau)
-    let second_half = (TAU::Tau1::USIZE..TAU::Tau::USIZE)
-        .map(|i| chall_to_u16(chall, TAU::tau0_offset_unchecked(i), k - 1));
+//     // Compute Delta_i[Tau1..Tau)
+//     let second_half = (TAU::Tau1::USIZE..TAU::Tau::USIZE)
+//         .map(|i| chall_to_u16(chall, TAU::tau0_offset_unchecked(i), k - 1));
 
-    first_half.chain(second_half).collect()
-}
+//     first_half.chain(second_half).collect()
+// }
 
 /// Xors the input slices and retuns an iterator over the resulting elements.
 ///
