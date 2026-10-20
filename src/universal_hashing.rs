@@ -1,15 +1,13 @@
 use core::{
     array,
     fmt::Debug,
-    iter::zip,
     ops::{Add, Mul},
 };
 
 use hybrid_array::{
     Array, ArraySize,
-    typenum::{Prod, Quot, Sum, U2, U3, U4, U5, U8, U16, Unsigned},
+    typenum::{Prod, Sum, U2, U3, U4, U8, U16, Unsigned},
 };
-use itertools::chain;
 
 use crate::{
     fields::{BaseField, BigGaloisField, ExtensionField, Field, GF64, GF128, GF192, GF256},
@@ -17,10 +15,10 @@ use crate::{
     // prover::field_commitment::{FieldCommitDegOne, FieldCommitDegThree, FieldCommitDegTwo},
 };
 
-/// Additional bits returned by VOLE hash
-type BBits = U16;
-/// Additional bytes returned by VOLE hash
-pub(crate) type B = Quot<BBits, U8>;
+/// Seed size for FAEST VOLEHash
+pub(crate) type VoleHashSeedLength<LambdaBytes> = Sum<Prod<LambdaBytes, U8>, U8>;
+/// Output size for FAEST VOLEHash.
+pub(crate) type VoleHashOutputLength<LambdaBytes> = Prod<LambdaBytes, U4>;
 
 /// Interface to instantiate a VOLE hasher
 pub(crate) trait VoleHasherInit<F>
@@ -32,11 +30,11 @@ where
     type Hasher: VoleHasherProcess<F, Self::OutputLength>;
 
     fn new_vole_hasher(sd: &Array<u8, Self::SDLength>) -> Self::Hasher {
-        let r = array::from_fn(|i| F::from(&sd[i * F::Length::USIZE..(i + 1) * F::Length::USIZE]));
-        let s = F::from(&sd[4 * F::Length::USIZE..5 * F::Length::USIZE]);
-        let t = GF64::from(
-            &sd[5 * F::Length::USIZE..5 * F::Length::USIZE + <GF64 as Field>::Length::USIZE],
-        );
+        // Parse `r0 || ... || r3 || s0 || ... || s3 || t`
+        let n = F::Length::USIZE;
+        let r = array::from_fn(|i| F::from(&sd[i * n..(i + 1) * n]));
+        let s = array::from_fn(|i| F::from(&sd[(4 + i) * n..(5 + i) * n]));
+        let t = GF64::from(&sd[8 * n..8 * n + <GF64 as Field>::Length::USIZE]);
 
         Self::Hasher::from_r_s_t(r, s, t)
     }
@@ -52,90 +50,64 @@ where
     fn process_split(&self, x0: &[u8], x1: &[u8]) -> Array<u8, OutputLength>;
 
     fn process(&self, x: &[u8]) -> Array<u8, OutputLength> {
-        debug_assert!(x.len() > OutputLength::USIZE);
-
         let (x0, x1) = x.split_at(x.len() - OutputLength::USIZE);
         self.process_split(x0, x1)
     }
 
-    fn from_r_s_t(r: [F; 4], s: F, t: GF64) -> Self;
+    fn from_r_s_t(r: [F; 4], s: [F; 4], t: GF64) -> Self;
 }
 
-/// The VOLE hasher
 #[derive(Debug, Clone)]
-pub(crate) struct VoleHasher<F>
-where
-    F: BigGaloisField,
-{
+pub(crate) struct VoleHasher<F: BigGaloisField> {
     r: [F; 4],
-    s: F,
+    s: [F; 4],
     t: GF64,
 }
 
 impl<F> VoleHasherInit<F> for VoleHasher<F>
 where
     F: BigGaloisField<Length: SecurityParameter>,
-    <F as Field>::Length:
-        Mul<U5, Output: ArraySize + Add<U8, Output: ArraySize>> + Add<U2, Output: ArraySize>,
+    Prod<F::Length, U8>: Add<U8, Output: ArraySize>,
 {
-    type SDLength = Sum<Prod<<F as Field>::Length, U5>, <GF64 as Field>::Length>;
-    type OutputLength = Sum<<F as Field>::Length, B>;
+    type SDLength = VoleHashSeedLength<F::Length>;
+    type OutputLength = VoleHashOutputLength<F::Length>;
     type Hasher = Self;
 }
 
-impl<F> VoleHasherProcess<F, <Self as VoleHasherInit<F>>::OutputLength> for VoleHasher<F>
+impl<F> VoleHasherProcess<F, VoleHashOutputLength<F::Length>> for VoleHasher<F>
 where
-    F: BigGaloisField,
-    Self: VoleHasherInit<F>,
+    F: BigGaloisField<Length: Mul<U4, Output: ArraySize>>,
 {
-    fn process_split(
-        &self,
-        x0: &[u8],
-        x1: &[u8],
-    ) -> Array<u8, <Self as VoleHasherInit<F>>::OutputLength> {
-        let mut h0 = F::ZERO;
-        let mut h1 = GF64::ZERO;
+    fn process_split(&self, x0: &[u8], x1: &[u8]) -> Array<u8, VoleHashOutputLength<F::Length>> {
+        // TODO: consider using hybrid arrays
+        let mut x0s = x0.chunks_exact(F::Length::USIZE);
 
-        let iter = x0.chunks_exact(<F as Field>::Length::USIZE);
-        let remainder = iter.remainder();
-        for data in iter {
-            self.process_block(&mut h0, &mut h1, data);
-        }
-        if !remainder.is_empty() {
-            self.process_unpadded_block(&mut h0, &mut h1, remainder);
+        // line 7
+        // SAFETY: caller must ensure coefficients have correct lengths
+        let mut y = [F::from(x0s.next().unwrap()); 5];
+        for bytes in x0s {
+            let x0_i = F::from(bytes);
+            for (yj, sj) in y.iter_mut().zip(&self.s) {
+                *yj = *yj * *sj + x0_i;
+            }
+            y[4] = y[4] * self.t + x0_i;
         }
 
-        let h2 = self.r[0] * h0 + self.r[1] * h1;
-        let h3 = self.r[2] * h0 + self.r[3] * h1;
-
-        zip(
-            chain(h2.as_bytes(), h3.as_bytes().into_iter().take(B::USIZE)),
-            x1,
-        )
-        .map(|(x1, x2)| x1 ^ x2)
-        .collect()
+        // line 8
+        let mut output = Array::<u8, VoleHashOutputLength<F::Length>>::default();
+        for (j, (chunk, x1_j)) in output
+            .chunks_exact_mut(F::Length::USIZE)
+            .zip(x1.chunks_exact(F::Length::USIZE))
+            .enumerate()
+        {
+            let mask = F::from(x1_j);
+            chunk.copy_from_slice(&(self.r[j] * y[0] + y[j + 1] + mask).as_bytes());
+        }
+        output
     }
 
-    fn from_r_s_t(r: [F; 4], s: F, t: GF64) -> Self {
+    fn from_r_s_t(r: [F; 4], s: [F; 4], t: GF64) -> Self {
         Self { r, s, t }
-    }
-}
-
-impl<F> VoleHasher<F>
-where
-    F: BigGaloisField,
-{
-    fn process_block(&self, h0: &mut F, h1: &mut GF64, data: &[u8]) {
-        *h0 = *h0 * self.s + F::from(data);
-        for data in data.chunks_exact(<GF64 as Field>::Length::USIZE) {
-            *h1 = *h1 * self.t + GF64::from(data);
-        }
-    }
-
-    fn process_unpadded_block(&self, h0: &mut F, h1: &mut GF64, data: &[u8]) {
-        let mut buf = Array::<u8, F::Length>::default();
-        buf[..data.len()].copy_from_slice(data);
-        self.process_block(h0, h1, &buf);
     }
 }
 
@@ -466,10 +438,7 @@ mod test {
 
     use crate::{
         fields::{GF128, GF192, GF256},
-        utils::{
-            array_ref,
-            test::{array_from_slice, read_test_data},
-        },
+        utils::{array_ref, test::read_test_data},
     };
 
     #[derive(Debug, Deserialize)]
@@ -483,8 +452,10 @@ mod test {
 
     #[derive(Debug, Deserialize)]
     struct VoleHashDatabaseEntry {
+        lambda: usize,
+        ell: usize,
         sd: Vec<u8>,
-        xs: Vec<u8>,
+        x: Vec<u8>,
         h: Vec<u8>,
     }
 
@@ -495,45 +466,37 @@ mod test {
         expected_h: Vec<u8>,
     }
 
-    #[test]
-    fn test_volehash_128() {
-        let database: Vec<VoleHashDatabaseEntry> = read_test_data("volehash_128.json");
-        for data in database {
-            let sd = array_ref(&data.sd);
-            let h = array_from_slice(&data.h);
-
-            let hasher = VoleHasher::<GF128>::new_vole_hasher(sd);
-            let res = hasher.process(&data.xs);
-            assert_eq!(h, res);
+    fn check_volehash_vectors<F>()
+    where
+        F: BigGaloisField<Length: SecurityParameter>,
+        Prod<F::Length, U8>: Add<U8, Output: ArraySize>,
+    {
+        let database: Vec<VoleHashDatabaseEntry> =
+            serde_json::from_str(include_str!("../tests/vole_hash.json")).unwrap();
+        let entries: Vec<_> = database
+            .iter()
+            .filter(|v| v.lambda == F::Length::USIZE * 8)
+            .collect();
+        for data in &entries {
+            let hasher = VoleHasher::<F>::new_vole_hasher(array_ref(&data.sd));
+            assert_eq!(hasher.process(&data.x).as_slice(), data.h);
+            let (x0, x1) = data.x.split_at(data.x.len() - data.h.len());
+            assert_eq!(hasher.process_split(x0, x1).as_slice(), data.h);
         }
     }
 
-    #[test]
-    fn test_volehash_192() {
-        let database: Vec<VoleHashDatabaseEntry> = read_test_data("volehash_192.json");
-        for data in database {
-            let sd = array_ref(&data.sd);
-            let h = array_from_slice(&data.h);
-
-            let hasher = VoleHasher::<GF192>::new_vole_hasher(sd);
-            let res = hasher.process(&data.xs);
-            assert_eq!(h, res);
-        }
+    macro_rules! volehash_tests {
+        ($name:ident, $field:ty) => {
+            #[test]
+            fn $name() {
+                check_volehash_vectors::<$field>();
+            }
+        };
     }
 
-    #[test]
-    fn test_volehash_256() {
-        let database: Vec<VoleHashDatabaseEntry> = read_test_data("volehash_256.json");
-
-        for data in database {
-            let sd = array_ref(&data.sd);
-            let h = array_from_slice(&data.h);
-
-            let hasher = VoleHasher::<GF256>::new_vole_hasher(sd);
-            let res = hasher.process(&data.xs);
-            assert_eq!(h, res);
-        }
-    }
+    volehash_tests!(test_volehash_128, crate::fields::large_fields::GF128);
+    volehash_tests!(test_volehash_192, crate::fields::large_fields::GF192);
+    volehash_tests!(test_volehash_256, crate::fields::large_fields::GF256);
 
     #[test]
     fn test_zkhash_128() {

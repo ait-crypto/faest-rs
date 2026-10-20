@@ -15,8 +15,8 @@ use crate::{
     random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256},
     // rijndael_32::{Rijndael192, Rijndael256},
     universal_hashing::{
-        B, LeafHasher128, LeafHasher192, LeafHasher256, VoleHasher, VoleHasherInit,
-        VoleHasherProcess, ZKHasher, ZKHasherInit,
+        LeafHasher128, LeafHasher192, LeafHasher256, VoleHashOutputLength, VoleHashSeedLength,
+        VoleHasher, VoleHasherInit, VoleHasherProcess, ZKHasher, ZKHasherInit,
     },
     utils::xor_arrays_inplace,
     // witness::aes_extendedwitness,
@@ -29,10 +29,10 @@ use aes::{
 use hybrid_array::{
     Array, ArraySize,
     typenum::{
-        Diff, Prod, Quot, Sum, U0, U1, U2, U3, U4, U5, U6, U7, U8, U10, U11, U12, U14, U16, U22,
-        U24, U32, U40, U48, U52, U60, U64, U102, U103, U110, U112, U120, U128, U160, U162, U163,
-        U176, U192, U216, U218, U234, U245, U246, U256, U312, U336, U384, U388, U448, U512, U672,
-        U832, U1024, U2048, Unsigned,
+        Diff, Prod, Quot, Sum, U0, U1, U2, U3, U4, U6, U7, U8, U10, U11, U12, U14, U16, U22, U24,
+        U32, U40, U48, U52, U60, U64, U102, U103, U110, U112, U120, U128, U160, U162, U163, U176,
+        U192, U216, U218, U234, U245, U246, U256, U312, U336, U384, U388, U448, U512, U672, U832,
+        U1024, U2048, Unsigned,
     },
 };
 use rand_core::Rng;
@@ -103,7 +103,7 @@ pub(crate) trait BaseParameters {
     type Field: BigGaloisField<Length = Self::LambdaBytes>;
     /// Hasher implementation of `ZKHash`
     type ZKHasher: ZKHasherInit<Self::Field, SDLength = Self::Chall>;
-    /// Hasher implementation of `VOLEHash`
+    /// Hasher implementation of `VOLEHash`.
     type VoleHasher: VoleHasherInit<
             Self::Field,
             SDLength = Self::Chall1,
@@ -122,47 +122,47 @@ pub(crate) trait BaseParameters {
     type Chall: ArraySize;
     type Chall1: ArraySize;
     type VoleHasherOutputLength: ArraySize;
-    /// Hash `v` row by row using [`Self::ZKHasher`] and update `h2_hasher` with the results
-    fn hash_v_matrix(
-        h2_hasher: &mut impl Hasher,
-        v: &[Array<u8, impl ArraySize>],
-        chall1: &Array<u8, Self::Chall1>,
-    ) {
-        let vole_hasher = Self::VoleHasher::new_vole_hasher(chall1);
-        for vi in v {
-            // Hash column-wise
-            h2_hasher.update(VoleHasherProcess::process(&vole_hasher, vi).as_slice());
-        }
-    }
-    /// Hash `u` using [`Self::ZKHasher`] and write the result into `signature_u`
-    fn hash_u_vector(
-        signature_u: &mut [u8],
-        u: &Array<u8, impl ArraySize>,
-        chall1: &Array<u8, Self::Chall1>,
-    ) {
-        let vole_hasher_u = Self::VoleHasher::new_vole_hasher(chall1);
-        signature_u.copy_from_slice(vole_hasher_u.process(u).as_slice());
-    }
-    /// Hash `q` row by row using [`Self::ZKHasher`] and update `h2_hasher` with the results
-    fn hash_q_matrix(
-        h2_hasher: &mut impl Hasher,
-        q: &[Array<u8, impl ArraySize>],
-        u_tilde_sig: &[u8],
-        chall1: &Array<u8, Self::Chall1>,
-        decoded_chall3_iter: impl Iterator<Item = u8>,
-    ) {
-        let vole_hasher = Self::VoleHasher::new_vole_hasher(chall1);
-        for (q_i, d_i) in zip(q, decoded_chall3_iter) {
-            // ::12
-            let mut q_tilde = vole_hasher.process(q_i);
-            // ::14
-            if d_i == 1 {
-                xor_arrays_inplace(&mut q_tilde, u_tilde_sig);
-            }
-            // ::15
-            h2_hasher.update(&q_tilde);
-        }
-    }
+    // /// Hash `v` row by row using [`Self::ZKHasher`] and update `h2_hasher` with the results
+    // fn hash_v_matrix(
+    //     h2_hasher: &mut impl Hasher,
+    //     v: &[Array<u8, impl ArraySize>],
+    //     chall1: &Array<u8, Self::Chall1>,
+    // ) {
+    //     let vole_hasher = Self::VoleHasher::new_vole_hasher(chall1);
+    //     for vi in v {
+    //         // Hash column-wise
+    //         h2_hasher.update(VoleHasherProcess::process(&vole_hasher, vi).as_slice());
+    //     }
+    // }
+    // /// Hash `u` using [`Self::ZKHasher`] and write the result into `signature_u`
+    // fn hash_u_vector(
+    //     signature_u: &mut [u8],
+    //     u: &Array<u8, impl ArraySize>,
+    //     chall1: &Array<u8, Self::Chall1>,
+    // ) {
+    //     let vole_hasher_u = Self::VoleHasher::new_vole_hasher(chall1);
+    //     signature_u.copy_from_slice(vole_hasher_u.process(u).as_slice());
+    // }
+    // /// Hash `q` row by row using [`Self::ZKHasher`] and update `h2_hasher` with the results
+    // fn hash_q_matrix(
+    //     h2_hasher: &mut impl Hasher,
+    //     q: &[Array<u8, impl ArraySize>],
+    //     u_tilde_sig: &[u8],
+    //     chall1: &Array<u8, Self::Chall1>,
+    //     decoded_chall3_iter: impl Iterator<Item = u8>,
+    // ) {
+    //     let vole_hasher = Self::VoleHasher::new_vole_hasher(chall1);
+    //     for (q_i, d_i) in zip(q, decoded_chall3_iter) {
+    //         // ::12
+    //         let mut q_tilde = vole_hasher.process(q_i);
+    //         // ::14
+    //         if d_i == 1 {
+    //             xor_arrays_inplace(&mut q_tilde, u_tilde_sig);
+    //         }
+    //         // ::15
+    //         h2_hasher.update(&q_tilde);
+    //     }
+    // }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -185,8 +185,8 @@ where
     type LambdaBytesTimes2 = U32;
 
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
-    type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
-    type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
+    type Chall1 = VoleHashSeedLength<Self::LambdaBytes>;
+    type VoleHasherOutputLength = VoleHashOutputLength<Self::LambdaBytes>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -207,8 +207,8 @@ where
     type LambdaBytesTimes2 = U48;
 
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
-    type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
-    type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
+    type Chall1 = VoleHashSeedLength<Self::LambdaBytes>;
+    type VoleHasherOutputLength = VoleHashOutputLength<Self::LambdaBytes>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -229,8 +229,8 @@ where
     type LambdaBytesTimes2 = U64;
 
     type Chall = Sum<U8, Prod<U3, Self::LambdaBytes>>;
-    type Chall1 = Sum<U8, Prod<U5, Self::LambdaBytes>>;
-    type VoleHasherOutputLength = Sum<Self::LambdaBytes, B>;
+    type Chall1 = VoleHashSeedLength<Self::LambdaBytes>;
+    type VoleHasherOutputLength = VoleHashOutputLength<Self::LambdaBytes>;
 }
 
 // pub(crate) trait OWFParameters: Sized {
