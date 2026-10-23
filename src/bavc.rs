@@ -1,3 +1,8 @@
+//! Batch all-but-one vector commitments.
+//!
+//! Algorithm line references follow FAEST v3, Figures 5.3–5.5:
+//! <https://faest.info/faest-spec-v3.0.pdf>
+
 use core::{marker::PhantomData, ops::Mul};
 
 #[cfg(not(feature = "std"))]
@@ -10,7 +15,7 @@ use hybrid_array::{
 };
 
 use crate::{
-    parameter::TauParameters,
+    parameter::{SecurityParameter, TauParameters},
     prg::{IV, PseudoRandomGenerator, Twk},
     random_oracles::{Hasher, RandomOracle},
     universal_hashing::LeafHasher,
@@ -54,35 +59,25 @@ where
 }
 
 pub(crate) trait LeafCommit {
-    type LambdaBytes: ArraySize;
-    type LambdaBytesTimes2: ArraySize;
-    type LambdaBytesTimes3: ArraySize;
-    type PRG: PseudoRandomGenerator;
+    type LambdaBytes: SecurityParameter + Mul<Self::NLeafCommit, Output: ArraySize>;
+    type PRG: PseudoRandomGenerator<KeySize = Self::LambdaBytes>;
+    type NLeafCommit: ArraySize;
+    type Context;
+
+    fn init<RO: RandomOracle>(iv: &IV) -> Self::Context;
 
     fn commit(
         r: &Array<u8, Self::LambdaBytes>,
         iv: &IV,
         tweak: Twk,
-        uhash: &Array<u8, Self::LambdaBytesTimes3>,
+        context: &Self::Context,
     ) -> (
         Array<u8, Self::LambdaBytes>,
-        Array<u8, Self::LambdaBytesTimes3>,
-    );
-
-    fn commit_em(
-        r: &Array<u8, Self::LambdaBytes>,
-        iv: &IV,
-        tewak: Twk,
-    ) -> (
-        Array<u8, Self::LambdaBytes>,
-        Array<u8, Self::LambdaBytesTimes2>,
+        Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>,
     );
 }
 
-pub(crate) struct LeafCommitment<PRG, LH>(PhantomData<PRG>, PhantomData<LH>)
-where
-    PRG: PseudoRandomGenerator,
-    LH: LeafHasher;
+pub(crate) struct LeafCommitment<PRG, LH>(PhantomData<(PRG, LH)>);
 
 impl<PRG, LH> LeafCommit for LeafCommitment<PRG, LH>
 where
@@ -90,41 +85,58 @@ where
     LH: LeafHasher,
 {
     type LambdaBytes = LH::LambdaBytes;
-    type LambdaBytesTimes2 = Prod<LH::LambdaBytes, U2>;
-    type LambdaBytesTimes3 = Prod<LH::LambdaBytes, U3>;
     type PRG = PRG;
+    type NLeafCommit = U3;
+    type Context = Array<u8, Prod<LH::LambdaBytes, U3>>;
+
+    fn init<RO: RandomOracle>(iv: &IV) -> Self::Context {
+        let mut hasher = RO::h0_init();
+        hasher.update(iv);
+        hasher.finish().read_into()
+    }
 
     fn commit(
         r: &Array<u8, Self::LambdaBytes>,
         iv: &IV,
         tweak: Twk,
-        uhash: &Array<u8, Self::LambdaBytesTimes3>,
+        uhash: &Self::Context,
     ) -> (
         Array<u8, Self::LambdaBytes>,
-        Array<u8, Self::LambdaBytesTimes3>,
+        Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>,
     ) {
-        // Step 2
         let hash = PRG::new_prg(r, iv, tweak).read_into();
-
         let com = <LH as LeafHasher>::hash(uhash, &hash);
-
         let sd = hash.into_iter().take(Self::LambdaBytes::USIZE).collect();
 
         (sd, com)
     }
+}
 
-    fn commit_em(
+pub(crate) struct LeafCommitmentEm<PRG>(PhantomData<PRG>);
+
+impl<PRG> LeafCommit for LeafCommitmentEm<PRG>
+where
+    PRG: PseudoRandomGenerator,
+    PRG::KeySize:
+        Mul<U2, Output: ArraySize> + Mul<U3, Output: ArraySize> + Mul<U8, Output: ArraySize>,
+{
+    type LambdaBytes = PRG::KeySize;
+    type PRG = PRG;
+    type NLeafCommit = U2;
+    type Context = ();
+
+    fn init<RO: RandomOracle>(_iv: &IV) -> Self::Context {}
+
+    fn commit(
         r: &Array<u8, Self::LambdaBytes>,
         iv: &IV,
         tweak: Twk,
+        _context: &Self::Context,
     ) -> (
         Array<u8, Self::LambdaBytes>,
-        Array<u8, Self::LambdaBytesTimes2>,
+        Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>,
     ) {
-        // Step 1
         let com = PRG::new_prg(r, iv, tweak).read_into();
-
-        // Step 2
         let sd = r.to_owned();
 
         (sd, com)
@@ -136,6 +148,7 @@ where
     PRG: PseudoRandomGenerator,
     TAU: TauParameters,
 {
+    // BAVC.Commit, lines 3–5
     let mut keys = vec![Array::default(); 2 * TAU::L - 1];
     keys[0].copy_from_slice(r);
 
@@ -158,13 +171,13 @@ where
     PRG: PseudoRandomGenerator,
     TAU: TauParameters,
 {
-    // Steps 8..11
+    // BAVC.Reconstruct, lines 6–9
     for i in 0..TAU::Tau::USIZE {
         let alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
         s.set(alpha, true);
     }
 
-    // Steps 13..21
+    // BAVC.Reconstruct, lines 11–19
     let mut keys = vec![Array::default(); 2 * TAU::L - 1];
     let mut decom_iter = decom_keys.iter();
     for i in (0..TAU::L - 1).rev() {
@@ -181,14 +194,14 @@ where
         }
     }
 
-    // Step 22
+    // BAVC.Reconstruct, lines 20–21
     for &pad in decom_iter {
         if pad.iter().any(|&x| x != 0) {
             return None;
         }
     }
 
-    // Steps 25..27
+    // BAVC.Reconstruct, lines 23–25
     for i in s[..TAU::L - 1].iter_zeros() {
         let mut rng = PRG::new_prg(&keys[i], iv, i as Twk);
         rng.read(&mut keys[2 * i + 1]);
@@ -202,7 +215,7 @@ fn mark_nodes<TAU>(s: &mut BitSlice, i_delta: &Array<u16, TAU::Tau>) -> Option<u
 where
     TAU: TauParameters,
 {
-    // Steps 6 ..15
+    // BAVC.Open, lines 6–15
     let mut n_h = 0;
     for i in 0..TAU::Tau::USIZE {
         let mut alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
@@ -214,7 +227,7 @@ where
         }
     }
 
-    // Step 16
+    // BAVC.Open, lines 16–17
     if n_h - 2 * TAU::Tau::U32 + 1 > TAU::Topen::U32 {
         None
     } else {
@@ -230,7 +243,7 @@ where
     LambdaBytes: ArraySize,
     TAU: TauParameters,
 {
-    // Steps 19..22
+    // BAVC.Open, lines 19–22
     (0..TAU::L - 1)
         .rev()
         .filter_map(|i| {
@@ -248,7 +261,6 @@ where
 pub(crate) trait BatchVectorCommitment {
     type PRG: PseudoRandomGenerator<KeySize = Self::LambdaBytes>;
     type TAU: TauParameters<Tau = Self::Tau>;
-    type LH: LeafHasher;
     type RO: RandomOracle;
 
     type Lambda: ArraySize;
@@ -261,7 +273,11 @@ pub(crate) trait BatchVectorCommitment {
     type LambdaBytesTimes3: ArraySize;
     type Tau: ArraySize;
     const L: usize;
-    type LC: LeafCommit;
+    type LC: LeafCommit<
+            PRG = Self::PRG,
+            LambdaBytes = Self::LambdaBytes,
+            NLeafCommit = Self::NLeafCommit,
+        >;
     type NLeafCommit: ArraySize;
     type Topen: ArraySize;
 
@@ -282,58 +298,43 @@ pub(crate) trait BatchVectorCommitment {
     ) -> Option<BavcReconstructResult<Self::LambdaBytes>>;
 }
 
-pub(crate) struct Bavc<RO, PRG, LH, TAU>(
-    PhantomData<RO>,
-    PhantomData<PRG>,
-    PhantomData<LH>,
-    PhantomData<TAU>,
-)
-where
-    RO: RandomOracle,
-    PRG: PseudoRandomGenerator,
-    TAU: TauParameters,
-    LH: LeafHasher;
+pub(crate) struct Bavc<RO, LC, TAU>(PhantomData<(RO, LC, TAU)>);
 
-impl<RO, PRG, LH, TAU> BatchVectorCommitment for Bavc<RO, PRG, LH, TAU>
+impl<RO, LC, TAU> BatchVectorCommitment for Bavc<RO, LC, TAU>
 where
     RO: RandomOracle,
-    PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
+    LC: LeafCommit,
     TAU: TauParameters,
-    LH: LeafHasher,
 {
-    type LH = LH;
     type RO = RO;
-    type Lambda = LH::Lambda;
-    type LambdaBytes = LH::LambdaBytes;
-    type LambdaBytesTimes2 = Prod<LH::LambdaBytes, U2>;
-    type LambdaBytesTimes3 = Prod<LH::LambdaBytes, U3>;
-    type LC = LeafCommitment<PRG, LH>;
+    type Lambda = Prod<LC::LambdaBytes, U8>;
+    type LambdaBytes = LC::LambdaBytes;
+    type LambdaBytesTimes2 = Prod<LC::LambdaBytes, U2>;
+    type LambdaBytesTimes3 = Prod<LC::LambdaBytes, U3>;
+    type LC = LC;
     type TAU = TAU;
     type Tau = TAU::Tau;
     const L: usize = TAU::L;
-    type PRG = PRG;
+    type PRG = LC::PRG;
     type Topen = TAU::Topen;
-    type NLeafCommit = U3;
+    type NLeafCommit = LC::NLeafCommit;
 
     fn commit(
         r: &Array<u8, Self::LambdaBytes>,
         iv: &IV,
     ) -> BavcCommitResult<Self::LambdaBytes, Self::NLeafCommit> {
-        // Step 3
-        let mut h0_hasher = RO::h0_init();
-        h0_hasher.update(iv);
-        let uhash = h0_hasher.finish().read_into();
+        // lines 1–2: initialize uhash (placeholder for FAEST-EM)
+        let uhash = LC::init::<RO>(iv);
 
-        // Steps 5..7
-        let keys = construct_keys::<PRG, TAU>(r, iv);
+        // lines 3–5
+        let keys = construct_keys::<LC::PRG, TAU>(r, iv);
 
-        // Setps 8..13
         let mut com_hasher = RO::h1_init();
         let mut seeds = Vec::with_capacity(Self::L);
         let mut coms = Vec::with_capacity(Self::L);
 
+        // lines 6–12
         for i in 0..TAU::Tau::U32 {
-            // Step 2
             let mut hi_hasher = RO::h1_init();
 
             let n_i = TAU::bavc_max_node_index(i as usize);
@@ -349,11 +350,11 @@ where
                 coms.push(com);
             }
 
-            // Step 14
+            // lines 13–14: hash each vector into the final commitment
             com_hasher.update(&hi_hasher.finish().read_into::<Self::LambdaBytesTimes2>());
         }
 
-        // Steps 15, 16
+        // lines 14–16
         let decom = BavcDecommitment { keys, coms };
         let com = com_hasher.finish().read_into();
 
@@ -364,18 +365,18 @@ where
         decom: &'a BavcDecommitment<Self::LambdaBytes, Self::NLeafCommit>,
         i_delta: &Array<u16, TAU::Tau>,
     ) -> Option<BavcOpenResult<'a>> {
-        // Step 5
+        // line 5
         let mut s = bitvec![0; 2 * TAU::L - 1];
 
-        // Steps 6..17
+        // lines 6–17
         mark_nodes::<TAU>(&mut s, i_delta)?;
 
-        // Steps 19..23
+        // lines 19–22
         let nodes = construct_nodes::<Self::LambdaBytes, TAU>(&decom.keys, &s);
 
-        // Skip step 24: as we know expected nodes len we can keep the 0s-pad implicit
+        // skip line 23: as we know expected nodes len we can keep the 0s-pad implicit
 
-        // Step 3
+        // line 3
         let coms = (0..TAU::Tau::USIZE)
             .map(|i| decom.coms[TAU::bavc_index_offset(i) + i_delta[i] as usize].as_slice())
             .collect();
@@ -388,18 +389,16 @@ where
         i_delta: &Array<u16, TAU::Tau>,
         iv: &IV,
     ) -> Option<BavcReconstructResult<Self::LambdaBytes>> {
-        // Step 7
+        // lines 2–3: recreate the per-IV leaf context
+        let context = LC::init::<RO>(iv);
+
+        // line 5
         let mut s = bitvec![0; 2 * TAU::L - 1];
 
-        // Steps 8..27
-        let keys = reconstruct_keys::<PRG, TAU>(&mut s, &decom_i.nodes, i_delta, iv)?;
+        // lines 6–25
+        let keys = reconstruct_keys::<LC::PRG, TAU>(&mut s, &decom_i.nodes, i_delta, iv)?;
 
-        // Step 4
-        let mut h0_hasher = RO::h0_init();
-        h0_hasher.update(iv);
-        let uhash = h0_hasher.finish().read_into();
-
-        // Steps 28..34
+        // lines 26–28
         let mut h1_com_hasher = RO::h1_init();
         let mut seeds = Vec::with_capacity(TAU::L - TAU::Tau::USIZE);
         let mut com_it = decom_i.coms.iter();
@@ -410,21 +409,22 @@ where
             let n_i = TAU::bavc_max_node_index(i as usize);
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
-                // Step 33
+                // lines 31–35: recompute revealed leaves
                 if !*s.get(alpha)? {
-                    let (sd, h) = Self::LC::commit(&keys[alpha], iv, i + TAU::L as u32 - 1, &uhash);
+                    let (sd, h) =
+                        Self::LC::commit(&keys[alpha], iv, i + TAU::L as u32 - 1, &context);
 
                     seeds.push(sd);
                     h1_hasher.update(&h);
                 }
-                // Step 31
+                // lines 29–30: use the hidden leaf commitment
                 else {
                     let com_ij = com_it.next()?;
                     h1_hasher.update(com_ij);
                 }
             }
 
-            // Step 37
+            // lines 36–37
             h1_com_hasher.update(&h1_hasher.finish().read_into::<Self::LambdaBytesTimes2>());
         }
 
@@ -435,155 +435,7 @@ where
     }
 }
 
-pub(crate) struct BavcEm<RO, PRG, LH, TAU>(
-    PhantomData<RO>,
-    PhantomData<PRG>,
-    PhantomData<LH>,
-    PhantomData<TAU>,
-)
-where
-    RO: RandomOracle,
-    PRG: PseudoRandomGenerator,
-    TAU: TauParameters,
-    LH: LeafHasher;
 
-impl<RO, PRG, LH, TAU> BatchVectorCommitment for BavcEm<RO, PRG, LH, TAU>
-where
-    RO: RandomOracle,
-    PRG: PseudoRandomGenerator<KeySize = LH::LambdaBytes>,
-    TAU: TauParameters,
-    LH: LeafHasher,
-{
-    type RO = RO;
-    type PRG = PRG;
-    type LH = LH;
-    type TAU = TAU;
-    type LC = LeafCommitment<PRG, LH>;
-
-    type Lambda = LH::Lambda;
-    type LambdaBytes = LH::LambdaBytes;
-    type LambdaBytesTimes2 = Prod<LH::LambdaBytes, U2>;
-    type LambdaBytesTimes3 = Prod<LH::LambdaBytes, U3>;
-    type Tau = TAU::Tau;
-    const L: usize = TAU::L;
-    type Topen = TAU::Topen;
-    type NLeafCommit = U2;
-
-    fn commit(
-        r: &Array<u8, Self::LambdaBytes>,
-        iv: &IV,
-    ) -> BavcCommitResult<Self::LambdaBytes, Self::NLeafCommit> {
-        // Steps 5..7
-        let keys = construct_keys::<PRG, TAU>(r, iv);
-
-        // Setps 8..13
-        let mut com_hasher = RO::h1_init();
-        let mut seeds = Vec::with_capacity(TAU::L);
-        let mut coms = Vec::with_capacity(TAU::L);
-
-        for i in 0..TAU::Tau::U32 {
-            let mut hi_hasher = RO::h1_init();
-
-            let n_i = TAU::bavc_max_node_index(i as usize);
-            for j in 0..n_i {
-                let alpha = TAU::pos_in_tree(i as usize, j);
-                let tweak = i + TAU::L as u32 - 1;
-
-                let (seed, com) = Self::LC::commit_em(&keys[alpha], iv, tweak);
-
-                // Step 13
-                hi_hasher.update(&com);
-
-                seeds.push(seed);
-                coms.push(com);
-            }
-
-            // Step 14
-            com_hasher.update(&hi_hasher.finish().read_into::<Self::LambdaBytesTimes2>());
-        }
-
-        // Steps 15, 16
-        let decom = BavcDecommitment { keys, coms };
-        let com = com_hasher.finish().read_into();
-
-        BavcCommitResult { com, decom, seeds }
-    }
-
-    fn open<'a>(
-        decom: &'a BavcDecommitment<Self::LambdaBytes, Self::NLeafCommit>,
-        i_delta: &Array<u16, Self::Tau>,
-    ) -> Option<BavcOpenResult<'a>> {
-        // Step 5
-        let mut s = bitvec![0; 2 * TAU::L - 1];
-
-        // Steps 6..17
-        mark_nodes::<TAU>(&mut s, i_delta)?;
-
-        // Steps 19..23
-        let nodes = construct_nodes::<Self::LambdaBytes, Self::TAU>(&decom.keys, &s);
-
-        // Skip step 24: as we know expected nodes len we can keep the 0s-pad implicit
-
-        // Step 3
-        let coms = (0..TAU::Tau::USIZE)
-            .map(|i| decom.coms[TAU::bavc_index_offset(i) + i_delta[i] as usize].as_slice())
-            .collect();
-
-        Some(BavcOpenResult { coms, nodes })
-    }
-
-    fn reconstruct(
-        decom_i: &BavcOpenResult,
-        i_delta: &Array<u16, Self::Tau>,
-        iv: &IV,
-    ) -> Option<BavcReconstructResult<Self::LambdaBytes>> {
-        // Step 7
-        let mut s = bitvec![0; 2 * TAU::L - 1];
-
-        // Steps 8..11
-        for i in 0..TAU::Tau::USIZE {
-            let alpha = TAU::pos_in_tree(i, i_delta[i] as usize);
-            s.set(alpha, true);
-        }
-
-        // Steps 13..21
-        let keys = reconstruct_keys::<PRG, TAU>(&mut s, &decom_i.nodes, i_delta, iv)?;
-
-        // Steps 28..34
-        let mut h1_com_hasher = RO::h1_init();
-        let mut seeds = Vec::with_capacity(TAU::L - TAU::Tau::USIZE);
-        let mut com_it = decom_i.coms.iter();
-
-        for i in 0u32..TAU::Tau::U32 {
-            let mut h1_hasher = RO::h1_init();
-
-            let n_i = TAU::bavc_max_node_index(i as usize);
-            for j in 0..n_i {
-                let alpha = TAU::pos_in_tree(i as usize, j);
-
-                // Step 33
-                if !*s.get(alpha)? {
-                    let (sd, h) = Self::LC::commit_em(&keys[alpha], iv, i + TAU::L as u32 - 1);
-                    seeds.push(sd);
-                    h1_hasher.update(&h);
-                }
-                // Step 31
-                else {
-                    let com_ij = com_it.next()?;
-                    h1_hasher.update(com_ij);
-                }
-            }
-
-            // Step 37
-            h1_com_hasher.update(&h1_hasher.finish().read_into::<Self::LambdaBytesTimes2>());
-        }
-
-        Some(BavcReconstructResult {
-            com: h1_com_hasher.finish().read_into(),
-            seeds,
-        })
-    }
-}
 
 #[cfg(test)]
 mod test {
