@@ -322,7 +322,7 @@ where
         // Step 3
         let mut h0_hasher = RO::h0_init();
         h0_hasher.update(iv);
-        let mut h0_hasher = h0_hasher.finish();
+        let uhash = h0_hasher.finish().read_into();
 
         // Steps 5..7
         let keys = construct_keys::<PRG, TAU>(r, iv);
@@ -335,15 +335,13 @@ where
         for i in 0..TAU::Tau::U32 {
             // Step 2
             let mut hi_hasher = RO::h1_init();
-            let mut uhash_i = Array::default();
-            h0_hasher.read(&mut uhash_i);
 
             let n_i = TAU::bavc_max_node_index(i as usize);
             for j in 0..n_i {
                 let alpha = TAU::pos_in_tree(i as usize, j);
                 let tweak = i + Self::L as u32 - 1;
 
-                let (sd, com) = Self::LC::commit(&keys[alpha], iv, tweak, &uhash_i);
+                let (sd, com) = Self::LC::commit(&keys[alpha], iv, tweak, &uhash);
 
                 hi_hasher.update(&com);
 
@@ -399,7 +397,7 @@ where
         // Step 4
         let mut h0_hasher = RO::h0_init();
         h0_hasher.update(iv);
-        let mut h0_hasher = h0_hasher.finish();
+        let uhash = h0_hasher.finish().read_into();
 
         // Steps 28..34
         let mut h1_com_hasher = RO::h1_init();
@@ -407,10 +405,6 @@ where
         let mut com_it = decom_i.coms.iter();
 
         for i in 0u32..TAU::Tau::U32 {
-            // Step 3
-            let mut uhash_i = Array::default();
-            h0_hasher.read(&mut uhash_i);
-
             let mut h1_hasher = RO::h1_init();
 
             let n_i = TAU::bavc_max_node_index(i as usize);
@@ -418,8 +412,7 @@ where
                 let alpha = TAU::pos_in_tree(i as usize, j);
                 // Step 33
                 if !*s.get(alpha)? {
-                    let (sd, h) =
-                        Self::LC::commit(&keys[alpha], iv, i + TAU::L as u32 - 1, &uhash_i);
+                    let (sd, h) = Self::LC::commit(&keys[alpha], iv, i + TAU::L as u32 - 1, &uhash);
 
                     seeds.push(sd);
                     h1_hasher.update(&h);
