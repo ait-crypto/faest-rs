@@ -29,10 +29,10 @@ use aes::{
 use hybrid_array::{
     Array, ArraySize,
     typenum::{
-        Diff, Prod, Quot, Sum, U0, U1, U2, U3, U4, U6, U7, U8, U10, U11, U12, U14, U16, U22, U24,
-        U32, U40, U48, U52, U60, U64, U102, U103, U110, U112, U120, U128, U160, U162, U163, U176,
-        U192, U216, U218, U234, U245, U246, U256, U312, U336, U384, U388, U448, U512, U672, U832,
-        U1024, U2048, Unsigned,
+        Diff, Prod, Quot, Sum, U0, U1, U2, U3, U4, U6, U7, U8, U9, U10, U11, U12, U14, U16, U17,
+        U22, U24, U25, U32, U33, U40, U48, U52, U64, U102, U103, U105, U108, U110, U112, U120,
+        U128, U162, U163, U171, U176, U192, U218, U225, U229, U234, U245, U246, U256, U448, U672,
+        Unsigned,
     },
 };
 use rand_core::Rng;
@@ -66,13 +66,6 @@ pub(crate) mod x86_simd {
     // pub(crate) type FAESTEM256fParameters = super::FAESTEM256fParameters<GF256>;
     // pub(crate) type FAESTEM256sParameters = super::FAESTEM256sParameters<GF256>;
 }
-
-// OWF L_Enc size
-type U1216 = Sum<U1024, U192>;
-type U2432 = Sum<U2048, U384>;
-
-// l_hat = l + 3*lambda + B
-type LHatBytes<LBytes, LambdaBytes, B> = Sum<LBytes, Sum<Prod<U3, LambdaBytes>, Quot<B, U8>>>;
 
 /// Extract base field from OWF parameters
 // pub(crate) type OWFField<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
@@ -233,764 +226,769 @@ where
     type VoleHasherOutputLength = VoleHashOutputLength<Self::LambdaBytes>;
 }
 
-// pub(crate) trait OWFParameters: Sized {
-//     // Base parameters of the OWF
-//     type BaseParams: BaseParameters<Lambda = Self::Lambda, LambdaBytes = Self::LambdaBytes>;
-//     /// Length of secret key (in bytes)
-//     type SK: ArraySize;
-//     /// Length of public key (in bytes)
-//     type PK: ArraySize;
-//     /// The input size of the OWF (in bytes)
-//     type InputSize: ArraySize + Mul<U8, Output: ArraySize>;
-//     /// The output size of the OWF (in bytes)
-//     type OutputSize: ArraySize + Mul<U8, Output: ArraySize>;
-//     /// Security parameter (in bits)
-//     type Lambda: ArraySize + Mul<U2, Output: ArraySize>;
-//     /// Security parameter (in bytes)
-//     type LambdaBytes: SecurityParameter
-//         + Mul<Self::NLeafCommit, Output: ArraySize>
-//         + Mul<U2, Output = Self::LambdaBytesTimes2>
-//         + Mul<U8, Output = Self::Lambda>;
-//     /// Two times the security parameter (in bytes)
-//     type LambdaBytesTimes2: ArraySize + Add<Self::LBytes, Output = Self::LProdLambdaBytes>;
-//     /// Extra length padding for the VOLE check
-//     type B: ArraySize;
-//     /// Witness length for the zk proof (in bytes)
-//     type LBytes: ArraySize + Mul<U8, Output = Self::L>;
-//     /// Witness length for the zk proof (in bits)
-//     type L: ArraySize;
-//     /// Witness length plus extra randomness for VOLE + ZK checks
-//     type LHatBytes: ArraySize + Mul<U8, Output: ArraySize>;
-//     /// Number of message blocks
-//     type Beta: ArraySize;
-//     /// Number of 32-bit words in key
-//     type NK: ArraySize;
-//     /// Number of encryption rounds
-//     type R: ArraySize;
-//     /// Number of S-boxes in key schedule
-//     type SKe: ArraySize + Mul<U8, Output: ArraySize>;
-//     /// Number of witness bits for key schedule (in bits)
-//     type LKe: ArraySize;
-//     /// Number of witness bits for key schedule (in bytes)
-//     type LKeBytes: ArraySize + Mul<U8, Output = Self::LKe>;
-//     /// Number of witness bits for encryption (in bits)
-//     type LEnc: ArraySize;
-//     /// Number of witness bits for encryption (in bytes)
-//     type LEncBytes: ArraySize + Mul<U8, Output: ArraySize>;
-//     /// Block size (in 32-bit words)
-//     type NSt: ArraySize + Mul<U4, Output = Self::NStBytes>;
-//     /// Block size (in bytes)
-//     type NStBytes: SecurityParameter
-//         + Mul<U8, Output = Self::NStBits>
-//         + Div<U2, Output: ArraySize + Mul<U8, Output: ArraySize>>;
-//     /// Block size (in bits)
-//     type NStBits: ArraySize
-//         + Mul<U4, Output: ArraySize>
-//         + Div<U2, Output: ArraySize + Mul<U8, Output: ArraySize>>;
-//     /// Number of Lambda-bit blocks in each leaf commitment
-//     type NLeafCommit: ArraySize;
-//     /// Result of [`Self::L`] * [`Self::Lambda`] (in bytes)
-//     type LProdLambdaBytes: ArraySize + Mul<U8, Output: ArraySize>;
-//     /// Result of ([`Self::R`] + 1) * 128 (in bytes)
-//     type R1Times128Bytes: ArraySize
-//         + Mul<U8, Output = Self::R1Times128>
-//         + Sub<Self::LKeBytes, Output: ArraySize>;
-//     /// Result of ([`Self::R`] + 1) * 128 (in bits)
-//     type R1Times128: ArraySize + Sub<Self::LKe, Output: ArraySize>;
-//     /// Result of [`Self::LKe`] - [`Self::Lambda`] (in bytes)
-//     type LKeMinusLambdaBytes: ArraySize + Mul<U8, Output: ArraySize>;
-//     /// Result of [`Self::LKe`] - [`Self::Lambda`] (in bits)
-//     type LKeMinusLambda: ArraySize;
-
-//     /// Returns whether the OWF is used in EM mode
-//     const IS_EM: bool;
-
-//     /// Applies the OWF using the secret key `key` to `input` and writes the result in the `output` slice
-//     fn evaluate_owf(
-//         key: &Array<u8, Self::LambdaBytes>,
-//         input: &Array<u8, Self::InputSize>,
-//     ) -> Array<u8, Self::OutputSize>;
-
-//     /// Compute the extended witness from `owf_key` and `owf_input`
-//     fn extendwitness(
-//         owf_key: &Array<u8, Self::LambdaBytes>,
-//         owf_input: &Array<u8, Self::InputSize>,
-//     ) -> Box<Array<u8, Self::LBytes>>;
-
-//     /// Compute the extended witness using the secret key `sk`
-//     fn witness(sk: &SecretKey<Self>) -> Box<Array<u8, Self::LBytes>> {
-//         Self::extendwitness(&sk.owf_key, &sk.pk.owf_input)
-//     }
-
-//     /// Generates the prover's Quicksilver constraints
-//     fn prove(
-//         w: &Array<u8, Self::LBytes>,
-//         u: &Array<u8, Self::LambdaBytesTimes2>,
-//         v: CstrntsVal<Self>,
-//         pk: &PublicKey<Self>,
-//         chall: &Array<u8, <Self::BaseParams as BaseParameters>::Chall>,
-//     ) -> QSProof<Self> {
-//         aes_prove::<Self>(w, u, v, pk, chall)
-//     }
-
-//     /// Derives the prover's challenge that can be used to verify the Quicksilver constraints
-//     fn verify(
-//         q: CstrntsVal<Self>,
-//         d: &Array<u8, Self::LBytes>,
-//         pk: &PublicKey<Self>,
-//         chall_2: &Array<u8, <Self::BaseParams as BaseParameters>::Chall>,
-//         chall_3: &Array<u8, Self::LambdaBytes>,
-//         a1_tilde: &Array<u8, Self::LambdaBytes>,
-//         a2_tilde: &Array<u8, Self::LambdaBytes>,
-//     ) -> OWFField<Self> {
-//         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-//     }
-
-//     /// Generates the prover's secret key using the input generator
-//     fn keygen_with_rng<R: Rng + ?Sized>(rng: &mut R) -> SecretKey<Self> {
-//         let mut owf_key = Array::default();
-
-//         loop {
-//             rng.fill_bytes(&mut owf_key);
-//             if owf_key[0] & 0b11 != 0b11 {
-//                 break;
-//             }
-//         }
-
-//         let mut owf_input = Array::default();
-//         rng.fill_bytes(&mut owf_input);
-
-//         let owf_output = Self::evaluate_owf(&owf_key, &owf_input);
-
-//         SecretKey {
-//             owf_key,
-//             pk: PublicKey {
-//                 owf_input,
-//                 owf_output,
-//             },
-//         }
-//     }
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct OWF128<F = GF128>(PhantomData<F>);
-
-// impl<F> OWFParameters for OWF128<F>
-// where
-//     F: BigGaloisField<Length = U16>,
-// {
-//     type BaseParams = BaseParams128<F>;
-//     type InputSize = U16;
-//     type OutputSize = U16;
-
-//     type B = U16;
-//     type Lambda = U128;
-//     type LambdaBytes = U16;
-//     type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
-//     type LBytes = U160;
-//     type L = Prod<Self::LBytes, U8>;
-//     type LHatBytes = LHatBytes<Self::LBytes, Self::LambdaBytes, Self::B>;
-
-//     type NK = U4;
-//     type R = U10;
-//     type SKe = U40;
-//     type Beta = U1;
-//     type LKe = U448;
-//     type LKeBytes = Quot<Self::LKe, U8>;
-//     type LEnc = U832;
-//     type LEncBytes = Quot<Self::LEnc, U8>;
-//     type NSt = U4;
-//     type NStBytes = Prod<Self::NSt, U4>;
-//     type NStBits = Prod<Self::NStBytes, U8>;
-//     type NLeafCommit = U3;
-//     type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
-
-//     type R1Times128 = Prod<Sum<Self::R, U1>, U128>;
-//     type R1Times128Bytes = Quot<Self::R1Times128, U8>;
-
-//     type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
-//     type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
-
-//     type SK = U32;
-//     type PK = U32;
-
-//     const IS_EM: bool = false;
-
-//     fn evaluate_owf(
-//         key: &Array<u8, Self::LambdaBytes>,
-//         input: &Array<u8, Self::InputSize>,
-//     ) -> Array<u8, Self::OutputSize> {
-//         let aes = Aes128Enc::new(key);
-//         let mut output = Array::default();
-//         aes.encrypt_block_b2b(input, &mut output);
-//         output
-//     }
-
-//     #[inline]
-//     fn extendwitness(
-//         owf_key: &Array<u8, Self::LambdaBytes>,
-//         owf_input: &Array<u8, Self::InputSize>,
-//     ) -> Box<Array<u8, Self::LBytes>> {
-//         aes_extendedwitness::<Self>(owf_key, owf_input)
-//     }
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct OWF192<F = GF192>(PhantomData<F>);
-
-// impl<F> OWFParameters for OWF192<F>
-// where
-//     F: BigGaloisField<Length = U24>,
-// {
-//     type BaseParams = BaseParams192<F>;
-//     type InputSize = U16;
-//     type OutputSize = U32;
-
-//     type B = U16;
-//     type Lambda = U192;
-//     type LambdaBytes = U24;
-//     type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
-//     type LBytes = U312;
-//     type L = Prod<Self::LBytes, U8>;
-//     type LHatBytes = LHatBytes<Self::LBytes, Self::LambdaBytes, Self::B>;
-//     type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
-
-//     type NK = U6;
-//     type R = U12;
-//     type SKe = U32;
-//     type Beta = U2;
-//     type LKe = U448;
-//     type LKeBytes = Quot<Self::LKe, U8>;
-//     type LEnc = U1024;
-//     type LEncBytes = Quot<Self::LEnc, U8>;
-//     type NSt = U4;
-//     type NStBytes = Prod<Self::NSt, U4>;
-//     type NStBits = Prod<Self::NStBytes, U8>;
-//     type NLeafCommit = U3;
-
-//     type R1Times128 = Prod<Sum<Self::R, U1>, U128>;
-//     type R1Times128Bytes = Quot<Self::R1Times128, U8>;
-
-//     type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
-//     type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
-
-//     type SK = U40;
-//     type PK = U48;
-
-//     const IS_EM: bool = false;
-
-//     fn evaluate_owf(
-//         key: &Array<u8, Self::LambdaBytes>,
-//         input: &Array<u8, Self::InputSize>,
-//     ) -> Array<u8, Self::OutputSize> {
-//         let aes = Aes192Enc::new(key);
-//         let mut output1 = Array::default();
-//         aes.encrypt_block_b2b(input, &mut output1);
-
-//         let mut input = *input;
-//         input[0] ^= 1;
-
-//         let mut output2 = Array::default();
-//         aes.encrypt_block_b2b(&input, &mut output2);
-//         output1.concat(output2)
-//     }
-
-//     #[inline]
-//     fn extendwitness(
-//         owf_key: &Array<u8, Self::LambdaBytes>,
-//         owf_input: &Array<u8, Self::InputSize>,
-//     ) -> Box<Array<u8, Self::LBytes>> {
-//         aes_extendedwitness::<Self>(owf_key, owf_input)
-//     }
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct OWF256<F = GF256>(PhantomData<F>);
-
-// impl<F> OWFParameters for OWF256<F>
-// where
-//     F: BigGaloisField<Length = U32>,
-// {
-//     type BaseParams = BaseParams256<F>;
-//     type InputSize = U16;
-//     type OutputSize = U32;
-
-//     type B = U16;
-//     type Lambda = U256;
-//     type LambdaBytes = U32;
-//     type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
-//     type LBytes = U388;
-//     type L = Prod<Self::LBytes, U8>;
-//     type LHatBytes = LHatBytes<Self::LBytes, Self::LambdaBytes, Self::B>;
-//     type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
-
-//     type NK = U8;
-//     type R = U14;
-//     type SKe = U52;
-//     type Beta = U2;
-//     type LKe = U672;
-//     type LKeBytes = Quot<Self::LKe, U8>;
-//     type LEnc = U1216;
-//     type LEncBytes = Quot<Self::LEnc, U8>;
-//     type NSt = U4;
-//     type NStBytes = Prod<Self::NSt, U4>;
-//     type NStBits = Prod<Self::NStBytes, U8>;
-//     type NLeafCommit = U3;
-
-//     type R1Times128 = Prod<Sum<Self::R, U1>, U128>;
-//     type R1Times128Bytes = Quot<Self::R1Times128, U8>;
-
-//     type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
-//     type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
-
-//     type SK = U48;
-//     type PK = U48;
-
-//     const IS_EM: bool = false;
-
-//     fn evaluate_owf(
-//         key: &Array<u8, Self::LambdaBytes>,
-//         input: &Array<u8, Self::InputSize>,
-//     ) -> Array<u8, Self::OutputSize> {
-//         let aes = Aes256Enc::new(key);
-//         let mut output1 = Array::default();
-//         aes.encrypt_block_b2b(input, &mut output1);
-
-//         let mut input = *input;
-//         input[0] ^= 1;
-
-//         let mut output2 = Array::default();
-//         aes.encrypt_block_b2b(&input, &mut output2);
-//         output1.concat(output2)
-//     }
-
-//     #[inline]
-//     fn extendwitness(
-//         owf_key: &Array<u8, Self::LambdaBytes>,
-//         owf_input: &Array<u8, Self::InputSize>,
-//     ) -> Box<Array<u8, Self::LBytes>> {
-//         aes_extendedwitness::<Self>(owf_key, owf_input)
-//     }
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct OWF128EM<F = GF128>(PhantomData<F>);
-
-// impl<F> OWFParameters for OWF128EM<F>
-// where
-//     F: BigGaloisField<Length = U16>,
-// {
-//     type BaseParams = BaseParams128<F>;
-//     type InputSize = U16;
-//     type OutputSize = U16;
-
-//     type B = U16;
-//     type Lambda = U128;
-//     type LambdaBytes = U16;
-//     type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
-//     type LBytes = U120;
-//     type L = Prod<Self::LBytes, U8>;
-//     type LHatBytes = LHatBytes<Self::LBytes, Self::LambdaBytes, Self::B>;
-//     type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
-
-//     type NK = U4;
-//     type NSt = U4;
-//     type NStBytes = Prod<Self::NSt, U4>;
-//     type NStBits = Prod<Self::NStBytes, U8>;
-//     type R = U10;
-//     type SKe = U40;
-//     type Beta = U1;
-//     type LKe = U128;
-//     type LKeBytes = Quot<Self::LKe, U8>;
-//     type LEnc = U832;
-//     type LEncBytes = Quot<Self::LEnc, U8>;
-//     type NLeafCommit = U2;
-
-//     type R1Times128 = Prod<Sum<Self::R, U1>, U128>;
-//     type R1Times128Bytes = Quot<Self::R1Times128, U8>;
-
-//     type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
-//     type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
-
-//     type SK = U32;
-//     type PK = U32;
-
-//     const IS_EM: bool = true;
-
-//     fn evaluate_owf(
-//         key: &Array<u8, Self::LambdaBytes>,
-//         input: &Array<u8, Self::InputSize>,
-//     ) -> Array<u8, Self::OutputSize> {
-//         let aes = Aes128Enc::new(input);
-//         let mut output = Array::default();
-//         aes.encrypt_block_b2b(key, &mut output);
-//         for idx in 0..Self::InputSize::USIZE {
-//             output[idx] ^= key[idx];
-//         }
-//         output
-//     }
-
-//     #[inline]
-//     fn extendwitness(
-//         owf_key: &Array<u8, Self::LambdaBytes>,
-//         owf_input: &Array<u8, Self::InputSize>,
-//     ) -> Box<Array<u8, Self::LBytes>> {
-//         aes_extendedwitness::<Self>(owf_input, owf_key)
-//     }
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct OWF192EM<F = GF192>(PhantomData<F>)
-// where
-//     F: BigGaloisField<Length = U24>;
-
-// type U1536 = Sum<U1024, U512>;
-
-// impl<F> OWFParameters for OWF192EM<F>
-// where
-//     F: BigGaloisField<Length = U24>,
-// {
-//     type BaseParams = BaseParams192<F>;
-//     type InputSize = U24;
-//     type OutputSize = U24;
-
-//     type B = U16;
-//     type Lambda = U192;
-//     type LambdaBytes = U24;
-//     type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
-//     type LBytes = U216;
-//     type L = Prod<Self::LBytes, U8>;
-//     type LHatBytes = LHatBytes<Self::LBytes, Self::LambdaBytes, Self::B>;
-//     type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
-
-//     type NK = U6;
-//     type NSt = U6;
-//     type NStBytes = Prod<Self::NSt, U4>;
-//     type NStBits = Prod<Self::NStBytes, U8>;
-//     type Beta = U1;
-//     type R = U12;
-//     type SKe = U52;
-//     type LKe = U192;
-//     type LKeBytes = Quot<Self::LKe, U8>;
-//     type LEnc = U1536;
-//     type LEncBytes = Quot<Self::LEnc, U8>;
-//     type NLeafCommit = U2;
-
-//     type R1Times128 = Prod<Sum<Self::R, U1>, Self::Lambda>;
-//     type R1Times128Bytes = Quot<Self::R1Times128, U8>;
-
-//     type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
-//     type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
-
-//     type SK = U48;
-//     type PK = U48;
-
-//     const IS_EM: bool = true;
-
-//     fn evaluate_owf(
-//         key: &Array<u8, Self::LambdaBytes>,
-//         input: &Array<u8, Self::InputSize>,
-//     ) -> Array<u8, Self::OutputSize> {
-//         let aes = Rijndael192::new(input);
-//         let mut output = Array::default();
-//         aes.encrypt_block_b2b(key, &mut output);
-//         for idx in 0..Self::InputSize::USIZE {
-//             output[idx] ^= key[idx];
-//         }
-//         output
-//     }
-
-//     #[inline]
-//     fn extendwitness(
-//         owf_key: &Array<u8, Self::LambdaBytes>,
-//         owf_input: &Array<u8, Self::InputSize>,
-//     ) -> Box<Array<u8, Self::LBytes>> {
-//         aes_extendedwitness::<Self>(owf_input, owf_key)
-//     }
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct OWF256EM<F = GF256>(PhantomData<F>)
-// where
-//     F: BigGaloisField<Length = U32>;
-
-// impl<F> OWFParameters for OWF256EM<F>
-// where
-//     F: BigGaloisField<Length = U32>,
-// {
-//     type BaseParams = BaseParams256<F>;
-//     type InputSize = U32;
-//     type OutputSize = U32;
-
-//     type B = U16;
-//     type Lambda = U256;
-//     type LambdaBytes = U32;
-//     type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
-//     type LBytes = U336;
-//     type L = Prod<Self::LBytes, U8>;
-//     type LHatBytes = LHatBytes<Self::LBytes, Self::LambdaBytes, Self::B>;
-//     type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
-
-//     type NK = U8;
-//     type NSt = U8;
-//     type NStBytes = Prod<Self::NSt, U4>;
-//     type NStBits = Prod<Self::NStBytes, U8>;
-//     type Beta = U1;
-//     type R = U14;
-//     type SKe = U60;
-//     type LKe = U256;
-//     type LKeBytes = Quot<Self::LKe, U8>;
-//     type LEnc = U2432;
-//     type LEncBytes = Quot<Self::LEnc, U8>;
-//     type NLeafCommit = U2;
-
-//     type R1Times128 = Prod<Sum<Self::R, U1>, Self::Lambda>;
-//     type R1Times128Bytes = Quot<Self::R1Times128, U8>;
-
-//     type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
-//     type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
-
-//     type SK = U64;
-//     type PK = U64;
-
-//     const IS_EM: bool = true;
-
-//     fn evaluate_owf(
-//         key: &Array<u8, Self::LambdaBytes>,
-//         input: &Array<u8, Self::InputSize>,
-//     ) -> Array<u8, Self::OutputSize> {
-//         let aes = Rijndael256::new(input);
-//         let mut output = Array::default();
-//         aes.encrypt_block_b2b(key, &mut output);
-//         for idx in 0..Self::InputSize::USIZE {
-//             output[idx] ^= key[idx];
-//         }
-//         output
-//     }
-
-//     #[inline]
-//     fn extendwitness(
-//         owf_key: &Array<u8, Self::LambdaBytes>,
-//         owf_input: &Array<u8, Self::InputSize>,
-//     ) -> Box<Array<u8, Self::LBytes>> {
-//         aes_extendedwitness::<Self>(owf_input, owf_key)
-//     }
-// }
-
-// pub(crate) trait TauParameters {
-//     /// Number of small-VOLE instances
-//     type Tau: ArraySize;
-//     /// Bit-length of the larger small-VOLE instances (the smaller small-VOLE instances have length K-1)
-//     type K: ArraySize;
-//     /// Number of smaller small-VOLE instances
-//     type Tau0: ArraySize;
-//     /// Number of larger small-VOLE instances
-//     type Tau1: ArraySize;
-//     /// Number of leaves of the GGM tree
-//     const L: usize;
-//     /// Threshold for the maximum opening size of the GGM tree
-//     type Topen: ArraySize;
-
-//     #[inline]
-//     fn tau1_offset_unchecked(i: usize) -> usize {
-//         Self::K::USIZE * i
-//     }
-
-//     #[inline]
-//     fn tau0_offset_unchecked(i: usize) -> usize {
-//         Self::Tau1::USIZE * (Self::K::USIZE) + (Self::K::USIZE - 1) * (i - Self::Tau1::USIZE)
-//     }
-
-//     /// Retuns leaf offset of the i-th small-VOLE instance within the GGM tree
-//     fn bavc_index_offset(i: usize) -> usize {
-//         if i < Self::Tau1::USIZE {
-//             return (1 << Self::K::USIZE) * i;
-//         }
-//         Self::Tau1::USIZE * (1 << Self::K::USIZE)
-//             + (1 << (Self::K::USIZE - 1)) * (i - Self::Tau1::USIZE)
-//     }
-
-//     /// Returns the maximum depth of the i-th small-VOLE instance
-//     fn bavc_max_node_depth(i: usize) -> usize {
-//         if i < Self::Tau1::USIZE {
-//             Self::K::USIZE
-//         } else {
-//             Self::K::USIZE - 1
-//         }
-//     }
-
-//     /// Returns the maximum node index of the i-th small-VOLE instance
-//     fn bavc_max_node_index(i: usize) -> usize {
-//         1usize << Self::bavc_max_node_depth(i)
-//     }
-
-//     /// Maps the j-th entry of the i-th small-VOLE instance to the corresponding leaf in the GGM tree
-//     fn pos_in_tree(i: usize, j: usize) -> usize {
-//         let tmp = 1usize << (Self::K::USIZE - 1);
-
-//         if j < tmp {
-//             return Self::L - 1 + Self::Tau::USIZE * j + i;
-//         }
-
-//         // Applying mod 2^(k-1) is same as taking the k-2 LSB
-//         let mask = tmp - 1;
-//         Self::L - 1 + Self::Tau::USIZE * tmp + Self::Tau1::USIZE * (j & mask) + i
-//     }
-
-//     /// Returns the required array length for generating the vole correlations in [`crate::vole::convert_to_vole`]
-//     fn vole_array_length(i: usize) -> usize {
-//         let n = Self::bavc_max_node_index(i);
-//         n / 2
-//             - (2..Self::bavc_max_node_depth(i))
-//                 .map(|d| n / (1 << d) - 1)
-//                 .sum::<usize>()
-//     }
-// }
-
-// // FAEST
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct Tau128Small;
-
-// impl TauParameters for Tau128Small {
-//     type Tau = U11;
-//     type K = U12;
-//     const L: usize = 22528;
-//     type Tau0 = U11;
-//     type Tau1 = U0;
-//     type Topen = U102;
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct Tau128Fast;
-
-// impl TauParameters for Tau128Fast {
-//     type Tau = U16;
-//     type K = U8;
-//     const L: usize = 3072;
-//     type Tau0 = U8;
-//     type Tau1 = U8;
-//     type Topen = U110;
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct Tau192Small;
-
-// impl TauParameters for Tau192Small {
-//     type Tau = U16;
-//     type K = U12;
-//     const L: usize = 40960;
-//     type Tau0 = U12;
-//     type Tau1 = U4;
-//     type Topen = U162;
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct Tau192Fast;
-
-// impl TauParameters for Tau192Fast {
-//     type Tau = U24;
-//     type K = U8;
-//     const L: usize = 5120;
-//     type Tau0 = U8;
-//     type Tau1 = U16;
-//     type Topen = U163;
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct Tau256Small;
-
-// impl TauParameters for Tau256Small {
-//     type Tau = U22;
-//     type K = U12;
-//     const L: usize = 61440;
-//     type Tau0 = U14;
-//     type Tau1 = U8;
-//     type Topen = U245;
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct Tau256Fast;
-
-// impl TauParameters for Tau256Fast {
-//     type Tau = U32;
-//     type K = U8;
-//     const L: usize = 7168;
-//     type Tau0 = U8;
-//     type Tau1 = U24;
-//     type Topen = U246;
-// }
-
-// // FAEST-EM
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct Tau128SmallEM;
-
-// impl TauParameters for Tau128SmallEM {
-//     type Tau = U11;
-//     type K = U12;
-//     const L: usize = 22528;
-//     type Tau0 = U11;
-//     type Tau1 = U0;
-//     type Topen = U103;
-// }
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct Tau128FastEM;
-
-// impl TauParameters for Tau128FastEM {
-//     type Tau = U16;
-//     type K = U8;
-//     const L: usize = 3072;
-//     type Tau0 = U8;
-//     type Tau1 = U8;
-//     type Topen = U112;
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct Tau192SmallEM;
-
-// impl TauParameters for Tau192SmallEM {
-//     type Tau = U16;
-//     type K = U12;
-//     const L: usize = 49152;
-//     type Tau0 = U8;
-//     type Tau1 = U8;
-//     type Topen = U162;
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct Tau192FastEM;
-
-// impl TauParameters for Tau192FastEM {
-//     type Tau = U24;
-//     type K = U8;
-//     const L: usize = 5120;
-//     type Tau0 = U8;
-//     type Tau1 = U16;
-//     type Topen = U176;
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct Tau256SmallEM;
-
-// impl TauParameters for Tau256SmallEM {
-//     type Tau = U22;
-//     type K = U12;
-//     const L: usize = 61440;
-//     type Tau0 = U14;
-//     type Tau1 = U8;
-//     type Topen = U218;
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct Tau256FastEM;
-
-// impl TauParameters for Tau256FastEM {
-//     type Tau = U32;
-//     type K = U8;
-//     const L: usize = 7168;
-//     type Tau0 = U8;
-//     type Tau1 = U24;
-//     type Topen = U234;
-// }
+/// OWF parameters from FAEST v3.0, Table 3.3.
+/// <https://faest.info/faest-spec-v3.0.pdf>
+pub(crate) trait OWFParameters: Sized {
+    // Base parameters of the OWF
+    type BaseParams: BaseParameters<Lambda = Self::Lambda, LambdaBytes = Self::LambdaBytes>;
+    /// Length of secret key (in bytes)
+    type SK: ArraySize;
+    /// Length of public key (in bytes)
+    type PK: ArraySize;
+    /// The input size of the OWF (in bytes)
+    type InputSize: ArraySize + Mul<U8, Output: ArraySize>;
+    /// The output size of the OWF (in bytes)
+    type OutputSize: ArraySize + Mul<U8, Output: ArraySize>;
+    /// Security parameter (in bits)
+    type Lambda: ArraySize + Mul<U2, Output: ArraySize>;
+    /// Security parameter (in bytes)
+    type LambdaBytes: SecurityParameter
+        + Mul<Self::NLeafCommit, Output: ArraySize>
+        + Mul<U2, Output = Self::LambdaBytesTimes2>
+        + Mul<U8, Output = Self::Lambda>;
+    /// Two times the security parameter (in bytes)
+    type LambdaBytesTimes2: ArraySize + Add<Self::LBytes, Output = Self::LProdLambdaBytes>;
+    /// Witness length for the zk proof (in bytes)
+    type LBytes: ArraySize + Mul<U8, Output = Self::L>;
+    /// Witness length for the zk proof (in bits)
+    type L: ArraySize;
+    /// Number of message blocks
+    type Beta: ArraySize;
+    /// Number of 32-bit words in key
+    type NK: ArraySize;
+    /// Number of encryption rounds
+    type R: ArraySize;
+    /// Number of S-boxes in key schedule
+    type SKe: ArraySize + Mul<U8, Output: ArraySize>;
+    /// Number of S-boxes in one encryption block
+    type SEnc: ArraySize;
+    /// Total number of degree-7 constraints, including the witness bit checks
+    type C: Unsigned;
+    /// Number of witness bits for key schedule (in bits)
+    type LKe: ArraySize;
+    /// Number of witness bits for key schedule (in bytes)
+    type LKeBytes: ArraySize + Mul<U8, Output = Self::LKe>;
+    /// Number of witness bits for encryption (in bits)
+    type LEnc: ArraySize;
+    /// Number of witness bits for encryption (in bytes)
+    type LEncBytes: ArraySize + Mul<U8, Output = Self::LEnc>;
+    /// Block size (in 32-bit words)
+    type NSt: ArraySize + Mul<U4, Output = Self::NStBytes>;
+    /// Block size (in bytes)
+    type NStBytes: SecurityParameter
+        + Mul<U8, Output = Self::NStBits>
+        + Div<U2, Output: ArraySize + Mul<U8, Output: ArraySize>>;
+    /// Block size (in bits)
+    type NStBits: ArraySize
+        + Mul<U4, Output: ArraySize>
+        + Div<U2, Output: ArraySize + Mul<U8, Output: ArraySize>>;
+    /// Number of Lambda-bit blocks in each leaf commitment
+    type NLeafCommit: ArraySize;
+    /// Result of [`Self::L`] * [`Self::Lambda`] (in bytes)
+    type LProdLambdaBytes: ArraySize + Mul<U8, Output: ArraySize>;
+    /// Result of ([`Self::R`] + 1) * 128 (in bytes)
+    type R1Times128Bytes: ArraySize
+        + Mul<U8, Output = Self::R1Times128>
+        + Sub<Self::LKeBytes, Output: ArraySize>;
+    /// Result of ([`Self::R`] + 1) * 128 (in bits)
+    type R1Times128: ArraySize + Sub<Self::LKe, Output: ArraySize>;
+    /// Result of [`Self::LKe`] - [`Self::Lambda`] (in bytes)
+    type LKeMinusLambdaBytes: ArraySize + Mul<U8, Output: ArraySize>;
+    /// Result of [`Self::LKe`] - [`Self::Lambda`] (in bits)
+    type LKeMinusLambda: ArraySize;
+
+    /// Returns whether the OWF is used in EM mode
+    const IS_EM: bool;
+
+    //     /// Applies the OWF using the secret key `key` to `input` and writes the result in the `output` slice
+    //     fn evaluate_owf(
+    //         key: &Array<u8, Self::LambdaBytes>,
+    //         input: &Array<u8, Self::InputSize>,
+    //     ) -> Array<u8, Self::OutputSize>;
+
+    //     /// Compute the extended witness from `owf_key` and `owf_input`
+    //     fn extendwitness(
+    //         owf_key: &Array<u8, Self::LambdaBytes>,
+    //         owf_input: &Array<u8, Self::InputSize>,
+    //     ) -> Box<Array<u8, Self::LBytes>>;
+
+    //     /// Compute the extended witness using the secret key `sk`
+    //     fn witness(sk: &SecretKey<Self>) -> Box<Array<u8, Self::LBytes>> {
+    //         Self::extendwitness(&sk.owf_key, &sk.pk.owf_input)
+    //     }
+
+    //     /// Generates the prover's Quicksilver constraints
+    //     fn prove(
+    //         w: &Array<u8, Self::LBytes>,
+    //         u: &Array<u8, Self::LambdaBytesTimes2>,
+    //         v: CstrntsVal<Self>,
+    //         pk: &PublicKey<Self>,
+    //         chall: &Array<u8, <Self::BaseParams as BaseParameters>::Chall>,
+    //     ) -> QSProof<Self> {
+    //         aes_prove::<Self>(w, u, v, pk, chall)
+    //     }
+
+    //     /// Derives the prover's challenge that can be used to verify the Quicksilver constraints
+    //     fn verify(
+    //         q: CstrntsVal<Self>,
+    //         d: &Array<u8, Self::LBytes>,
+    //         pk: &PublicKey<Self>,
+    //         chall_2: &Array<u8, <Self::BaseParams as BaseParameters>::Chall>,
+    //         chall_3: &Array<u8, Self::LambdaBytes>,
+    //         a1_tilde: &Array<u8, Self::LambdaBytes>,
+    //         a2_tilde: &Array<u8, Self::LambdaBytes>,
+    //     ) -> OWFField<Self> {
+    //         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
+    //     }
+
+    //     /// Generates the prover's secret key using the input generator
+    //     fn keygen_with_rng<R: Rng + ?Sized>(rng: &mut R) -> SecretKey<Self> {
+    //         let mut owf_key = Array::default();
+
+    //         loop {
+    //             rng.fill_bytes(&mut owf_key);
+    //             if owf_key[0] & 0b11 != 0b11 {
+    //                 break;
+    //             }
+    //         }
+
+    //         let mut owf_input = Array::default();
+    //         rng.fill_bytes(&mut owf_input);
+
+    //         let owf_output = Self::evaluate_owf(&owf_key, &owf_input);
+
+    //         SecretKey {
+    //             owf_key,
+    //             pk: PublicKey {
+    //                 owf_input,
+    //                 owf_output,
+    //             },
+    //         }
+    //     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OWF128<F = GF128>(PhantomData<F>);
+
+impl<F> OWFParameters for OWF128<F>
+where
+    F: BigGaloisField<Length = U16>,
+{
+    type BaseParams = BaseParams128<F>;
+    type InputSize = U16;
+    type OutputSize = U16;
+
+    type Lambda = U128;
+    type LambdaBytes = U16;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LBytes = Sum<Self::LKeBytes, Prod<Self::Beta, Self::LEncBytes>>;
+    type L = Prod<Self::LBytes, U8>;
+
+    type NK = U4;
+    type R = U10;
+    type SKe = U40;
+    type SEnc = Prod<Self::NStBytes, Self::R>;
+    type C =
+        Sum<Sum<Self::L, Prod<U2, Self::SKe>>, Sum<Prod<Self::Beta, Quot<Self::SEnc, U2>>, U1>>;
+    type Beta = U1;
+    type LKe = U448;
+    type LKeBytes = Quot<Self::LKe, U8>;
+    type LEnc = Prod<Diff<Quot<Self::R, U2>, U1>, Self::NStBits>;
+    type LEncBytes = Quot<Self::LEnc, U8>;
+    type NSt = U4;
+    type NStBytes = Prod<Self::NSt, U4>;
+    type NStBits = Prod<Self::NStBytes, U8>;
+    type NLeafCommit = U3;
+    type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
+
+    type R1Times128 = Prod<Sum<Self::R, U1>, U128>;
+    type R1Times128Bytes = Quot<Self::R1Times128, U8>;
+
+    type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
+    type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
+
+    type SK = U32;
+    type PK = U32;
+
+    const IS_EM: bool = false;
+
+    //     fn evaluate_owf(
+    //         key: &Array<u8, Self::LambdaBytes>,
+    //         input: &Array<u8, Self::InputSize>,
+    //     ) -> Array<u8, Self::OutputSize> {
+    //         let aes = Aes128Enc::new(key);
+    //         let mut output = Array::default();
+    //         aes.encrypt_block_b2b(input, &mut output);
+    //         output
+    //     }
+
+    //     #[inline]
+    //     fn extendwitness(
+    //         owf_key: &Array<u8, Self::LambdaBytes>,
+    //         owf_input: &Array<u8, Self::InputSize>,
+    //     ) -> Box<Array<u8, Self::LBytes>> {
+    //         aes_extendedwitness::<Self>(owf_key, owf_input)
+    //     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OWF192<F = GF192>(PhantomData<F>);
+
+impl<F> OWFParameters for OWF192<F>
+where
+    F: BigGaloisField<Length = U24>,
+{
+    type BaseParams = BaseParams192<F>;
+    type InputSize = U16;
+    type OutputSize = U32;
+
+    type Lambda = U192;
+    type LambdaBytes = U24;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LBytes = Sum<Self::LKeBytes, Prod<Self::Beta, Self::LEncBytes>>;
+    type L = Prod<Self::LBytes, U8>;
+    type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
+
+    type NK = U6;
+    type R = U12;
+    type SKe = U32;
+    type SEnc = Prod<Self::NStBytes, Self::R>;
+    type C =
+        Sum<Sum<Self::L, Prod<U2, Self::SKe>>, Sum<Prod<Self::Beta, Quot<Self::SEnc, U2>>, U1>>;
+    type Beta = U2;
+    type LKe = U448;
+    type LKeBytes = Quot<Self::LKe, U8>;
+    type LEnc = Prod<Diff<Quot<Self::R, U2>, U1>, Self::NStBits>;
+    type LEncBytes = Quot<Self::LEnc, U8>;
+    type NSt = U4;
+    type NStBytes = Prod<Self::NSt, U4>;
+    type NStBits = Prod<Self::NStBytes, U8>;
+    type NLeafCommit = U3;
+
+    type R1Times128 = Prod<Sum<Self::R, U1>, U128>;
+    type R1Times128Bytes = Quot<Self::R1Times128, U8>;
+
+    type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
+    type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
+
+    type SK = U40;
+    type PK = U48;
+
+    const IS_EM: bool = false;
+
+    //     fn evaluate_owf(
+    //         key: &Array<u8, Self::LambdaBytes>,
+    //         input: &Array<u8, Self::InputSize>,
+    //     ) -> Array<u8, Self::OutputSize> {
+    //         let aes = Aes192Enc::new(key);
+    //         let mut output1 = Array::default();
+    //         aes.encrypt_block_b2b(input, &mut output1);
+
+    //         let mut input = *input;
+    //         input[0] ^= 1;
+
+    //         let mut output2 = Array::default();
+    //         aes.encrypt_block_b2b(&input, &mut output2);
+    //         output1.concat(output2)
+    //     }
+
+    //     #[inline]
+    //     fn extendwitness(
+    //         owf_key: &Array<u8, Self::LambdaBytes>,
+    //         owf_input: &Array<u8, Self::InputSize>,
+    //     ) -> Box<Array<u8, Self::LBytes>> {
+    //         aes_extendedwitness::<Self>(owf_key, owf_input)
+    //     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OWF256<F = GF256>(PhantomData<F>);
+
+impl<F> OWFParameters for OWF256<F>
+where
+    F: BigGaloisField<Length = U32>,
+{
+    type BaseParams = BaseParams256<F>;
+    type InputSize = U16;
+    type OutputSize = U32;
+
+    type Lambda = U256;
+    type LambdaBytes = U32;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LBytes = Sum<Self::LKeBytes, Prod<Self::Beta, Self::LEncBytes>>;
+    type L = Prod<Self::LBytes, U8>;
+    type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
+
+    type NK = U8;
+    type R = U14;
+    type SKe = U52;
+    type SEnc = Prod<Self::NStBytes, Self::R>;
+    type C =
+        Sum<Sum<Self::L, Prod<U2, Self::SKe>>, Sum<Prod<Self::Beta, Quot<Self::SEnc, U2>>, U1>>;
+    type Beta = U2;
+    type LKe = U672;
+    type LKeBytes = Quot<Self::LKe, U8>;
+    type LEnc = Prod<Diff<Quot<Self::R, U2>, U1>, Self::NStBits>;
+    type LEncBytes = Quot<Self::LEnc, U8>;
+    type NSt = U4;
+    type NStBytes = Prod<Self::NSt, U4>;
+    type NStBits = Prod<Self::NStBytes, U8>;
+    type NLeafCommit = U3;
+
+    type R1Times128 = Prod<Sum<Self::R, U1>, U128>;
+    type R1Times128Bytes = Quot<Self::R1Times128, U8>;
+
+    type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
+    type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
+
+    type SK = U48;
+    type PK = U48;
+
+    const IS_EM: bool = false;
+
+    //     fn evaluate_owf(
+    //         key: &Array<u8, Self::LambdaBytes>,
+    //         input: &Array<u8, Self::InputSize>,
+    //     ) -> Array<u8, Self::OutputSize> {
+    //         let aes = Aes256Enc::new(key);
+    //         let mut output1 = Array::default();
+    //         aes.encrypt_block_b2b(input, &mut output1);
+
+    //         let mut input = *input;
+    //         input[0] ^= 1;
+
+    //         let mut output2 = Array::default();
+    //         aes.encrypt_block_b2b(&input, &mut output2);
+    //         output1.concat(output2)
+    //     }
+
+    //     #[inline]
+    //     fn extendwitness(
+    //         owf_key: &Array<u8, Self::LambdaBytes>,
+    //         owf_input: &Array<u8, Self::InputSize>,
+    //     ) -> Box<Array<u8, Self::LBytes>> {
+    //         aes_extendedwitness::<Self>(owf_key, owf_input)
+    //     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OWF128EM<F = GF128>(PhantomData<F>);
+
+impl<F> OWFParameters for OWF128EM<F>
+where
+    F: BigGaloisField<Length = U16>,
+{
+    type BaseParams = BaseParams128<F>;
+    type InputSize = U16;
+    type OutputSize = U16;
+
+    type Lambda = U128;
+    type LambdaBytes = U16;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LBytes = Sum<Self::LKeBytes, Prod<Self::Beta, Self::LEncBytes>>;
+    type L = Prod<Self::LBytes, U8>;
+    type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
+
+    type NK = U4;
+    type NSt = U4;
+    type NStBytes = Prod<Self::NSt, U4>;
+    type NStBits = Prod<Self::NStBytes, U8>;
+    type R = U10;
+    type SKe = U0;
+    type SEnc = Prod<Self::NStBytes, Self::R>;
+    type C =
+        Sum<Sum<Self::L, Prod<U2, Self::SKe>>, Sum<Prod<Self::Beta, Quot<Self::SEnc, U2>>, U1>>;
+    type Beta = U1;
+    type LKe = U128;
+    type LKeBytes = Quot<Self::LKe, U8>;
+    type LEnc = Prod<Diff<Quot<Self::R, U2>, U1>, Self::NStBits>;
+    type LEncBytes = Quot<Self::LEnc, U8>;
+    type NLeafCommit = U2;
+
+    type R1Times128 = Prod<Sum<Self::R, U1>, U128>;
+    type R1Times128Bytes = Quot<Self::R1Times128, U8>;
+
+    type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
+    type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
+
+    type SK = U32;
+    type PK = U32;
+
+    const IS_EM: bool = true;
+
+    //     fn evaluate_owf(
+    //         key: &Array<u8, Self::LambdaBytes>,
+    //         input: &Array<u8, Self::InputSize>,
+    //     ) -> Array<u8, Self::OutputSize> {
+    //         let aes = Aes128Enc::new(input);
+    //         let mut output = Array::default();
+    //         aes.encrypt_block_b2b(key, &mut output);
+    //         for idx in 0..Self::InputSize::USIZE {
+    //             output[idx] ^= key[idx];
+    //         }
+    //         output
+    //     }
+
+    //     #[inline]
+    //     fn extendwitness(
+    //         owf_key: &Array<u8, Self::LambdaBytes>,
+    //         owf_input: &Array<u8, Self::InputSize>,
+    //     ) -> Box<Array<u8, Self::LBytes>> {
+    //         aes_extendedwitness::<Self>(owf_input, owf_key)
+    //     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OWF192EM<F = GF192>(PhantomData<F>)
+where
+    F: BigGaloisField<Length = U24>;
+
+impl<F> OWFParameters for OWF192EM<F>
+where
+    F: BigGaloisField<Length = U24>,
+{
+    type BaseParams = BaseParams192<F>;
+    type InputSize = U24;
+    type OutputSize = U24;
+
+    type Lambda = U192;
+    type LambdaBytes = U24;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LBytes = Sum<Self::LKeBytes, Prod<Self::Beta, Self::LEncBytes>>;
+    type L = Prod<Self::LBytes, U8>;
+    type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
+
+    type NK = U6;
+    type NSt = U6;
+    type NStBytes = Prod<Self::NSt, U4>;
+    type NStBits = Prod<Self::NStBytes, U8>;
+    type Beta = U1;
+    type R = U12;
+    type SKe = U0;
+    type SEnc = Prod<Self::NStBytes, Self::R>;
+    type C =
+        Sum<Sum<Self::L, Prod<U2, Self::SKe>>, Sum<Prod<Self::Beta, Quot<Self::SEnc, U2>>, U1>>;
+    type LKe = U192;
+    type LKeBytes = Quot<Self::LKe, U8>;
+    type LEnc = Prod<Diff<Quot<Self::R, U2>, U1>, Self::NStBits>;
+    type LEncBytes = Quot<Self::LEnc, U8>;
+    type NLeafCommit = U2;
+
+    type R1Times128 = Prod<Sum<Self::R, U1>, Self::Lambda>;
+    type R1Times128Bytes = Quot<Self::R1Times128, U8>;
+
+    type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
+    type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
+
+    type SK = U48;
+    type PK = U48;
+
+    const IS_EM: bool = true;
+
+    //     fn evaluate_owf(
+    //         key: &Array<u8, Self::LambdaBytes>,
+    //         input: &Array<u8, Self::InputSize>,
+    //     ) -> Array<u8, Self::OutputSize> {
+    //         let aes = Rijndael192::new(input);
+    //         let mut output = Array::default();
+    //         aes.encrypt_block_b2b(key, &mut output);
+    //         for idx in 0..Self::InputSize::USIZE {
+    //             output[idx] ^= key[idx];
+    //         }
+    //         output
+    //     }
+
+    //     #[inline]
+    //     fn extendwitness(
+    //         owf_key: &Array<u8, Self::LambdaBytes>,
+    //         owf_input: &Array<u8, Self::InputSize>,
+    //     ) -> Box<Array<u8, Self::LBytes>> {
+    //         aes_extendedwitness::<Self>(owf_input, owf_key)
+    //     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OWF256EM<F = GF256>(PhantomData<F>)
+where
+    F: BigGaloisField<Length = U32>;
+
+impl<F> OWFParameters for OWF256EM<F>
+where
+    F: BigGaloisField<Length = U32>,
+{
+    type BaseParams = BaseParams256<F>;
+    type InputSize = U32;
+    type OutputSize = U32;
+
+    type Lambda = U256;
+    type LambdaBytes = U32;
+    type LambdaBytesTimes2 = Prod<Self::LambdaBytes, U2>;
+    type LBytes = Sum<Self::LKeBytes, Prod<Self::Beta, Self::LEncBytes>>;
+    type L = Prod<Self::LBytes, U8>;
+    type LProdLambdaBytes = Sum<Self::LambdaBytesTimes2, Self::LBytes>;
+
+    type NK = U8;
+    type NSt = U8;
+    type NStBytes = Prod<Self::NSt, U4>;
+    type NStBits = Prod<Self::NStBytes, U8>;
+    type Beta = U1;
+    type R = U14;
+    type SKe = U0;
+    type SEnc = Prod<Self::NStBytes, Self::R>;
+    type C =
+        Sum<Sum<Self::L, Prod<U2, Self::SKe>>, Sum<Prod<Self::Beta, Quot<Self::SEnc, U2>>, U1>>;
+    type LKe = U256;
+    type LKeBytes = Quot<Self::LKe, U8>;
+    type LEnc = Prod<Diff<Quot<Self::R, U2>, U1>, Self::NStBits>;
+    type LEncBytes = Quot<Self::LEnc, U8>;
+    type NLeafCommit = U2;
+
+    type R1Times128 = Prod<Sum<Self::R, U1>, Self::Lambda>;
+    type R1Times128Bytes = Quot<Self::R1Times128, U8>;
+
+    type LKeMinusLambda = Diff<Self::LKe, Self::Lambda>;
+    type LKeMinusLambdaBytes = Quot<Self::LKeMinusLambda, U8>;
+
+    type SK = U64;
+    type PK = U64;
+
+    const IS_EM: bool = true;
+
+    //     fn evaluate_owf(
+    //         key: &Array<u8, Self::LambdaBytes>,
+    //         input: &Array<u8, Self::InputSize>,
+    //     ) -> Array<u8, Self::OutputSize> {
+    //         let aes = Rijndael256::new(input);
+    //         let mut output = Array::default();
+    //         aes.encrypt_block_b2b(key, &mut output);
+    //         for idx in 0..Self::InputSize::USIZE {
+    //             output[idx] ^= key[idx];
+    //         }
+    //         output
+    //     }
+
+    //     #[inline]
+    //     fn extendwitness(
+    //         owf_key: &Array<u8, Self::LambdaBytes>,
+    //         owf_input: &Array<u8, Self::InputSize>,
+    //     ) -> Box<Array<u8, Self::LBytes>> {
+    //         aes_extendedwitness::<Self>(owf_input, owf_key)
+    //     }
+}
+
+pub(crate) trait TauParameters {
+    /// Number of small-VOLE instances
+    type Tau: ArraySize;
+    /// Bit-length of the larger small-VOLE instances (the smaller small-VOLE instances have length K-1)
+    type K: ArraySize;
+    /// Number of smaller small-VOLE instances
+    type Tau0: ArraySize;
+    /// Number of larger small-VOLE instances
+    type Tau1: ArraySize;
+    /// Number of leaves of the GGM tree
+    const L: usize;
+    /// Threshold for the maximum opening size of the GGM tree
+    type Topen: ArraySize;
+
+    #[inline]
+    fn tau1_offset_unchecked(i: usize) -> usize {
+        Self::K::USIZE * i
+    }
+
+    #[inline]
+    fn tau0_offset_unchecked(i: usize) -> usize {
+        Self::Tau1::USIZE * (Self::K::USIZE) + (Self::K::USIZE - 1) * (i - Self::Tau1::USIZE)
+    }
+
+    /// Retuns leaf offset of the i-th small-VOLE instance within the GGM tree
+    fn bavc_index_offset(i: usize) -> usize {
+        if i < Self::Tau1::USIZE {
+            return (1 << Self::K::USIZE) * i;
+        }
+        Self::Tau1::USIZE * (1 << Self::K::USIZE)
+            + (1 << (Self::K::USIZE - 1)) * (i - Self::Tau1::USIZE)
+    }
+
+    /// Returns the maximum depth of the i-th small-VOLE instance
+    fn bavc_max_node_depth(i: usize) -> usize {
+        if i < Self::Tau1::USIZE {
+            Self::K::USIZE
+        } else {
+            Self::K::USIZE - 1
+        }
+    }
+
+    /// Returns the maximum node index of the i-th small-VOLE instance
+    fn bavc_max_node_index(i: usize) -> usize {
+        1usize << Self::bavc_max_node_depth(i)
+    }
+
+    /// Maps the j-th entry of the i-th small-VOLE instance to the corresponding leaf in the GGM tree
+    fn pos_in_tree(i: usize, j: usize) -> usize {
+        let tmp = 1usize << (Self::K::USIZE - 1);
+
+        if j < tmp {
+            return Self::L - 1 + Self::Tau::USIZE * j + i;
+        }
+
+        // Applying mod 2^(k-1) is same as taking the k-2 LSB
+        let mask = tmp - 1;
+        Self::L - 1 + Self::Tau::USIZE * tmp + Self::Tau1::USIZE * (j & mask) + i
+    }
+
+    /// Returns the required array length for generating the vole correlations in [`crate::vole::convert_to_vole`]
+    fn vole_array_length(i: usize) -> usize {
+        let n = Self::bavc_max_node_index(i);
+        n / 2
+            - (2..Self::bavc_max_node_depth(i))
+                .map(|d| n / (1 << d) - 1)
+                .sum::<usize>()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau128Small;
+
+impl TauParameters for Tau128Small {
+    type Tau = U11;
+    type K = U12;
+    const L: usize = 22528;
+    type Tau0 = U11;
+    type Tau1 = U0;
+    type Topen = U102;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau128Fast;
+
+impl TauParameters for Tau128Fast {
+    type Tau = U17;
+    type K = U8;
+    const L: usize = 2304;
+    type Tau0 = U16;
+    type Tau1 = U1;
+    type Topen = U108;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau192Small;
+
+impl TauParameters for Tau192Small {
+    type Tau = U16;
+    type K = U12;
+    const L: usize = 40960;
+    type Tau0 = U12;
+    type Tau1 = U4;
+    type Topen = U162;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau192Fast;
+
+impl TauParameters for Tau192Fast {
+    type Tau = U24;
+    type K = U8;
+    const L: usize = 5120;
+    type Tau0 = U8;
+    type Tau1 = U16;
+    type Topen = U163;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau256Small;
+
+impl TauParameters for Tau256Small {
+    type Tau = U22;
+    type K = U12;
+    const L: usize = 61440;
+    type Tau0 = U14;
+    type Tau1 = U8;
+    type Topen = U225;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau256Fast;
+
+impl TauParameters for Tau256Fast {
+    type Tau = U33;
+    type K = U8;
+    const L: usize = 6400;
+    type Tau0 = U16;
+    type Tau1 = U17;
+    type Topen = U229;
+}
+
+// FAEST-EM
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau128SmallEM;
+
+impl TauParameters for Tau128SmallEM {
+    type Tau = U11;
+    type K = U12;
+    const L: usize = 22528;
+    type Tau0 = U11;
+    type Tau1 = U0;
+    type Topen = U103;
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau128FastEM;
+
+impl TauParameters for Tau128FastEM {
+    type Tau = U17;
+    type K = U8;
+    const L: usize = 2304;
+    type Tau0 = U16;
+    type Tau1 = U1;
+    type Topen = U105;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau192SmallEM;
+
+impl TauParameters for Tau192SmallEM {
+    type Tau = U16;
+    type K = U12;
+    const L: usize = 49152;
+    type Tau0 = U8;
+    type Tau1 = U8;
+    type Topen = U162;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau192FastEM;
+
+impl TauParameters for Tau192FastEM {
+    type Tau = U25;
+    type K = U8;
+    const L: usize = 4352;
+    type Tau0 = U16;
+    type Tau1 = U9;
+    type Topen = U171;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau256SmallEM;
+
+impl TauParameters for Tau256SmallEM {
+    type Tau = U22;
+    type K = U12;
+    const L: usize = 61440;
+    type Tau0 = U14;
+    type Tau1 = U8;
+    type Topen = U218;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tau256FastEM;
+
+impl TauParameters for Tau256FastEM {
+    type Tau = U33;
+    type K = U8;
+    const L: usize = 6400;
+    type Tau0 = U16;
+    type Tau1 = U17;
+    type Topen = U229;
+}
 
 // pub(crate) trait FAESTParameters {
 //     /// Associated [`OWFParameters`] type
@@ -1221,6 +1219,48 @@ where
 //     BavcEm<RandomOracleShake256, PRG256, LeafHasher256<F>, Tau256SmallEM>;
 // pub(crate) type BAVC256FastEM<F> =
 //     BavcEm<RandomOracleShake256, PRG256, LeafHasher256<F>, Tau256FastEM>;
+
+#[cfg(test)]
+mod owf_tests {
+    use super::*;
+
+    fn check<O: OWFParameters>(expected: [usize; 13]) {
+        assert_eq!(
+            [
+                O::Lambda::USIZE,
+                O::NK::USIZE,
+                O::NSt::USIZE,
+                O::NStBytes::USIZE,
+                O::NStBits::USIZE,
+                O::Beta::USIZE,
+                O::R::USIZE,
+                O::SKe::USIZE,
+                O::SEnc::USIZE,
+                O::LKe::USIZE,
+                O::LEnc::USIZE,
+                O::L::USIZE,
+                O::C::USIZE,
+            ],
+            expected
+        );
+        assert_eq!(O::LBytes::USIZE * 8, O::L::USIZE);
+        assert_eq!(O::LKeBytes::USIZE * 8, O::LKe::USIZE);
+        assert_eq!(O::LEncBytes::USIZE * 8, O::LEnc::USIZE);
+        assert_eq!(O::SK::USIZE, O::LambdaBytes::USIZE + O::InputSize::USIZE);
+        assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::OutputSize::USIZE);
+    }
+
+    #[test]
+    fn v3_table_3_3() {
+        // Columns follow Table 3.3, including the total constraint count C.
+        check::<OWF128>([128, 4, 4, 16, 128, 1, 10, 40, 160, 448, 512, 960, 1121]);
+        check::<OWF192>([192, 6, 4, 16, 128, 2, 12, 32, 192, 448, 640, 1728, 1985]);
+        check::<OWF256>([256, 8, 4, 16, 128, 2, 14, 52, 224, 672, 768, 2208, 2537]);
+        check::<OWF128EM>([128, 4, 4, 16, 128, 1, 10, 0, 160, 128, 512, 640, 721]);
+        check::<OWF192EM>([192, 6, 6, 24, 192, 1, 12, 0, 288, 192, 960, 1152, 1297]);
+        check::<OWF256EM>([256, 8, 8, 32, 256, 1, 14, 0, 448, 256, 1536, 1792, 2017]);
+    }
+}
 
 // #[cfg(test)]
 // mod test {
