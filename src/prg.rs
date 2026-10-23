@@ -11,7 +11,7 @@ use hybrid_array::{
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
-use crate::utils::Reader;
+use crate::{parameter::SecurityParameter, utils::Reader};
 
 type Aes128Ctr32LE = ctr::Ctr32LE<aes::Aes128>;
 type Aes192Ctr32LE = ctr::Ctr32LE<aes::Aes192>;
@@ -53,7 +53,7 @@ fn read_from_stream<S: StreamCipher>(stream: &mut S, dst: &mut [u8]) {
 /// Interface for the PRG
 pub(crate) trait PseudoRandomGenerator: Sized + Reader {
     /// Size of the PRG key
-    type KeySize: ArraySize;
+    type KeySize: SecurityParameter;
 
     /// Instantiate new PRG instance
     fn new_prg(k: &Array<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self;
