@@ -331,12 +331,7 @@ pub(crate) trait LeafHasher {
     type F: BigGaloisField<Length = Self::LambdaBytes>;
     type ExtensionField: ExtensionField<Length = Prod<Self::LambdaBytes, U3>, BaseField = Self::F>;
     type Lambda: ArraySize;
-    type LambdaBytes: ArraySize
-        + Mul<U2, Output: ArraySize>
-        + Mul<U3, Output: ArraySize>
-        + Mul<U4, Output: ArraySize>
-        + Mul<U8, Output = Self::Lambda>
-        + PartialEq;
+    type LambdaBytes: SecurityParameter;
 
     fn hash(
         uhash: &Array<u8, Prod<Self::LambdaBytes, U3>>,
