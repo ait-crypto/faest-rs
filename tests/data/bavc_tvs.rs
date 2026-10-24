@@ -1,4 +1,4 @@
-// Test vectors converted from <https://github.com/faest-sign/faest-ref/blob/main/tests/bavc_tvs.hpp>
+//! Test vectors converted from <https://github.com/faest-sign/faest-ref/blob/main/tests/bavc_tvs.hpp>
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Mode {
