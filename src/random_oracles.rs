@@ -47,6 +47,11 @@ pub(crate) trait RandomOracle {
     fn h4_init() -> Self::Hasher<4> {
         Self::Hasher::default()
     }
+
+    /// Create hasher for `H5`
+    fn h5_init() -> Self::Hasher<5> {
+        Self::Hasher::default()
+    }
 }
 
 /// Interface for hashers associated ot the random oracles
