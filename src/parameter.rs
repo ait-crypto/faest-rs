@@ -8,7 +8,7 @@ use core::{
 use alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
-    // bavc::{BatchVectorCommitment, Bavc, BavcEm},
+    bavc::{BatchVectorCommitment, Bavc, LeafCommitment, LeafCommitmentEm},
     fields::{BaseField, BigGaloisField, GF128, GF192, GF256},
     // internal_keys::{PublicKey, SecretKey},
     prg::{PRG128, PRG192, PRG256, PseudoRandomGenerator},
@@ -21,6 +21,10 @@ use crate::{
     utils::xor_arrays_inplace,
     // witness::aes_extendedwitness,
     // zk_constraints::{CstrntsVal, aes_prove, aes_verify},
+    vole::tables::{
+        TABLES_128F, TABLES_128S, TABLES_192F, TABLES_192S, TABLES_256F, TABLES_256S,
+        TABLES_EM_192F, TABLES_EM_192S, VoleTables,
+    },
 };
 use aes::{
     Aes128Enc, Aes192Enc, Aes256Enc,
@@ -777,6 +781,8 @@ where
 }
 
 pub(crate) trait TauParameters {
+    /// Bilinear multiplication tables
+    const VOLE_TABLES: &'static crate::vole::tables::VoleTables;
     /// Number of small-VOLE instances
     type Tau: ArraySize;
     /// Bit-length of the larger small-VOLE instances (the smaller small-VOLE instances have length K-1)
@@ -850,6 +856,7 @@ pub(crate) trait TauParameters {
 pub(crate) struct Tau128Small;
 
 impl TauParameters for Tau128Small {
+    const VOLE_TABLES: &'static VoleTables = &TABLES_128S;
     type Tau = U11;
     type K = U12;
     const L: usize = 22528;
@@ -862,6 +869,7 @@ impl TauParameters for Tau128Small {
 pub(crate) struct Tau128Fast;
 
 impl TauParameters for Tau128Fast {
+    const VOLE_TABLES: &'static VoleTables = &TABLES_128F;
     type Tau = U17;
     type K = U8;
     const L: usize = 2304;
@@ -874,6 +882,7 @@ impl TauParameters for Tau128Fast {
 pub(crate) struct Tau192Small;
 
 impl TauParameters for Tau192Small {
+    const VOLE_TABLES: &'static VoleTables = &TABLES_192S;
     type Tau = U16;
     type K = U12;
     const L: usize = 40960;
@@ -886,6 +895,7 @@ impl TauParameters for Tau192Small {
 pub(crate) struct Tau192Fast;
 
 impl TauParameters for Tau192Fast {
+    const VOLE_TABLES: &'static VoleTables = &TABLES_192F;
     type Tau = U24;
     type K = U8;
     const L: usize = 5120;
@@ -898,6 +908,7 @@ impl TauParameters for Tau192Fast {
 pub(crate) struct Tau256Small;
 
 impl TauParameters for Tau256Small {
+    const VOLE_TABLES: &'static VoleTables = &TABLES_256S;
     type Tau = U22;
     type K = U12;
     const L: usize = 61440;
@@ -910,6 +921,7 @@ impl TauParameters for Tau256Small {
 pub(crate) struct Tau256Fast;
 
 impl TauParameters for Tau256Fast {
+    const VOLE_TABLES: &'static VoleTables = &TABLES_256F;
     type Tau = U33;
     type K = U8;
     const L: usize = 6400;
@@ -923,6 +935,7 @@ impl TauParameters for Tau256Fast {
 pub(crate) struct Tau128SmallEM;
 
 impl TauParameters for Tau128SmallEM {
+    const VOLE_TABLES: &'static VoleTables = &TABLES_128S;
     type Tau = U11;
     type K = U12;
     const L: usize = 22528;
@@ -934,6 +947,7 @@ impl TauParameters for Tau128SmallEM {
 pub(crate) struct Tau128FastEM;
 
 impl TauParameters for Tau128FastEM {
+    const VOLE_TABLES: &'static VoleTables = &TABLES_128F;
     type Tau = U17;
     type K = U8;
     const L: usize = 2304;
@@ -946,6 +960,7 @@ impl TauParameters for Tau128FastEM {
 pub(crate) struct Tau192SmallEM;
 
 impl TauParameters for Tau192SmallEM {
+    const VOLE_TABLES: &'static VoleTables = &TABLES_EM_192S;
     type Tau = U16;
     type K = U12;
     const L: usize = 49152;
@@ -958,6 +973,7 @@ impl TauParameters for Tau192SmallEM {
 pub(crate) struct Tau192FastEM;
 
 impl TauParameters for Tau192FastEM {
+    const VOLE_TABLES: &'static VoleTables = &TABLES_EM_192F;
     type Tau = U25;
     type K = U8;
     const L: usize = 4352;
@@ -970,6 +986,7 @@ impl TauParameters for Tau192FastEM {
 pub(crate) struct Tau256SmallEM;
 
 impl TauParameters for Tau256SmallEM {
+    const VOLE_TABLES: &'static VoleTables = &TABLES_256S;
     type Tau = U22;
     type K = U12;
     const L: usize = 61440;
@@ -982,6 +999,7 @@ impl TauParameters for Tau256SmallEM {
 pub(crate) struct Tau256FastEM;
 
 impl TauParameters for Tau256FastEM {
+    const VOLE_TABLES: &'static VoleTables = &TABLES_256F;
     type Tau = U33;
     type K = U8;
     const L: usize = 6400;
@@ -1200,25 +1218,28 @@ impl TauParameters for Tau256FastEM {
 //     const SIGNATURE_SIZE: usize = 23476;
 // }
 
-// pub(crate) type BAVC128Small<F> = Bavc<RandomOracleShake128, PRG128, LeafHasher128<F>, Tau128Small>;
-// pub(crate) type BAVC128Fast<F> = Bavc<RandomOracleShake128, PRG128, LeafHasher128<F>, Tau128Fast>;
-// pub(crate) type BAVC192Small<F> = Bavc<RandomOracleShake256, PRG192, LeafHasher192<F>, Tau192Small>;
-// pub(crate) type BAVC192Fast<F> = Bavc<RandomOracleShake256, PRG192, LeafHasher192<F>, Tau192Fast>;
-// pub(crate) type BAVC256Small<F> = Bavc<RandomOracleShake256, PRG256, LeafHasher256<F>, Tau256Small>;
-// pub(crate) type BAVC256Fast<F> = Bavc<RandomOracleShake256, PRG256, LeafHasher256<F>, Tau256Fast>;
+pub(crate) type BAVC128Small<F> =
+    Bavc<RandomOracleShake128, LeafCommitment<PRG128, LeafHasher128<F>>, Tau128Small>;
+pub(crate) type BAVC128Fast<F> =
+    Bavc<RandomOracleShake128, LeafCommitment<PRG128, LeafHasher128<F>>, Tau128Fast>;
+pub(crate) type BAVC192Small<F> =
+    Bavc<RandomOracleShake256, LeafCommitment<PRG192, LeafHasher192<F>>, Tau192Small>;
+pub(crate) type BAVC192Fast<F> =
+    Bavc<RandomOracleShake256, LeafCommitment<PRG192, LeafHasher192<F>>, Tau192Fast>;
+pub(crate) type BAVC256Small<F> =
+    Bavc<RandomOracleShake256, LeafCommitment<PRG256, LeafHasher256<F>>, Tau256Small>;
+pub(crate) type BAVC256Fast<F> =
+    Bavc<RandomOracleShake256, LeafCommitment<PRG256, LeafHasher256<F>>, Tau256Fast>;
 
-// pub(crate) type BAVC128SmallEM<F> =
-//     BavcEm<RandomOracleShake128, PRG128, LeafHasher128<F>, Tau128SmallEM>;
-// pub(crate) type BAVC128FastEM<F> =
-//     BavcEm<RandomOracleShake128, PRG128, LeafHasher128<F>, Tau128FastEM>;
-// pub(crate) type BAVC192SmallEM<F> =
-//     BavcEm<RandomOracleShake256, PRG192, LeafHasher192<F>, Tau192SmallEM>;
-// pub(crate) type BAVC192FastEM<F> =
-//     BavcEm<RandomOracleShake256, PRG192, LeafHasher192<F>, Tau192FastEM>;
-// pub(crate) type BAVC256SmallEM<F> =
-//     BavcEm<RandomOracleShake256, PRG256, LeafHasher256<F>, Tau256SmallEM>;
-// pub(crate) type BAVC256FastEM<F> =
-//     BavcEm<RandomOracleShake256, PRG256, LeafHasher256<F>, Tau256FastEM>;
+pub(crate) type BAVC128SmallEM =
+    Bavc<RandomOracleShake128, LeafCommitmentEm<PRG128>, Tau128SmallEM>;
+pub(crate) type BAVC128FastEM = Bavc<RandomOracleShake128, LeafCommitmentEm<PRG128>, Tau128FastEM>;
+pub(crate) type BAVC192SmallEM =
+    Bavc<RandomOracleShake256, LeafCommitmentEm<PRG192>, Tau192SmallEM>;
+pub(crate) type BAVC192FastEM = Bavc<RandomOracleShake256, LeafCommitmentEm<PRG192>, Tau192FastEM>;
+pub(crate) type BAVC256SmallEM =
+    Bavc<RandomOracleShake256, LeafCommitmentEm<PRG256>, Tau256SmallEM>;
+pub(crate) type BAVC256FastEM = Bavc<RandomOracleShake256, LeafCommitmentEm<PRG256>, Tau256FastEM>;
 
 #[cfg(test)]
 mod owf_tests {
