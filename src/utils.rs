@@ -3,7 +3,7 @@ use core::iter::zip;
 use hybrid_array::{Array, ArraySize, typenum::Unsigned};
 use itertools::izip;
 
-// use crate::parameter::TauParameters;
+use crate::parameter::TauParameters;
 
 /// Reader interface for PRGs and random oracles
 pub(crate) trait Reader {
@@ -18,6 +18,56 @@ pub(crate) trait Reader {
         let mut dst = Array::default();
         self.read(&mut dst);
         dst
+    }
+}
+
+#[inline]
+pub(crate) fn load_u64(src: &[u8], word_idx: usize) -> u64 {
+    let offset = word_idx * 8;
+    let mut bytes = [0u8; 8];
+    if offset < src.len() {
+        let count = (src.len() - offset).min(8);
+        bytes[..count].copy_from_slice(&src[offset..offset + count]);
+    }
+    u64::from_le_bytes(bytes)
+}
+
+#[inline]
+pub(crate) const fn bit_word_mask(bits: usize) -> u64 {
+    if bits >= 64 {
+        u64::MAX
+    } else {
+        (1u64 << bits) - 1
+    }
+}
+
+pub(crate) fn extract_bit_slice(src: &[u8], offset: usize, bits: u32) -> u16 {
+    let bit_offset = offset & 7;
+    let byte_idx = offset >> 3;
+    assert!(bits > 0 && bits <= 16);
+
+    let mut value = (src[byte_idx] >> bit_offset) as u32;
+    if bit_offset + bits as usize > 8 {
+        value |= (src[byte_idx + 1] as u32) << (8 - bit_offset);
+    }
+    if bit_offset + bits as usize > 16 {
+        value |= (src[byte_idx + 2] as u32) << (16 - bit_offset);
+    }
+    return (value & ((1u32 << bits) - 1)) as u16;
+}
+
+pub(crate) fn insert_bit_slice(dst: &mut [u8], offset: usize, value: u16, bits: u32) {
+    let bit_offset = offset & 7;
+    let byte_idx = offset >> 3;
+    assert!(bits > 0 && bits <= 16);
+
+    let shifted = (value as u32) << bit_offset;
+    dst[byte_idx] |= shifted as u8;
+    if bit_offset + bits as usize > 8 {
+        dst[byte_idx + 1] |= (shifted >> 8) as u8;
+    }
+    if bit_offset + bits as usize > 16 {
+        dst[byte_idx + 2] |= (shifted >> 16) as u8;
     }
 }
 
@@ -76,19 +126,19 @@ const fn chall_to_u16(chall: &[u8], start_bit: usize, k: usize) -> u16 {
         << (nbits_first_byte + 8)
 }
 
-// pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> Array<u16, TAU::Tau> {
-//     let k = TAU::K::USIZE;
+pub(crate) fn decode_all_chall_3<TAU: TauParameters>(chall: &[u8]) -> Array<u16, TAU::Tau> {
+    let k = TAU::K::USIZE;
 
-//     // Compute Delta_i[0...Tau1)
-//     let first_half =
-//         (0..TAU::Tau1::USIZE).map(|i| chall_to_u16(chall, TAU::tau1_offset_unchecked(i), k));
+    // Compute Delta_i[0...Tau1)
+    let first_half =
+        (0..TAU::Tau1::USIZE).map(|i| chall_to_u16(chall, TAU::tau1_offset_unchecked(i), k));
 
-//     // Compute Delta_i[Tau1..Tau)
-//     let second_half = (TAU::Tau1::USIZE..TAU::Tau::USIZE)
-//         .map(|i| chall_to_u16(chall, TAU::tau0_offset_unchecked(i), k - 1));
+    // Compute Delta_i[Tau1..Tau)
+    let second_half = (TAU::Tau1::USIZE..TAU::Tau::USIZE)
+        .map(|i| chall_to_u16(chall, TAU::tau0_offset_unchecked(i), k - 1));
 
-//     first_half.chain(second_half).collect()
-// }
+    first_half.chain(second_half).collect()
+}
 
 /// Xors the input slices and retuns an iterator over the resulting elements.
 ///
@@ -119,6 +169,16 @@ pub(crate) const fn get_bit(input: &[u8], index: usize) -> u8 {
     let byte_index = index / 8;
     let bit_offset = index % 8;
     (input[byte_index] >> bit_offset) & 1
+}
+
+/// Sets the bit at the given index in the destination byte array.
+///
+/// Panics if the index is out of bounds.
+#[inline]
+pub(crate) const fn set_bit(dst: &mut [u8], index: usize, bit: u8) {
+    let byte_index = index / 8;
+    let bit_offset = index % 8;
+    dst[byte_index] |= bit << bit_offset;
 }
 
 /// Converts a slice into a shared `Array` reference.
