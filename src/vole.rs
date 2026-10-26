@@ -112,78 +112,44 @@ where
     }
 }
 
-pub(crate) fn convert_to_vole<'a, 'b, BAVC, LHatBytes>(
-    v: &'a mut [Array<u8, LHatBytes>],
-    mut sd: impl ExactSizeIterator<Item = &'a Array<u8, BAVC::LambdaBytes>>,
+fn convert_to_vole<BAVC: BatchVectorCommitment, LHatBytes: ArraySize>(
+    sd: &[Array<u8, BAVC::LambdaBytes>],
     iv: &IV,
     round: u32,
-) -> Box<Array<u8, LHatBytes>>
-where
-    BAVC: BatchVectorCommitment,
-    LHatBytes: ArraySize,
-{
-    let twk = round + TWEAK_OFFSET;
+    u: &mut [u8],
+    v: &mut [Array<u8, LHatBytes>],
+    scratch: &mut [Array<u8, LHatBytes>],
+) {
+    let di = BAVC::TAU::bavc_max_node_depth(round as usize);
 
-    let ni = BAVC::TAU::bavc_max_node_index(round as usize);
-    debug_assert!(sd.len() == ni);
+    v.fill(Array::default());
 
-    // Init auxiliary memory
-    let mut rj: Vec<Box<Array<u8, LHatBytes>>> =
-        vec![Box::default(); BAVC::TAU::vole_array_length(round as usize)];
-    let mut right_leaf: Array<u8, LHatBytes> = Array::default();
+    // SAFETY: scratch has size d0+1
+    let (mut current, stack) = scratch.split_last_mut().unwrap();
 
-    let mut next = 0;
-    for i in 0..ni / 2 {
-        // 1. Read left leaf and right leaf
-        // SAFETY: FAEST parameters ensure sd.len() = ni, hence the two unwraps are safe
-        BAVC::PRG::new_prg(sd.next().unwrap(), iv, twk).read(&mut rj[next]);
-        BAVC::PRG::new_prg(sd.next().unwrap(), iv, twk).read(&mut right_leaf);
+    // optimized traversal algo with reduced scratch memory: d0+1 vs 2^d_i
+    for (leaf, seed) in sd.iter().enumerate() {
+        // line 4
+        current.fill(0);
+        BAVC::PRG::new_prg(seed, iv, TWEAK_OFFSET + round).read(&mut current);
 
-        // 2. Level 0 => update V[0]
-        xor_arrays_inplace(v[0].as_mut_slice(), right_leaf.as_slice());
+        let mut level = 0;
+        while (leaf >> level) & 1 != 0 {
+            // line 8-9
+            xor_arrays_inplace(&mut v[level], &current);
+            xor_arrays_inplace(&mut current, &stack[level]);
+            level += 1;
+        }
 
-        // 3. Father (level 1) is left leaf xor right leaf
-        xor_arrays_inplace(&mut rj[next], right_leaf.as_slice());
-
-        // Move one position forward and clean right leaf
-        next += 1;
-        right_leaf.fill(0);
-
-        // Traverse all levels for which we can already compute internal nodes
-        for (d, v_d) in v[1..].iter_mut().enumerate() {
-            // Last two nodes are on different levels => abort
-            if (i + 1) % (1 << (d + 1)) != 0 {
-                break;
-            }
-
-            // Last two nodes are on same level:
-
-            // 1. Save them as left, right
-            let (left, right) = {
-                let (l, r) = rj.split_at_mut(next - 1);
-                (l[l.len() - 1].as_mut_slice(), r[0].as_mut_slice())
-            };
-
-            // 2. Level d => Update V[d]
-            xor_arrays_inplace(v_d.as_mut_slice(), right);
-
-            // 3. Father (level d+1) is left node xor right node
-            xor_arrays_inplace(left, right);
-
-            // 4. Move one position back and clean right node
-            right.fill(0);
-            next -= 1;
+        // line 10 (u = r_d,0)
+        if level == di {
+            u.copy_from_slice(&current);
+        } else {
+            // becomes left subtree with 2^level leaves
+            stack[level].copy_from_slice(&current);
         }
     }
-
-    // ::10: after traversing all levels, rj[0] will contain r_{d,0}
-    // SAFETY: FAEST parameters ensure LHatBytes > 0 (hence rj is not empty)
-    rj.into_iter().next().unwrap()
 }
-
-pub fn volecommit<BAVC, LHatBytes>(
-    mut c: VoleCommitmentCRefMut<LHatBytes>,
-    r: &Array<u8, BAVC::LambdaBytes>,
     iv: &IV,
 ) -> VoleCommitResult<
     <BAVC as BatchVectorCommitment>::LambdaBytes,
