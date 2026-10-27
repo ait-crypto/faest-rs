@@ -7,7 +7,10 @@ pub(crate) mod tables;
 
 use crate::{
     bavc::{BatchVectorCommitment, BavcCommitResult, BavcDecommitment, BavcOpenResult},
-    parameter::{FAESTParameters, NMask, OWFParameters, SecurityParameter, TauParameters, ToBytes},
+    parameter::{
+        FAESTParameters, MaxDepthPlusOne, NMask, OWFParameters, SecurityParameter, TauParameters,
+        ToBytes,
+    },
     prg::{IV, PseudoRandomGenerator},
     random_oracles::{Hasher, RandomOracle},
     utils::{
@@ -339,36 +342,30 @@ pub(crate) fn volecommit<P: FAESTParameters>(
     let d0 = P::Tau::bavc_max_node_depth(0);
     let len = P::LHatBytes::USIZE;
     assert_eq!(len, (ell + NMask::USIZE * d0).div_ceil(8));
-    let low_bits = tables.w_crt.columns;
-    let low_bytes = low_bits.div_ceil(8);
     let n_mult = tables.gates;
     let n_mult_bytes = tables.gates.div_ceil(8);
-    assert_eq!(c.0.len(), (tau - 1) * ell_bytes,);
-    assert_eq!(c_mult.len(), NMask::USIZE * n_mult_bytes,);
 
     // line 1
     let BavcCommitResult { com, decom, seeds } = P::BAVC::commit(r, iv);
 
-    // init v matrix and buffers
-    let mut raw_v = Box::<
-        Array<Array<u8, P::LHatBytes>, Diff<<P::BAVC as BatchVectorCommitment>::Lambda, P::WGRIND>>,
-    >::default();
-    let mut scratch =
-        Box::<Array<Array<u8, P::LHatBytes>, Sum<<P::Tau as TauParameters>::K, U1>>>::default();
+    // V stored in column major
+    let mut raw_v = Box::<Array<Array<u8, P::LHatBytes>, P::LambdaMinusWGrind>>::default();
+    // extra buffers
     let mut ui = Box::<Array<Array<u8, P::LHatBytes>, <P::Tau as TauParameters>::Tau>>::default();
+    let mut scratch = Box::<Array<Array<u8, P::LHatBytes>, MaxDepthPlusOne<P>>>::default();
 
     // line 2-4
     let mut offset = 0;
-    for tau_i in 0..tau {
-        let tree_offset = P::Tau::bavc_index_offset(tau_i);
-        let di = P::Tau::bavc_max_node_depth(tau_i);
+    for i in 0..tau {
+        let tree_offset = P::Tau::bavc_index_offset(i);
+        let di = P::Tau::bavc_max_node_depth(i);
         let ni = 1 << di;
         convert_to_vole::<P::BAVC, P::LHatBytes>(
             seeds[tree_offset..tree_offset + ni].iter(),
             iv,
-            tau_i as u32,
+            i as u32,
             false,
-            &mut ui[tau_i],
+            &mut ui[i],
             &mut raw_v[offset..offset + di],
             &mut scratch,
         );
@@ -376,25 +373,23 @@ pub(crate) fn volecommit<P: FAESTParameters>(
     }
 
     // line 6-8
-    let mut u: Box<Array<u8, <<P as FAESTParameters>::OWF as OWFParameters>::LBytes>> =
-        Box::<Array<u8, <P::OWF as OWFParameters>::LBytes>>::default();
+    let mut u = Box::<Array<u8, <P::OWF as OWFParameters>::LBytes>>::default();
     u.copy_from_slice(&ui[0][..<P::OWF as OWFParameters>::LBytes::USIZE]);
-    for tree in 1..tau {
-        for byte in 0..ell_bytes {
-            c[tree - 1][byte] = u[byte] ^ ui[tree][byte];
-        }
+    for i in 1..tau {
+        c[i - 1].copy_from_slice(&u);
+        xor_arrays_inplace(&mut c[i - 1], &ui[i][..ell_bytes]);
     }
 
     // line 10
     let mut u_hi_all = vec![0; (NMask::USIZE * P::WGRIND::USIZE).div_ceil(8)];
     <P::BAVC as BatchVectorCommitment>::PRG::new_prg(r, iv, TWEAK_OFFSET - 1).read(&mut u_hi_all);
-    let mut u_hi = vec![0; P::WGRIND::USIZE.div_ceil(8)];
 
     let mut u_bar = Array::<Array<u8, <P::OWF as OWFParameters>::LambdaBytes>, NMask>::default();
     let mut r_tilde = Box::<Array<Array<u8, P::LambdaMinusWGrind>, NMask>>::default();
-    let mut u_low = vec![0; low_bytes];
-    let mut product = vec![0; lambda_bytes];
 
+    // scratch
+    let mut u_low = Array::<u8, ToBytes<P::LambdaMinusWGrind>>::default();
+    let mut product = Array::<u8, <P::OWF as OWFParameters>::LambdaBytes>::default();
     for m in 0..NMask::USIZE {
         u_low.fill(0);
         offset = 0;
@@ -412,18 +407,15 @@ pub(crate) fn volecommit<P: FAESTParameters>(
             );
 
             // lines 15-17
-            let reduced = tree_product_share(
-                &raw_v[offset..offset + d_i],
-                ell_m,
-                tables.tree_moduli[i],
-            );
+            let reduced =
+                tree_product_share(&raw_v[offset..offset + d_i], ell_m, tables.tree_moduli[i]);
             insert_bit_slice(&mut r_tilde[m], offset, reduced, d_i as u32);
             offset += d_i;
         }
 
         // line 14
         matrix_mul_table(&mut u_bar[m], &u_low, &tables.w_crt);
-        u_hi.fill(0);
+        let mut u_hi = Array::<u8, ToBytes<P::WGRIND>>::default();
         insert_bit_slice(
             &mut u_hi,
             0,
@@ -435,7 +427,7 @@ pub(crate) fn volecommit<P: FAESTParameters>(
             &u_hi,
             P::WGRIND::USIZE,
             tables.m_tree,
-            low_bits + 1,
+            P::LambdaMinusWGrind::USIZE + 1,
         );
         xor_arrays_inplace(&mut u_bar[m], &product);
 
@@ -590,8 +582,7 @@ pub fn volereconstruct<P: FAESTParameters>(
             // line 19
             let di = P::Tau::bavc_max_node_depth(i);
             let mut columns = &mut raw_q[offset..offset + di];
-            let reduced =
-                tree_product_share(&mut columns, ell_m, tables.tree_moduli[i]);
+            let reduced = tree_product_share(&mut columns, ell_m, tables.tree_moduli[i]);
             insert_bit_slice(&mut r_tilde[m], offset, reduced, di as u32);
             offset += di;
         }
