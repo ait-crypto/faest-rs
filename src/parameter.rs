@@ -31,7 +31,8 @@ use aes::{
     cipher::{BlockCipherEncrypt, KeyInit},
 };
 use hybrid_array::{
-    Array, ArraySize,
+    ArraySize,
+    sizes::{U90, U94, U130, U134, U154, U159, U226, U231, U239, U286, U291},
     typenum::{
         Diff, Prod, Quot, Sum, U0, U1, U2, U3, U4, U6, U7, U8, U9, U10, U11, U12, U14, U16, U17,
         U22, U24, U25, U32, U33, U40, U48, U52, U64, U102, U103, U105, U108, U110, U112, U120,
@@ -82,6 +83,7 @@ pub(crate) mod x86_simd {
 pub(crate) trait SecurityParameter:
     ArraySize
     + Add<Self, Output: ArraySize>
+    + Add<U7, Output: ArraySize + Div<U8, Output: ArraySize>>
     + Mul<U2, Output: ArraySize>
     + Mul<U3, Output: ArraySize>
     + Mul<U4, Output: ArraySize>
@@ -93,6 +95,9 @@ pub(crate) trait SecurityParameter:
 impl SecurityParameter for U16 {}
 impl SecurityParameter for U24 {}
 impl SecurityParameter for U32 {}
+
+// Get bytes from bit length
+pub(crate) type ToBytes<L: ArraySize> = Quot<Sum<L, U7>, U8>;
 
 /// Base parameters per security level
 pub(crate) trait BaseParameters {
@@ -841,15 +846,6 @@ pub(crate) trait TauParameters {
         let mask = tmp - 1;
         Self::L - 1 + Self::Tau::USIZE * tmp + Self::Tau1::USIZE * (j & mask) + i
     }
-
-    /// Returns the required array length for generating the vole correlations in [`crate::vole::convert_to_vole`]
-    fn vole_array_length(i: usize) -> usize {
-        let n = Self::bavc_max_node_index(i);
-        n / 2
-            - (2..Self::bavc_max_node_depth(i))
-                .map(|d| n / (1 << d) - 1)
-                .sum::<usize>()
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1008,215 +1004,250 @@ impl TauParameters for Tau256FastEM {
     type Topen = U229;
 }
 
-// pub(crate) trait FAESTParameters {
-//     /// Associated [`OWFParameters`] type
-//     type OWF: OWFParameters;
-//     /// Associated [`TauParameters`] type
-//     type Tau: TauParameters<Tau = <<Self as FAESTParameters>::BAVC as BatchVectorCommitment>::Tau>;
-//     /// Associated [`BatchVectorCommitment`] type
-//     type BAVC: BatchVectorCommitment<
-//             RO = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle,
-//             PRG = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::PRG,
-//             TAU = Self::Tau,
-//             LambdaBytes = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::LambdaBytes,
-//             NLeafCommit = <Self::OWF as OWFParameters>::NLeafCommit,
-//         >;
-//     /// Grinding parameter specifying how many upperbits of the Fiat-Shamir challenge must be set to 0
-//     type WGRIND: ArraySize;
-//     /// Size of the signature (in bytes)
-//     const SIGNATURE_SIZE: usize;
+/// Number of masks used in the VOLE consistency check (n_mask)
+pub(crate) type NMask = U10;
 
-//     #[inline]
-//     fn get_decom_size() -> usize {
-//         // coms
-//         <<Self as FAESTParameters>::OWF as OWFParameters>::NLeafCommit::USIZE
-//             * <<Self as FAESTParameters>::OWF as OWFParameters>::LambdaBytes::USIZE
-//             * <<Self as FAESTParameters>::Tau as TauParameters>::Tau::USIZE
-//             +
-//             // nodes
-//             <<Self as FAESTParameters>::Tau as TauParameters>::Topen::USIZE
-//                 * <<Self as FAESTParameters>::OWF as OWFParameters>::LambdaBytes::USIZE
-//     }
+/// Signature parameters from FAEST v3.0, matching `faest-ref`.
+pub(crate) trait FAESTParameters {
+    /// Associated [`OWFParameters`] type
+    type OWF: OWFParameters;
+    /// Associated [`TauParameters`] type
+    type Tau: TauParameters<
+            Tau = <<Self as FAESTParameters>::BAVC as BatchVectorCommitment>::Tau,
+            K: Add<U1, Output: ArraySize>,
+        >;
+    /// Associated [`BatchVectorCommitment`] type
+    type BAVC: BatchVectorCommitment<
+            RO = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::RandomOracle,
+            PRG = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::PRG,
+            TAU = Self::Tau,
+            LambdaBytes = <<Self::OWF as OWFParameters>::BaseParams as BaseParameters>::LambdaBytes,
+            Lambda: Sub<Self::WGRIND, Output: ArraySize>,
+            NLeafCommit = <Self::OWF as OWFParameters>::NLeafCommit,
+        >;
+    /// Grinding parameter specifying how many upperbits of the Fiat-Shamir challenge must be set to 0
+    type WGRIND: ArraySize + Add<U7, Output: ArraySize + Div<U8, Output: ArraySize>>;
+    type LambdaMinusWGrind: ArraySize;
+    /// Binary length of each vector produced by [`crate::vole::convert_to_vole`]
+    type LHatBytes: ArraySize;
+    /// Size of the signature (in bytes)
+    const SIGNATURE_SIZE: usize;
 
-//     /// Returns an iterator over the individual bits of the i-th VOLE sub-challenge (i.e., the one associated to the i-th small-vole instance)
-//     fn decode_challenge_as_iter(chal: &[u8]) -> impl Iterator<Item = u8> + '_ {
-//         (0..<Self::Tau as TauParameters>::Tau1::USIZE + <Self::Tau as TauParameters>::Tau0::USIZE)
-//             .flat_map(|i| {
-//                 let lo = <Self::Tau as TauParameters>::bavc_index_offset(i);
-//                 let hi = <Self::Tau as TauParameters>::bavc_index_offset(i + 1);
-//                 (lo..hi).map(|j| (chal[j / 8] >> (j % 8)) & 1)
-//             })
-//             .chain(repeat_n(0, Self::WGRIND::USIZE))
-//     }
-// }
+    #[inline]
+    fn get_decom_size() -> usize {
+        // coms
+        <<Self as FAESTParameters>::OWF as OWFParameters>::NLeafCommit::USIZE
+            * <<Self as FAESTParameters>::OWF as OWFParameters>::LambdaBytes::USIZE
+            * <<Self as FAESTParameters>::Tau as TauParameters>::Tau::USIZE
+            +
+            // nodes
+            <<Self as FAESTParameters>::Tau as TauParameters>::Topen::USIZE
+                * <<Self as FAESTParameters>::OWF as OWFParameters>::LambdaBytes::USIZE
+    }
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct FAEST128sParameters<F = GF128>(PhantomData<F>);
+    /// Returns an iterator over the individual bits of the i-th VOLE sub-challenge (i.e., the one associated to the i-th small-vole instance)
+    fn decode_challenge_as_iter(chal: &[u8]) -> impl Iterator<Item = u8> + '_ {
+        (0..<Self::Tau as TauParameters>::Tau1::USIZE + <Self::Tau as TauParameters>::Tau0::USIZE)
+            .flat_map(|i| {
+                let lo = <Self::Tau as TauParameters>::bavc_index_offset(i);
+                let hi = <Self::Tau as TauParameters>::bavc_index_offset(i + 1);
+                (lo..hi).map(|j| (chal[j / 8] >> (j % 8)) & 1)
+            })
+            .chain(repeat_n(0, Self::WGRIND::USIZE))
+    }
+}
 
-// impl<F> FAESTParameters for FAEST128sParameters<F>
-// where
-//     F: BigGaloisField<Length = U16> + BaseField,
-// {
-//     type OWF = OWF128<F>;
-//     type Tau = Tau128Small;
-//     type BAVC = BAVC128Small<F>;
-//     type WGRIND = U7;
-//     const SIGNATURE_SIZE: usize = 4506;
-// }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FAEST128sParameters<F = GF128>(PhantomData<F>);
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct FAEST128fParameters<F = GF128>(PhantomData<F>);
+impl<F> FAESTParameters for FAEST128sParameters<F>
+where
+    F: BigGaloisField<Length = U16> + BaseField,
+{
+    type OWF = OWF128<F>;
+    type Tau = Tau128Small;
+    type BAVC = BAVC128Small<F>;
+    type WGRIND = U7;
+    type LambdaMinusWGrind = Diff<<Self::OWF as OWFParameters>::Lambda, Self::WGRIND>;
+    type LHatBytes = U134;
+    const SIGNATURE_SIZE: usize = 4066;
+}
 
-// impl<F> FAESTParameters for FAEST128fParameters<F>
-// where
-//     F: BigGaloisField<Length = U16> + BaseField,
-// {
-//     type OWF = OWF128<F>;
-//     type Tau = Tau128Fast;
-//     type BAVC = BAVC128Fast<F>;
-//     type WGRIND = U8;
-//     const SIGNATURE_SIZE: usize = 5924;
-// }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FAEST128fParameters<F = GF128>(PhantomData<F>);
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct FAEST192sParameters<F = GF192>(PhantomData<F>);
+impl<F> FAESTParameters for FAEST128fParameters<F>
+where
+    F: BigGaloisField<Length = U16> + BaseField,
+{
+    type OWF = OWF128<F>;
+    type Tau = Tau128Fast;
+    type BAVC = BAVC128Fast<F>;
+    type WGRIND = U8;
+    type LambdaMinusWGrind = Diff<<Self::OWF as OWFParameters>::Lambda, Self::WGRIND>;
+    type LHatBytes = U130;
+    const SIGNATURE_SIZE: usize = 5170;
+}
 
-// impl<F> FAESTParameters for FAEST192sParameters<F>
-// where
-//     F: BigGaloisField<Length = U24> + BaseField,
-// {
-//     type OWF = OWF192<F>;
-//     type Tau = Tau192Small;
-//     type BAVC = BAVC192Small<F>;
-//     type WGRIND = U12;
-//     const SIGNATURE_SIZE: usize = 11260;
-// }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FAEST192sParameters<F = GF192>(PhantomData<F>);
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct FAEST192fParameters<F = GF192>(PhantomData<F>);
+impl<F> FAESTParameters for FAEST192sParameters<F>
+where
+    F: BigGaloisField<Length = U24> + BaseField,
+{
+    type OWF = OWF192<F>;
+    type Tau = Tau192Small;
+    type BAVC = BAVC192Small<F>;
+    type WGRIND = U12;
+    type LHatBytes = U231;
+    type LambdaMinusWGrind = Diff<<Self::OWF as OWFParameters>::Lambda, Self::WGRIND>;
+    const SIGNATURE_SIZE: usize = 9410;
+}
 
-// impl<F> FAESTParameters for FAEST192fParameters<F>
-// where
-//     F: BigGaloisField<Length = U24> + BaseField,
-// {
-//     type OWF = OWF192<F>;
-//     type Tau = Tau192Fast;
-//     type BAVC = BAVC192Fast<F>;
-//     type WGRIND = U8;
-//     const SIGNATURE_SIZE: usize = 14948;
-// }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FAEST192fParameters<F = GF192>(PhantomData<F>);
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct FAEST256sParameters<F = GF256>(PhantomData<F>);
+impl<F> FAESTParameters for FAEST192fParameters<F>
+where
+    F: BigGaloisField<Length = U24> + BaseField,
+{
+    type OWF = OWF192<F>;
+    type Tau = Tau192Fast;
+    type BAVC = BAVC192Fast<F>;
+    type WGRIND = U8;
+    type LHatBytes = U226;
+    type LambdaMinusWGrind = Diff<<Self::OWF as OWFParameters>::Lambda, Self::WGRIND>;
+    const SIGNATURE_SIZE: usize = 11738;
+}
 
-// impl<F> FAESTParameters for FAEST256sParameters<F>
-// where
-//     F: BigGaloisField<Length = U32> + BaseField,
-// {
-//     type OWF = OWF256<F>;
-//     type Tau = Tau256Small;
-//     type BAVC = BAVC256Small<F>;
-//     type WGRIND = U6;
-//     const SIGNATURE_SIZE: usize = 20696;
-// }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FAEST256sParameters<F = GF256>(PhantomData<F>);
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct FAEST256fParameters<F = GF256>(PhantomData<F>);
+impl<F> FAESTParameters for FAEST256sParameters<F>
+where
+    F: BigGaloisField<Length = U32> + BaseField,
+{
+    type OWF = OWF256<F>;
+    type Tau = Tau256Small;
+    type BAVC = BAVC256Small<F>;
+    type WGRIND = U6;
+    type LHatBytes = U291;
+    type LambdaMinusWGrind = Diff<<Self::OWF as OWFParameters>::Lambda, Self::WGRIND>;
+    const SIGNATURE_SIZE: usize = 16626;
+}
 
-// impl<F> FAESTParameters for FAEST256fParameters<F>
-// where
-//     F: BigGaloisField<Length = U32> + BaseField,
-// {
-//     type OWF = OWF256<F>;
-//     type Tau = Tau256Fast;
-//     type BAVC = BAVC256Fast<F>;
-//     type WGRIND = U8;
-//     const SIGNATURE_SIZE: usize = 26548;
-// }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FAEST256fParameters<F = GF256>(PhantomData<F>);
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct FAESTEM128sParameters<F = GF128>(PhantomData<F>);
+impl<F> FAESTParameters for FAEST256fParameters<F>
+where
+    F: BigGaloisField<Length = U32> + BaseField,
+{
+    type OWF = OWF256<F>;
+    type Tau = Tau256Fast;
+    type BAVC = BAVC256Fast<F>;
+    type WGRIND = U8;
+    type LHatBytes = U286;
+    type LambdaMinusWGrind = Diff<<Self::OWF as OWFParameters>::Lambda, Self::WGRIND>;
+    const SIGNATURE_SIZE: usize = 20856;
+}
 
-// impl<F> FAESTParameters for FAESTEM128sParameters<F>
-// where
-//     F: BigGaloisField<Length = U16> + BaseField,
-// {
-//     type OWF = OWF128EM<F>;
-//     type Tau = Tau128SmallEM;
-//     type BAVC = BAVC128SmallEM<F>;
-//     type WGRIND = U7;
-//     const SIGNATURE_SIZE: usize = 3906;
-// }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FAESTEM128sParameters<F = GF128>(PhantomData<F>);
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct FAESTEM128fParameters<F = GF128>(PhantomData<F>);
+impl<F> FAESTParameters for FAESTEM128sParameters<F>
+where
+    F: BigGaloisField<Length = U16> + BaseField,
+{
+    type OWF = OWF128EM<F>;
+    type Tau = Tau128SmallEM;
+    type BAVC = BAVC128SmallEM;
+    type WGRIND = U7;
+    type LHatBytes = U94;
+    type LambdaMinusWGrind = Diff<<Self::OWF as OWFParameters>::Lambda, Self::WGRIND>;
+    const SIGNATURE_SIZE: usize = 3466;
+}
 
-// impl<F> FAESTParameters for FAESTEM128fParameters<F>
-// where
-//     F: BigGaloisField<Length = U16> + BaseField,
-// {
-//     type OWF = OWF128EM<F>;
-//     type Tau = Tau128FastEM;
-//     type BAVC = BAVC128FastEM<F>;
-//     type WGRIND = U8;
-//     const SIGNATURE_SIZE: usize = 5060;
-// }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FAESTEM128fParameters<F = GF128>(PhantomData<F>);
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct FAESTEM192sParameters<F = GF192>(PhantomData<F>);
+impl<F> FAESTParameters for FAESTEM128fParameters<F>
+where
+    F: BigGaloisField<Length = U16> + BaseField,
+{
+    type OWF = OWF128EM<F>;
+    type Tau = Tau128FastEM;
+    type BAVC = BAVC128FastEM;
+    type WGRIND = U8;
+    type LHatBytes = U90;
+    type LambdaMinusWGrind = Diff<<Self::OWF as OWFParameters>::Lambda, Self::WGRIND>;
+    const SIGNATURE_SIZE: usize = 4170;
+}
 
-// impl<F> FAESTParameters for FAESTEM192sParameters<F>
-// where
-//     F: BigGaloisField<Length = U24> + BaseField,
-// {
-//     type OWF = OWF192EM<F>;
-//     type Tau = Tau192SmallEM;
-//     type BAVC = BAVC192SmallEM<F>;
-//     type WGRIND = U8;
-//     const SIGNATURE_SIZE: usize = 9340;
-// }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FAESTEM192sParameters<F = GF192>(PhantomData<F>);
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct FAESTEM192fParameters<F = GF192>(PhantomData<F>);
+impl<F> FAESTParameters for FAESTEM192sParameters<F>
+where
+    F: BigGaloisField<Length = U24> + BaseField,
+{
+    type OWF = OWF192EM<F>;
+    type Tau = Tau192SmallEM;
+    type BAVC = BAVC192SmallEM;
+    type WGRIND = U8;
+    type LHatBytes = U159;
+    type LambdaMinusWGrind = Diff<<Self::OWF as OWFParameters>::Lambda, Self::WGRIND>;
+    const SIGNATURE_SIZE: usize = 7874;
+}
 
-// impl<F> FAESTParameters for FAESTEM192fParameters<F>
-// where
-//     F: BigGaloisField<Length = U24> + BaseField,
-// {
-//     type OWF = OWF192EM<F>;
-//     type Tau = Tau192FastEM;
-//     type BAVC = BAVC192FastEM<F>;
-//     type WGRIND = U8;
-//     const SIGNATURE_SIZE: usize = 12380;
-// }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FAESTEM192fParameters<F = GF192>(PhantomData<F>);
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct FAESTEM256sParameters<F = GF256>(PhantomData<F>);
+impl<F> FAESTParameters for FAESTEM192fParameters<F>
+where
+    F: BigGaloisField<Length = U24> + BaseField,
+{
+    type OWF = OWF192EM<F>;
+    type Tau = Tau192FastEM;
+    type BAVC = BAVC192FastEM;
+    type WGRIND = U8;
+    type LHatBytes = U154;
+    type LambdaMinusWGrind = Diff<<Self::OWF as OWFParameters>::Lambda, Self::WGRIND>;
+    const SIGNATURE_SIZE: usize = 9818;
+}
 
-// impl<F> FAESTParameters for FAESTEM256sParameters<F>
-// where
-//     F: BigGaloisField<Length = U32> + BaseField,
-// {
-//     type OWF = OWF256EM<F>;
-//     type Tau = Tau256SmallEM;
-//     type BAVC = BAVC256SmallEM<F>;
-//     type WGRIND = U6;
-//     const SIGNATURE_SIZE: usize = 17984;
-// }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FAESTEM256sParameters<F = GF256>(PhantomData<F>);
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub(crate) struct FAESTEM256fParameters<F = GF256>(PhantomData<F>);
+impl<F> FAESTParameters for FAESTEM256sParameters<F>
+where
+    F: BigGaloisField<Length = U32> + BaseField,
+{
+    type OWF = OWF256EM<F>;
+    type Tau = Tau256SmallEM;
+    type BAVC = BAVC256SmallEM;
+    type WGRIND = U6;
+    type LHatBytes = U239;
+    type LambdaMinusWGrind = Diff<<Self::OWF as OWFParameters>::Lambda, Self::WGRIND>;
+    const SIGNATURE_SIZE: usize = 14554;
+}
 
-// impl<F> FAESTParameters for FAESTEM256fParameters<F>
-// where
-//     F: BigGaloisField<Length = U32> + BaseField,
-// {
-//     type OWF = OWF256EM<F>;
-//     type Tau = Tau256FastEM;
-//     type BAVC = BAVC256FastEM<F>;
-//     type WGRIND = U8;
-//     const SIGNATURE_SIZE: usize = 23476;
-// }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FAESTEM256fParameters<F = GF256>(PhantomData<F>);
+
+impl<F> FAESTParameters for FAESTEM256fParameters<F>
+where
+    F: BigGaloisField<Length = U32> + BaseField,
+{
+    type OWF = OWF256EM<F>;
+    type Tau = Tau256FastEM;
+    type BAVC = BAVC256FastEM;
+    type WGRIND = U8;
+    type LHatBytes = U234;
+    type LambdaMinusWGrind = Diff<<Self::OWF as OWFParameters>::Lambda, Self::WGRIND>;
+    const SIGNATURE_SIZE: usize = 18084;
+}
 
 pub(crate) type BAVC128Small<F> =
     Bavc<RandomOracleShake128, LeafCommitment<PRG128, LeafHasher128<F>>, Tau128Small>;
@@ -1240,6 +1271,62 @@ pub(crate) type BAVC192FastEM = Bavc<RandomOracleShake256, LeafCommitmentEm<PRG1
 pub(crate) type BAVC256SmallEM =
     Bavc<RandomOracleShake256, LeafCommitmentEm<PRG256>, Tau256SmallEM>;
 pub(crate) type BAVC256FastEM = Bavc<RandomOracleShake256, LeafCommitmentEm<PRG256>, Tau256FastEM>;
+
+#[cfg(test)]
+mod faest_tests {
+    use super::*;
+
+    fn check<P: FAESTParameters>(signature_size: usize) {
+        let lambda = <P::OWF as OWFParameters>::Lambda::USIZE;
+        let lambda_bytes = <P::OWF as OWFParameters>::LambdaBytes::USIZE;
+        let tau = <P::Tau as TauParameters>::Tau::USIZE;
+        let tau0 = <P::Tau as TauParameters>::Tau0::USIZE;
+        let tau1 = <P::Tau as TauParameters>::Tau1::USIZE;
+        let k = <P::Tau as TauParameters>::K::USIZE;
+        let tables = <P::Tau as TauParameters>::VOLE_TABLES;
+
+        assert_eq!(NMask::USIZE, 10);
+        assert_eq!(P::SIGNATURE_SIZE, signature_size);
+        assert_eq!(tables.lambda, lambda);
+        assert_eq!(tables.tau, tau);
+        assert_eq!(tables.grinding_bits, P::WGRIND::USIZE);
+        assert_eq!(tau0 + tau1, tau);
+        assert_eq!(tau0 * (k - 1) + tau1 * k + P::WGRIND::USIZE, lambda);
+        assert_eq!(
+            <P::Tau as TauParameters>::L,
+            tau0 * (1 << (k - 1)) + tau1 * (1 << k)
+        );
+
+        // v3 signature layout: c, c_mult, u_tilde, d, a1..a6,
+        // BAVC opening, challenge, IV, and counter (faest-ref/faest_impl.c).
+        assert_eq!(
+            P::SIGNATURE_SIZE,
+            tau * <P::OWF as OWFParameters>::LBytes::USIZE
+                + NMask::USIZE * tables.gates.div_ceil(8)
+                + (4 + 6 + 1) * lambda_bytes
+                + P::get_decom_size()
+                + 16
+                + 4
+        );
+    }
+
+    #[test]
+    fn v3_parameter_sets() {
+        // Signature sizes from faest-ref/meson.build.
+        check::<FAEST128sParameters>(4066);
+        check::<FAEST128fParameters>(5170);
+        check::<FAEST192sParameters>(9410);
+        check::<FAEST192fParameters>(11738);
+        check::<FAEST256sParameters>(16626);
+        check::<FAEST256fParameters>(20856);
+        check::<FAESTEM128sParameters>(3466);
+        check::<FAESTEM128fParameters>(4170);
+        check::<FAESTEM192sParameters>(7874);
+        check::<FAESTEM192fParameters>(9818);
+        check::<FAESTEM256sParameters>(14554);
+        check::<FAESTEM256fParameters>(18084);
+    }
+}
 
 #[cfg(test)]
 mod owf_tests {
