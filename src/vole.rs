@@ -1,15 +1,20 @@
+//! FAEST v3 VOLE commitments and reconstruction
+//!
+//! Algorithm line comments refer to Figure 5.6, 6.2 and 6.3:
+//! <https://faest.info/faest-spec-v3.0.pdf>.
+
 pub(crate) mod tables;
 
 use crate::{
     bavc::{BatchVectorCommitment, BavcCommitResult, BavcDecommitment, BavcOpenResult},
-    parameter::{FAESTParameters, NMask, OWFParameters, TauParameters},
+    parameter::{FAESTParameters, NMask, OWFParameters, SecurityParameter, TauParameters, ToBytes},
     prg::{IV, PseudoRandomGenerator},
     random_oracles::{Hasher, RandomOracle},
     utils::{
         Reader, bit_word_mask, decode_all_chall_3, extract_bit_slice, get_bit, insert_bit_slice,
-        load_u64, set_bit, xor_arrays_inplace,
+        load_u64, set_bit, xor_arrays, xor_arrays_inplace,
     },
-    vole::tables::PackedMatrix,
+    vole::tables::{PackedMatrix, VoleTables},
 };
 #[cfg(not(feature = "std"))]
 use alloc::{boxed::Box, vec};
@@ -42,36 +47,34 @@ where
     pub v_bar: Array<Array<u8, LambdaBytes>, NMask>,
 }
 
-/// Result of VOLE reconstruction.
+/// Reconstructed VOLE shares. Bit i is coefficient i (least significant bit first).
 #[derive(Clone, Debug, Default)]
-pub struct VoleReconstructResult<LambdaBytes, LHatBytes>
+pub struct VoleReconstructResult<LambdaBytes, LBytes>
 where
-    LambdaBytes: ArraySize + Mul<U2, Output: ArraySize> + Mul<U8, Output: ArraySize>,
-    LHatBytes: ArraySize,
+    LambdaBytes: SecurityParameter,
+    LBytes: ArraySize,
 {
     pub com: Array<u8, Prod<LambdaBytes, U2>>,
-    pub q: Box<Array<Array<u8, LHatBytes>, Prod<LambdaBytes, U8>>>,
+    /// Contiguous witness columns; a witness row encodes one field element.
+    pub q: Box<Array<Array<u8, LBytes>, Prod<LambdaBytes, U8>>>,
+    /// Ten mask shares, encoded as field coefficients in little-endian order.
+    pub q_bar: Array<Array<u8, LambdaBytes>, NMask>,
+    pub delta: Array<u8, LambdaBytes>,
 }
 
-/// Immutable reference to storage area in signature for all `c`s.
+/// Immutable signature storage containing tau-1 witness-length corrections.
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct VoleCommitmentCRef<'a, LHatBytes>(&'a [u8], PhantomData<LHatBytes>);
+pub(crate) struct VoleCommitmentCRef<'a, LBytes>(&'a [u8], PhantomData<LBytes>);
 
-impl<LHatBytes> Index<usize> for VoleCommitmentCRef<'_, LHatBytes>
-where
-    LHatBytes: ArraySize,
-{
+impl<LBytes: ArraySize> Index<usize> for VoleCommitmentCRef<'_, LBytes> {
     type Output = [u8];
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index * LHatBytes::USIZE..(index + 1) * LHatBytes::USIZE]
+        &self.0[index * LBytes::USIZE..(index + 1) * LBytes::USIZE]
     }
 }
 
-impl<'a, LHatBytes> VoleCommitmentCRef<'a, LHatBytes>
-where
-    LHatBytes: ArraySize,
-{
+impl<'a, LBytes: ArraySize> VoleCommitmentCRef<'a, LBytes> {
     pub(crate) fn new(buffer: &'a [u8]) -> Self {
         Self(buffer, PhantomData)
     }
@@ -121,8 +124,10 @@ fn matrix_mul_table(dst: &mut [u8], src: &[u8], table: &PackedMatrix) {
     for i in 0..table.rows {
         let mut acc = 0;
         for j in 0..table.stride {
-            let valid = table.columns.saturating_sub(j * 64).min(64);
-            acc ^= table.words[i * table.stride + j] & load_u64(src, j) & bit_word_mask(valid);
+            let remaining_bits = table.columns.saturating_sub(j * 64).min(64);
+            acc ^= table.words[i * table.stride + j]
+                & load_u64(src, j)
+                & bit_word_mask(remaining_bits);
         }
         set_bit(dst, i, (acc.count_ones() & 1) as u8);
     }
@@ -189,6 +194,59 @@ fn reduce_tree_product(mut value: u32, modulus: u16, degree: usize) -> u16 {
     value as u16
 }
 
+fn tree_product_share<LHatBytes: ArraySize>(
+    columns: &[Array<u8, LHatBytes>],
+    bit_offset: usize,
+    modulus: u16,
+) -> u16 {
+    let degree = columns.len();
+    let mut acc = 0;
+
+    for (t, column) in columns.iter().enumerate() {
+        acc ^= u32::from(extract_bit_slice(column, bit_offset, degree as u32)) << t;
+    }
+    reduce_tree_product(acc, modulus, degree)
+}
+
+/// XOR labels selected by one public row of G. Traversal depends only on G.
+fn gate_label<L: ArraySize>(
+    dst: &mut [u8],
+    columns: &[Array<u8, L>],
+    g: &PackedMatrix,
+    gate: usize,
+) {
+    dst.fill(0);
+    for word in 0..g.stride {
+        let mut bits = g.words[gate * g.stride + word]
+            & bit_word_mask(g.columns.saturating_sub(word * 64).min(64));
+        while bits != 0 {
+            let col = word * 64 + bits.trailing_zeros() as usize;
+            xor_arrays_inplace(dst, &columns[col][..dst.len()]);
+            bits &= bits - 1;
+        }
+    }
+}
+
+fn recombine_mask_shares<LambdaBytes: SecurityParameter, LambdaMinusWgrind: ArraySize>(
+    dst: &mut Array<Array<u8, LambdaBytes>, NMask>,
+    r_tilde: &[Array<u8, LambdaMinusWgrind>],
+    v_tilde: &[u8],
+    tables: &VoleTables,
+) {
+    let mut product = Array::<u8, LambdaBytes>::default();
+    let gate_bytes = tables.gates.div_ceil(8);
+
+    for m in 0..NMask::USIZE {
+        matrix_mul_table(&mut dst[m], &r_tilde[m], &tables.w_tree);
+        matrix_mul_table(
+            &mut product,
+            &v_tilde[m * gate_bytes..(m + 1) * gate_bytes],
+            &tables.w_gate,
+        );
+        xor_arrays_inplace(&mut dst[m], &product);
+    }
+}
+
 fn crt_transform_columns<L: ArraySize, LHatBytes: ArraySize>(
     dst: &mut [Array<u8, L>],
     src: &[Array<u8, LHatBytes>],
@@ -219,40 +277,48 @@ fn convert_to_vole<'a, BAVC: BatchVectorCommitment, LHatBytes: ArraySize>(
 ) {
     let di = BAVC::TAU::bavc_max_node_depth(round as usize);
 
+    assert_eq!(sd.len(), 1 << di);
+    assert_eq!(v.len(), di);
+    assert!(scratch.len() > di);
+    if !ubot {
+        assert_eq!(u.len(), LHatBytes::USIZE);
+    }
     v.fill(Array::default());
 
-    // SAFETY: scratch has size d0+1
-    let (mut current, stack) = scratch.split_last_mut().unwrap();
+    // One current vector and at least di saved left subtrees.
+    let (current, stack) = scratch.split_last_mut().unwrap();
 
     // optimized traversal algo with reduced scratch memory: d0+1 vs 2^d_i
     for (leaf, seed) in sd.enumerate() {
-        // line 4
+        // ConvertToVOLE (Figure 5.6), lines 1-4: bottom expands to zero.
         current.fill(0);
-        BAVC::PRG::new_prg(seed, iv, TWEAK_OFFSET + round).read(&mut current);
+        if leaf != 0 || !ubot {
+            BAVC::PRG::new_prg(seed, iv, TWEAK_OFFSET + round).read(current);
+        }
 
         let mut level = 0;
         while (leaf >> level) & 1 != 0 {
             // line 8-9
-            xor_arrays_inplace(&mut v[level], &current);
-            xor_arrays_inplace(&mut current, &stack[level]);
+            xor_arrays_inplace(&mut v[level], current);
+            xor_arrays_inplace(current, &stack[level]);
             level += 1;
         }
 
         if level != di {
             // becomes left subtree with 2^level leaves
-            stack[level].copy_from_slice(&current);
+            stack[level].copy_from_slice(current);
         } else if !ubot {
             // line 10 (u = r_d,0)
-            u.copy_from_slice(&current);
+            u.copy_from_slice(current);
         }
     }
 }
 
 fn h5_init<P: FAESTParameters>(iv: &IV, e: usize) -> impl Hasher + Clone {
     let mut hash = <P::BAVC as BatchVectorCommitment>::RO::h5_init();
-    hash.update(&iv);
+    hash.update(iv);
     hash.update(&(e as u32).to_le_bytes());
-    return hash;
+    hash
 }
 
 pub(crate) fn volecommit<P: FAESTParameters>(
@@ -325,7 +391,7 @@ pub(crate) fn volecommit<P: FAESTParameters>(
     let mut u_hi = vec![0; P::WGRIND::USIZE.div_ceil(8)];
 
     let mut u_bar = Array::<Array<u8, <P::OWF as OWFParameters>::LambdaBytes>, NMask>::default();
-    let mut r_tilde = vec![0; NMask::USIZE * low_bytes];
+    let mut r_tilde = Box::<Array<Array<u8, P::LambdaMinusWGrind>, NMask>>::default();
     let mut u_low = vec![0; low_bytes];
     let mut product = vec![0; lambda_bytes];
 
@@ -334,29 +400,24 @@ pub(crate) fn volecommit<P: FAESTParameters>(
         offset = 0;
         let ell_m = ell + m * d0;
 
-        for tau_i in 0..tau {
-            let d_i = P::Tau::bavc_max_node_depth(tau_i);
+        for i in 0..tau {
+            let d_i = P::Tau::bavc_max_node_depth(i);
 
             // line 13
             insert_bit_slice(
                 &mut u_low,
                 offset,
-                extract_bit_slice(&ui[tau_i], ell_m, d_i as u32),
+                extract_bit_slice(&ui[i], ell_m, d_i as u32),
                 d_i as u32,
             );
 
-            // line 15
-            let mut acc = 0u32;
-            for t in 0..d_i {
-                acc ^= u32::from(extract_bit_slice(&raw_v[offset + t], ell_m, d_i as u32)) << t;
-            }
-            let reduced = reduce_tree_product(acc, tables.tree_moduli[tau_i], d_i);
-            insert_bit_slice(
-                &mut r_tilde[m * low_bytes..(m + 1) * low_bytes],
-                offset,
-                reduced,
-                d_i as u32,
+            // lines 15-17
+            let reduced = tree_product_share(
+                &raw_v[offset..offset + d_i],
+                ell_m,
+                tables.tree_moduli[i],
             );
+            insert_bit_slice(&mut r_tilde[m], offset, reduced, d_i as u32);
             offset += d_i;
         }
 
@@ -386,21 +447,13 @@ pub(crate) fn volecommit<P: FAESTParameters>(
         );
     }
 
-    let mut v_tilde = vec![0; NMask::USIZE * n_mult];
+    let mut v_tilde = vec![0; NMask::USIZE * n_mult_bytes];
     // line 21
     for e in 0..n_mult {
         let mut l_e = Array::<u8, <P::OWF as OWFParameters>::LambdaBytes>::default();
 
         // line 22
-        for word in 0..tables.g.stride {
-            let mut bits = tables.g.words[e * tables.g.stride + word]
-                & bit_word_mask(low_bits.saturating_sub(word * 64).min(64));
-            while bits != 0 {
-                let col = word * 64 + bits.trailing_zeros() as usize;
-                xor_arrays_inplace(&mut l_e, &raw_v[col][..lambda_bytes]);
-                bits &= bits - 1;
-            }
-        }
+        gate_label(&mut l_e, &raw_v, &tables.g, e);
 
         // init hashers
         let mut hash_one = h5_init::<P>(iv, e);
@@ -432,25 +485,13 @@ pub(crate) fn volecommit<P: FAESTParameters>(
 
     // line 29
     let mut v_bar = Array::<Array<u8, <P::OWF as OWFParameters>::LambdaBytes>, NMask>::default();
-    for m in 0..NMask::USIZE {
-        matrix_mul_table(
-            &mut v_bar[m],
-            &r_tilde[m * low_bytes..(m + 1) * low_bytes],
-            &tables.w_tree,
-        );
-        matrix_mul_table(
-            &mut product,
-            &v_tilde[m * n_mult_bytes..(m + 1) * n_mult_bytes],
-            &tables.w_gate,
-        );
-        xor_arrays_inplace(&mut v_bar[m], &product);
-    }
+    recombine_mask_shares(&mut v_bar, &r_tilde, &v_tilde, tables);
 
     // line 31-32
     let mut v = Box::<
         Array<Array<u8, <P::OWF as OWFParameters>::LBytes>, <P::OWF as OWFParameters>::Lambda>,
     >::default();
-    crt_transform_columns(&mut v[..], &raw_v[..], &tables.w_crt);
+    crt_transform_columns(&mut v, &raw_v, &tables.w_crt);
 
     VoleCommitResult {
         com,
@@ -462,93 +503,151 @@ pub(crate) fn volecommit<P: FAESTParameters>(
     }
 }
 
-// pub fn volereconstruct<P: FAESTParameters>(
-//     chall: &Array<u8, <P::BAVC as BatchVectorCommitment>::LambdaBytes>,
-//     decom_i: &BavcOpenResult,
-//     c: VoleCommitmentCRef<P::LHatBytes>,
-//     iv: &IV,
-// ) -> Option<VoleReconstructResult<<P::BAVC as BatchVectorCommitment>::LambdaBytes, P::LHatBytes>> {
-//     // line 1
-//     let i_delta = decode_all_chall_3::<<P::BAVC as BatchVectorCommitment>::TAU>(chall);
+pub fn volereconstruct<P: FAESTParameters>(
+    chall: &Array<u8, <P::BAVC as BatchVectorCommitment>::LambdaBytes>,
+    decom_i: &BavcOpenResult,
+    c: VoleCommitmentCRef<<P::OWF as OWFParameters>::LBytes>,
+    c_mult: &[u8],
+    iv: &IV,
+) -> Option<
+    VoleReconstructResult<
+        <P::BAVC as BatchVectorCommitment>::LambdaBytes,
+        <P::OWF as OWFParameters>::LBytes,
+    >,
+> {
+    let tables = P::Tau::VOLE_TABLES;
+    let tau = <P::Tau as TauParameters>::Tau::USIZE;
+    let ell = <P::OWF as OWFParameters>::L::USIZE;
+    let ell_bytes = <P::OWF as OWFParameters>::LBytes::USIZE;
+    // TODO: would be nice if this was a constant
+    let n_mult_bytes = tables.gates.div_ceil(8);
+    let d0 = P::Tau::bavc_max_node_depth(0);
 
-//     // Skip line 2 as decode_all_chall_3 can't fail (parameter constraints ensure that we only provide valid challenges/indexes)
+    // lines 1
+    let i_delta = decode_all_chall_3::<P::Tau>(chall);
 
-//     // line 3
-//     let rec = P::BAVC::reconstruct(decom_i, &i_delta, iv)?;
+    // lines 3
+    let rec = P::BAVC::reconstruct(decom_i, &i_delta, iv)?;
 
-//     let mut q =
-//         Box::<Array<Array<u8, P::LHatBytes>, <P::BAVC as BatchVectorCommitment>::Lambda>>::default(
-//         );
-//     let mut q_ref = q.as_mut_slice();
+    let mut raw_q = Box::<Array<Array<u8, P::LHatBytes>, P::LambdaMinusWGrind>>::default();
+    let mut scratch =
+        Box::<Array<Array<u8, P::LHatBytes>, Sum<<P::Tau as TauParameters>::K, U1>>>::default(); // Tau::K is always >= d0
 
-//     // At round i, seeds_i has offset \sum_{j=0}^{i-1} N_j in the seeds vector
-//     let mut sdi_off = 0;
+    // lines 6-10
+    let zeros = Array::default();
+    let mut seed_offset = 0;
+    let mut offset = 0;
+    for i in 0..tau {
+        let delta_i = i_delta[i] as usize;
+        let di = P::Tau::bavc_max_node_depth(i);
+        let ni = 1 << di;
 
-//     // line 7
-//     let mut zero_arr = Array::default();
-//     let mut scratch =
-//         Box::<Array<Array<u8, P::LHatBytes>, Sum<<P::Tau as TauParameters>::K, U1>>>::default();
-//     for i in 0..<P::BAVC as BatchVectorCommitment>::Tau::U32 {
-//         // ::8
-//         let delta_i = i_delta[i as usize];
-//         let ni = <P::BAVC as BatchVectorCommitment>::TAU::bavc_max_node_index(i as usize);
-//         let ki = <P::BAVC as BatchVectorCommitment>::TAU::bavc_max_node_depth(i as usize);
+        // line 7: iterate the XOR-permuted seeds
+        let seeds = (0..ni).map(|j| {
+            if j == 0 {
+                &zeros
+            } else {
+                let original = j ^ delta_i;
+                &rec.seeds[seed_offset + original - usize::from(original > delta_i)]
+            }
+        });
 
-//         let qi_ref;
-//         (qi_ref, q_ref) = q_ref.split_at_mut(ki);
+        // line 8
+        let columns = &mut raw_q[offset..offset + di];
+        convert_to_vole::<P::BAVC, P::LHatBytes>(
+            seeds,
+            iv,
+            i as u32,
+            true,
+            &mut [],
+            columns,
+            &mut scratch,
+        );
 
-//         // line 7
-//         let seeds_i = (0..ni)
-//             // To map values in-order, instead of iterating over j we iterate over j ^ delta_i
-//             .map(|j_xor_delta| {
-//                 if j_xor_delta == 0 {
-//                     return &zero_arr;
-//                 }
-//                 let j = j_xor_delta ^ delta_i as usize;
+        // line 11
+        if i != 0 {
+            for (d, column) in columns.iter_mut().enumerate() {
+                let delta_mask = 0u8.wrapping_sub(((delta_i >> d) & 1) as u8);
+                for (q_ij, &c_ij) in column[..ell_bytes].iter_mut().zip(&c[i - 1]) {
+                    *q_ij ^= c_ij & delta_mask;
+                }
+            }
+        }
+        offset += di;
+        seed_offset += ni - 1;
+    }
 
-//                 let seeds_idx = if j < delta_i as usize {
-//                     sdi_off + j
-//                 } else {
-//                     sdi_off + j - 1
-//                 };
+    // line 13-14: delta prime is the low challenge bits
+    let mut delta = Array::default();
+    matrix_mul_table(&mut delta, chall, &tables.w_crt);
 
-//                 // As we start from j_xor_delta = 1, we skip case j = delta_i
-//                 &rec.seeds[seeds_idx]
-//             });
+    // line 16
+    let mut r_tilde = Box::<Array<Array<u8, P::LambdaMinusWGrind>, NMask>>::default();
+    for m in 0..NMask::USIZE {
+        let ell_m = ell + m * d0;
+        offset = 0;
+        for i in 0..tau {
+            // line 19
+            let di = P::Tau::bavc_max_node_depth(i);
+            let mut columns = &mut raw_q[offset..offset + di];
+            let reduced =
+                tree_product_share(&mut columns, ell_m, tables.tree_moduli[i]);
+            insert_bit_slice(&mut r_tilde[m], offset, reduced, di as u32);
+            offset += di;
+        }
+    }
 
-//         // line 8
-//         let _ = convert_to_vole::<P::BAVC, P::LHatBytes>(
-//             seeds_i,
-//             iv,
-//             i,
-//             true,
-//             &mut [],
-//             qi_ref,
-//             &mut scratch,
-//         );
+    // lines 21-27: corrected witness columns are the verifier's wire labels.
+    let mut q_tilde = vec![0; NMask::USIZE * n_mult_bytes];
+    let mut l_e_prime = Array::<u8, <P::OWF as OWFParameters>::LambdaBytes>::default();
+    let mut gamma = vec![0; n_mult_bytes];
+    matrix_mul_table(&mut gamma, chall, &tables.g);
+    for e in 0..tables.gates {
+        // line 24
+        gate_label(&mut l_e_prime, &raw_q, &tables.g, e);
 
-//         // line 12
-//         if i != 0 {
-//             // ::15
-//             for (_, q_ij) in qi_ref
-//                 .iter_mut()
-//                 .take(<P::OWF as OWFParameters>::L::USIZE)
-//                 .enumerate()
-//                 .filter(|(j, _)| delta_i & (1 << j) != 0)
-//             {
-//                 // xor column q_{i,j} with correction c_i
-//                 for (q_ij, c_ij) in q_ij.iter_mut().zip(&c[i as usize - 1]) {
-//                     *q_ij ^= c_ij;
-//                 }
-//             }
-//         }
+        // line 25
+        let mut hash = h5_init::<P>(iv, e);
+        hash.update(&l_e_prime);
+        let mut he = [0u8; 2];
+        hash.finish().read(&mut he);
 
-//         // Round i+1 will write the next N_{i+1} columns
-//         sdi_off += ni - 1;
-//     }
+        // lines 27: part one (implicit transpose of he)
+        // TODO: transpose he vector instead
+        for m in 0..NMask::USIZE {
+            set_bit(
+                &mut q_tilde[m * n_mult_bytes..(m + 1) * n_mult_bytes],
+                e,
+                get_bit(&he, m),
+            );
+        }
+    }
 
-//     Some(VoleReconstructResult { com: rec.com, q })
-// }
+    // lines 27: part two
+    for m in 0..NMask::USIZE {
+        for j in 0..n_mult_bytes {
+            q_tilde[m * n_mult_bytes + j] ^= gamma[j] & c_mult[m * n_mult_bytes + j];
+        }
+    }
+
+    // line 30
+    let mut q_bar = Array::default();
+    recombine_mask_shares(&mut q_bar, &r_tilde, &q_tilde, tables);
+
+    // lines 31: lift witness rows
+    let mut q = Box::<
+        Array<Array<u8, <P::OWF as OWFParameters>::LBytes>, <P::OWF as OWFParameters>::Lambda>,
+    >::default();
+    crt_transform_columns(&mut q, &raw_q, &tables.w_crt);
+
+    // line 33
+    Some(VoleReconstructResult {
+        com: rec.com,
+        q,
+        q_bar,
+        delta,
+    })
+}
 
 #[cfg(test)]
 #[path = "../tests/data/vole_tvs.rs"]
@@ -561,7 +660,66 @@ mod test {
 
     use super::test_vectors::{DataVOLE, FAEST_EM_TEST_VECTORS, ROOT_KEY, VOLE_TEST_VECTORS};
     use super::*;
-    use crate::{parameter::*, utils::test::hash_array};
+    use crate::{fields::Field, parameter::*, utils::test::hash_array};
+
+    fn witness_rows<L: ArraySize>(columns: &[Array<u8, L>], lambda_bytes: usize) -> Vec<u8> {
+        let mut rows = vec![0; L::USIZE * 8 * lambda_bytes];
+        for (bit, row) in rows.chunks_exact_mut(lambda_bytes).enumerate() {
+            for (col, column) in columns.iter().enumerate() {
+                set_bit(row, col, get_bit(column, bit));
+            }
+        }
+        rows
+    }
+
+    fn check_correlations<P: FAESTParameters>(
+        committed: &VoleCommitResult<
+            <P::BAVC as BatchVectorCommitment>::LambdaBytes,
+            <P::BAVC as BatchVectorCommitment>::NLeafCommit,
+            <P::OWF as OWFParameters>::LBytes,
+        >,
+        reconstructed: &VoleReconstructResult<
+            <P::BAVC as BatchVectorCommitment>::LambdaBytes,
+            <P::OWF as OWFParameters>::LBytes,
+        >,
+        challenge: &[u8],
+    ) {
+        assert_eq!(committed.com, reconstructed.com);
+        let table = &P::Tau::VOLE_TABLES.w_crt;
+        let mut expected_delta = vec![0; table.rows.div_ceil(8)];
+        // Independent coefficient matrix product, including non-word-aligned inputs.
+        for row in 0..table.rows {
+            let mut bit = 0;
+            for col in 0..table.columns {
+                bit ^= get_bit(challenge, col)
+                    & ((table.words[row * table.stride + col / 64] >> (col % 64)) as u8 & 1);
+            }
+            set_bit(&mut expected_delta, row, bit);
+        }
+        assert_eq!(reconstructed.delta.as_slice(), expected_delta);
+        for (col, (q, v)) in reconstructed.q.iter().zip(committed.v.iter()).enumerate() {
+            let mask = 0u8.wrapping_sub(get_bit(&expected_delta, col));
+            for byte in 0..<P::OWF as OWFParameters>::LBytes::USIZE {
+                assert_eq!(
+                    q[byte],
+                    v[byte] ^ (committed.u[byte] & mask),
+                    "witness column {col}, byte {byte}"
+                );
+            }
+        }
+        type F<P> =
+            <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::Field;
+        let delta = F::<P>::from(reconstructed.delta.as_slice());
+        for m in 0..NMask::USIZE {
+            let expected = F::<P>::from(committed.v_bar[m].as_slice())
+                + F::<P>::from(committed.u_bar[m].as_slice()) * delta;
+            assert_eq!(
+                reconstructed.q_bar[m].as_slice(),
+                expected.as_bytes().as_slice(),
+                "mask {m}"
+            );
+        }
+    }
 
     fn check_vector<P: FAESTParameters>(tv: &DataVOLE) {
         assert_eq!(tv.lambda as usize, <P::OWF as OWFParameters>::Lambda::USIZE);
@@ -579,7 +737,7 @@ mod test {
         assert_eq!(res.com.as_slice(), tv.h, "com");
         assert_eq!(hash_array(&c), tv.hashed_c, "c");
         assert_eq!(hash_array(&cm), tv.hashed_c_mult, "c_mult");
-        assert_eq!(hash_array(&res.u[..]), tv.hashed_u, "u");
+        assert_eq!(hash_array(&res.u), tv.hashed_u, "u");
         let mut rows = vec![0; len * 8 * <P::OWF as OWFParameters>::LambdaBytes::USIZE];
         for bit in 0..len * 8 {
             let row = &mut rows[bit * r.len()..(bit + 1) * r.len()];
@@ -598,6 +756,51 @@ mod test {
             tv.hashed_bar_v,
             "v_bar"
         );
+        let challenge = Array::try_from(tv.chall).unwrap();
+        let indices = decode_all_chall_3::<P::Tau>(&challenge);
+        let opening = P::BAVC::open(&res.decom, &indices).unwrap();
+        let rec = volereconstruct::<P>(
+            &challenge,
+            &opening,
+            VoleCommitmentCRef::new(&c),
+            &cm,
+            &IV::default(),
+        )
+        .unwrap();
+        assert_eq!(hash_array(&witness_rows(&rec.q, r.len())), tv.hashed_q, "q");
+        assert_eq!(
+            hash_array(rec.q_bar.as_flattened()),
+            tv.hashed_bar_q,
+            "q_bar"
+        );
+        check_correlations::<P>(&res, &rec, &challenge);
+
+        // Neither grinding bits nor unused gate padding enters reconstruction.
+        let mut alternate_challenge = challenge.clone();
+        for bit in P::Tau::VOLE_TABLES.w_crt.columns..tv.lambda as usize {
+            let value = get_bit(&alternate_challenge, bit) ^ 1;
+            set_bit(&mut alternate_challenge, bit, value);
+        }
+        let mut padded_cm = cm.clone();
+        let gates = P::Tau::VOLE_TABLES.gates;
+        if gates % 8 != 0 {
+            for row in padded_cm.chunks_exact_mut(gates.div_ceil(8)) {
+                *row.last_mut().unwrap() |= 0xff << (gates % 8);
+            }
+        }
+        let repeated = volereconstruct::<P>(
+            &alternate_challenge,
+            &opening,
+            VoleCommitmentCRef::new(&c),
+            &padded_cm,
+            &IV::default(),
+        )
+        .unwrap();
+        assert_eq!(rec.com, repeated.com);
+        assert_eq!(rec.q, repeated.q);
+        assert_eq!(rec.q_bar, repeated.q_bar);
+        assert_eq!(rec.delta, repeated.delta);
+
         let mut c2 = vec![0; c.len()];
         let mut cm2 = vec![0; cm.len()];
         let res2 = volecommit::<P>(
@@ -622,6 +825,26 @@ mod test {
                 assert_eq!(row[row.len() - 1] >> (gates % 8), 0);
             }
         }
+        // Exercise the complete path with a different root and nonzero IV.
+        let mut other_root = r.clone();
+        other_root[0] ^= 0xa5;
+        let iv = IV::from([0x37; 16]);
+        let other = volecommit::<P>(
+            VoleCommitmentCRefMut::new(&mut c2),
+            &mut cm2,
+            &other_root,
+            &iv,
+        );
+        let opening = P::BAVC::open(&other.decom, &indices).unwrap();
+        let rec = volereconstruct::<P>(
+            &challenge,
+            &opening,
+            VoleCommitmentCRef::new(&c2),
+            &cm2,
+            &iv,
+        )
+        .unwrap();
+        check_correlations::<P>(&other, &rec, &challenge);
     }
 
     macro_rules! vector_test {
@@ -789,6 +1012,161 @@ mod test {
                 }
             }
         }
+    }
+
+    fn check_streaming<B: BatchVectorCommitment, L: ArraySize>() {
+        let iv = IV::from([0x91; 16]);
+        for tree in [0, <B::TAU as TauParameters>::Tau::USIZE - 1] {
+            let depth = B::TAU::bavc_max_node_depth(tree);
+            let count = 1 << depth;
+            let seeds: Vec<Array<u8, B::LambdaBytes>> = (0..count)
+                .map(|leaf| {
+                    let mut seed = Array::default();
+                    for (byte, dst) in seed.iter_mut().enumerate() {
+                        *dst = (leaf as u8)
+                            .wrapping_mul(37)
+                            .wrapping_add((leaf >> 8) as u8)
+                            .wrapping_add(byte as u8);
+                    }
+                    seed
+                })
+                .collect();
+            let mut scratch = vec![Array::<u8, L>::default(); B::TAU::bavc_max_node_depth(0) + 1];
+            for hidden in [None, Some(0), Some(1), Some(count / 2), Some(count - 1)] {
+                for column in &mut scratch {
+                    column.fill(0xa5);
+                }
+                let mut expanded = vec![Array::<u8, L>::default(); count];
+                for (leaf, out) in expanded.iter_mut().enumerate() {
+                    if hidden.is_some() && leaf == 0 {
+                        continue;
+                    }
+                    let original = leaf ^ hidden.unwrap_or(0);
+                    B::PRG::new_prg(&seeds[original], &iv, TWEAK_OFFSET + tree as u32).read(out);
+                }
+                // Straightforward specification traversal, materializing all leaves.
+                let mut expected = vec![Array::<u8, L>::default(); depth];
+                for (level, column) in expected.iter_mut().enumerate() {
+                    for pair in 0..count >> (level + 1) {
+                        xor_arrays_inplace(column, &expanded[2 * pair + 1]);
+                        let mut sum = expanded[2 * pair].clone();
+                        xor_arrays_inplace(&mut sum, &expanded[2 * pair + 1]);
+                        expanded[pair] = sum;
+                    }
+                }
+                let mut actual = vec![Array::<u8, L>::default(); depth];
+                for col in &mut actual {
+                    col.fill(0xff);
+                }
+                let mut u = vec![0x5a; L::USIZE];
+                let bottom = Array::default();
+                let permuted = (0..count).map(|leaf| {
+                    if hidden.is_some() && leaf == 0 {
+                        &bottom
+                    } else {
+                        &seeds[leaf ^ hidden.unwrap_or(0)]
+                    }
+                });
+                convert_to_vole::<B, L>(
+                    permuted,
+                    &iv,
+                    tree as u32,
+                    hidden.is_some(),
+                    &mut u,
+                    &mut actual,
+                    &mut scratch,
+                );
+                assert_eq!(actual, expected, "tree={tree}, hidden={hidden:?}");
+                if hidden.is_none() {
+                    assert_eq!(u, expanded[0].as_slice());
+                } else {
+                    assert!(u.iter().all(|&b| b == 0x5a));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn streaming_conversion_matches_leaf_reduction() {
+        use hybrid_array::typenum::{U9, U17, U135};
+        check_streaming::<BAVC128Small<crate::fields::GF128>, U1>();
+        check_streaming::<BAVC128Fast<crate::fields::GF128>, U9>();
+        check_streaming::<BAVC192SmallEM, U17>();
+        check_streaming::<BAVC256FastEM, U135>();
+    }
+
+    #[test]
+    fn malformed_reconstruction_inputs() {
+        type P = FAEST128fParameters;
+        let tables = <P as FAESTParameters>::Tau::VOLE_TABLES;
+        let mut c = vec![
+            0;
+            (tables.tau - 1)
+                * <<P as FAESTParameters>::OWF as OWFParameters>::LBytes::USIZE
+        ];
+        let mut cm = vec![0; NMask::USIZE * tables.gates.div_ceil(8)];
+        let iv = IV::default();
+        let committed = volecommit::<P>(
+            VoleCommitmentCRefMut::new(&mut c),
+            &mut cm,
+            &Array::default(),
+            &iv,
+        );
+        let challenge = Array::try_from(VOLE_TEST_VECTORS[1].chall).unwrap();
+        let indices = decode_all_chall_3::<<P as FAESTParameters>::Tau>(&challenge);
+        let opening = <P as FAESTParameters>::BAVC::open(&committed.decom, &indices).unwrap();
+        let reconstruct = |opening: &BavcOpenResult, c: &[u8], cm: &[u8]| {
+            volereconstruct::<P>(&challenge, opening, VoleCommitmentCRef::new(c), cm, &iv)
+        };
+        for (c_size, cm_size) in [
+            (c.len() - 1, cm.len()),
+            (c.len() + 1, cm.len()),
+            (c.len(), cm.len() - 1),
+            (c.len(), cm.len() + 1),
+        ] {
+            assert!(reconstruct(&opening, &vec![0; c_size], &vec![0; cm_size]).is_none());
+        }
+        let mut bad = opening.clone();
+        bad.coms.pop();
+        assert!(reconstruct(&bad, &c, &cm).is_none());
+        let mut bad = opening.clone();
+        bad.coms.push(opening.coms[0]);
+        assert!(reconstruct(&bad, &c, &cm).is_none());
+        let mut bad = opening.clone();
+        bad.coms[0] = &opening.coms[0][1..];
+        assert!(reconstruct(&bad, &c, &cm).is_none());
+        let mut bad = opening.clone();
+        bad.nodes.pop();
+        assert!(reconstruct(&bad, &c, &cm).is_none());
+        let mut bad = opening.clone();
+        bad.nodes[0] = &opening.nodes[0][1..];
+        assert!(reconstruct(&bad, &c, &cm).is_none());
+        let mut bad = opening.clone();
+        bad.nodes.resize(
+            <<P as FAESTParameters>::BAVC as BatchVectorCommitment>::Topen::USIZE + 1,
+            opening.nodes[0],
+        );
+        assert!(reconstruct(&bad, &c, &cm).is_none());
+        // Padding is allowed up to Topen, but must be zero.
+        assert!(
+            opening.nodes.len()
+                < <<P as FAESTParameters>::BAVC as BatchVectorCommitment>::Topen::USIZE
+        );
+        let pad = [0u8; 16];
+        let mut padded = opening.clone();
+        padded.nodes.push(&pad);
+        let rec = reconstruct(&padded, &c, &cm).unwrap();
+        assert_eq!(rec.com, committed.com);
+        let nonzero_pad = [1u8; 16];
+        padded.nodes.pop();
+        padded.nodes.push(&nonzero_pad);
+        assert!(reconstruct(&padded, &c, &cm).is_none());
+        // Reconstruction computes a commitment; it cannot authenticate it.
+        let mut altered_com = opening.coms[0].to_vec();
+        altered_com[0] ^= 1;
+        let mut altered = opening.clone();
+        altered.coms[0] = &altered_com;
+        assert_ne!(reconstruct(&altered, &c, &cm).unwrap().com, committed.com);
     }
 
     #[test]
