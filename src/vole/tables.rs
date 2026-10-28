@@ -9,6 +9,7 @@ pub(crate) struct PackedMatrix {
     pub columns: usize,
     /// Number of words per row, including zero padding.
     pub stride: usize,
+    /// Caller may assume zero-padding
     pub words: &'static [u64],
 }
 
@@ -26,6 +27,7 @@ pub(crate) struct VoleTables {
     pub w_crt: PackedMatrix,
     pub tree_moduli: &'static [u16],
     /// Product of the tree moduli, including its leading coefficient.
+    /// Caller may assume zero-padding
     pub m_tree: &'static [u64],
 }
 include!(concat!(env!("OUT_DIR"), "/vole_tables.rs"));
