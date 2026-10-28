@@ -96,8 +96,10 @@ impl SecurityParameter for U16 {}
 impl SecurityParameter for U24 {}
 impl SecurityParameter for U32 {}
 
-// Get bytes from bit length
+/// Get bytes from bit length
 pub(crate) type ToBytes<L: ArraySize> = Quot<Sum<L, U7>, U8>;
+/// Upper-bound on max small-tree depth plus one (i.e., d0 + 1)
+pub(crate) type MaxDepthPlusOne<P: FAESTParameters> = Sum<<P::Tau as TauParameters>::K, U1>; // K is always >= d0
 
 /// Base parameters per security level
 pub(crate) trait BaseParameters {
@@ -1027,7 +1029,7 @@ pub(crate) trait FAESTParameters {
         >;
     /// Grinding parameter specifying how many upperbits of the Fiat-Shamir challenge must be set to 0
     type WGRIND: ArraySize + Add<U7, Output: ArraySize + Div<U8, Output: ArraySize>>;
-    type LambdaMinusWGrind: ArraySize;
+    type LambdaMinusWGrind: ArraySize + Add<U7, Output: ArraySize + Div<U8, Output: ArraySize>>;
     /// Binary length of each vector produced by [`crate::vole::convert_to_vole`]
     type LHatBytes: ArraySize;
     /// Size of the signature (in bytes)
