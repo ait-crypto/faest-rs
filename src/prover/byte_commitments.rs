@@ -119,6 +119,13 @@ where
     F: BigGaloisField,
     L: ArraySize + Mul<U8, Output: ArraySize>,
 {
+    pub(crate) fn to_owned(self) -> ByteCommits<F, L> {
+        ByteCommits {
+            keys: Box::new(self.keys.clone()),
+            tags: Box::new(self.tags.clone()),
+        }
+    }
+
     /// Create a new instance of ByteCommitsRef from slices to commitment keys and tags.
     ///
     /// Panics if the lengths of the keys is not equal to the length of the tags divided by 8.
