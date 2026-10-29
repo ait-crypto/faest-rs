@@ -1,8 +1,4 @@
-use core::{
-    iter::zip,
-    mem,
-    ops::{AddAssign, Mul},
-};
+use core::{iter::zip, mem, ops::Mul};
 
 #[cfg(not(feature = "std"))]
 use alloc::{borrow::ToOwned, boxed::Box};
@@ -12,42 +8,13 @@ use hybrid_array::{
     typenum::{U8, Unsigned},
 };
 
-use super::{ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo};
+use super::{ByteCommits, ByteCommitsRef};
 use crate::{
     aes::*,
-    fields::{
-        BigGaloisField, ByteCombine, ByteCombineConstants, Sigmas,
-        large_fields::ByteCombineSquaredConstants,
-    },
+    fields::{BigGaloisField, ByteCombine},
     parameter::{OWFField, OWFParameters, SecurityParameter},
     utils::xor_arrays_inplace,
 };
-
-// Helper type aliases
-pub(crate) type StateBitsSquaredCommits<O> =
-    Box<Array<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NStBits>>;
-
-pub(crate) type StateBytesCommits<O> =
-    Box<Array<FieldCommitDegOne<OWFField<O>>, <O as OWFParameters>::NStBytes>>;
-
-pub(crate) type StateBytesSquaredCommits<O> =
-    Box<Array<FieldCommitDegTwo<OWFField<O>>, <O as OWFParameters>::NStBytes>>;
-
-// implementations of StateToBytes
-
-// Committed state
-impl<O, L> StateToBytes<O> for ByteCommitsRef<'_, OWFField<O>, L>
-where
-    L: ArraySize + Mul<U8, Output: ArraySize>,
-    O: OWFParameters,
-{
-    type Output = StateBytesCommits<O>;
-
-    fn state_to_bytes(&self) -> Self::Output
-where {
-        Box::new((0..L::USIZE).map(|i| self.get_field_commit(i)).collect())
-    }
-}
 
 // Scalar commitments to known state
 impl<O, L> StateToBytes<O> for Array<u8, L>
@@ -189,19 +156,7 @@ where
     }
 }
 
-impl<F, L, T> AddRoundKeyBytes<&Array<T, L>> for Box<Array<FieldCommitDegTwo<F>, L>>
-where
-    F: BigGaloisField,
-    L: ArraySize + Mul<U8, Output: ArraySize>,
-    for<'a> FieldCommitDegTwo<F>: AddAssign<&'a T>,
-{
-    fn add_round_key_bytes(&mut self, key: &Array<T, L>, _sq: bool) {
-        for (st, k) in zip(self.iter_mut(), key) {
-            *st += k;
-        }
-    }
-}
-
+/// FAEST v3 Figure 7.11.
 impl<O> InverseShiftRows<O> for ByteCommitsRef<'_, OWFField<O>, O::NStBytes>
 where
     O: OWFParameters,
@@ -213,14 +168,14 @@ where
 
         for r in 0..4 {
             for c in 0..O::NSt::USIZE {
-                // :: 3-6
+                // ::3-6
                 let i = if (O::NSt::USIZE != 8) || (r <= 1) {
                     4 * ((O::NSt::USIZE + c - r) % O::NSt::USIZE) + r
                 } else {
                     4 * ((O::NSt::USIZE + c - r - 1) % O::NSt::USIZE) + r
                 };
 
-                // :: 7
+                // ::7
                 state_prime.keys[4 * c + r] = self.keys[i];
                 state_prime.tags[8 * (4 * c + r)..8 * (4 * c + r) + 8]
                     .copy_from_slice(&self.tags[8 * i..8 * i + 8]);
@@ -231,38 +186,7 @@ where
     }
 }
 
-impl<O> MixColumns<O> for StateBytesSquaredCommits<O>
-where
-    O: OWFParameters,
-{
-    fn mix_columns(&mut self, sq: bool) {
-        let v2 = if sq {
-            &OWFField::<O>::BYTE_COMBINE_SQ_2
-        } else {
-            &OWFField::<O>::BYTE_COMBINE_2
-        };
-        let v3 = if sq {
-            &OWFField::<O>::BYTE_COMBINE_SQ_3
-        } else {
-            &OWFField::<O>::BYTE_COMBINE_3
-        };
-
-        for scalars in self.as_chunks_mut::<4>().0 {
-            // Save the 4 state's columns that will be modified in this round
-            let tmp = scalars.clone();
-
-            // ::7
-            scalars[0] = &tmp[0] * v2 + &tmp[1] * v3 + &tmp[2] + &tmp[3];
-            // ::8
-            scalars[1] = &tmp[1] * v2 + &tmp[2] * v3 + &tmp[0] + &tmp[3];
-            // ::9
-            scalars[2] = &tmp[2] * v2 + &tmp[3] * v3 + &tmp[0] + &tmp[1];
-            // ::10
-            scalars[3] = &tmp[0] * v3 + &tmp[3] * v2 + &tmp[1] + &tmp[2];
-        }
-    }
-}
-
+/// FAEST v3 Figure 7.9.
 impl<O> BytewiseMixColumns<O> for ByteCommitsRef<'_, OWFField<O>, O::NStBytes>
 where
     O: OWFParameters,
@@ -292,7 +216,7 @@ where
                     a_tags[6],
                 ];
 
-                // ::6..10
+                // ::6-9
                 // Add b(r) to o_{4*c+r} and o_{4* c + (r - 1 mod 4)}
                 for j in 0..2 {
                     let off = (4 + r - j) % 4;
@@ -323,38 +247,7 @@ where
     }
 }
 
-impl<O> SBoxAffine<O> for StateBitsSquaredCommits<O>
-where
-    O: OWFParameters,
-{
-    type Output = StateBytesSquaredCommits<O>;
-
-    fn s_box_affine(&self, sq: bool) -> Self::Output {
-        let sigmas = if sq {
-            &OWFField::<O>::SIGMA_SQUARES
-        } else {
-            &OWFField::<O>::SIGMA
-        };
-
-        let t = sq as usize;
-
-        // :: 8-10
-        Box::new(
-            (0..O::NStBytes::USIZE)
-                .map(|i| {
-                    // :: 9
-                    let mut y_i = &self[i * 8 + t % 8] * sigmas[0];
-                    for sigma_idx in 1..8 {
-                        y_i += &self[i * 8 + (sigma_idx + t) % 8] * sigmas[sigma_idx];
-                    }
-                    y_i += sigmas[8];
-                    y_i
-                })
-                .collect(),
-        )
-    }
-}
-
+/// FAEST v3 Figure 7.6.
 impl<F, L> InverseAffine for ByteCommits<F, L>
 where
     F: BigGaloisField,
@@ -370,7 +263,7 @@ where
         }
 
         for scalars in self.tags.as_chunks_mut::<8>().0 {
-            // 6
+            // ::6
             let xi_tags = *scalars;
             for bit_i in 0..8 {
                 // ::6
