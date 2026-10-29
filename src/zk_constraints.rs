@@ -8,13 +8,20 @@ use crate::{
     internal_keys::PublicKey,
     parameter::{BaseParameters, OWFField, OWFParameters, QSProof},
     prover::{self, byte_commitments::ByteCommitsRef},
-    universal_hashing::ZKHasherInit,
-    utils::{array_ref, get_bit},
-    verifier::{self, VoleCommitsRef},
+    universal_hashing::{ZKHasherInit, ZKProofHasher, ZKVerifyHasher},
+    utils::get_bit,
 };
+use hybrid_array::{Array, ArraySize, typenum::Unsigned};
 
-pub(crate) type CstrntsVal<'a, O> =
-    &'a Array<Array<u8, <O as OWFParameters>::LHatBytes>, <O as OWFParameters>::Lambda>;
+/// Hashes OWF constraint polynomials.
+///
+/// The prover hashes their coefficients, while the verifier hashes their evaluations at Delta.
+pub(crate) trait ConstraintHasher<F: BigGaloisField> {
+    fn hash_constraint(&mut self, polynomial: Polynomial<F>);
+}
+
+pub(crate) type Challenge<O> =
+    Array<u8, <<O as OWFParameters>::LHatBytes>, <O as OWFParameters>::Lambda>;
 
 // // Reshapes a matrix of size (l_hat/8) x lambda into a matrix of size l_hat x (lambda/8).
 // // Then, it converts all rows in the interval [row_start, rowstart + nrows) to field elements.
