@@ -8,32 +8,20 @@ use core::{
 use alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
-    bavc::{BatchVectorCommitment, Bavc, LeafCommitment, LeafCommitmentEm},
-    fields::{BaseField, BigGaloisField, GF128, GF192, GF256},
-    // internal_keys::{PublicKey, SecretKey},
-    prg::{PRG128, PRG192, PRG256, PseudoRandomGenerator},
-    random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256},
-    // rijndael_32::{Rijndael192, Rijndael256},
-    universal_hashing::{
+    bavc::{BatchVectorCommitment, Bavc, LeafCommitment, LeafCommitmentEm}, fields::{BaseField, BigGaloisField, GF128, GF192, GF256}, prg::{PRG128, PRG192, PRG256, PseudoRandomGenerator}, random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256}, universal_hashing::{
         LeafHasher128, LeafHasher192, LeafHasher256, VoleHashOutputLength, VoleHashSeedLength,
         VoleHasher, VoleHasherInit, VoleHasherProcess, ZKHasher, ZKHasherInit,
-    },
-    utils::xor_arrays_inplace,
-    // witness::aes_extendedwitness,
-    // zk_constraints::{CstrntsVal, aes_prove, aes_verify},
-    vole::tables::{
+    }, utils::xor_arrays_inplace, vole::tables::{
         TABLES_128F, TABLES_128S, TABLES_192F, TABLES_192S, TABLES_256F, TABLES_256S,
         TABLES_EM_192F, TABLES_EM_192S, VoleTables,
-    },
+    }, witness::extend_witness,
 };
 use aes::{
     Aes128Enc, Aes192Enc, Aes256Enc,
     cipher::{BlockCipherEncrypt, KeyInit},
 };
 use hybrid_array::{
-    ArraySize,
-    sizes::{U90, U94, U130, U134, U154, U159, U226, U231, U239, U286, U291},
-    typenum::{
+    Array, ArraySize, sizes::{U90, U94, U130, U134, U154, U159, U226, U231, U239, U286, U291}, typenum::{
         Diff, Prod, Quot, Sum, U0, U1, U2, U3, U4, U6, U7, U8, U9, U10, U11, U12, U14, U16, U17,
         U22, U24, U25, U32, U33, U40, U48, U52, U64, U102, U103, U105, U108, U110, U112, U120,
         U128, U162, U163, U171, U176, U192, U218, U225, U229, U234, U245, U246, U256, U448, U672,
@@ -317,11 +305,11 @@ pub(crate) trait OWFParameters: Sized {
     //         input: &Array<u8, Self::InputSize>,
     //     ) -> Array<u8, Self::OutputSize>;
 
-    //     /// Compute the extended witness from `owf_key` and `owf_input`
-    //     fn extendwitness(
-    //         owf_key: &Array<u8, Self::LambdaBytes>,
-    //         owf_input: &Array<u8, Self::InputSize>,
-    //     ) -> Box<Array<u8, Self::LBytes>>;
+        /// Compute the extended witness from `owf_key` and `owf_input`
+        fn extendwitness(
+            owf_key: &Array<u8, Self::LambdaBytes>,
+            owf_input: &Array<u8, Self::InputSize>,
+        ) -> Box<Array<u8, Self::LBytes>>;
 
     //     /// Compute the extended witness using the secret key `sk`
     //     fn witness(sk: &SecretKey<Self>) -> Box<Array<u8, Self::LBytes>> {
@@ -433,13 +421,13 @@ where
     //         output
     //     }
 
-    //     #[inline]
-    //     fn extendwitness(
-    //         owf_key: &Array<u8, Self::LambdaBytes>,
-    //         owf_input: &Array<u8, Self::InputSize>,
-    //     ) -> Box<Array<u8, Self::LBytes>> {
-    //         aes_extendedwitness::<Self>(owf_key, owf_input)
-    //     }
+        #[inline]
+        fn extendwitness(
+            owf_key: &Array<u8, Self::LambdaBytes>,
+            owf_input: &Array<u8, Self::InputSize>,
+        ) -> Box<Array<u8, Self::LBytes>> {
+            extend_witness::<Self>(owf_key, owf_input)
+        }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -503,13 +491,13 @@ where
     //         output1.concat(output2)
     //     }
 
-    //     #[inline]
-    //     fn extendwitness(
-    //         owf_key: &Array<u8, Self::LambdaBytes>,
-    //         owf_input: &Array<u8, Self::InputSize>,
-    //     ) -> Box<Array<u8, Self::LBytes>> {
-    //         aes_extendedwitness::<Self>(owf_key, owf_input)
-    //     }
+        #[inline]
+        fn extendwitness(
+            owf_key: &Array<u8, Self::LambdaBytes>,
+            owf_input: &Array<u8, Self::InputSize>,
+        ) -> Box<Array<u8, Self::LBytes>> {
+            extend_witness::<Self>(owf_key, owf_input)
+        }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -573,13 +561,13 @@ where
     //         output1.concat(output2)
     //     }
 
-    //     #[inline]
-    //     fn extendwitness(
-    //         owf_key: &Array<u8, Self::LambdaBytes>,
-    //         owf_input: &Array<u8, Self::InputSize>,
-    //     ) -> Box<Array<u8, Self::LBytes>> {
-    //         aes_extendedwitness::<Self>(owf_key, owf_input)
-    //     }
+        #[inline]
+        fn extendwitness(
+            owf_key: &Array<u8, Self::LambdaBytes>,
+            owf_input: &Array<u8, Self::InputSize>,
+        ) -> Box<Array<u8, Self::LBytes>> {
+            extend_witness::<Self>(owf_key, owf_input)
+        }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -640,13 +628,13 @@ where
     //         output
     //     }
 
-    //     #[inline]
-    //     fn extendwitness(
-    //         owf_key: &Array<u8, Self::LambdaBytes>,
-    //         owf_input: &Array<u8, Self::InputSize>,
-    //     ) -> Box<Array<u8, Self::LBytes>> {
-    //         aes_extendedwitness::<Self>(owf_input, owf_key)
-    //     }
+        #[inline]
+        fn extendwitness(
+            owf_key: &Array<u8, Self::LambdaBytes>,
+            owf_input: &Array<u8, Self::InputSize>,
+        ) -> Box<Array<u8, Self::LBytes>> {
+            extend_witness::<Self>(owf_input, owf_key)
+        }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -709,13 +697,13 @@ where
     //         output
     //     }
 
-    //     #[inline]
-    //     fn extendwitness(
-    //         owf_key: &Array<u8, Self::LambdaBytes>,
-    //         owf_input: &Array<u8, Self::InputSize>,
-    //     ) -> Box<Array<u8, Self::LBytes>> {
-    //         aes_extendedwitness::<Self>(owf_input, owf_key)
-    //     }
+        #[inline]
+        fn extendwitness(
+            owf_key: &Array<u8, Self::LambdaBytes>,
+            owf_input: &Array<u8, Self::InputSize>,
+        ) -> Box<Array<u8, Self::LBytes>> {
+            extend_witness::<Self>(owf_input, owf_key)
+        }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -778,13 +766,13 @@ where
     //         output
     //     }
 
-    //     #[inline]
-    //     fn extendwitness(
-    //         owf_key: &Array<u8, Self::LambdaBytes>,
-    //         owf_input: &Array<u8, Self::InputSize>,
-    //     ) -> Box<Array<u8, Self::LBytes>> {
-    //         aes_extendedwitness::<Self>(owf_input, owf_key)
-    //     }
+        #[inline]
+        fn extendwitness(
+            owf_key: &Array<u8, Self::LambdaBytes>,
+            owf_input: &Array<u8, Self::InputSize>,
+        ) -> Box<Array<u8, Self::LBytes>> {
+            extend_witness::<Self>(owf_input, owf_key)
+        }
 }
 
 pub(crate) trait TauParameters {

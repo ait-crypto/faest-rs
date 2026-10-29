@@ -672,7 +672,8 @@ const fn rotate_rows_2(x: u32) -> u32 {
     x.rotate_right(ror_distance(2, 0))
 }
 
-const fn ske(r: usize, nst: usize, nk: usize) -> usize {
+#[inline]
+pub(crate) const fn ske(r: usize, nst: usize, nk: usize) -> usize {
     4 * (r + 1) * nst / nk
 }
 

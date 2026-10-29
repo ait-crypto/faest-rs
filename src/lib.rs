@@ -105,7 +105,7 @@ pub use signature::{self, Error, Keypair, Signer, Verifier};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 // mod aes;
-// mod bavc;
+mod bavc;
 #[cfg(feature = "capi")]
 pub mod capi;
 // mod faest;
@@ -117,12 +117,12 @@ mod parameter;
 mod prg;
 // mod prover;
 mod random_oracles;
-// mod rijndael_32;
+mod rijndael_32;
 mod universal_hashing;
 mod utils;
 // mod verifier;
-// mod vole;
-// mod witness;
+mod vole;
+mod witness;
 // mod zk_constraints;
 
 // use crate::{
