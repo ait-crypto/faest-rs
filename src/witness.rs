@@ -1,15 +1,9 @@
-use core::mem::size_of;
-
 #[cfg(not(feature = "std"))]
 use alloc::{borrow::ToOwned, boxed::Box};
 
-use hybrid_array::{
-    Array,
-    typenum::{U3, Unsigned},
-};
+use hybrid_array::{Array, typenum::Unsigned};
 
 use crate::{
-    fields::{GF8, Square},
     parameter::OWFParameters,
     rijndael_32::{
         State, bitslice, convert_from_batchblocks, inv_bitslice, mix_columns_0,
@@ -36,17 +30,13 @@ pub(crate) fn extend_witness<O: OWFParameters>(
 
     if !O::IS_EM {
         // line 8
-        save_secret_bits::<O>(&mut witness, &owf_key, &mut offset);
-        // line 9
+        append_bytes(&mut witness, &mut offset, &owf_key);
         save_non_lin_bits::<O>(&mut witness, &k_bar, &mut offset);
-
     } else {
         // line 18
-        // in EM mode, AES key is part of public input while pt is secret
-        save_secret_bits::<O>(&mut witness, owf_input, &mut offset);
+        append_bytes(&mut witness, &mut offset, owf_input);
     };
 
-    
     // line 21
     for _ in 0..O::Beta::USIZE {
         round_with_save::<O>(&input, &k_bar, &mut witness, &mut offset);
@@ -56,12 +46,9 @@ pub(crate) fn extend_witness<O: OWFParameters>(
     witness
 }
 
-fn save_secret_bits<O>(witness: &mut [u8], owf_secret: &[u8], offset: &mut usize)
-where
-    O: OWFParameters,
-{
-    witness[..O::LambdaBytes::USIZE].copy_from_slice(owf_secret);
-    *offset += O::LambdaBytes::USIZE;
+fn append_bytes(witness: &mut [u8], offset: &mut usize, bytes: &[u8]) {
+    witness[*offset..*offset + bytes.len()].copy_from_slice(bytes);
+    *offset += bytes.len();
 }
 
 fn save_non_lin_bits<O>(witness: &mut [u8], kb: &[u32], offset: &mut usize)
@@ -77,17 +64,18 @@ where
     };
 
     for j in start_off..start_off + non_lin_blocks {
-        let inside = Array::<_, U3>::from_iter(
-            convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)])).take(3),
-        );
-
+        // SAFETY: unwraps don't panic beacause AES BatchBlock is converted to 8 x 4-byte arrays
         if O::NK::USIZE != 6 || j % 3 == 0 {
-            witness[*offset..*offset + size_of::<u32>()].copy_from_slice(&inside[0]);
-            *offset += size_of::<u32>();
+            let inside = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]))
+                .nth(0)
+                .unwrap();
+            append_bytes(witness, offset, &inside);
         } else if j % 3 == 1 {
-            witness[*offset..*offset + size_of::<u32>()].copy_from_slice(&inside[2]);
-            *offset += size_of::<u32>();
-        }
+            let inside = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]))
+                .nth(2)
+                .unwrap();
+            append_bytes(witness, offset, &inside);
+        };
     }
 }
 
@@ -118,8 +106,7 @@ fn round_with_save<O>(
         // line 29-30
         if (j % 2) == 0 {
             for state_word in convert_from_batchblocks(inv_bitslice(&state)).take(O::NSt::USIZE) {
-                witness[*offset..*offset + state_word.len()].copy_from_slice(&state_word);
-                *offset += state_word.len();
+                append_bytes(witness, offset, &state_word);
             }
         }
 
@@ -137,18 +124,11 @@ mod test_vectors;
 
 #[cfg(test)]
 mod test {
-    #![allow(clippy::needless_range_loop)]
-
     use super::test_vectors::*;
     use crate::{
-        fields::{GF128, GF192, GF256},
         parameter::{OWF128, OWF128EM, OWF192, OWF192EM, OWF256, OWF256EM, OWFParameters},
-        utils::{array_ref, test::read_test_data},
+        utils::array_ref,
     };
-    #[cfg(not(feature = "std"))]
-    use alloc::vec::Vec;
-
-    use serde::Deserialize;
 
     macro_rules! witness_test {
         ($vectors:ident, $owf:ty, $input_size:literal) => {
