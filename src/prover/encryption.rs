@@ -1,192 +1,155 @@
-use core::{iter::zip, ops::AddAssign};
-
 #[cfg(not(feature = "std"))]
-use alloc::boxed::Box;
+use alloc::vec::Vec;
 
-use hybrid_array::{
-    Array,
-    typenum::{Quot, U2, U4, U8, Unsigned},
-};
-
-use super::{
-    ByteCommits, ByteCommitsRef, FieldCommitDegOne, FieldCommitDegTwo,
-    byte_commitments::ByteCommitment,
-};
+use super::{ByteCommitsRef, byte_commitments::ByteCommitment, polynomial::Polynomial};
 use crate::{
-    aes::*,
-    fields::{BigGaloisField, Square},
+    aes::{AddRoundKeyAssign, BytewiseMixColumns, InverseAffine, InverseShiftRows},
+    fields::{BigGaloisField, ByteCombineConstants},
     parameter::{OWFField, OWFParameters},
-    prover::aes::{StateBitsSquaredCommits, StateBytesSquaredCommits},
-    universal_hashing::ZKProofHasher,
+    zk_constraints::ConstraintHasher,
 };
+use core::array;
+use hybrid_array::typenum::Unsigned;
 
-pub(crate) fn enc_cstrnts<O, K, S>(
-    zk_hasher: &mut ZKProofHasher<OWFField<O>>,
-    input: impl for<'a> AddRoundKey<&'a K, Output = ByteCommits<OWFField<O>, O::NStBytes>>,
-    output: impl for<'a> AddRoundKey<&'a K, Output = ByteCommits<OWFField<O>, O::NStBytes>>,
+pub(crate) fn enc_cstrnts<O: OWFParameters>(
+    hasher: &mut impl ConstraintHasher<OWFField<O>>,
+    input: ByteCommitsRef<OWFField<O>, O::NStBytes>,
+    output: ByteCommitsRef<OWFField<O>, O::NStBytes>,
     w: ByteCommitsRef<OWFField<O>, O::LEncBytes>,
-    extended_key: &[K],
-) where
-    O: OWFParameters,
-    K: StateToBytes<O, Output = Box<Array<S, O::NStBytes>>>,
-    S: Square + Clone,
-    for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a S>,
-    for<'a> FieldCommitDegTwo<OWFField<O>>: AddAssign<&'a <S as Square>::Output>,
-    ByteCommits<OWFField<O>, O::NStBytes>: for<'a> AddRoundKeyAssign<&'a K>,
-    for<'a> ByteCommitsRef<'a, OWFField<O>, O::NStBytes>:
-        BytewiseMixColumns<O, Output = ByteCommits<OWFField<O>, O::NStBytes>>,
-{
-    // ::1
-    let mut state = input.add_round_key(&extended_key[0]);
+    extended_key: &[ByteCommitsRef<OWFField<O>, O::NStBytes>],
+) {
+    // line 1
+    let mut state = input.to_owned();
+    state.add_round_key_assign(&extended_key[0]);
 
-    // ::2
     for r in 0..O::R::USIZE / 2 {
-        // ::3-15
-        let state_prime = enc_cstrnts_even::<O>(
-            zk_hasher,
-            &state,
-            w.get_commits_ref::<Quot<O::NStBytes, U2>>(3 * O::NStBytes::USIZE * r / 2),
-        );
+        // line 4
+        let mut st: Vec<_> = state.iter().map(sbox).collect();
 
-        // ::16-17
-        let round_key = extended_key[2 * r + 1].state_to_bytes();
-        let round_key_sq = (&round_key).square();
+        // line 5
+        shift_rows::<O>(&mut st);
 
-        // ::18-22
-        let st_0 = aes_round::<O, _>(&state_prime, &round_key, false);
-        let st_1 = aes_round::<O, _>(&state_prime, &round_key_sq, true);
+        // line 6
+        mix_columns::<O>(&mut st);
 
-        let round_key = &extended_key[2 * r + 2];
+        // line 7
+        add_round_key::<O>(&mut st, &extended_key[2 * r + 1]);
 
-        if r != O::R::USIZE / 2 - 1 {
-            let s_tilde = w.get_commits_ref::<O::NStBytes>(
-                O::NStBytes::USIZE / 2 + 3 * O::NStBytes::USIZE * r / 2,
-            );
-
-            // ::29-38
-            enc_cstrnts_odd::<O>(zk_hasher, s_tilde, &st_0, &st_1);
-
-            // ::39-40
-            state = s_tilde.bytewise_mix_columns();
-            state.add_round_key_assign(round_key);
+        // lines 10-14
+        let last = r == O::R::USIZE / 2 - 1;
+        // TODO: should we avoid this?
+        let final_state;
+        let s_tilde = if last {
+            final_state = {
+                let mut state = output.to_owned();
+                state.add_round_key_assign(&extended_key[O::R::USIZE]);
+                state
+            };
+            final_state.to_ref()
         } else {
-            let s_tilde = output.add_round_key(round_key);
+            w.get_commits_ref::<O::NStBytes>(O::NStBytes::USIZE * r)
+        };
 
-            // ::29-38
-            enc_cstrnts_odd::<O>(zk_hasher, s_tilde.to_ref(), &st_0, &st_1);
+        // line 15-16
+        let mut backward =
+            <ByteCommitsRef<OWFField<O>, O::NStBytes> as InverseShiftRows<O>>::inverse_shift_rows(
+                &s_tilde,
+            );
+        backward.inverse_affine();
+
+        // line 17-19
+        for (b, forward) in backward.iter().zip(st) {
+            hasher.hash_constraint(inverse_sbox(b) + forward);
+        }
+
+        // line 21-23
+        if !last {
+            state = <ByteCommitsRef<OWFField<O>, O::NStBytes> as BytewiseMixColumns<O>>::bytewise_mix_columns(&s_tilde);
+            state.add_round_key_assign(&extended_key[2 * r + 2]);
         }
     }
 }
 
-fn enc_cstrnts_even<O>(
-    zk_hasher: &mut ZKProofHasher<OWFField<O>>,
-    state: &ByteCommits<OWFField<O>, O::NStBytes>,
-    w: ByteCommitsRef<OWFField<O>, Quot<O::NStBytes, U2>>,
-) -> StateBitsSquaredCommits<O>
-where
-    O: OWFParameters,
-{
-    // ::4
-    let mut state_prime = StateBitsSquaredCommits::<O>::default();
-    let mut state_conj = Array::default();
-
-    // ::7
-    for (i, (state_prime, mut commit_i)) in
-        zip(state_prime.chunks_exact_mut(8), state.iter()).enumerate()
-    {
-        // ::9
-        let norm = (w.keys[i / 2] >> ((i % 2) * 4)) & 0xf;
-        let ys = invnorm_to_conjugates(norm, &w.tags[4 * i..4 * i + 4]);
-
-        // ::4
-        f256_f2_conjugates(&mut state_conj, &mut commit_i);
-
-        //::11
-        // Save 1 mul by storing intermediate constraint in state'[0]
-        state_prime[0] = &ys[0] * &state_conj[4];
-        let cnstr = &state_prime[0] * &state_conj[1] + &state_conj[0];
-        zk_hasher.update(&cnstr);
-
-        // ::12
-        for j in 1..8 {
-            state_prime[j] = &state_conj[(j + 4) % 8] * &ys[j % 4];
+fn shift_rows<O: OWFParameters>(state: &mut [Polynomial<OWFField<O>>]) {
+    let n = O::NSt::USIZE;
+    for row in 1..4 {
+        let shift = row + usize::from(n == 8 && row > 1);
+        for _ in 0..shift {
+            for column in 0..n - 1 {
+                state.swap(4 * column + row, 4 * (column + 1) + row);
+            }
         }
     }
-
-    state_prime
 }
 
-fn enc_cstrnts_odd<O>(
-    zk_hasher: &mut ZKProofHasher<OWFField<O>>,
-    s_tilde: ByteCommitsRef<OWFField<O>, O::NStBytes>,
-    st_0: &StateBytesSquaredCommits<O>,
-    st_1: &StateBytesSquaredCommits<O>,
-) where
-    O: OWFParameters,
-    ByteCommits<OWFField<O>, O::NStBytes>: InverseAffine,
-    for<'a> ByteCommitsRef<'a, OWFField<O>, O::NStBytes>:
-        InverseShiftRows<O, Output = ByteCommits<OWFField<O>, O::NStBytes>>,
-{
-    // ::29-30
-    let mut s = s_tilde.inverse_shift_rows();
-    s.inverse_affine();
 
-    // ::31-37
-    for (byte_i, (st0, st1)) in zip(st_0.as_ref(), st_1.as_ref()).enumerate() {
-        let si = s.get_field_commit(byte_i);
-        let si_sq = s.get_field_commit_sq(byte_i);
-        zk_hasher.odd_round_cstrnts(&si, &si_sq, st0, st1);
+fn mix_columns<O: OWFParameters>(state: &mut [Polynomial<OWFField<O>>]) {
+    let v2 = OWFField::<O>::BYTE_COMBINE_2;
+    let v3 = OWFField::<O>::BYTE_COMBINE_3;
+    for scalars in state.as_chunks_mut::<4>().0 {
+        let xi = *scalars;
+        // lines 7-10
+        scalars[0] = xi[0] * v2 + xi[1] * v3 + xi[2] + xi[3];
+        scalars[1] = xi[1] * v2 + xi[2] * v3 + xi[0] + xi[3];
+        scalars[2] = xi[2] * v2 + xi[3] * v3 + xi[0] + xi[1];
+        scalars[3] = xi[0] * v3 + xi[3] * v2 + xi[1] + xi[2];
     }
 }
 
-fn aes_round<O, T>(
-    state: &StateBitsSquaredCommits<O>,
-    key_bytes: &Array<T, O::NStBytes>,
-    sq: bool,
-) -> StateBytesSquaredCommits<O>
-where
-    O: OWFParameters,
-    StateBitsSquaredCommits<O>: SBoxAffine<O, Output = StateBytesSquaredCommits<O>>,
-    FieldCommitDegTwo<OWFField<O>>: for<'a> AddAssign<&'a T>,
-    StateBytesSquaredCommits<O>: MixColumns<O>,
-{
-    // ::19-22
-    let mut st = state.s_box_affine(sq);
-    st.shift_rows();
-    st.mix_columns(sq);
-    st.add_round_key_bytes(key_bytes, sq);
-    st
-}
-
-fn invnorm_to_conjugates<F>(x_val: u8, x_tag: &[F]) -> Array<FieldCommitDegOne<F>, U4>
-where
-    F: BigGaloisField,
-{
-    (0..4)
-        .map(|j| {
-            let key = F::from_bit(x_val & 1)
-                + F::BETA_SQUARES[j] * ((x_val >> 1) & 1)
-                + F::BETA_SQUARES[j + 1] * ((x_val >> 2) & 1)
-                + F::BETA_CUBES[j] * ((x_val >> 3) & 1);
-            let tag = x_tag[0]
-                + F::BETA_SQUARES[j] * x_tag[1]
-                + F::BETA_SQUARES[j + 1] * x_tag[2]
-                + F::BETA_CUBES[j] * x_tag[3];
-
-            FieldCommitDegOne::new(key, tag)
-        })
-        .collect()
-}
-
-pub(crate) fn f256_f2_conjugates<F>(
-    state_conj: &mut Array<FieldCommitDegOne<F>, U8>,
-    commit: &mut ByteCommitment<F>,
-) where
-    F: BigGaloisField,
-{
-    // ::4-8
-    for st_conj_i in state_conj.iter_mut() {
-        *st_conj_i = commit.combine();
-        commit.square_inplace();
+fn add_round_key<O: OWFParameters>(
+    state: &mut [Polynomial<OWFField<O>>],
+    key: &ByteCommitsRef<OWFField<O>, O::NStBytes>,
+) {
+    for (i, st_i) in state.iter_mut().enumerate() {
+        *st_i += &Polynomial::commitment(&key.get_field_commit(i)).lift(7);
     }
+}
+
+#[inline]
+fn f256_f2_conjugates<F: BigGaloisField>(byte: &mut ByteCommitment<F>) -> [Polynomial<F>; 8] {
+    array::from_fn(|_| {
+        // TODO: avoid conversion from FieldCommitment
+        let conjugate = Polynomial::commitment(&byte.combine());
+        byte.square_inplace();
+        conjugate
+    })
+}
+
+fn inverse_sbox<F: BigGaloisField>(mut byte: ByteCommitment<F>) -> Polynomial<F> {
+    // skip inverse_affine: computed in encr_constraints
+
+    // line 3
+    let conjugates = f256_f2_conjugates(&mut byte);
+
+    // lines 4-6
+    conjugates
+        .into_iter()
+        .skip(1)
+        .fold(Polynomial::constant(F::ONE), |p, c| p * c)
+}
+
+fn sbox<F: BigGaloisField>(mut byte: ByteCommitment<F>) -> Polynomial<F> {
+    // line 1
+    let conjugates: [Polynomial<F>; 8] = f256_f2_conjugates(&mut byte);
+
+    // line 3-5
+    let zetas = [0x05, 0x09, 0xf9, 0x25, 0xf4, 0x01, 0xb5, 0x8f, 0x63].map(F::byte_combine_bits);
+
+    // line 8-10
+    let p1: [Polynomial<F>; 4] =
+        core::array::from_fn(|i| &conjugates[2 * i] * &conjugates[2 * i + 1]);
+    let f1: [Polynomial<F>; 4] = core::array::from_fn(|i| {
+        conjugates[2 * i + 1].clone().scale(zetas[2 * i])
+            + conjugates[2 * i].clone().scale(zetas[2 * i + 1])
+    });
+
+    // line 11-13
+    let p2: [Polynomial<F>; 2] = core::array::from_fn(|i| &p1[2 * i] * &p1[2 * i + 1]);
+    let f2: [Polynomial<F>; 2] =
+        core::array::from_fn(|i| &f1[2 * i] * &p1[2 * i + 1] + &f1[2 * i + 1] * &p1[2 * i]);
+
+    // line 14
+    let [f_left, f_right] = f2;
+    let [p_left, p_right] = p2;
+    f_left * p_right + f_right * p_left + Polynomial::constant(zetas[8]).lift(7)
 }
