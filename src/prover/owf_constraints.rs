@@ -4,7 +4,7 @@ use hybrid_array::{Array, typenum::Unsigned};
 use alloc::vec::Vec;
 
 use super::{
-    ByteCommits, ByteCommitsRef, FieldCommitDegOne, encryption::enc_cstrnts,
+    ByteCommits, ByteCommitsRef, encryption::enc_cstrnts,
     key_expansion::key_exp_cstrnts,
 };
 use crate::{
@@ -33,14 +33,14 @@ pub(crate) fn owf_constraints<O>(
     // line 5
     {
         let (k_0, k_1) = ((w.keys[0] & 0b1), (w.keys[0] & 0b10) >> 1);
-        let a = Polynomial::commitment(&FieldCommitDegOne::new(
+        let a = Polynomial::from_key_tag(
             OWFField::<O>::from_bit(k_0),
             w.tags[0],
-        ));
-        let b = Polynomial::commitment(&FieldCommitDegOne::new(
+        );
+        let b = Polynomial::from_key_tag(
             OWFField::<O>::from_bit(k_1),
             w.tags[1],
-        ));
+        );
         zk_hasher.hash_constraint((a * b).lift(7));
     }
 

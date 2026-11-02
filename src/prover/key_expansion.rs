@@ -8,7 +8,7 @@ use crate::{
     fields::{BigGaloisField, ByteCombine},
     parameter::{OWFField, OWFParameters},
     prover::{
-        ByteCommits, ByteCommitsRef, field_commitment::FieldCommitDegOne, polynomial::Polynomial,
+        ByteCommits, ByteCommitsRef, polynomial::Polynomial,
     },
     rijndael_32::RCON_TABLE,
     zk_constraints::ConstraintHasher,
@@ -69,16 +69,14 @@ where
 
 fn lift_and_process<F: BigGaloisField>(
     hasher: &mut impl ConstraintHasher<F>,
-    a: &FieldCommitDegOne<F>,
-    a_sq: &FieldCommitDegOne<F>,
-    b: &FieldCommitDegOne<F>,
-    b_sq: &FieldCommitDegOne<F>,
+    a: &Polynomial<F>,
+    a_sq: &Polynomial<F>,
+    b: &Polynomial<F>,
+    b_sq: &Polynomial<F>,
 ) {
     // lines 19-20,
-    let a = Polynomial::commitment(a);
-    let b = Polynomial::commitment(b);
-    let second_product = &a * Polynomial::commitment(b_sq);
-    hasher.hash_constraint((Polynomial::commitment(a_sq) * &b + a.lift(2)).lift(7));
+    let second_product = a * b_sq;
+    hasher.hash_constraint((a_sq * b + a.lift(2)).lift(7));
     hasher.hash_constraint((second_product + b.lift(2)).lift(7));
 }
 

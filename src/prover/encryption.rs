@@ -100,15 +100,14 @@ fn add_round_key<O: OWFParameters>(
     key: &ByteCommitsRef<OWFField<O>, O::NStBytes>,
 ) {
     for (i, st_i) in state.iter_mut().enumerate() {
-        *st_i += &Polynomial::commitment(&key.get_field_commit(i)).lift(7);
+        *st_i += &key.get_field_commit(i).lift(7);
     }
 }
 
 #[inline]
 fn f256_f2_conjugates<F: BigGaloisField>(byte: &mut ByteCommitment<F>) -> [Polynomial<F>; 8] {
     array::from_fn(|_| {
-        // TODO: avoid conversion from FieldCommitment
-        let conjugate = Polynomial::commitment(&byte.combine());
+        let conjugate = byte.combine();
         byte.square_inplace();
         conjugate
     })

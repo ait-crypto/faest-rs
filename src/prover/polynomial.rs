@@ -1,4 +1,3 @@
-use super::field_commitment::FieldCommitment;
 use crate::fields::BigGaloisField;
 use core::ops::{Add, AddAssign, Mul, MulAssign};
 
@@ -9,25 +8,22 @@ pub(crate) struct Polynomial<F: BigGaloisField> {
 }
 
 impl<F: BigGaloisField> Polynomial<F> {
+    pub(crate) fn from_key_tag(key: F, tag: F) -> Self {
+        let mut coefficients = [F::ZERO; 8];
+        coefficients[0] = tag;
+        coefficients[1] = key;
+        Self {
+            degree: 1,
+            coefficients,
+        }
+    }
+
     pub(crate) fn constant(value: F) -> Self {
         let mut coefficients = [F::ZERO; 8];
         coefficients[0] = value;
         Self {
             coefficients,
             degree: 0,
-        }
-    }
-
-    pub(crate) fn commitment<const D: usize>(value: &FieldCommitment<F, D>) -> Self {
-        const {
-            assert!(D <= 7);
-        }
-        let mut coefficients = [F::ZERO; 8];
-        coefficients[..D].copy_from_slice(&value.tag);
-        coefficients[D] = value.key;
-        Self {
-            coefficients,
-            degree: D,
         }
     }
 
@@ -148,15 +144,12 @@ mod test {
     use super::*;
     use crate::{
         fields::{GF128, GF192, GF256},
-        prover::field_commitment::FieldCommitDegOne,
     };
 
     fn arithmetic<F: BigGaloisField>() {
-        let a = FieldCommitDegOne::new(F::byte_combine_bits(0x53), F::byte_combine_bits(0xca));
-        let b = FieldCommitDegOne::new(F::byte_combine_bits(0xf1), F::byte_combine_bits(0x77));
         let scalar = F::byte_combine_bits(0x31);
-        let p = Polynomial::commitment(&a);
-        let q = Polynomial::commitment(&b);
+        let p = Polynomial::from_key_tag(F::byte_combine_bits(0x53), F::byte_combine_bits(0xca));
+        let q = Polynomial::from_key_tag(F::byte_combine_bits(0xf1), F::byte_combine_bits(0x77));
         let mut power = Polynomial::constant(F::ONE);
         for degree in 0..=7 {
             assert_eq!(power.degree, degree);

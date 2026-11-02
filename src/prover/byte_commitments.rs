@@ -8,9 +8,9 @@ use hybrid_array::{
     typenum::{Prod, U8},
 };
 
-use super::field_commitment::FieldCommitDegOne;
 use crate::{
     fields::{BigGaloisField, GF8},
+    prover::polynomial::Polynomial,
     utils::array_ref,
 };
 
@@ -32,8 +32,8 @@ where
         self.key = GF8::square_bits(self.key);
     }
 
-    pub fn combine(&self) -> FieldCommitDegOne<F> {
-        FieldCommitDegOne::new(
+    pub fn combine(&self) -> Polynomial<F> {
+        Polynomial::from_key_tag(
             F::byte_combine_bits(self.key),
             F::byte_combine_slice(self.tags.as_slice()),
         )
@@ -59,15 +59,16 @@ where
         Self { keys, tags }
     }
 
-    pub(crate) fn get_field_commit(&self, index: usize) -> FieldCommitDegOne<F> {
-        FieldCommitDegOne::new(
+    pub(crate) fn get_field_commit(&self, index: usize) -> Polynomial<F> {
+        Polynomial::from_key_tag(
             F::byte_combine_bits(self.keys[index]),
             F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
         )
     }
 
-    pub(crate) fn get_field_commit_sq(&self, index: usize) -> FieldCommitDegOne<F> {
-        FieldCommitDegOne::new(
+    pub(crate) fn get_field_commit_sq(&self, index: usize) -> Polynomial<F> {
+        let mut coefficients = [F::ZERO; 8];
+        Polynomial::from_key_tag(
             F::byte_combine_bits_sq(self.keys[index]),
             F::byte_combine_sq_slice(&self.tags[index * 8..index * 8 + 8]),
         )
@@ -136,8 +137,8 @@ where
         }
     }
 
-    pub(crate) fn get_field_commit(&self, index: usize) -> FieldCommitDegOne<F> {
-        FieldCommitDegOne::new(
+    pub(crate) fn get_field_commit(&self, index: usize) -> Polynomial<F> {
+        Polynomial::from_key_tag(
             F::byte_combine_bits(self.keys[index]),
             F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
         )
