@@ -82,7 +82,6 @@ fn shift_rows<O: OWFParameters>(state: &mut [Polynomial<OWFField<O>>]) {
     }
 }
 
-
 fn mix_columns<O: OWFParameters>(state: &mut [Polynomial<OWFField<O>>]) {
     let v2 = OWFField::<O>::BYTE_COMBINE_2;
     let v3 = OWFField::<O>::BYTE_COMBINE_3;
@@ -139,8 +138,7 @@ fn sbox<F: BigGaloisField>(mut byte: ByteCommitment<F>) -> Polynomial<F> {
     let p1: [Polynomial<F>; 4] =
         core::array::from_fn(|i| &conjugates[2 * i] * &conjugates[2 * i + 1]);
     let f1: [Polynomial<F>; 4] = core::array::from_fn(|i| {
-        conjugates[2 * i + 1].clone().scale(zetas[2 * i])
-            + conjugates[2 * i].clone().scale(zetas[2 * i + 1])
+        conjugates[2 * i + 1] * zetas[2 * i] + conjugates[2 * i] * zetas[2 * i + 1]
     });
 
     // line 11-13

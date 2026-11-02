@@ -1,8 +1,8 @@
 use super::field_commitment::FieldCommitment;
 use crate::fields::BigGaloisField;
-use core::ops::{Add, Mul};
+use core::ops::{Add, AddAssign, Mul, MulAssign};
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct Polynomial<F: BigGaloisField> {
     pub(crate) coefficients: [F; 8],
     pub(crate) degree: usize,
@@ -41,13 +41,6 @@ impl<F: BigGaloisField> Polynomial<F> {
         self
     }
 
-    pub(crate) fn scale(mut self, scalar: F) -> Self {
-        for a in &mut self.coefficients {
-            *a *= scalar;
-        }
-        self
-    }
-
     pub(crate) fn evaluate(&self, delta: F) -> F {
         self.coefficients[..=self.degree]
             .iter()
@@ -56,14 +49,20 @@ impl<F: BigGaloisField> Polynomial<F> {
     }
 }
 
-impl<F: BigGaloisField> Add<&Self> for Polynomial<F> {
-    type Output = Self;
-
-    fn add(mut self, rhs: &Self) -> Self::Output {
+impl<F: BigGaloisField> AddAssign<&Self> for Polynomial<F> {
+    fn add_assign(&mut self, rhs: &Self) {
         assert_eq!(self.degree, rhs.degree);
         for (a, b) in self.coefficients.iter_mut().zip(rhs.coefficients) {
             *a += b;
         }
+    }
+}
+
+impl<F: BigGaloisField> Add<&Self> for Polynomial<F> {
+    type Output = Self;
+
+    fn add(mut self, rhs: &Self) -> Self::Output {
+        self += rhs;
         self
     }
 }
@@ -119,6 +118,31 @@ impl<F: BigGaloisField> Mul for &Polynomial<F> {
     }
 }
 
+impl<F: BigGaloisField> MulAssign<F> for Polynomial<F> {
+    fn mul_assign(&mut self, rhs: F) {
+        for coefficient in &mut self.coefficients {
+            *coefficient *= rhs;
+        }
+    }
+}
+
+impl<F: BigGaloisField> Mul<F> for Polynomial<F> {
+    type Output = Self;
+
+    fn mul(mut self, rhs: F) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+
+impl<F: BigGaloisField> Mul<F> for &Polynomial<F> {
+    type Output = Polynomial<F>;
+
+    fn mul(self, rhs: F) -> Self::Output {
+        *self * rhs
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -136,7 +160,22 @@ mod test {
         let mut power = Polynomial::constant(F::ONE);
         for degree in 0..=7 {
             assert_eq!(power.degree, degree);
-            let scaled = power.clone().scale(scalar);
+            let scaled = power * scalar;
+            for factor in [F::ZERO, F::ONE, scalar] {
+                let owned = power * factor;
+                let borrowed = &power * factor;
+                let mut assigned = power;
+                assigned *= factor;
+                assert_eq!(owned.degree, degree);
+                assert_eq!(borrowed.degree, degree);
+                assert_eq!(assigned.degree, degree);
+                for i in 0..8 {
+                    let expected = power.coefficients[i] * factor;
+                    assert_eq!(owned.coefficients[i], expected);
+                    assert_eq!(borrowed.coefficients[i], expected);
+                    assert_eq!(assigned.coefficients[i], expected);
+                }
+            }
             for i in 0..=degree {
                 assert_eq!(scaled.coefficients[i], power.coefficients[i] * scalar);
             }
