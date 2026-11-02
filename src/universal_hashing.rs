@@ -227,56 +227,43 @@ impl<F: BigGaloisField> ConstraintHasher<F> for ZKProofHasher<F> {
     }
 }
 
-pub(crate) struct ZKVerifyHasher<F>
-// where
-//     F: BigGaloisField,
-// {
-//     pub(crate) b_hasher: ZKHasher<F>,
-//     pub(crate) delta: F,
-//     pub(crate) delta_squared: F,
-// }
+pub(crate) struct ZKVerifyHasher<F: BigGaloisField> {
+    hasher: ZKHasher<F>,
+    delta: F,
+    pub(crate) count: usize,
+}
 
-// impl<F> ZKVerifyHasher<F>
-// where
-//     F: BigGaloisField,
-// {
-//     pub(crate) fn new(b_hasher: ZKHasher<F>, delta: F) -> Self {
-//         Self {
-//             b_hasher,
-//             delta,
-//             delta_squared: delta.square(),
-//         }
-//     }
+impl<F: BigGaloisField> ZKVerifyHasher<F> {
+    pub(crate) fn new(hasher: ZKHasher<F>, delta: F) -> Self {
+        Self {
+            hasher,
+            delta,
+            count: 0,
+        }
+    }
 
-//     pub(crate) fn update(&mut self, val: &F) {
-//         self.b_hasher.update(val);
-//     }
+    pub(crate) fn finalize(self, q_bar: &[F; 6], a_tilde: &[F; 6]) -> F {
+        // OWFVerify line 5
+        let q_star = q_bar
+            .iter()
+            .rev()
+            .fold(F::ZERO, |acc, q_j| acc * self.delta + q_j);
+        // OWFVerify lines 14-16
+        let rhs = a_tilde
+            .iter()
+            .rev()
+            .fold(F::ZERO, |acc, a_j| acc * self.delta + a_j)
+            * self.delta;
+        self.hasher.finalize(&q_star) + rhs
+    }
+}
 
-//     pub(crate) fn mul_and_update(&mut self, a: &F, b: &F) {
-//         self.b_hasher.update(&(self.delta * a * b));
-//     }
-
-//     pub(crate) fn inv_norm_constraints(&mut self, conjugates: &[F], y: &F) {
-//         let cnstr = *y * conjugates[1] * conjugates[4] + self.delta_squared * conjugates[0];
-//         self.b_hasher.update(&cnstr);
-//     }
-
-//     pub(crate) fn odd_round_cstrnts(&mut self, si: &F, si_sq: &F, st0_i: &F, st1_i: &F) {
-//         self.update(&(self.delta_squared * si + *si_sq * st0_i));
-//         self.update(&(self.delta * st0_i + *si * st1_i));
-//     }
-
-//     /// Lift and hash coefficients of <a^2> * <b> - <a> and <b^2> * <a> - <b>
-//     pub(crate) fn lift_and_process(&mut self, a: &F, a_sq: &F, b: &F, b_sq: &F) {
-//         // Raise to degree 3 and update
-//         self.update(&(self.delta * (*a_sq * b - self.delta * a)));
-//         self.update(&(self.delta * (*a * b_sq - self.delta * b)));
-//     }
-
-//     pub(crate) fn finalize(self, v: &F) -> F {
-//         self.b_hasher.finalize(v)
-//     }
-// }
+impl<F: BigGaloisField> ConstraintHasher<F> for ZKVerifyHasher<F> {
+    fn hash_constraint(&mut self, polynomial: Polynomial<F>) {
+        self.hasher.update(&polynomial.evaluate(self.delta));
+        self.count += 1;
+    }
+}
 
 pub(crate) trait LeafHasher {
     type F: BigGaloisField<Length = Self::LambdaBytes>;
