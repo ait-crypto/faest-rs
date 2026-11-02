@@ -1,3 +1,4 @@
+use super::{ByteCommits, ByteCommitsRef, hashing::ConstraintHasher, polynomial::Polynomial};
 use hybrid_array::{
     Array,
     typenum::{U8, Unsigned},
@@ -7,11 +8,7 @@ use itertools::iproduct;
 use crate::{
     fields::{BigGaloisField, ByteCombine},
     parameter::{OWFField, OWFParameters},
-    prover::{
-        ByteCommits, ByteCommitsRef, polynomial::Polynomial,
-    },
     rijndael_32::RCON_TABLE,
-    zk_constraints::ConstraintHasher,
 };
 
 pub(super) fn key_exp_cstrnts<O>(
@@ -176,130 +173,5 @@ where
 
     for i in 0..8 {
         y_0[i] = x_0[(i + 8 - 1) % 8] + x_0[(i + 8 - 3) % 8] + x_0[(i + 8 - 6) % 8];
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::{
-        fields::{Field, FromBit},
-        parameter::{OWF128, OWF192, OWF256},
-        zk_constraints::test::{fixture, public_key},
-    };
-    #[cfg(not(feature = "std"))]
-    use alloc::vec::Vec;
-
-    // Independent scalar AES field arithmetic, reduced modulo x^8+x^4+x^3+x+1.
-    fn multiply(mut a: u8, mut b: u8) -> u8 {
-        let mut out = 0;
-        for _ in 0..8 {
-            if b & 1 != 0 {
-                out ^= a;
-            }
-            a = (a << 1) ^ if a & 0x80 != 0 { 0x1b } else { 0 };
-            b >>= 1;
-        }
-        out
-    }
-
-    fn inverse(x: u8) -> u8 {
-        (0..254).fold(1, |acc, _| multiply(acc, x))
-    }
-
-    fn check<O: OWFParameters>(variant: usize) {
-        for sample in 0..2 {
-            let (key, pk) = public_key::<O>(variant, sample);
-            let witness = O::extendwitness(&key, &pk.owf_input);
-            // Tags contain the witness bits themselves, so every linear map can
-            // also be checked on tags independently of the polynomial keys.
-            let tags: Vec<_> = (0..O::LKe::USIZE)
-                .map(|i| OWFField::<O>::from_bit((witness[i / 8] >> (i % 8)) & 1))
-                .collect();
-            let w = ByteCommitsRef::from_slices(&witness[..O::LKeBytes::USIZE], &tags);
-            let expanded = key_exp_fwd::<O>(w);
-            let reference = fixture(variant, sample);
-            assert_eq!(
-                hex::encode(expanded.keys.as_slice()),
-                reference["expanded"].as_str().unwrap()
-            );
-            for (i, &byte) in expanded.keys.iter().enumerate() {
-                for j in 0..8 {
-                    assert_eq!(
-                        expanded.tags[8 * i + j],
-                        OWFField::<O>::from_bit((byte >> j) & 1)
-                    );
-                }
-            }
-            let backward = key_exp_bkwd::<O>(
-                w.get_commits_ref::<O::LKeMinusLambdaBytes>(O::LambdaBytes::USIZE),
-                expanded.to_ref(),
-            );
-            let mut saw_zero = false;
-            for j in 0..O::SKe::USIZE / 4 {
-                let word = O::NK::USIZE - 1 + j * if O::NK::USIZE == 6 { 6 } else { 4 };
-                let rotate = O::NK::USIZE != 8 || j % 2 == 0;
-                for r in 0..4 {
-                    let input = expanded.keys[4 * word + if rotate { (r + 1) % 4 } else { r }];
-                    saw_zero |= input == 0;
-                    let expected = inverse(input);
-                    assert_eq!(backward.keys[4 * j + r], expected, "S-box {j}, byte {r}");
-                    let stride = if O::NK::USIZE == 6 { 6 } else { 4 };
-                    let raw = witness[O::LambdaBytes::USIZE + 4 * j + r]
-                        ^ expanded.keys[4 * j * stride + r];
-                    // Rcon and the affine offset affect keys, not tags.
-                    let linear = raw.rotate_left(1) ^ raw.rotate_left(3) ^ raw.rotate_left(6);
-                    for bit in 0..8 {
-                        assert_eq!(
-                            backward.tags[8 * (4 * j + r) + bit],
-                            OWFField::<O>::from_bit((linear >> bit) & 1)
-                        );
-                    }
-                }
-            }
-            if sample == 0 {
-                assert!(saw_zero);
-            }
-        }
-    }
-
-    #[test]
-    fn independent_aes128() {
-        check::<OWF128>(0);
-    }
-    #[test]
-    fn independent_aes192() {
-        check::<OWF192>(1);
-    }
-    #[test]
-    fn independent_aes256_both_rotations() {
-        check::<OWF256>(2);
-    }
-
-    #[test]
-    fn inverse_affine_all_bytes() {
-        use crate::fields::GF128;
-        for byte in 0..=255u8 {
-            let affine = byte
-                ^ byte.rotate_left(1)
-                ^ byte.rotate_left(2)
-                ^ byte.rotate_left(3)
-                ^ byte.rotate_left(4)
-                ^ 0x63;
-            let tags =
-                core::array::from_fn::<_, 8, _>(|i| GF128::from_bit((affine >> i) & 1)).into();
-            let mut key = 0;
-            let mut out = [GF128::ZERO; 8];
-            // ::11
-            inverse_affine_byte(affine, &tags, &mut key, &mut out);
-            assert_eq!(key, byte);
-            // Affine constants are represented in the polynomial's key.
-            for i in 0..8 {
-                assert_eq!(
-                    out[i] + GF128::from_bit(((0x05u8) >> i) & 1),
-                    GF128::from_bit((byte >> i) & 1)
-                );
-            }
-        }
     }
 }

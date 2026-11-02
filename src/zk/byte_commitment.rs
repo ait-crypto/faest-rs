@@ -1,3 +1,4 @@
+use super::polynomial::Polynomial;
 use core::ops::Mul;
 
 #[cfg(not(feature = "std"))]
@@ -10,17 +11,16 @@ use hybrid_array::{
 
 use crate::{
     fields::{BigGaloisField, GF8},
-    prover::polynomial::Polynomial,
     utils::array_ref,
 };
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct ByteCommitment<F>
+pub(super) struct ByteCommitment<F>
 where
     F: BigGaloisField,
 {
-    pub(crate) key: u8,
-    pub(crate) tags: Array<F, U8>,
+    pub(super) key: u8,
+    pub(super) tags: Array<F, U8>,
 }
 
 impl<F> ByteCommitment<F>
@@ -41,13 +41,13 @@ where
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct ByteCommits<F, L>
+pub(super) struct ByteCommits<F, L>
 where
     F: BigGaloisField,
     L: ArraySize + Mul<U8, Output: ArraySize>,
 {
-    pub(crate) keys: Box<Array<u8, L>>,
-    pub(crate) tags: Box<Array<F, Prod<L, U8>>>,
+    pub(super) keys: Box<Array<u8, L>>,
+    pub(super) tags: Box<Array<F, Prod<L, U8>>>,
 }
 
 impl<F, L> ByteCommits<F, L>
@@ -55,18 +55,18 @@ where
     F: BigGaloisField,
     L: ArraySize + Mul<U8, Output: ArraySize>,
 {
-    pub(crate) fn new(keys: Box<Array<u8, L>>, tags: Box<Array<F, Prod<L, U8>>>) -> Self {
+    pub(super) fn new(keys: Box<Array<u8, L>>, tags: Box<Array<F, Prod<L, U8>>>) -> Self {
         Self { keys, tags }
     }
 
-    pub(crate) fn get_field_commit(&self, index: usize) -> Polynomial<F> {
+    pub(super) fn get_field_commit(&self, index: usize) -> Polynomial<F> {
         Polynomial::from_key_tag(
             F::byte_combine_bits(self.keys[index]),
             F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
         )
     }
 
-    pub(crate) fn get_field_commit_sq(&self, index: usize) -> Polynomial<F> {
+    pub(super) fn get_field_commit_sq(&self, index: usize) -> Polynomial<F> {
         let mut coefficients = [F::ZERO; 8];
         Polynomial::from_key_tag(
             F::byte_combine_bits_sq(self.keys[index]),
@@ -74,7 +74,7 @@ where
         )
     }
 
-    pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<'_, F, L2>
+    pub(super) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<'_, F, L2>
     where
         L2: ArraySize + Mul<U8, Output: ArraySize>,
     {
@@ -86,7 +86,7 @@ where
         }
     }
 
-    pub(crate) fn to_ref(&self) -> ByteCommitsRef<'_, F, L> {
+    pub(super) fn to_ref(&self) -> ByteCommitsRef<'_, F, L> {
         ByteCommitsRef {
             keys: &self.keys,
             tags: &self.tags,
@@ -100,19 +100,19 @@ where
         }
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = ByteCommitment<F>> {
+    pub(super) fn iter(&self) -> impl Iterator<Item = ByteCommitment<F>> {
         (0..L::USIZE).map(|idx| self.get(idx))
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct ByteCommitsRef<'a, F, L>
+pub(super) struct ByteCommitsRef<'a, F, L>
 where
     F: BigGaloisField,
     L: ArraySize + Mul<U8, Output: ArraySize>,
 {
-    pub(crate) keys: &'a Array<u8, L>,
-    pub(crate) tags: &'a Array<F, Prod<L, U8>>,
+    pub(super) keys: &'a Array<u8, L>,
+    pub(super) tags: &'a Array<F, Prod<L, U8>>,
 }
 
 impl<'a, F, L> ByteCommitsRef<'a, F, L>
@@ -120,7 +120,7 @@ where
     F: BigGaloisField,
     L: ArraySize + Mul<U8, Output: ArraySize>,
 {
-    pub(crate) fn to_owned(self) -> ByteCommits<F, L> {
+    pub(super) fn to_owned(self) -> ByteCommits<F, L> {
         ByteCommits {
             keys: Box::new(self.keys.clone()),
             tags: Box::new(self.tags.clone()),
@@ -130,21 +130,21 @@ where
     /// Create a new instance of ByteCommitsRef from slices to commitment keys and tags.
     ///
     /// Panics if the lengths of the keys is not equal to the length of the tags divided by 8.
-    pub(crate) fn from_slices(keys: &'a [u8], tags: &'a [F]) -> Self {
+    pub(super) fn from_slices(keys: &'a [u8], tags: &'a [F]) -> Self {
         Self {
             keys: array_ref(keys),
             tags: array_ref(tags),
         }
     }
 
-    pub(crate) fn get_field_commit(&self, index: usize) -> Polynomial<F> {
+    pub(super) fn get_field_commit(&self, index: usize) -> Polynomial<F> {
         Polynomial::from_key_tag(
             F::byte_combine_bits(self.keys[index]),
             F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
         )
     }
 
-    pub(crate) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<'_, F, L2>
+    pub(super) fn get_commits_ref<L2>(&self, start_byte: usize) -> ByteCommitsRef<'_, F, L2>
     where
         L2: ArraySize + Mul<U8, Output: ArraySize>,
     {

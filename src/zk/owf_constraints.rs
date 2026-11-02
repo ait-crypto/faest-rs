@@ -1,23 +1,19 @@
+use super::{hashing::ConstraintHasher, polynomial::Polynomial};
 use hybrid_array::{Array, typenum::Unsigned};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
-use super::{
-    ByteCommits, ByteCommitsRef, encryption::enc_cstrnts,
-    key_expansion::key_exp_cstrnts,
-};
+use super::{ByteCommits, ByteCommitsRef, encryption::enc_cstrnts, key_expansion::key_exp_cstrnts};
 use crate::{
     fields::FromBit,
     internal_keys::PublicKey,
     parameter::{OWFField, OWFParameters},
-    prover::polynomial::Polynomial,
     rijndael_32::{rijndael_key_schedule_unbitsliced, ske},
     utils::xor_arrays,
-    zk_constraints::ConstraintHasher,
 };
 
-pub(crate) fn owf_constraints<O>(
+pub(super) fn owf_constraints<O>(
     zk_hasher: &mut impl ConstraintHasher<OWFField<O>>,
     w: ByteCommitsRef<OWFField<O>, O::LBytes>,
     pk: &PublicKey<O>,
@@ -33,14 +29,8 @@ pub(crate) fn owf_constraints<O>(
     // line 5
     {
         let (k_0, k_1) = ((w.keys[0] & 0b1), (w.keys[0] & 0b10) >> 1);
-        let a = Polynomial::from_key_tag(
-            OWFField::<O>::from_bit(k_0),
-            w.tags[0],
-        );
-        let b = Polynomial::from_key_tag(
-            OWFField::<O>::from_bit(k_1),
-            w.tags[1],
-        );
+        let a = Polynomial::from_key_tag(OWFField::<O>::from_bit(k_0), w.tags[0]);
+        let b = Polynomial::from_key_tag(OWFField::<O>::from_bit(k_1), w.tags[1]);
         zk_hasher.hash_constraint((a * b).lift(7));
     }
 

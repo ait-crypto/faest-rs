@@ -1,17 +1,17 @@
+use super::hashing::ConstraintHasher;
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
-use super::{ByteCommitsRef, byte_commitments::ByteCommitment, polynomial::Polynomial};
+use super::{ByteCommitsRef, byte_commitment::ByteCommitment, polynomial::Polynomial};
 use crate::{
     aes::{AddRoundKeyAssign, BytewiseMixColumns, InverseAffine, InverseShiftRows},
     fields::{BigGaloisField, ByteCombineConstants},
     parameter::{OWFField, OWFParameters},
-    zk_constraints::ConstraintHasher,
 };
 use core::array;
 use hybrid_array::typenum::Unsigned;
 
-pub(crate) fn enc_cstrnts<O: OWFParameters>(
+pub(super) fn enc_cstrnts<O: OWFParameters>(
     hasher: &mut impl ConstraintHasher<OWFField<O>>,
     input: ByteCommitsRef<OWFField<O>, O::NStBytes>,
     output: ByteCommitsRef<OWFField<O>, O::NStBytes>,

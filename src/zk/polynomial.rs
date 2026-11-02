@@ -2,13 +2,13 @@ use crate::fields::BigGaloisField;
 use core::ops::{Add, AddAssign, Mul, MulAssign};
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct Polynomial<F: BigGaloisField> {
-    pub(crate) coefficients: [F; 8],
-    pub(crate) degree: usize,
+pub(super) struct Polynomial<F: BigGaloisField> {
+    pub(super) coefficients: [F; 8],
+    pub(super) degree: usize,
 }
 
 impl<F: BigGaloisField> Polynomial<F> {
-    pub(crate) fn from_key_tag(key: F, tag: F) -> Self {
+    pub(super) fn from_key_tag(key: F, tag: F) -> Self {
         let mut coefficients = [F::ZERO; 8];
         coefficients[0] = tag;
         coefficients[1] = key;
@@ -18,7 +18,7 @@ impl<F: BigGaloisField> Polynomial<F> {
         }
     }
 
-    pub(crate) fn constant(value: F) -> Self {
+    pub(super) fn constant(value: F) -> Self {
         let mut coefficients = [F::ZERO; 8];
         coefficients[0] = value;
         Self {
@@ -28,7 +28,7 @@ impl<F: BigGaloisField> Polynomial<F> {
     }
 
     /// DegLift multiplies by X^(degree - self.degree), including zero coefficients.
-    pub(crate) fn lift(mut self, degree: usize) -> Self {
+    pub(super) fn lift(mut self, degree: usize) -> Self {
         assert!(self.degree <= degree && degree <= 7);
         self.coefficients
             .copy_within(..=self.degree, degree - self.degree);
@@ -37,7 +37,7 @@ impl<F: BigGaloisField> Polynomial<F> {
         self
     }
 
-    pub(crate) fn evaluate(&self, delta: F) -> F {
+    pub(super) fn evaluate(&self, delta: F) -> F {
         self.coefficients[..=self.degree]
             .iter()
             .rev()
@@ -142,9 +142,7 @@ impl<F: BigGaloisField> Mul<F> for &Polynomial<F> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        fields::{GF128, GF192, GF256},
-    };
+    use crate::fields::{GF128, GF192, GF256};
 
     fn arithmetic<F: BigGaloisField>() {
         let scalar = F::byte_combine_bits(0x31);

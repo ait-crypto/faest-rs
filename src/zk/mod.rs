@@ -1,24 +1,29 @@
+mod aes;
+mod byte_commitment;
+mod encryption;
+mod hashing;
+mod key_expansion;
+mod owf_constraints;
+mod polynomial;
+
+use byte_commitment::{ByteCommits, ByteCommitsRef};
+use hashing::{ConstraintHasher, ZKProofHasher, ZKVerifyHasher};
+use owf_constraints::owf_constraints;
+use polynomial::Polynomial;
+
 use crate::{
     fields::{BigGaloisField, Field, FromBit},
     internal_keys::PublicKey,
     parameter::{BaseParameters, OWFField, OWFParameters, QSProof},
-    prover::{ByteCommitsRef, owf_constraints, polynomial::Polynomial},
-    universal_hashing::{ZKHasherInit, ZKProofHasher, ZKVerifyHasher},
+    universal_hashing::ZKHasherInit,
     utils::get_bit,
 };
 use hybrid_array::{Array, ArraySize, typenum::Unsigned};
 
-/// Hashes OWF constraint polynomials.
-///
-/// The prover hashes their coefficients, while the verifier hashes their evaluations at Delta.
-pub(crate) trait ConstraintHasher<F: BigGaloisField> {
-    fn hash_constraint(&mut self, polynomial: Polynomial<F>);
-}
-
 pub(crate) type Challenge<O> =
     Array<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>;
 
-pub(crate) fn aes_prove<O: OWFParameters>(
+pub(crate) fn owf_prove<O: OWFParameters>(
     w: &Array<u8, O::LBytes>,
     v: &Array<OWFField<O>, O::L>,
     masks: &[(OWFField<O>, OWFField<O>); 6],
@@ -40,7 +45,7 @@ pub(crate) fn aes_prove<O: OWFParameters>(
 }
 
 /// Applies witness corrections to raw VOLE shares in place and recovers the proof constant.
-pub(crate) fn aes_verify<O: OWFParameters>(
+pub(crate) fn owf_verify<O: OWFParameters>(
     d: &Array<u8, O::LBytes>,
     q: &mut Array<OWFField<O>, O::L>,
     q_bar: &[OWFField<O>; 6],
