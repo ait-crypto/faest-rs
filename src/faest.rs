@@ -9,7 +9,7 @@ use rand_core::CryptoRng;
 use zeroize::Zeroizing;
 
 use crate::{
-    Error, bavc::{BatchVectorCommitment, BavcOpenResult}, declassify, fields::{Field, FromBit}, internal_keys::{PublicKey, SecretKey, UnpackedSecretKey}, parameter::{BaseParameters, FAESTParameters, NMask, OWFField, OWFParameters, TauParameters}, prg::{IV, IVSize}, random_oracles::{Hasher, RandomOracle}, universal_hashing::{VoleHasherInit, VoleHasherProcess}, utils::{Reader, decode_all_chall_3, get_bit, xor_arrays_into}, vole::{VoleCommitmentCRef, VoleCommitmentCRefMut, volecommit, volereconstruct}, zk::{Challenge, owf_prove, owf_verify},
+    Error, bavc::{BatchVectorCommitment, BavcOpenResult}, declassify, fields::{Field, FromBit}, internal_keys::{PublicKeyView, SecretKey, SecretKeyView, UnpackedSecretKeyView}, parameter::{BaseParameters, FAESTParameters, NMask, OWFField, OWFParameters, TauParameters}, prg::{IV, IVSize}, random_oracles::{Hasher, RandomOracle}, universal_hashing::{VoleHasherInit, VoleHasherProcess}, utils::{Reader, decode_all_chall_3, get_bit, xor_arrays_into}, vole::{VoleCommitmentCRef, VoleCommitmentCRefMut, volecommit, volereconstruct}, zk::{Challenge, owf_prove, owf_verify},
 };
 
 type O<P> = <P as FAESTParameters>::OWF;
@@ -162,12 +162,12 @@ impl<'a, P: FAESTParameters> SignatureRef<'a, P> {
 }
 
 fn hash_mu<P: FAESTParameters>(
-    pk: &PublicKey<O<P>>,
+    pk: &PublicKeyView<'_, O<P>>,
     msg: &[u8],
 ) -> Array<u8, <O<P> as OWFParameters>::LambdaBytesTimes2> {
     let mut h = RO::<P>::h2_0_init();
-    h.update(&pk.owf_input);
-    h.update(&pk.owf_output);
+    h.update(pk.owf_input);
+    h.update(pk.owf_output);
     h.update(msg);
     h.finish().read_into()
 }
@@ -298,14 +298,14 @@ where
 #[inline]
 pub(crate) fn faest_sign<P: FAESTParameters>(
     msg: &[u8],
-    sk: &SecretKey<O<P>>,
+    sk: SecretKeyView<'_, O<P>>,
     rho: &[u8],
     signature: &mut [u8],
 ) -> Result<(), Error> {
     let signature = SignatureRefMut::<P>::from(signature);
     // line 16
     // TODO: consider directly returning Zeroising array from extendwitness
-    let w = O::<P>::extendwitness(&sk.owf_key, &sk.pk.owf_input);
+    let w = O::<P>::extendwitness(sk.owf_key, sk.pk.owf_input);
     #[cfg(feature = "zeroize")]
     let w = Zeroizing::new(*w);
     sign::<P>(msg, sk, &w, rho, signature)
@@ -314,17 +314,17 @@ pub(crate) fn faest_sign<P: FAESTParameters>(
 #[inline]
 pub(crate) fn faest_unpacked_sign<P: FAESTParameters>(
     msg: &[u8],
-    sk: &UnpackedSecretKey<O<P>>,
+    sk: UnpackedSecretKeyView<'_, O<P>>,
     rho: &[u8],
     signature: &mut [u8],
 ) -> Result<(), Error> {
     let signature = SignatureRefMut::<P>::from(signature);
-    sign::<P>(msg, &sk.sk, &sk.wit, rho, signature)
+    sign::<P>(msg, sk.sk, sk.wit, rho, signature)
 }
 
 fn sign<P: FAESTParameters>(
     msg: &[u8],
-    sk: &SecretKey<O<P>>,
+    sk: SecretKeyView<'_, O<P>>,
     witness: &Array<u8, <O<P> as OWFParameters>::LBytes>,
     rho: &[u8],
     mut sig: SignatureRefMut<'_, P>,
@@ -336,7 +336,7 @@ fn sign<P: FAESTParameters>(
         let mut r = Array::default();
         #[cfg(feature = "zeroize")]
         let mut r = Zeroizing::new(Array::default());
-        hash_r_iv::<P>(&mut r, sig.iv_pre, &sk.owf_key, &mu, rho);
+        hash_r_iv::<P>(&mut r, sig.iv_pre, sk.owf_key, &mu, rho);
         let iv = hash_iv::<P>(sig.iv_pre, &mu);
 
         // line 6
@@ -395,7 +395,7 @@ fn sign<P: FAESTParameters>(
 
 pub(crate) fn faest_verify<P: FAESTParameters>(
     msg: &[u8],
-    pk: &PublicKey<O<P>>,
+    pk: &PublicKeyView<'_, O<P>>,
     sig: &[u8],
 ) -> Result<(), Error> {
     // lines 1–7
@@ -462,7 +462,10 @@ mod test_vectors;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parameter::*;
+    use crate::{
+        internal_keys::{PublicKey, UnpackedSecretKey},
+        parameter::*,
+    };
     #[cfg(not(feature = "std"))]
     use alloc::vec;
 
@@ -504,13 +507,13 @@ mod tests {
 
     fn check<P: FAESTParameters>(fixture: &SignatureFixture) {
         let sk = secret_key::<P>(fixture);
-        faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk, fixture.signature).unwrap();
+        faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk.as_view(), fixture.signature).unwrap();
 
         // Dirty output storage also checks that signing writes all padding bytes.
         let mut sig = vec![0xff; P::SIGNATURE_SIZE];
         faest_sign::<P>(
             &test_vectors::MESSAGE,
-            &sk,
+            sk.as_view(),
             &test_vectors::RANDOM_SEED,
             &mut sig,
         )
@@ -520,7 +523,7 @@ mod tests {
             fixture.signature,
             "reference signature mismatch"
         );
-        faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk, &sig).unwrap();
+        faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk.as_view(), &sig).unwrap();
 
         let cached = UnpackedSecretKey::from(sk);
         assert_eq!(
@@ -531,7 +534,7 @@ mod tests {
         let mut cached_sig = vec![0xa5; P::SIGNATURE_SIZE];
         faest_unpacked_sign::<P>(
             &test_vectors::MESSAGE,
-            &cached,
+            cached.as_view(),
             &test_vectors::RANDOM_SEED,
             &mut cached_sig,
         )
@@ -544,7 +547,7 @@ mod tests {
         let layout = SignatureLayout::new::<P>();
         let mut msg = test_vectors::MESSAGE.to_vec();
         msg[0] ^= 1;
-        assert!(faest_verify::<P>(&msg, &sk.pk, fixture.signature).is_err());
+        assert!(faest_verify::<P>(&msg, &sk.pk.as_view(), fixture.signature).is_err());
         for output in [false, true] {
             let mut pk = sk.pk.clone();
             if output {
@@ -552,7 +555,7 @@ mod tests {
             } else {
                 pk.owf_input[0] ^= 1;
             }
-            assert!(faest_verify::<P>(&test_vectors::MESSAGE, &pk, fixture.signature).is_err());
+            assert!(faest_verify::<P>(&test_vectors::MESSAGE, &pk.as_view(), fixture.signature).is_err());
         }
 
         // Mutate each signature component
@@ -573,13 +576,13 @@ mod tests {
             let mut sig = fixture.signature.to_vec();
             sig[pos] ^= 1;
             assert!(
-                faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk, &sig).is_err(),
+                faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk.as_view(), &sig).is_err(),
                 "mutation at {pos}"
             );
         }
         let mut sig = fixture.signature.to_vec();
         sig[layout.chall_3.end - 1] |= 0x80;
-        assert!(faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk, &sig).is_err());
+        assert!(faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk.as_view(), &sig).is_err());
 
         // When the reference opening leaves padding, every padding byte must be zero.
         let pad = padding_start::<P>(fixture.signature, &layout);
@@ -587,10 +590,10 @@ mod tests {
         if pad < layout.decom_i.end {
             let mut sig = fixture.signature.to_vec();
             sig[pad] = 1;
-            assert!(faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk, &sig).is_err());
+            assert!(faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk.as_view(), &sig).is_err());
             sig[pad] = 0;
             sig[layout.decom_i.end - 1] = 1;
-            assert!(faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk, &sig).is_err());
+            assert!(faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk.as_view(), &sig).is_err());
         }
     }
 

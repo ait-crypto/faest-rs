@@ -5,7 +5,7 @@
 use core::fmt::{self, Debug};
 
 #[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 
 use hybrid_array::{Array, typenum::Unsigned};
 #[cfg(feature = "serde")]
@@ -13,10 +13,25 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::{
-    ByteEncoding, Error, classify, declassify,
-    parameter::{OWFParameters, Witness},
-};
+use crate::{ByteEncoding, Error, classify, declassify, parameter::OWFParameters};
+
+/// Borrowed public key fields for a selected arithmetic backend
+pub(crate) struct PublicKeyView<'a, O: OWFParameters> {
+    pub(crate) owf_input: &'a Array<u8, O::InputSize>,
+    pub(crate) owf_output: &'a Array<u8, O::OutputSize>,
+}
+
+/// Borrowed secret key fields for a selected arithmetic backend
+pub(crate) struct SecretKeyView<'a, O: OWFParameters> {
+    pub(crate) owf_key: &'a Array<u8, O::LambdaBytes>,
+    pub(crate) pk: PublicKeyView<'a, O>,
+}
+
+/// Borrowed secret key and cached witness for a selected arithmetic backend
+pub(crate) struct UnpackedSecretKeyView<'a, O: OWFParameters> {
+    pub(crate) sk: SecretKeyView<'a, O>,
+    pub(crate) wit: &'a Array<u8, O::LBytes>,
+}
 
 /// Internal representation of a secret key.
 pub(crate) struct SecretKey<O>
@@ -36,6 +51,9 @@ where
         self.owf_key.zeroize();
     }
 }
+
+#[cfg(feature = "zeroize")]
+impl<O: OWFParameters> ZeroizeOnDrop for SecretKey<O> {}
 
 #[cfg(feature = "zeroize")]
 impl<O> Drop for SecretKey<O>
@@ -79,11 +97,9 @@ where
                 return Err(Error::new());
             }
 
-            let owf_output = O::evaluate_owf(&owf_key, &owf_input);
-
             classify!(&owf_key);
+            let owf_output = O::evaluate_owf(&owf_key, &owf_input);
             declassify!(&owf_output);
-            declassify!(&owf_input);
 
             Ok(Self {
                 owf_key,
@@ -138,6 +154,21 @@ impl<O> SecretKey<O>
 where
     O: OWFParameters,
 {
+    /// Borrow fields using a backend with the same key dimensions
+    pub(crate) fn as_view<T>(&self) -> SecretKeyView<'_, T>
+    where
+        T: OWFParameters<
+                LambdaBytes = O::LambdaBytes,
+                InputSize = O::InputSize,
+                OutputSize = O::OutputSize,
+            >,
+    {
+        SecretKeyView {
+            owf_key: &self.owf_key,
+            pk: self.pk.as_view(),
+        }
+    }
+
     pub(crate) fn as_public_key(&self) -> PublicKey<O> {
         self.pk.clone()
     }
@@ -203,7 +234,7 @@ where
     O: OWFParameters,
 {
     pub(crate) sk: SecretKey<O>,
-    pub(crate) wit: Witness<O>,
+    pub(crate) wit: Box<Array<u8, O::LBytes>>,
 }
 
 impl<O> Clone for UnpackedSecretKey<O>
@@ -224,7 +255,7 @@ where
 {
     fn from(value: SecretKey<O>) -> Self {
         Self {
-            wit: O::witness(&value),
+            wit: O::extendwitness(&value.owf_key, &value.pk.owf_input),
             sk: value,
         }
     }
@@ -238,7 +269,7 @@ where
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         SecretKey::try_from(value).map(|sk| Self {
-            wit: O::witness(&sk),
+            wit: O::extendwitness(&sk.owf_key, &sk.pk.owf_input),
             sk,
         })
     }
@@ -276,6 +307,22 @@ impl<O> UnpackedSecretKey<O>
 where
     O: OWFParameters,
 {
+    /// Borrow key fields and the witness using compatible backend dimensions.
+    pub(crate) fn as_view<T>(&self) -> UnpackedSecretKeyView<'_, T>
+    where
+        T: OWFParameters<
+                LambdaBytes = O::LambdaBytes,
+                InputSize = O::InputSize,
+                OutputSize = O::OutputSize,
+                LBytes = O::LBytes,
+            >,
+    {
+        UnpackedSecretKeyView {
+            sk: self.sk.as_view(),
+            wit: &self.wit,
+        }
+    }
+
     pub(crate) fn as_public_key(&self) -> PublicKey<O> {
         self.sk.pk.clone()
     }
@@ -342,6 +389,19 @@ where
 {
     pub(crate) owf_input: Array<u8, O::InputSize>,
     pub(crate) owf_output: Array<u8, O::OutputSize>,
+}
+
+impl<O: OWFParameters> PublicKey<O> {
+    /// Borrow fields using a backend with the same public key dimensions.
+    pub(crate) fn as_view<T>(&self) -> PublicKeyView<'_, T>
+    where
+        T: OWFParameters<InputSize = O::InputSize, OutputSize = O::OutputSize>,
+    {
+        PublicKeyView {
+            owf_input: &self.owf_input,
+            owf_output: &self.owf_output,
+        }
+    }
 }
 
 impl<O> Clone for PublicKey<O>

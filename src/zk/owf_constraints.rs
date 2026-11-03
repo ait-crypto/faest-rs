@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 use super::{ByteCommits, ByteCommitsRef, encryption::enc_cstrnts, key_expansion::key_exp_cstrnts};
 use crate::{
     fields::FromBit,
-    internal_keys::PublicKey,
+    internal_keys::PublicKeyView,
     parameter::{OWFField, OWFParameters},
     rijndael_32::{rijndael_key_schedule_unbitsliced, ske},
     utils::xor_arrays,
@@ -16,15 +16,15 @@ use crate::{
 pub(super) fn owf_constraints<O>(
     zk_hasher: &mut impl ConstraintHasher<OWFField<O>>,
     w: ByteCommitsRef<OWFField<O>, O::LBytes>,
-    pk: &PublicKey<O>,
+    pk: &PublicKeyView<'_, O>,
 ) where
     O: OWFParameters,
 {
     // line 1
-    let PublicKey {
+    let PublicKeyView {
         owf_input: x,
         owf_output: y,
-    } = pk;
+    } = *pk;
 
     // line 5
     {

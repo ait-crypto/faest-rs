@@ -260,12 +260,9 @@ macro_rules! define_impl {
                         not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
                     ))]
                     if x86_intrinsics::get() {
-                        // TODO: can we avoid unsafe transmute?
-                        let sk: &SecretKey<<x86_simd::[<$param Parameters>] as FAESTParameters>::OWF> =
-                            unsafe { core::mem::transmute(sk) };
-                        return faest_sign::<x86_simd::[<$param Parameters>]>(msg, sk, rho, signature);
+                        return faest_sign::<x86_simd::[<$param Parameters>]>(msg, sk.as_view(), rho, signature);
                     }
-                    faest_sign::<[<$param Parameters>]>(msg, sk, rho, signature)
+                    faest_sign::<[<$param Parameters>]>(msg, sk.as_view(), rho, signature)
                 }
 
                 #[inline]
@@ -281,11 +278,9 @@ macro_rules! define_impl {
                         not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
                     ))]
                     if x86_intrinsics::get() {
-                        let sk: &UnpackedSecretKey<<x86_simd::[<$param Parameters>] as FAESTParameters>::OWF> =
-                            unsafe { core::mem::transmute(sk) };
-                        return faest_unpacked_sign::<x86_simd::[<$param Parameters>]>(msg, sk, rho, signature);
+                        return faest_unpacked_sign::<x86_simd::[<$param Parameters>]>(msg, sk.as_view(), rho, signature);
                     }
-                    faest_unpacked_sign::<[<$param Parameters>]>(msg, sk, rho, signature)
+                    faest_unpacked_sign::<[<$param Parameters>]>(msg, sk.as_view(), rho, signature)
                 }
 
                 #[inline]
@@ -301,11 +296,9 @@ macro_rules! define_impl {
                         not(all(target_feature = "avx2", target_feature = "pclmulqdq"))
                     ))]
                     if x86_intrinsics::get() {
-                        let pk: &PublicKey<<x86_simd::[<$param Parameters>] as FAESTParameters>::OWF> =
-                            unsafe { core::mem::transmute(pk) };
-                        return faest_verify::<x86_simd::[<$param Parameters>]>(msg, pk, sigma);
+                        return faest_verify::<x86_simd::[<$param Parameters>]>(msg, &pk.as_view(), sigma);
                     }
-                    faest_verify::<[<$param Parameters>]>(msg, pk, sigma)
+                    faest_verify::<[<$param Parameters>]>(msg, &pk.as_view(), sigma)
                 }
             }
 
