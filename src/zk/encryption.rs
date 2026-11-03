@@ -4,9 +4,7 @@ use alloc::vec::Vec;
 
 use super::{ByteCommitsRef, byte_commitment::ByteCommitment, polynomial::Polynomial};
 use crate::{
-    aes::{AddRoundKeyAssign, BytewiseMixColumns, InverseAffine, InverseShiftRows},
-    fields::{BigGaloisField, ByteCombineConstants},
-    parameter::{OWFField, OWFParameters},
+    aes::{AddRoundKeyAssign, BytewiseMixColumns, InverseAffine, InverseShiftRows}, fields::{BigGaloisField, ByteCombineConstants, Sigmas}, parameter::{OWFField, OWFParameters},
 };
 use core::array;
 use hybrid_array::typenum::Unsigned;
@@ -130,14 +128,11 @@ fn sbox<F: BigGaloisField>(mut byte: ByteCommitment<F>) -> Polynomial<F> {
     // line 1
     let conjugates: [Polynomial<F>; 8] = f256_f2_conjugates(&mut byte);
 
-    // line 3-5
-    let zetas = [0x05, 0x09, 0xf9, 0x25, 0xf4, 0x01, 0xb5, 0x8f, 0x63].map(F::byte_combine_bits);
-
     // line 8-10
     let p1: [Polynomial<F>; 4] =
         core::array::from_fn(|i| &conjugates[2 * i] * &conjugates[2 * i + 1]);
     let f1: [Polynomial<F>; 4] = core::array::from_fn(|i| {
-        conjugates[2 * i + 1] * zetas[2 * i] + conjugates[2 * i] * zetas[2 * i + 1]
+        conjugates[2 * i + 1] * F::SIGMA[2 * i] + conjugates[2 * i] * F::SIGMA[2 * i + 1]
     });
 
     // line 11-13
@@ -148,5 +143,5 @@ fn sbox<F: BigGaloisField>(mut byte: ByteCommitment<F>) -> Polynomial<F> {
     // line 14
     let [f_left, f_right] = f2;
     let [p_left, p_right] = p2;
-    f_left * p_right + f_right * p_left + Polynomial::constant(zetas[8]).lift(7)
+    f_left * p_right + f_right * p_left + Polynomial::constant(F::SIGMA[8]).lift(7)
 }
