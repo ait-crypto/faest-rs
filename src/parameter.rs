@@ -1,5 +1,5 @@
 use core::{
-    iter::{repeat_n, zip},
+    iter::repeat_n,
     marker::PhantomData,
     ops::{Add, Div, Mul, Sub},
 };
@@ -8,24 +8,37 @@ use core::{
 use alloc::{borrow::ToOwned, boxed::Box};
 
 use crate::{
-    bavc::{BatchVectorCommitment, Bavc, LeafCommitment, LeafCommitmentEm}, fields::{BaseField, BigGaloisField, GF128, GF192, GF256}, prg::{PRG128, PRG192, PRG256, PseudoRandomGenerator}, random_oracles::{Hasher, RandomOracle, RandomOracleShake128, RandomOracleShake256}, universal_hashing::{
+    classify, declassify,
+    rijndael_32::{Rijndael192, Rijndael256},
+};
+
+use crate::{
+    bavc::{BatchVectorCommitment, Bavc, LeafCommitment, LeafCommitmentEm},
+    fields::{BaseField, BigGaloisField, GF128, GF192, GF256},
+    internal_keys::{PublicKey, SecretKey},
+    prg::{PRG128, PRG192, PRG256, PseudoRandomGenerator},
+    random_oracles::{RandomOracle, RandomOracleShake128, RandomOracleShake256},
+    universal_hashing::{
         LeafHasher128, LeafHasher192, LeafHasher256, VoleHashOutputLength, VoleHashSeedLength,
-        VoleHasher, VoleHasherInit, VoleHasherProcess, ZKHasher, ZKHasherInit,
-    }, utils::xor_arrays_inplace, vole::tables::{
+        VoleHasher, VoleHasherInit, ZKHasher, ZKHasherInit,
+    },
+    vole::tables::{
         TABLES_128F, TABLES_128S, TABLES_192F, TABLES_192S, TABLES_256F, TABLES_256S,
         TABLES_EM_192F, TABLES_EM_192S, VoleTables,
-    }, witness::extend_witness,
+    },
+    witness::extend_witness,
 };
 use aes::{
     Aes128Enc, Aes192Enc, Aes256Enc,
     cipher::{BlockCipherEncrypt, KeyInit},
 };
 use hybrid_array::{
-    Array, ArraySize, sizes::{U90, U94, U130, U134, U154, U159, U226, U231, U239, U286, U291}, typenum::{
+    Array, ArraySize,
+    sizes::{U90, U94, U130, U134, U154, U159, U226, U231, U239, U286, U291},
+    typenum::{
         Diff, Prod, Quot, Sum, U0, U1, U2, U3, U4, U6, U7, U8, U9, U10, U11, U12, U14, U16, U17,
-        U22, U24, U25, U32, U33, U40, U48, U52, U64, U102, U103, U105, U108, U110, U112, U120,
-        U128, U162, U163, U171, U176, U192, U218, U225, U229, U234, U245, U246, U256, U448, U672,
-        Unsigned,
+        U22, U24, U25, U32, U33, U40, U48, U52, U64, U102, U103, U105, U108, U128, U162, U163,
+        U171, U192, U218, U225, U229, U234, U256, U448, U672, Unsigned,
     },
 };
 use rand_core::Rng;
@@ -41,30 +54,27 @@ pub(crate) mod x86_simd {
         x86_simd_large_fields::{GF128, GF192, GF256},
     };
 
-    // pub(crate) type FAEST128fParameters = super::FAEST128fParameters<GF128>;
-    // pub(crate) type FAEST128sParameters = super::FAEST128sParameters<GF128>;
+    pub(crate) type FAEST128fParameters = super::FAEST128fParameters<GF128>;
+    pub(crate) type FAEST128sParameters = super::FAEST128sParameters<GF128>;
 
-    // pub(crate) type FAESTEM128fParameters = super::FAESTEM128fParameters<GF128>;
-    // pub(crate) type FAESTEM128sParameters = super::FAESTEM128sParameters<GF128>;
+    pub(crate) type FAESTEM128fParameters = super::FAESTEM128fParameters<GF128>;
+    pub(crate) type FAESTEM128sParameters = super::FAESTEM128sParameters<GF128>;
 
-    // pub(crate) type FAEST192fParameters = super::FAEST192fParameters<GF192>;
-    // pub(crate) type FAEST192sParameters = super::FAEST192sParameters<GF192>;
+    pub(crate) type FAEST192fParameters = super::FAEST192fParameters<GF192>;
+    pub(crate) type FAEST192sParameters = super::FAEST192sParameters<GF192>;
 
-    // pub(crate) type FAESTEM192fParameters = super::FAESTEM192fParameters<GF192>;
-    // pub(crate) type FAESTEM192sParameters = super::FAESTEM192sParameters<GF192>;
+    pub(crate) type FAESTEM192fParameters = super::FAESTEM192fParameters<GF192>;
+    pub(crate) type FAESTEM192sParameters = super::FAESTEM192sParameters<GF192>;
 
-    // pub(crate) type FAEST256fParameters = super::FAEST256fParameters<GF256>;
-    // pub(crate) type FAEST256sParameters = super::FAEST256sParameters<GF256>;
+    pub(crate) type FAEST256fParameters = super::FAEST256fParameters<GF256>;
+    pub(crate) type FAEST256sParameters = super::FAEST256sParameters<GF256>;
 
-    // pub(crate) type FAESTEM256fParameters = super::FAESTEM256fParameters<GF256>;
-    // pub(crate) type FAESTEM256sParameters = super::FAESTEM256sParameters<GF256>;
+    pub(crate) type FAESTEM256fParameters = super::FAESTEM256fParameters<GF256>;
+    pub(crate) type FAESTEM256sParameters = super::FAESTEM256sParameters<GF256>;
 }
 
 /// Extract base field from OWF parameters
 // pub(crate) type OWFField<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
-
-/// The QuickSilver proof message
-// pub(crate) type QSProof<O> = (OWFField<O>, OWFField<O>, OWFField<O>);
 
 /// Witness for the secret key
 // pub(crate) type Witness<O> = Box<Array<u8, <O as OWFParameters>::LBytes>>;
@@ -76,6 +86,8 @@ pub(crate) trait SecurityParameter:
     + Mul<U3, Output: ArraySize>
     + Mul<U4, Output: ArraySize>
     + Mul<U8, Output: ArraySize>
+    + Mul<U3, Output: ArraySize + Add<U8, Output: ArraySize>>
+    + Add<U2, Output: ArraySize>
     + PartialEq
 {
 }
@@ -85,9 +97,14 @@ impl SecurityParameter for U24 {}
 impl SecurityParameter for U32 {}
 
 /// Get bytes from bit length
-pub(crate) type ToBytes<L: ArraySize> = Quot<Sum<L, U7>, U8>;
+pub(crate) type ToBytes<L> = Quot<Sum<L, U7>, U8>;
 /// Upper-bound on max small-tree depth plus one (i.e., d0 + 1)
-pub(crate) type MaxDepthPlusOne<P: FAESTParameters> = Sum<<P::Tau as TauParameters>::K, U1>; // K is always >= d0
+pub(crate) type MaxDepthPlusOne<P> = Sum<<<P as FAESTParameters>::Tau as TauParameters>::K, U1>; // K is always >= d0
+
+pub(crate) type OWFField<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
+
+/// The seven hashed coefficients of the internal v3 QuickSilver proof.
+pub(crate) type QSProof<O> = [OWFField<O>; 7];
 
 /// Base parameters per security level
 pub(crate) trait BaseParameters {
@@ -114,47 +131,6 @@ pub(crate) trait BaseParameters {
     type Chall: ArraySize;
     type Chall1: ArraySize;
     type VoleHasherOutputLength: ArraySize;
-    // /// Hash `v` row by row using [`Self::ZKHasher`] and update `h2_hasher` with the results
-    // fn hash_v_matrix(
-    //     h2_hasher: &mut impl Hasher,
-    //     v: &[Array<u8, impl ArraySize>],
-    //     chall1: &Array<u8, Self::Chall1>,
-    // ) {
-    //     let vole_hasher = Self::VoleHasher::new_vole_hasher(chall1);
-    //     for vi in v {
-    //         // Hash column-wise
-    //         h2_hasher.update(VoleHasherProcess::process(&vole_hasher, vi).as_slice());
-    //     }
-    // }
-    // /// Hash `u` using [`Self::ZKHasher`] and write the result into `signature_u`
-    // fn hash_u_vector(
-    //     signature_u: &mut [u8],
-    //     u: &Array<u8, impl ArraySize>,
-    //     chall1: &Array<u8, Self::Chall1>,
-    // ) {
-    //     let vole_hasher_u = Self::VoleHasher::new_vole_hasher(chall1);
-    //     signature_u.copy_from_slice(vole_hasher_u.process(u).as_slice());
-    // }
-    // /// Hash `q` row by row using [`Self::ZKHasher`] and update `h2_hasher` with the results
-    // fn hash_q_matrix(
-    //     h2_hasher: &mut impl Hasher,
-    //     q: &[Array<u8, impl ArraySize>],
-    //     u_tilde_sig: &[u8],
-    //     chall1: &Array<u8, Self::Chall1>,
-    //     decoded_chall3_iter: impl Iterator<Item = u8>,
-    // ) {
-    //     let vole_hasher = Self::VoleHasher::new_vole_hasher(chall1);
-    //     for (q_i, d_i) in zip(q, decoded_chall3_iter) {
-    //         // ::12
-    //         let mut q_tilde = vole_hasher.process(q_i);
-    //         // ::14
-    //         if d_i == 1 {
-    //             xor_arrays_inplace(&mut q_tilde, u_tilde_sig);
-    //         }
-    //         // ::15
-    //         h2_hasher.update(&q_tilde);
-    //     }
-    // }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -299,71 +275,45 @@ pub(crate) trait OWFParameters: Sized {
     /// Returns whether the OWF is used in EM mode
     const IS_EM: bool;
 
-    //     /// Applies the OWF using the secret key `key` to `input` and writes the result in the `output` slice
-    //     fn evaluate_owf(
-    //         key: &Array<u8, Self::LambdaBytes>,
-    //         input: &Array<u8, Self::InputSize>,
-    //     ) -> Array<u8, Self::OutputSize>;
+    /// Applies the OWF using the secret key `key` to `input` and writes the result in the `output` slice
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize>;
 
-        /// Compute the extended witness from `owf_key` and `owf_input`
-        fn extendwitness(
-            owf_key: &Array<u8, Self::LambdaBytes>,
-            owf_input: &Array<u8, Self::InputSize>,
-        ) -> Box<Array<u8, Self::LBytes>>;
+    /// Compute the extended witness from `owf_key` and `owf_input`
+    fn extendwitness(
+        owf_key: &Array<u8, Self::LambdaBytes>,
+        owf_input: &Array<u8, Self::InputSize>,
+    ) -> Box<Array<u8, Self::LBytes>>;
 
-    //     /// Compute the extended witness using the secret key `sk`
-    //     fn witness(sk: &SecretKey<Self>) -> Box<Array<u8, Self::LBytes>> {
-    //         Self::extendwitness(&sk.owf_key, &sk.pk.owf_input)
-    //     }
+    /// Generates the prover's secret key using the input generator
+    fn keygen_with_rng<R: Rng + ?Sized>(rng: &mut R) -> SecretKey<Self> {
+        let mut owf_key = Array::default();
 
-    //     /// Generates the prover's Quicksilver constraints
-    //     fn prove(
-    //         w: &Array<u8, Self::LBytes>,
-    //         u: &Array<u8, Self::LambdaBytesTimes2>,
-    //         v: CstrntsVal<Self>,
-    //         pk: &PublicKey<Self>,
-    //         chall: &Array<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    //     ) -> QSProof<Self> {
-    //         aes_prove::<Self>(w, u, v, pk, chall)
-    //     }
+        loop {
+            rng.fill_bytes(&mut owf_key);
+            if owf_key[0] & 0b11 != 0b11 {
+                break;
+            }
+        }
+        classify!(&owf_key);
 
-    //     /// Derives the prover's challenge that can be used to verify the Quicksilver constraints
-    //     fn verify(
-    //         q: CstrntsVal<Self>,
-    //         d: &Array<u8, Self::LBytes>,
-    //         pk: &PublicKey<Self>,
-    //         chall_2: &Array<u8, <Self::BaseParams as BaseParameters>::Chall>,
-    //         chall_3: &Array<u8, Self::LambdaBytes>,
-    //         a1_tilde: &Array<u8, Self::LambdaBytes>,
-    //         a2_tilde: &Array<u8, Self::LambdaBytes>,
-    //     ) -> OWFField<Self> {
-    //         aes_verify::<Self>(q, d, pk, chall_2, chall_3, a1_tilde, a2_tilde)
-    //     }
+        let mut owf_input = Array::default();
+        rng.fill_bytes(&mut owf_input);
 
-    //     /// Generates the prover's secret key using the input generator
-    //     fn keygen_with_rng<R: Rng + ?Sized>(rng: &mut R) -> SecretKey<Self> {
-    //         let mut owf_key = Array::default();
+        let owf_output = Self::evaluate_owf(&owf_key, &owf_input);
+        declassify!(&owf_output);
+        declassify!(&owf_input);
 
-    //         loop {
-    //             rng.fill_bytes(&mut owf_key);
-    //             if owf_key[0] & 0b11 != 0b11 {
-    //                 break;
-    //             }
-    //         }
-
-    //         let mut owf_input = Array::default();
-    //         rng.fill_bytes(&mut owf_input);
-
-    //         let owf_output = Self::evaluate_owf(&owf_key, &owf_input);
-
-    //         SecretKey {
-    //             owf_key,
-    //             pk: PublicKey {
-    //                 owf_input,
-    //                 owf_output,
-    //             },
-    //         }
-    //     }
+        SecretKey {
+            owf_key,
+            pk: PublicKey {
+                owf_input,
+                owf_output,
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -411,23 +361,23 @@ where
 
     const IS_EM: bool = false;
 
-    //     fn evaluate_owf(
-    //         key: &Array<u8, Self::LambdaBytes>,
-    //         input: &Array<u8, Self::InputSize>,
-    //     ) -> Array<u8, Self::OutputSize> {
-    //         let aes = Aes128Enc::new(key);
-    //         let mut output = Array::default();
-    //         aes.encrypt_block_b2b(input, &mut output);
-    //         output
-    //     }
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize> {
+        let aes = Aes128Enc::new(key);
+        let mut output = Array::default();
+        aes.encrypt_block_b2b(input, &mut output);
+        output
+    }
 
-        #[inline]
-        fn extendwitness(
-            owf_key: &Array<u8, Self::LambdaBytes>,
-            owf_input: &Array<u8, Self::InputSize>,
-        ) -> Box<Array<u8, Self::LBytes>> {
-            extend_witness::<Self>(owf_key, owf_input)
-        }
+    #[inline]
+    fn extendwitness(
+        owf_key: &Array<u8, Self::LambdaBytes>,
+        owf_input: &Array<u8, Self::InputSize>,
+    ) -> Box<Array<u8, Self::LBytes>> {
+        extend_witness::<Self>(owf_key, owf_input)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -475,29 +425,29 @@ where
 
     const IS_EM: bool = false;
 
-    //     fn evaluate_owf(
-    //         key: &Array<u8, Self::LambdaBytes>,
-    //         input: &Array<u8, Self::InputSize>,
-    //     ) -> Array<u8, Self::OutputSize> {
-    //         let aes = Aes192Enc::new(key);
-    //         let mut output1 = Array::default();
-    //         aes.encrypt_block_b2b(input, &mut output1);
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize> {
+        let aes = Aes192Enc::new(key);
+        let mut output1 = Array::default();
+        aes.encrypt_block_b2b(input, &mut output1);
 
-    //         let mut input = *input;
-    //         input[0] ^= 1;
+        let mut input = *input;
+        input[0] ^= 1;
 
-    //         let mut output2 = Array::default();
-    //         aes.encrypt_block_b2b(&input, &mut output2);
-    //         output1.concat(output2)
-    //     }
+        let mut output2 = Array::default();
+        aes.encrypt_block_b2b(&input, &mut output2);
+        output1.concat(output2)
+    }
 
-        #[inline]
-        fn extendwitness(
-            owf_key: &Array<u8, Self::LambdaBytes>,
-            owf_input: &Array<u8, Self::InputSize>,
-        ) -> Box<Array<u8, Self::LBytes>> {
-            extend_witness::<Self>(owf_key, owf_input)
-        }
+    #[inline]
+    fn extendwitness(
+        owf_key: &Array<u8, Self::LambdaBytes>,
+        owf_input: &Array<u8, Self::InputSize>,
+    ) -> Box<Array<u8, Self::LBytes>> {
+        extend_witness::<Self>(owf_key, owf_input)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -545,29 +495,29 @@ where
 
     const IS_EM: bool = false;
 
-    //     fn evaluate_owf(
-    //         key: &Array<u8, Self::LambdaBytes>,
-    //         input: &Array<u8, Self::InputSize>,
-    //     ) -> Array<u8, Self::OutputSize> {
-    //         let aes = Aes256Enc::new(key);
-    //         let mut output1 = Array::default();
-    //         aes.encrypt_block_b2b(input, &mut output1);
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize> {
+        let aes = Aes256Enc::new(key);
+        let mut output1 = Array::default();
+        aes.encrypt_block_b2b(input, &mut output1);
 
-    //         let mut input = *input;
-    //         input[0] ^= 1;
+        let mut input = *input;
+        input[0] ^= 1;
 
-    //         let mut output2 = Array::default();
-    //         aes.encrypt_block_b2b(&input, &mut output2);
-    //         output1.concat(output2)
-    //     }
+        let mut output2 = Array::default();
+        aes.encrypt_block_b2b(&input, &mut output2);
+        output1.concat(output2)
+    }
 
-        #[inline]
-        fn extendwitness(
-            owf_key: &Array<u8, Self::LambdaBytes>,
-            owf_input: &Array<u8, Self::InputSize>,
-        ) -> Box<Array<u8, Self::LBytes>> {
-            extend_witness::<Self>(owf_key, owf_input)
-        }
+    #[inline]
+    fn extendwitness(
+        owf_key: &Array<u8, Self::LambdaBytes>,
+        owf_input: &Array<u8, Self::InputSize>,
+    ) -> Box<Array<u8, Self::LBytes>> {
+        extend_witness::<Self>(owf_key, owf_input)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -615,26 +565,26 @@ where
 
     const IS_EM: bool = true;
 
-    //     fn evaluate_owf(
-    //         key: &Array<u8, Self::LambdaBytes>,
-    //         input: &Array<u8, Self::InputSize>,
-    //     ) -> Array<u8, Self::OutputSize> {
-    //         let aes = Aes128Enc::new(input);
-    //         let mut output = Array::default();
-    //         aes.encrypt_block_b2b(key, &mut output);
-    //         for idx in 0..Self::InputSize::USIZE {
-    //             output[idx] ^= key[idx];
-    //         }
-    //         output
-    //     }
-
-        #[inline]
-        fn extendwitness(
-            owf_key: &Array<u8, Self::LambdaBytes>,
-            owf_input: &Array<u8, Self::InputSize>,
-        ) -> Box<Array<u8, Self::LBytes>> {
-            extend_witness::<Self>(owf_input, owf_key)
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize> {
+        let aes = Aes128Enc::new(input);
+        let mut output = Array::default();
+        aes.encrypt_block_b2b(key, &mut output);
+        for idx in 0..Self::InputSize::USIZE {
+            output[idx] ^= key[idx];
         }
+        output
+    }
+
+    #[inline]
+    fn extendwitness(
+        owf_key: &Array<u8, Self::LambdaBytes>,
+        owf_input: &Array<u8, Self::InputSize>,
+    ) -> Box<Array<u8, Self::LBytes>> {
+        extend_witness::<Self>(owf_input, owf_key)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -684,26 +634,26 @@ where
 
     const IS_EM: bool = true;
 
-    //     fn evaluate_owf(
-    //         key: &Array<u8, Self::LambdaBytes>,
-    //         input: &Array<u8, Self::InputSize>,
-    //     ) -> Array<u8, Self::OutputSize> {
-    //         let aes = Rijndael192::new(input);
-    //         let mut output = Array::default();
-    //         aes.encrypt_block_b2b(key, &mut output);
-    //         for idx in 0..Self::InputSize::USIZE {
-    //             output[idx] ^= key[idx];
-    //         }
-    //         output
-    //     }
-
-        #[inline]
-        fn extendwitness(
-            owf_key: &Array<u8, Self::LambdaBytes>,
-            owf_input: &Array<u8, Self::InputSize>,
-        ) -> Box<Array<u8, Self::LBytes>> {
-            extend_witness::<Self>(owf_input, owf_key)
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize> {
+        let aes = Rijndael192::new(input);
+        let mut output = Array::default();
+        aes.encrypt_block_b2b(key, &mut output);
+        for idx in 0..Self::InputSize::USIZE {
+            output[idx] ^= key[idx];
         }
+        output
+    }
+
+    #[inline]
+    fn extendwitness(
+        owf_key: &Array<u8, Self::LambdaBytes>,
+        owf_input: &Array<u8, Self::InputSize>,
+    ) -> Box<Array<u8, Self::LBytes>> {
+        extend_witness::<Self>(owf_input, owf_key)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -753,26 +703,26 @@ where
 
     const IS_EM: bool = true;
 
-    //     fn evaluate_owf(
-    //         key: &Array<u8, Self::LambdaBytes>,
-    //         input: &Array<u8, Self::InputSize>,
-    //     ) -> Array<u8, Self::OutputSize> {
-    //         let aes = Rijndael256::new(input);
-    //         let mut output = Array::default();
-    //         aes.encrypt_block_b2b(key, &mut output);
-    //         for idx in 0..Self::InputSize::USIZE {
-    //             output[idx] ^= key[idx];
-    //         }
-    //         output
-    //     }
-
-        #[inline]
-        fn extendwitness(
-            owf_key: &Array<u8, Self::LambdaBytes>,
-            owf_input: &Array<u8, Self::InputSize>,
-        ) -> Box<Array<u8, Self::LBytes>> {
-            extend_witness::<Self>(owf_input, owf_key)
+    fn evaluate_owf(
+        key: &Array<u8, Self::LambdaBytes>,
+        input: &Array<u8, Self::InputSize>,
+    ) -> Array<u8, Self::OutputSize> {
+        let aes = Rijndael256::new(input);
+        let mut output = Array::default();
+        aes.encrypt_block_b2b(key, &mut output);
+        for idx in 0..Self::InputSize::USIZE {
+            output[idx] ^= key[idx];
         }
+        output
+    }
+
+    #[inline]
+    fn extendwitness(
+        owf_key: &Array<u8, Self::LambdaBytes>,
+        owf_input: &Array<u8, Self::InputSize>,
+    ) -> Box<Array<u8, Self::LBytes>> {
+        extend_witness::<Self>(owf_input, owf_key)
+    }
 }
 
 pub(crate) trait TauParameters {
@@ -1262,6 +1212,8 @@ pub(crate) type BAVC256SmallEM =
     Bavc<RandomOracleShake256, LeafCommitmentEm<PRG256>, Tau256SmallEM>;
 pub(crate) type BAVC256FastEM = Bavc<RandomOracleShake256, LeafCommitmentEm<PRG256>, Tau256FastEM>;
 
+
+// TODO: refactor tests
 #[cfg(test)]
 mod faest_tests {
     use super::*;
