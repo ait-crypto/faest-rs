@@ -21,6 +21,7 @@ use crate::{
 };
 #[cfg(not(feature = "std"))]
 use alloc::{boxed::Box, vec};
+use cmov::Cmov;
 use core::{
     marker::PhantomData,
     ops::{Index, IndexMut, Mul},
@@ -190,7 +191,8 @@ fn poly_mul(dst: &mut [u8], src: &[u8], src_bits: usize, table: &[u64], table_bi
 
 fn reduce_tree_product(mut value: u32, modulus: u16, degree: usize) -> u16 {
     for bit in (degree..2 * degree).rev() {
-        let mask = 0u32.wrapping_sub((value >> bit) & 1);
+        let mut mask = 0u32;
+        mask.cmovnz(&u32::MAX, ((value >> bit) & 1) as u8);
         value ^= (u32::from(modulus) << (bit - degree)) & mask;
     }
     value as u16
