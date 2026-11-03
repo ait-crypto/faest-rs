@@ -30,7 +30,7 @@ use super::{
     BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquaredConstants, Double,
     ExtensionField, Field, FromBit, GF64, Sigmas, Square,
     large_fields::{
-        Alphas, Betas, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192,
+        Alphas, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192,
         GF256 as UnoptimizedGF256, GF576 as UnoptimizedGF576, GF768 as UnoptimizedGF768, Modulus,
     },
 };
@@ -793,23 +793,6 @@ impl ByteCombineSquaredConstants for GF128 {
     const BYTE_COMBINE_SQ_3: Self = Self(gfu128_as_m128(UnoptimizedGF128::BYTE_COMBINE_SQ_3));
 }
 
-impl Betas for GF128 {
-    const BETA_SQUARES: [Self; 5] = [
-        Self(gfu128_as_m128(UnoptimizedGF128::BETA_SQUARES[0])),
-        Self(gfu128_as_m128(UnoptimizedGF128::BETA_SQUARES[1])),
-        Self(gfu128_as_m128(UnoptimizedGF128::BETA_SQUARES[2])),
-        Self(gfu128_as_m128(UnoptimizedGF128::BETA_SQUARES[3])),
-        Self(gfu128_as_m128(UnoptimizedGF128::BETA_SQUARES[4])),
-    ];
-
-    const BETA_CUBES: [Self; 4] = [
-        Self(gfu128_as_m128(UnoptimizedGF128::BETA_CUBES[0])),
-        Self(gfu128_as_m128(UnoptimizedGF128::BETA_CUBES[1])),
-        Self(gfu128_as_m128(UnoptimizedGF128::BETA_CUBES[2])),
-        Self(gfu128_as_m128(UnoptimizedGF128::BETA_CUBES[3])),
-    ];
-}
-
 impl Sigmas for GF128 {
     const SIGMA: [Self; 9] = [
         Self(gfu128_as_m128(UnoptimizedGF128::SIGMA[0])),
@@ -821,18 +804,6 @@ impl Sigmas for GF128 {
         Self(gfu128_as_m128(UnoptimizedGF128::SIGMA[6])),
         Self(gfu128_as_m128(UnoptimizedGF128::SIGMA[7])),
         Self(gfu128_as_m128(UnoptimizedGF128::SIGMA[8])),
-    ];
-
-    const SIGMA_SQUARES: [Self; 9] = [
-        Self(gfu128_as_m128(UnoptimizedGF128::SIGMA_SQUARES[0])),
-        Self(gfu128_as_m128(UnoptimizedGF128::SIGMA_SQUARES[1])),
-        Self(gfu128_as_m128(UnoptimizedGF128::SIGMA_SQUARES[2])),
-        Self(gfu128_as_m128(UnoptimizedGF128::SIGMA_SQUARES[3])),
-        Self(gfu128_as_m128(UnoptimizedGF128::SIGMA_SQUARES[4])),
-        Self(gfu128_as_m128(UnoptimizedGF128::SIGMA_SQUARES[5])),
-        Self(gfu128_as_m128(UnoptimizedGF128::SIGMA_SQUARES[6])),
-        Self(gfu128_as_m128(UnoptimizedGF128::SIGMA_SQUARES[7])),
-        Self(gfu128_as_m128(UnoptimizedGF128::SIGMA_SQUARES[8])),
     ];
 }
 
@@ -1310,23 +1281,6 @@ impl ByteCombineSquaredConstants for GF192 {
     const BYTE_COMBINE_SQ_3: Self = Self(gfu192_as_m256(UnoptimizedGF192::BYTE_COMBINE_SQ_3));
 }
 
-impl Betas for GF192 {
-    const BETA_SQUARES: [Self; 5] = [
-        Self(gfu192_as_m256(UnoptimizedGF192::BETA_SQUARES[0])),
-        Self(gfu192_as_m256(UnoptimizedGF192::BETA_SQUARES[1])),
-        Self(gfu192_as_m256(UnoptimizedGF192::BETA_SQUARES[2])),
-        Self(gfu192_as_m256(UnoptimizedGF192::BETA_SQUARES[3])),
-        Self(gfu192_as_m256(UnoptimizedGF192::BETA_SQUARES[4])),
-    ];
-
-    const BETA_CUBES: [Self; 4] = [
-        Self(gfu192_as_m256(UnoptimizedGF192::BETA_CUBES[0])),
-        Self(gfu192_as_m256(UnoptimizedGF192::BETA_CUBES[1])),
-        Self(gfu192_as_m256(UnoptimizedGF192::BETA_CUBES[2])),
-        Self(gfu192_as_m256(UnoptimizedGF192::BETA_CUBES[3])),
-    ];
-}
-
 impl Sigmas for GF192 {
     const SIGMA: [Self; 9] = [
         Self(gfu192_as_m256(UnoptimizedGF192::SIGMA[0])),
@@ -1338,18 +1292,6 @@ impl Sigmas for GF192 {
         Self(gfu192_as_m256(UnoptimizedGF192::SIGMA[6])),
         Self(gfu192_as_m256(UnoptimizedGF192::SIGMA[7])),
         Self(gfu192_as_m256(UnoptimizedGF192::SIGMA[8])),
-    ];
-
-    const SIGMA_SQUARES: [Self; 9] = [
-        Self(gfu192_as_m256(UnoptimizedGF192::SIGMA_SQUARES[0])),
-        Self(gfu192_as_m256(UnoptimizedGF192::SIGMA_SQUARES[1])),
-        Self(gfu192_as_m256(UnoptimizedGF192::SIGMA_SQUARES[2])),
-        Self(gfu192_as_m256(UnoptimizedGF192::SIGMA_SQUARES[3])),
-        Self(gfu192_as_m256(UnoptimizedGF192::SIGMA_SQUARES[4])),
-        Self(gfu192_as_m256(UnoptimizedGF192::SIGMA_SQUARES[5])),
-        Self(gfu192_as_m256(UnoptimizedGF192::SIGMA_SQUARES[6])),
-        Self(gfu192_as_m256(UnoptimizedGF192::SIGMA_SQUARES[7])),
-        Self(gfu192_as_m256(UnoptimizedGF192::SIGMA_SQUARES[8])),
     ];
 }
 
@@ -1790,23 +1732,6 @@ impl ByteCombineSquaredConstants for GF256 {
     const BYTE_COMBINE_SQ_3: Self = Self(gfu256_as_m256(UnoptimizedGF256::BYTE_COMBINE_SQ_3));
 }
 
-impl Betas for GF256 {
-    const BETA_SQUARES: [Self; 5] = [
-        Self(gfu256_as_m256(UnoptimizedGF256::BETA_SQUARES[0])),
-        Self(gfu256_as_m256(UnoptimizedGF256::BETA_SQUARES[1])),
-        Self(gfu256_as_m256(UnoptimizedGF256::BETA_SQUARES[2])),
-        Self(gfu256_as_m256(UnoptimizedGF256::BETA_SQUARES[3])),
-        Self(gfu256_as_m256(UnoptimizedGF256::BETA_SQUARES[4])),
-    ];
-
-    const BETA_CUBES: [Self; 4] = [
-        Self(gfu256_as_m256(UnoptimizedGF256::BETA_CUBES[0])),
-        Self(gfu256_as_m256(UnoptimizedGF256::BETA_CUBES[1])),
-        Self(gfu256_as_m256(UnoptimizedGF256::BETA_CUBES[2])),
-        Self(gfu256_as_m256(UnoptimizedGF256::BETA_CUBES[3])),
-    ];
-}
-
 impl Sigmas for GF256 {
     const SIGMA: [Self; 9] = [
         Self(gfu256_as_m256(UnoptimizedGF256::SIGMA[0])),
@@ -1818,18 +1743,6 @@ impl Sigmas for GF256 {
         Self(gfu256_as_m256(UnoptimizedGF256::SIGMA[6])),
         Self(gfu256_as_m256(UnoptimizedGF256::SIGMA[7])),
         Self(gfu256_as_m256(UnoptimizedGF256::SIGMA[8])),
-    ];
-
-    const SIGMA_SQUARES: [Self; 9] = [
-        Self(gfu256_as_m256(UnoptimizedGF256::SIGMA_SQUARES[0])),
-        Self(gfu256_as_m256(UnoptimizedGF256::SIGMA_SQUARES[1])),
-        Self(gfu256_as_m256(UnoptimizedGF256::SIGMA_SQUARES[2])),
-        Self(gfu256_as_m256(UnoptimizedGF256::SIGMA_SQUARES[3])),
-        Self(gfu256_as_m256(UnoptimizedGF256::SIGMA_SQUARES[4])),
-        Self(gfu256_as_m256(UnoptimizedGF256::SIGMA_SQUARES[5])),
-        Self(gfu256_as_m256(UnoptimizedGF256::SIGMA_SQUARES[6])),
-        Self(gfu256_as_m256(UnoptimizedGF256::SIGMA_SQUARES[7])),
-        Self(gfu256_as_m256(UnoptimizedGF256::SIGMA_SQUARES[8])),
     ];
 }
 
@@ -2938,16 +2851,7 @@ mod test {
             for (x, y) in zip(F::ALPHA, Fu::ALPHA) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
             }
-            for (x, y) in zip(F::BETA_CUBES, Fu::BETA_CUBES) {
-                assert_eq!(x.as_bytes(), y.as_bytes());
-            }
-            for (x, y) in zip(F::BETA_SQUARES, Fu::BETA_SQUARES) {
-                assert_eq!(x.as_bytes(), y.as_bytes());
-            }
             for (x, y) in zip(F::SIGMA, Fu::SIGMA) {
-                assert_eq!(x.as_bytes(), y.as_bytes());
-            }
-            for (x, y) in zip(F::SIGMA_SQUARES, Fu::SIGMA_SQUARES) {
                 assert_eq!(x.as_bytes(), y.as_bytes());
             }
         }

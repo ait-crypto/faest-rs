@@ -150,15 +150,9 @@ pub(crate) trait Alphas: Sized {
     const ALPHA: [Self; 7];
 }
 
-/// Helper trait that define "betas" for calculating F2 conjugates
-pub(crate) trait Betas: Sized {
-    const BETA_SQUARES: [Self; 5];
-    const BETA_CUBES: [Self; 4];
-}
-
+/// Helper trait that define "sigmas" for calculating Gaolis conjugates
 pub(crate) trait Sigmas: Sized {
     const SIGMA: [Self; 9];
-    const SIGMA_SQUARES: [Self; 9];
 }
 
 /// "Marker" trait for the larger binary Galois fields, i.e., [GF128], [GF192] and [GF256].
@@ -180,7 +174,6 @@ pub(crate) trait BigGaloisField:
     + ByteCombineSquared
     + ByteCombineSquaredConstants
     + SumPoly
-    + Betas
     + Sigmas
     + Debug
 where
