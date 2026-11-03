@@ -74,12 +74,12 @@ fn main() -> Result<(), std::io::Error> {
         api_test::<FAESTEM256fSigningKey, FAESTEM256fSignature>();
 
         // FAEST-s
-        api_test::<FAEST128fSigningKey, FAEST128fSignature>();
-        api_test::<FAESTEM128fSigningKey, FAESTEM128fSignature>();
-        api_test::<FAEST192fSigningKey, FAEST192fSignature>();
-        api_test::<FAESTEM192fSigningKey, FAESTEM192fSignature>();
-        api_test::<FAEST256fSigningKey, FAEST256fSignature>();
-        api_test::<FAESTEM256fSigningKey, FAESTEM256fSignature>();
+        api_test::<FAEST128sSigningKey, FAEST128sSignature>();
+        api_test::<FAESTEM128sSigningKey, FAESTEM128sSignature>();
+        api_test::<FAEST192sSigningKey, FAEST192sSignature>();
+        api_test::<FAESTEM192sSigningKey, FAESTEM192sSignature>();
+        api_test::<FAEST256sSigningKey, FAEST256sSignature>();
+        api_test::<FAESTEM256sSigningKey, FAESTEM256sSignature>();
 
         Ok(())
     }
