@@ -13,7 +13,7 @@ use polynomial::Polynomial;
 
 use crate::{
     fields::{BigGaloisField, Field, FromBit},
-    internal_keys::PublicKey,
+    internal_keys::PublicKeyView,
     parameter::{BaseParameters, OWFField, OWFParameters, QSProof},
     universal_hashing::ZKHasherInit,
     utils::get_bit,
@@ -27,7 +27,7 @@ pub(crate) fn owf_prove<O: OWFParameters>(
     w: &Array<u8, O::LBytes>,
     v: &Array<OWFField<O>, O::L>,
     masks: &[(OWFField<O>, OWFField<O>); 6],
-    pk: &PublicKey<O>,
+    pk: &PublicKeyView<'_, O>,
     chall_2: &Challenge<O>,
 ) -> QSProof<O> {
     let mut hasher = ZKProofHasher::new(
@@ -49,7 +49,7 @@ pub(crate) fn owf_verify<O: OWFParameters>(
     d: &Array<u8, O::LBytes>,
     q: &mut Array<OWFField<O>, O::L>,
     q_bar: &[OWFField<O>; 6],
-    pk: &PublicKey<O>,
+    pk: &PublicKeyView<'_, O>,
     chall_2: &Challenge<O>,
     delta: OWFField<O>,
     a_tilde: &[OWFField<O>; 6],
