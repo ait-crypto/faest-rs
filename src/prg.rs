@@ -5,7 +5,7 @@ use alloc::borrow::ToOwned;
 
 use aes::cipher::{KeyIvInit, StreamCipher};
 use hybrid_array::{
-    Array, ArraySize,
+    Array,
     typenum::{U16, U24, U32},
 };
 #[cfg(feature = "zeroize")]

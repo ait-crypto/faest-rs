@@ -28,7 +28,7 @@ use core::{
 };
 use hybrid_array::{
     Array, ArraySize,
-    typenum::{Diff, Prod, Sum, U1, U2, U8, Unsigned},
+    typenum::{Prod, Sum, U1, U2, U8, Unsigned},
 };
 
 const TWEAK_OFFSET: u32 = 1 << 31;

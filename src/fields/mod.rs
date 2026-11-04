@@ -20,8 +20,7 @@ pub(crate) mod small_fields;
 pub(crate) mod x86_simd_large_fields;
 
 pub(crate) use large_fields::{
-    BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquaredConstants, FromBit,
-    Sigmas, SumPoly,
+    BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquaredConstants, FromBit, Sigmas,
 };
 #[cfg(not(all(
     feature = "opt-simd",
