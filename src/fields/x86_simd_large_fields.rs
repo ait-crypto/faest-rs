@@ -193,47 +193,6 @@ unsafe fn karatsuba_mul_128_uncombined(x: __m128i, y: __m128i) -> [__m128i; 3] {
 }
 
 #[inline]
-#[target_feature(enable = "avx2", enable = "pclmulqdq")]
-unsafe fn karatsuba_square_128_uninterpolated_other_sum(
-    x: __m128i,
-    x_for_sum: __m128i,
-) -> [__m128i; 3] {
-    unsafe {
-        let x0y0 = m128_clmul_ll(x, x);
-        let x1y1 = m128_clmul_hh(x, x);
-        let x1_cat_y0 = _mm_alignr_epi8(x_for_sum, x_for_sum, 8);
-        let xsum = _mm_xor_si128(x_for_sum, x1_cat_y0); // Result in low.
-        let xsum_ysum = m128_clmul_lh(xsum, xsum);
-
-        [x0y0, xsum_ysum, x1y1]
-    }
-}
-
-#[inline]
-#[target_feature(enable = "avx2", enable = "pclmulqdq")]
-unsafe fn karatsuba_square_128_uninterpolated(x: __m128i) -> [__m128i; 3] {
-    unsafe {
-        let x0y0 = m128_clmul_ll(x, x);
-        let x1y1 = m128_clmul_hh(x, x);
-        let x1_cat_y0 = _mm_alignr_epi8(x, x, 8);
-        let xsum = _mm_xor_si128(x, x1_cat_y0); // Result in low.
-        let xsum_ysum = m128_clmul_lh(xsum, xsum);
-
-        [x0y0, xsum_ysum, x1y1]
-    }
-}
-
-#[inline]
-#[target_feature(enable = "avx2", enable = "pclmulqdq")]
-unsafe fn karatsuba_square_128_uncombined(x: __m128i) -> [__m128i; 3] {
-    unsafe {
-        let mut out = karatsuba_square_128_uninterpolated(x);
-        out[1] = _mm_xor_si128(_mm_xor_si128(out[0], out[2]), out[1]);
-        out
-    }
-}
-
-#[inline]
 #[target_feature(enable = "avx2")]
 unsafe fn combine_poly128s_3(v: [__m128i; 3]) -> [__m128i; 2] {
     unsafe {
@@ -517,15 +476,6 @@ unsafe fn square_gf128(lhs: __m128i) -> __m128i {
         let mask = _mm_setr_epi32(-1, 0x0, 0x0, 0x0);
         let tmp3 = m128_clmul_ll(lhs, lhs);
         let tmp6 = m128_clmul_hh(lhs, lhs);
-        let tmp4 = _mm_shuffle_epi32(lhs, _MM_SHUFFLE(1, 0, 3, 2));
-        let tmp4 = _mm_xor_si128(tmp4, lhs);
-        let tmp4 = m128_clmul_ll(tmp4, tmp4);
-        let tmp4 = _mm_xor_si128(tmp4, tmp3);
-        let tmp4 = _mm_xor_si128(tmp4, tmp6);
-        let tmp5 = _mm_slli_si128(tmp4, 8);
-        let tmp4 = _mm_srli_si128(tmp4, 8);
-        let tmp3 = _mm_xor_si128(tmp3, tmp5);
-        let tmp6 = _mm_xor_si128(tmp6, tmp4);
         let tmp7 = _mm_srli_epi32(tmp6, 31);
         let tmp8 = _mm_srli_epi32(tmp6, 30);
         let tmp9 = _mm_srli_epi32(tmp6, 25);
@@ -1038,32 +988,12 @@ unsafe fn square_gf192(lhs: __m256i) -> __m256i {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs, 0);
         let x1 = _mm256_extracti128_si256(lhs, 1);
-
-        let xlow_ylow = m128_clmul_ll(x0, x0);
-        let xhigh_yhigh = m128_clmul_ll(x1, x1);
-
-        let x0x1 = _mm_xor_si128(x0, x1);
-        let x1_cat_y0_plus_y2 = _mm_alignr_epi8(x0x1, x0, 8);
-        let xsum = _mm_xor_si128(x0x1, x1_cat_y0_plus_y2); // Result in low.
-        let ysum = _mm_xor_si128(x0, x1_cat_y0_plus_y2); // Result in high.
-        let xsum_ysum = m128_clmul_lh(xsum, ysum);
-
-        let m = _mm_set_epi64x(0, -1);
-        let xa = _mm_xor_si128(x0, m128_broadcast_low(_mm_and_si128(x1, m)));
-        // Karatsuba multiplication of two degree 1 polynomials (with deg <64 polynomial coefficients).
-        let karatsuba_out = karatsuba_square_128_uninterpolated_other_sum(xa, x0);
-        let xya0 = _mm_xor_si128(karatsuba_out[0], karatsuba_out[2]);
-        let xya1 = _mm_xor_si128(karatsuba_out[0], karatsuba_out[1]);
-
-        let xya0_plus_xsum_ysum = _mm_xor_si128(xya0, xsum_ysum);
-        let combined = [
-            xlow_ylow,
-            _mm_xor_si128(xya0_plus_xsum_ysum, xhigh_yhigh),
-            _mm_xor_si128(xya0_plus_xsum_ysum, xya1),
-            _mm_xor_si128(_mm_xor_si128(xlow_ylow, xsum_ysum), xya1),
-            xhigh_yhigh,
+        let squared = [
+            m128_clmul_ll(x0, x0),
+            m128_clmul_hh(x0, x0),
+            m128_clmul_ll(x1, x1),
         ];
-        poly384_reduce192(combine_poly128s_5(&combined))
+        poly384_reduce192(squared)
     }
 }
 
@@ -1513,20 +1443,13 @@ unsafe fn square_gf256(lhs: __m256i) -> __m256i {
     unsafe {
         let x0 = _mm256_extracti128_si256(lhs, 0);
         let x1 = _mm256_extracti128_si256(lhs, 1);
-        let x0y0 = karatsuba_square_128_uncombined(x0);
-        let x1y1 = karatsuba_square_128_uncombined(x1);
-        let xsum_ysum = karatsuba_square_128_uncombined(_mm_xor_si128(x0, x1));
-        let x0y0_2_plus_x1y1_0 = _mm_xor_si128(x0y0[2], x1y1[0]);
-        let combined = [
-            x0y0[0],
-            x0y0[1],
-            _mm_xor_si128(xsum_ysum[0], _mm_xor_si128(x0y0[0], x0y0_2_plus_x1y1_0)),
-            _mm_xor_si128(xsum_ysum[1], _mm_xor_si128(x0y0[1], x1y1[1])),
-            _mm_xor_si128(xsum_ysum[2], _mm_xor_si128(x1y1[2], x0y0_2_plus_x1y1_0)),
-            x1y1[1],
-            x1y1[2],
+        let squared = [
+            m128_clmul_ll(x0, x0),
+            m128_clmul_hh(x0, x0),
+            m128_clmul_ll(x1, x1),
+            m128_clmul_hh(x1, x1),
         ];
-        poly512_reduce256(combine_poly128s_7(&combined))
+        poly512_reduce256(squared)
     }
 }
 
@@ -2714,6 +2637,37 @@ mod test {
                 assert_eq!(v1, v3);
 
                 assert_eq!(v1 * v1, v1.square());
+            }
+        }
+
+        #[test]
+        fn square<Fu, F: BigGaloisField>()
+        where
+            StandardUniform: Distribution<Fu>,
+            Fu: BigGaloisField<Length = F::Length>,
+        {
+            let check = |bytes: &[u8]| {
+                let reference = Fu::from(bytes);
+                let value = F::from(bytes);
+                assert_eq!(value.square().as_bytes(), (reference * reference).as_bytes());
+                assert_eq!(value.square(), value * value);
+            };
+
+            let mut bytes = Array::<u8, F::Length>::default();
+            check(bytes.as_slice());
+            // Exercise every limb and every reduction boundary independently.
+            for bit in 0..bytes.len() * 8 {
+                bytes[bit / 8] = 1 << (bit % 8);
+                check(bytes.as_slice());
+                bytes[bit / 8] = 0;
+            }
+            bytes.fill(0xff);
+            check(bytes.as_slice());
+
+            let mut rng = rand::rng();
+            for _ in 0..RUNS {
+                let reference: Fu = rng.random();
+                check(reference.as_bytes().as_slice());
             }
         }
 
