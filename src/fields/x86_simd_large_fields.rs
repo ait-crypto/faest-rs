@@ -30,8 +30,8 @@ use super::{
     BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquaredConstants, Double,
     ExtensionField, Field, FromBit, GF64, Sigmas, Square,
     large_fields::{
-        Alphas, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192,
-        GF256 as UnoptimizedGF256, GF576 as UnoptimizedGF576, GF768 as UnoptimizedGF768, Modulus,
+        Alphas, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192, GF256 as UnoptimizedGF256,
+        GF576 as UnoptimizedGF576, GF768 as UnoptimizedGF768, Modulus,
     },
 };
 
@@ -2649,7 +2649,10 @@ mod test {
             let check = |bytes: &[u8]| {
                 let reference = Fu::from(bytes);
                 let value = F::from(bytes);
-                assert_eq!(value.square().as_bytes(), (reference * reference).as_bytes());
+                assert_eq!(
+                    value.square().as_bytes(),
+                    (reference * reference).as_bytes()
+                );
                 assert_eq!(value.square(), value * value);
             };
 

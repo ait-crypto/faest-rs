@@ -9,7 +9,18 @@ use rand_core::CryptoRng;
 use zeroize::Zeroizing;
 
 use crate::{
-    Error, bavc::{BatchVectorCommitment, BavcOpenResult}, declassify, fields::{Field, FromBit}, internal_keys::{PublicKeyView, SecretKey, SecretKeyView, UnpackedSecretKeyView}, parameter::{BaseParameters, FAESTParameters, NMask, OWFField, OWFParameters, TauParameters}, prg::{IV, IVSize}, random_oracles::{Hasher, RandomOracle}, universal_hashing::{VoleHasherInit, VoleHasherProcess}, utils::{Reader, decode_all_chall_3, get_bit, xor_arrays_into}, vole::{VoleCommitmentCRef, VoleCommitmentCRefMut, volecommit, volereconstruct}, zk::{Challenge, owf_prove, owf_verify},
+    Error,
+    bavc::{BatchVectorCommitment, BavcOpenResult},
+    declassify,
+    fields::{Field, FromBit},
+    internal_keys::{PublicKeyView, SecretKey, SecretKeyView, UnpackedSecretKeyView},
+    parameter::{BaseParameters, FAESTParameters, NMask, OWFField, OWFParameters, TauParameters},
+    prg::{IV, IVSize},
+    random_oracles::{Hasher, RandomOracle},
+    universal_hashing::{VoleHasherInit, VoleHasherProcess},
+    utils::{Reader, decode_all_chall_3, get_bit, xor_arrays_into},
+    vole::{VoleCommitmentCRef, VoleCommitmentCRefMut, volecommit, volereconstruct},
+    zk::{Challenge, owf_prove, owf_verify},
 };
 
 type O<P> = <P as FAESTParameters>::OWF;
@@ -555,7 +566,10 @@ mod tests {
             } else {
                 pk.owf_input[0] ^= 1;
             }
-            assert!(faest_verify::<P>(&test_vectors::MESSAGE, &pk.as_view(), fixture.signature).is_err());
+            assert!(
+                faest_verify::<P>(&test_vectors::MESSAGE, &pk.as_view(), fixture.signature)
+                    .is_err()
+            );
         }
 
         // Mutate each signature component
@@ -569,10 +583,9 @@ mod tests {
             layout.iv_pre.start,
             layout.ctr.start,
         ];
-        for pos in positions
-            .into_iter()
-            .chain((0..6).map(|i| layout.a_tilde.start + i * <O<P> as OWFParameters>::LambdaBytes::USIZE))
-        {
+        for pos in positions.into_iter().chain(
+            (0..6).map(|i| layout.a_tilde.start + i * <O<P> as OWFParameters>::LambdaBytes::USIZE),
+        ) {
             let mut sig = fixture.signature.to_vec();
             sig[pos] ^= 1;
             assert!(

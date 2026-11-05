@@ -1,8 +1,8 @@
 use crate::fields::{
     Field,
     large_fields::{
-        Alphas, BigGF, ByteCombineConstants, ByteCombineSquaredConstants, GF128, GF192,
-        GF256, Sigmas,
+        Alphas, BigGF, ByteCombineConstants, ByteCombineSquaredConstants, GF128, GF192, GF256,
+        Sigmas,
     },
 };
 

@@ -1212,7 +1212,6 @@ pub(crate) type BAVC256SmallEM =
     Bavc<RandomOracleShake256, LeafCommitmentEm<PRG256>, Tau256SmallEM>;
 pub(crate) type BAVC256FastEM = Bavc<RandomOracleShake256, LeafCommitmentEm<PRG256>, Tau256FastEM>;
 
-
 // TODO: refactor tests
 #[cfg(test)]
 mod faest_tests {
