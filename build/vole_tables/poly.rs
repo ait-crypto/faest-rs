@@ -100,7 +100,7 @@ pub fn irreducible(f: &Poly) -> bool {
     let mut v = n;
     let mut d = 2;
     while d * d <= v {
-        while v % d == 0 {
+        while v.is_multiple_of(d) {
             factors.insert(d);
             v /= d;
         }

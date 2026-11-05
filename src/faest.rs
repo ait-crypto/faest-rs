@@ -264,6 +264,7 @@ fn check_challenge_3<P: FAESTParameters>(challenge: &[u8]) -> bool {
 
 /// Transpose the witness once into field rows
 /// TODO: use optimize matrix transpose
+#[allow(clippy::type_complexity)]
 fn witness_rows<P: FAESTParameters>(
     columns: &Array<Array<u8, <O<P> as OWFParameters>::LBytes>, <O<P> as OWFParameters>::Lambda>,
 ) -> Box<Array<F<P>, <O<P> as OWFParameters>::L>> {

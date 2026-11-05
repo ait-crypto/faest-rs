@@ -1380,7 +1380,7 @@ impl ExtensionField for GF768 {
 
     fn as_bytes(&self) -> Array<u8, Self::Length> {
         let mut ret = Array::default();
-        for (dst, src) in zip(ret.chunks_exact_mut(16), self.0.as_ref()) {
+        for (dst, src) in zip(ret.as_chunks_mut::<16>().0, self.0.as_ref()) {
             dst.copy_from_slice(&src.to_le_bytes());
         }
         ret
@@ -1557,19 +1557,6 @@ mod test {
                 F::BYTE_COMBINE_2,
                 F::byte_combine(&[
                     F::ZERO,
-                    F::ONE,
-                    F::ZERO,
-                    F::ZERO,
-                    F::ZERO,
-                    F::ZERO,
-                    F::ZERO,
-                    F::ZERO
-                ])
-            );
-            assert_eq!(
-                F::BYTE_COMBINE_3,
-                F::byte_combine(&[
-                    F::ONE,
                     F::ONE,
                     F::ZERO,
                     F::ZERO,

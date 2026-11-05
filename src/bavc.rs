@@ -66,6 +66,7 @@ pub(crate) trait LeafCommit {
 
     fn init<RO: RandomOracle>(iv: &IV) -> Self::Context;
 
+    #[allow(clippy::type_complexity)]
     fn commit(
         r: &Array<u8, Self::LambdaBytes>,
         iv: &IV,

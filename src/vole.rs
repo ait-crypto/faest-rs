@@ -311,6 +311,7 @@ fn convert_to_vole<'a, BAVC: BatchVectorCommitment, LHatBytes: ArraySize>(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn volecommit<P: FAESTParameters>(
     mut c: VoleCommitmentCRefMut<<P::OWF as OWFParameters>::LBytes>,
     c_mult: &mut [u8],
@@ -475,6 +476,7 @@ pub(crate) fn volecommit<P: FAESTParameters>(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn volereconstruct<P: FAESTParameters>(
     chall: &Array<u8, <P::BAVC as BatchVectorCommitment>::LambdaBytes>,
     decom_i: &BavcOpenResult,
@@ -561,8 +563,8 @@ pub fn volereconstruct<P: FAESTParameters>(
         for i in 0..tau {
             // line 19
             let di = P::Tau::bavc_max_node_depth(i);
-            let mut columns = &mut raw_q[offset..offset + di];
-            let reduced = tree_product_share(&mut columns, ell_m, tables.tree_moduli[i]);
+            let columns = &raw_q[offset..offset + di];
+            let reduced = tree_product_share(columns, ell_m, tables.tree_moduli[i]);
             insert_bit_slice(&mut r_tilde[m], offset, reduced, di as u32);
             offset += di;
         }

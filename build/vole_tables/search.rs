@@ -47,7 +47,7 @@ impl Generator {
             .entry(d)
             .or_insert_with(|| {
                 ((1usize << d) | 1..1usize << (d + 1))
-                    .map(|f| Poly::from(f))
+                    .map(Poly::from)
                     .filter(irreducible)
                     .collect()
             })
@@ -175,10 +175,10 @@ impl Generator {
                 }
             }
             let pools = (2..n).map(|d| (d, self.irreducibles(d))).collect();
-            if let Some((c, p)) = self.search(2 * n - 1, n - 1, n - 1, &pools) {
-                if best.as_ref().is_none_or(|(b, _)| c < *b) {
-                    best = Some((c, Plan::Crt(p)));
-                }
+            if let Some((c, p)) = self.search(2 * n - 1, n - 1, n - 1, &pools)
+                && best.as_ref().is_none_or(|(b, _)| c < *b)
+            {
+                best = Some((c, Plan::Crt(p)));
             }
         }
         let best = best.expect("full_cost failed");

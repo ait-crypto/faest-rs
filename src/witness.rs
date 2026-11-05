@@ -30,7 +30,7 @@ pub(crate) fn extend_witness<O: OWFParameters>(
 
     if !O::IS_EM {
         // line 8
-        append_bytes(&mut witness, &mut offset, &owf_key);
+        append_bytes(&mut witness, &mut offset, owf_key);
         save_non_lin_bits::<O>(&mut witness, &k_bar, &mut offset);
     } else {
         // line 18
@@ -67,7 +67,7 @@ where
         // SAFETY: unwraps don't panic beacause AES BatchBlock is converted to 8 x 4-byte arrays
         if O::NK::USIZE != 6 || j % 3 == 0 {
             let inside = convert_from_batchblocks(inv_bitslice(&kb[8 * j..8 * (j + 1)]))
-                .nth(0)
+                .next()
                 .unwrap();
             append_bytes(witness, offset, &inside);
         } else if j % 3 == 1 {

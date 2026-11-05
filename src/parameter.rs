@@ -72,11 +72,6 @@ pub(crate) mod x86_simd {
     pub(crate) type FAESTEM256sParameters = super::FAESTEM256sParameters<GF256>;
 }
 
-/// Extract base field from OWF parameters
-// pub(crate) type OWFField<O> = <<O as OWFParameters>::BaseParams as BaseParameters>::Field;
-
-/// Witness for the secret key
-// pub(crate) type Witness<O> = Box<Array<u8, <O as OWFParameters>::LBytes>>;
 pub(crate) trait SecurityParameter:
     ArraySize
     + Add<Self, Output: ArraySize>

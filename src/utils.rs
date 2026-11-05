@@ -53,7 +53,7 @@ pub(crate) fn extract_bit_slice(src: &[u8], offset: usize, bits: u32) -> u16 {
     if bit_offset + bits as usize > 16 {
         value |= (src[byte_idx + 2] as u32) << (16 - bit_offset);
     }
-    return (value & ((1u32 << bits) - 1)) as u16;
+    (value & ((1u32 << bits) - 1)) as u16
 }
 
 pub(crate) fn insert_bit_slice(dst: &mut [u8], offset: usize, value: u16, bits: u32) {

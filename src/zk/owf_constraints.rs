@@ -111,7 +111,9 @@ where
         key,
         ske(O::R::USIZE, O::NSt::USIZE, O::NK::USIZE),
     )
-    .chunks_exact(32)
+    .as_chunks::<32>()
+    .0
+    .iter()
     .take(O::R::USIZE + 1)
     .map(|chunk| {
         let mut commitment = ByteCommits::<OWFField<O>, O::NStBytes>::default();

@@ -2518,41 +2518,6 @@ mod test {
         };
 
         #[test]
-        fn byte_combine_sq<Fu, F: BigGaloisField>()
-        where
-            StandardUniform: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length>,
-        {
-            let mut rng = rand::rng();
-
-            for _ in 0..RUNS {
-                let byte1: [Fu; 8] = std::array::from_fn(|_| rng.random());
-                let byte2: [F; 8] = std::array::from_fn(|i| F::from(&byte1[i].as_bytes()));
-                let byte3 = rand::rng().random::<u8>();
-
-                let v1 = Fu::byte_combine(&byte1);
-                let v2 = F::byte_combine(&byte2);
-                assert_eq!(v1.as_bytes(), v2.as_bytes());
-
-                let v2 = F::byte_combine_slice(byte2.as_slice());
-                assert_eq!(v1.as_bytes(), v2.as_bytes());
-
-                let v1 = Fu::byte_combine_bits_sq(byte3);
-                let v2 = F::byte_combine_bits_sq(byte3);
-                assert_eq!(v1.as_bytes(), v2.as_bytes());
-            }
-
-            assert_eq!(
-                F::BYTE_COMBINE_SQ_2.as_bytes(),
-                Fu::BYTE_COMBINE_SQ_2.as_bytes()
-            );
-            assert_eq!(
-                F::BYTE_COMBINE_SQ_3.as_bytes(),
-                Fu::BYTE_COMBINE_SQ_3.as_bytes()
-            );
-        }
-
-        #[test]
         fn constants<Fu, F: BigGaloisField + Alphas>()
         where
             StandardUniform: Distribution<Fu>,

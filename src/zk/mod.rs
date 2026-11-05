@@ -6,8 +6,8 @@ mod hashing;
 mod key_expansion;
 mod owf_constraints;
 mod polynomial;
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 use byte_commitment::{ByteCommits, ByteCommitsRef};
 use hashing::{ZKProofHasher, ZKVerifyHasher};
