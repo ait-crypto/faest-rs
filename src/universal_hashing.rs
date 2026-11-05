@@ -126,12 +126,8 @@ where
         );
 
         ZKHasher {
-            h0: F::ZERO,
-            h1: F::ZERO,
-            s,
-            t,
-            r0,
-            r1,
+            state: ZKHashState::default(),
+            parameters: ZKHashParameters { s, t, r0, r1 },
         }
     }
 }
@@ -152,12 +148,42 @@ pub(crate) struct ZKHasher<F>
 where
     F: BigGaloisField,
 {
+    pub(crate) state: ZKHashState<F>,
+    pub(crate) parameters: ZKHashParameters<F>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ZKHashState<F> {
     h0: F,
     h1: F,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ZKHashParameters<F> {
     s: F,
     t: GF64,
     r0: F,
     r1: F,
+}
+
+impl<F: BigGaloisField> Default for ZKHashState<F> {
+    fn default() -> Self {
+        Self {
+            h0: F::ZERO,
+            h1: F::ZERO,
+        }
+    }
+}
+
+impl<F: BigGaloisField> ZKHashState<F> {
+    pub(crate) fn update(&mut self, parameters: &ZKHashParameters<F>, v: &F) {
+        self.h0 = self.h0 * parameters.s + v;
+        self.h1 = self.h1 * parameters.t + v;
+    }
+
+    pub(crate) fn finalize(self, parameters: &ZKHashParameters<F>, x1: &F) -> F {
+        parameters.r0 * self.h0 + parameters.r1 * self.h1 + x1
+    }
 }
 
 impl<F> ZKHasherInit<F> for ZKHasher<F>
@@ -174,12 +200,11 @@ where
     F: BigGaloisField,
 {
     fn update(&mut self, v: &F) {
-        self.h0 = (self.h0 * self.s) + v;
-        self.h1 = (self.h1 * self.t) + v;
+        self.state.update(&self.parameters, v);
     }
 
     fn finalize(self, x1: &F) -> F {
-        (self.r0 * self.h0) + (self.r1 * self.h1) + x1
+        self.state.finalize(&self.parameters, x1)
     }
 }
 

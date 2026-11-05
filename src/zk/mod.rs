@@ -1,24 +1,25 @@
 mod aes;
+mod algebra;
 mod byte_commitment;
 mod encryption;
 mod hashing;
 mod key_expansion;
 mod owf_constraints;
 mod polynomial;
+#[cfg(test)]
+mod tests;
 
 use byte_commitment::{ByteCommits, ByteCommitsRef};
-use hashing::{ConstraintHasher, ZKProofHasher, ZKVerifyHasher};
+use hashing::{ZKProofHasher, ZKVerifyHasher};
 use owf_constraints::owf_constraints;
-use polynomial::Polynomial;
 
 use crate::{
-    fields::{BigGaloisField, Field, FromBit},
     internal_keys::PublicKeyView,
     parameter::{BaseParameters, OWFField, OWFParameters, QSProof},
     universal_hashing::ZKHasherInit,
     utils::get_bit,
 };
-use hybrid_array::{Array, ArraySize, typenum::Unsigned};
+use hybrid_array::{Array, typenum::Unsigned};
 
 pub(crate) type Challenge<O> =
     Array<u8, <<O as OWFParameters>::BaseParams as BaseParameters>::Chall>;
@@ -34,7 +35,7 @@ pub(crate) fn owf_prove<O: OWFParameters>(
         <O::BaseParams as BaseParameters>::ZKHasher::new_zk_hasher(chall_2),
     );
     // lines 2-3 + lift (line 9)
-    bit_constraints(&mut hasher, v, |i| OWFField::<O>::from_bit(get_bit(w, i)));
+    hasher.hash_bit_constraints(v);
 
     // line 11
     owf_constraints::<O>(&mut hasher, ByteCommitsRef::from_slices(w, v), pk);
@@ -65,7 +66,7 @@ pub(crate) fn owf_verify<O: OWFParameters>(
     }
 
     // line 9
-    bit_constraints(&mut hasher, q, |_| OWFField::<O>::ZERO);
+    hasher.hash_bit_constraints(q);
 
     // line 11
     let zero = Array::<u8, O::LBytes>::default();
@@ -74,17 +75,4 @@ pub(crate) fn owf_verify<O: OWFParameters>(
 
     // lines 5,14-16
     hasher.finalize(q_bar, a_tilde)
-}
-
-fn bit_constraints<F: BigGaloisField>(
-    hasher: &mut impl ConstraintHasher<F>,
-    tags: &[F],
-    key: impl Fn(usize) -> F,
-) {
-    for (i, &tag) in tags.iter().enumerate() {
-        // line 9
-        let w_i = Polynomial::from_key_tag(key(i), tag);
-        let one = Polynomial::constant(F::ONE).lift(1);
-        hasher.hash_constraint((w_i * (one + &w_i)).lift(7));
-    }
 }
