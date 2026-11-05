@@ -1195,202 +1195,101 @@ pub(crate) type BAVC256SmallEM =
     Bavc<RandomOracleShake256, LeafCommitmentEm<PRG256>, Tau256SmallEM>;
 pub(crate) type BAVC256FastEM = Bavc<RandomOracleShake256, LeafCommitmentEm<PRG256>, Tau256FastEM>;
 
-// TODO: refactor tests
 #[cfg(test)]
-mod faest_tests {
+mod test {
     use super::*;
 
-    fn check<P: FAESTParameters>(signature_size: usize) {
-        let lambda = <P::OWF as OWFParameters>::Lambda::USIZE;
-        let lambda_bytes = <P::OWF as OWFParameters>::LambdaBytes::USIZE;
-        let tau = <P::Tau as TauParameters>::Tau::USIZE;
-        let tau0 = <P::Tau as TauParameters>::Tau0::USIZE;
-        let tau1 = <P::Tau as TauParameters>::Tau1::USIZE;
-        let k = <P::Tau as TauParameters>::K::USIZE;
-        let tables = <P::Tau as TauParameters>::VOLE_TABLES;
+    mod faest_tests {
+        use super::*;
 
-        assert_eq!(NMask::USIZE, 10);
-        assert_eq!(P::SIGNATURE_SIZE, signature_size);
-        assert_eq!(tables.lambda, lambda);
-        assert_eq!(tables.tau, tau);
-        assert_eq!(tables.grinding_bits, P::WGRIND::USIZE);
-        assert_eq!(tau0 + tau1, tau);
-        assert_eq!(tau0 * (k - 1) + tau1 * k + P::WGRIND::USIZE, lambda);
-        assert_eq!(
-            <P::Tau as TauParameters>::L,
-            tau0 * (1 << (k - 1)) + tau1 * (1 << k)
-        );
+        fn check_faest_params<P: FAESTParameters>(signature_size: usize) {
+            let lambda = <P::OWF as OWFParameters>::Lambda::USIZE;
+            let lambda_bytes = <P::OWF as OWFParameters>::LambdaBytes::USIZE;
+            let tau = <P::Tau as TauParameters>::Tau::USIZE;
+            let tau0 = <P::Tau as TauParameters>::Tau0::USIZE;
+            let tau1 = <P::Tau as TauParameters>::Tau1::USIZE;
+            let k = <P::Tau as TauParameters>::K::USIZE;
+            let tables = <P::Tau as TauParameters>::VOLE_TABLES;
 
-        // v3 signature layout: c, c_mult, u_tilde, d, a1..a6,
-        // BAVC opening, challenge, IV, and counter (faest-ref/faest_impl.c).
-        assert_eq!(
-            P::SIGNATURE_SIZE,
-            tau * <P::OWF as OWFParameters>::LBytes::USIZE
-                + NMask::USIZE * tables.gates.div_ceil(8)
-                + (4 + 6 + 1) * lambda_bytes
-                + P::get_decom_size()
-                + 16
-                + 4
-        );
+            assert_eq!(NMask::USIZE, 10);
+            assert_eq!(P::SIGNATURE_SIZE, signature_size);
+            assert_eq!(tables.lambda, lambda);
+            assert_eq!(tables.tau, tau);
+            assert_eq!(tables.grinding_bits, P::WGRIND::USIZE);
+            assert_eq!(tau0 + tau1, tau);
+            assert_eq!(tau0 * (k - 1) + tau1 * k + P::WGRIND::USIZE, lambda);
+            assert_eq!(
+                <P::Tau as TauParameters>::L,
+                tau0 * (1 << (k - 1)) + tau1 * (1 << k)
+            );
+
+            assert_eq!(
+                P::SIGNATURE_SIZE,
+                tau * <P::OWF as OWFParameters>::LBytes::USIZE
+                    + NMask::USIZE * tables.gates.div_ceil(8)
+                    + (4 + 6 + 1) * lambda_bytes
+                    + P::get_decom_size()
+                    + 16
+                    + 4
+            );
+        }
+
+        #[test]
+        fn faest_parameter_sets() {
+            // Signature sizes from Table 9.3
+            check_faest_params::<FAEST128sParameters>(4066);
+            check_faest_params::<FAEST128fParameters>(5170);
+            check_faest_params::<FAEST192sParameters>(9410);
+            check_faest_params::<FAEST192fParameters>(11738);
+            check_faest_params::<FAEST256sParameters>(16626);
+            check_faest_params::<FAEST256fParameters>(20856);
+            check_faest_params::<FAESTEM128sParameters>(3466);
+            check_faest_params::<FAESTEM128fParameters>(4170);
+            check_faest_params::<FAESTEM192sParameters>(7874);
+            check_faest_params::<FAESTEM192fParameters>(9818);
+            check_faest_params::<FAESTEM256sParameters>(14554);
+            check_faest_params::<FAESTEM256fParameters>(18084);
+        }
     }
 
-    #[test]
-    fn v3_parameter_sets() {
-        // Signature sizes from faest-ref/meson.build.
-        check::<FAEST128sParameters>(4066);
-        check::<FAEST128fParameters>(5170);
-        check::<FAEST192sParameters>(9410);
-        check::<FAEST192fParameters>(11738);
-        check::<FAEST256sParameters>(16626);
-        check::<FAEST256fParameters>(20856);
-        check::<FAESTEM128sParameters>(3466);
-        check::<FAESTEM128fParameters>(4170);
-        check::<FAESTEM192sParameters>(7874);
-        check::<FAESTEM192fParameters>(9818);
-        check::<FAESTEM256sParameters>(14554);
-        check::<FAESTEM256fParameters>(18084);
+    mod owf_tests {
+        use super::*;
+
+        fn check_owf_params<O: OWFParameters>(expected: [usize; 13]) {
+            assert_eq!(
+                [
+                    O::Lambda::USIZE,
+                    O::NK::USIZE,
+                    O::NSt::USIZE,
+                    O::NStBytes::USIZE,
+                    O::NStBits::USIZE,
+                    O::Beta::USIZE,
+                    O::R::USIZE,
+                    O::SKe::USIZE,
+                    O::SEnc::USIZE,
+                    O::LKe::USIZE,
+                    O::LEnc::USIZE,
+                    O::L::USIZE,
+                    O::C::USIZE,
+                ],
+                expected
+            );
+            assert_eq!(O::LBytes::USIZE * 8, O::L::USIZE);
+            assert_eq!(O::LKeBytes::USIZE * 8, O::LKe::USIZE);
+            assert_eq!(O::LEncBytes::USIZE * 8, O::LEnc::USIZE);
+            assert_eq!(O::SK::USIZE, O::LambdaBytes::USIZE + O::InputSize::USIZE);
+            assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::OutputSize::USIZE);
+        }
+
+        #[test]
+        fn owf_parameter_sets() {
+            // Columns follow Table 3.3
+            check_owf_params::<OWF128>([128, 4, 4, 16, 128, 1, 10, 40, 160, 448, 512, 960, 1121]);
+            check_owf_params::<OWF192>([192, 6, 4, 16, 128, 2, 12, 32, 192, 448, 640, 1728, 1985]);
+            check_owf_params::<OWF256>([256, 8, 4, 16, 128, 2, 14, 52, 224, 672, 768, 2208, 2537]);
+            check_owf_params::<OWF128EM>([128, 4, 4, 16, 128, 1, 10, 0, 160, 128, 512, 640, 721]);
+            check_owf_params::<OWF192EM>([192, 6, 6, 24, 192, 1, 12, 0, 288, 192, 960, 1152, 1297]);
+            check_owf_params::<OWF256EM>([256, 8, 8, 32, 256, 1, 14, 0, 448, 256, 1536, 1792, 2017]);
+        }
     }
 }
-
-#[cfg(test)]
-mod owf_tests {
-    use super::*;
-
-    fn check<O: OWFParameters>(expected: [usize; 13]) {
-        assert_eq!(
-            [
-                O::Lambda::USIZE,
-                O::NK::USIZE,
-                O::NSt::USIZE,
-                O::NStBytes::USIZE,
-                O::NStBits::USIZE,
-                O::Beta::USIZE,
-                O::R::USIZE,
-                O::SKe::USIZE,
-                O::SEnc::USIZE,
-                O::LKe::USIZE,
-                O::LEnc::USIZE,
-                O::L::USIZE,
-                O::C::USIZE,
-            ],
-            expected
-        );
-        assert_eq!(O::LBytes::USIZE * 8, O::L::USIZE);
-        assert_eq!(O::LKeBytes::USIZE * 8, O::LKe::USIZE);
-        assert_eq!(O::LEncBytes::USIZE * 8, O::LEnc::USIZE);
-        assert_eq!(O::SK::USIZE, O::LambdaBytes::USIZE + O::InputSize::USIZE);
-        assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::OutputSize::USIZE);
-    }
-
-    #[test]
-    fn v3_table_3_3() {
-        // Columns follow Table 3.3, including the total constraint count C.
-        check::<OWF128>([128, 4, 4, 16, 128, 1, 10, 40, 160, 448, 512, 960, 1121]);
-        check::<OWF192>([192, 6, 4, 16, 128, 2, 12, 32, 192, 448, 640, 1728, 1985]);
-        check::<OWF256>([256, 8, 4, 16, 128, 2, 14, 52, 224, 672, 768, 2208, 2537]);
-        check::<OWF128EM>([128, 4, 4, 16, 128, 1, 10, 0, 160, 128, 512, 640, 721]);
-        check::<OWF192EM>([192, 6, 6, 24, 192, 1, 12, 0, 288, 192, 960, 1152, 1297]);
-        check::<OWF256EM>([256, 8, 8, 32, 256, 1, 14, 0, 448, 256, 1536, 1792, 2017]);
-    }
-}
-
-// #[cfg(test)]
-// mod test {
-//     use super::*;
-
-//     #[generic_tests::define]
-//     mod owf_parameters {
-//         use super::*;
-
-//         #[test]
-//         fn lambda<O: OWFParameters>() {
-//             assert!(O::Lambda::USIZE == 128 || O::Lambda::USIZE == 192 || O::Lambda::USIZE == 256);
-//             assert_eq!(O::LambdaBytes::USIZE * 8, O::Lambda::USIZE);
-//         }
-
-//         #[test]
-//         fn pk_sk_size<O: OWFParameters>() {
-//             assert_eq!(O::SK::USIZE, O::InputSize::USIZE + O::LambdaBytes::USIZE);
-//             assert_eq!(O::PK::USIZE, O::InputSize::USIZE + O::OutputSize::USIZE);
-//         }
-
-//         #[test]
-//         fn owf_parameters<O: OWFParameters>() {
-//             assert_eq!(O::LKe::USIZE % 8, 0);
-//             assert_eq!(O::LKeBytes::USIZE * 8, O::LKe::USIZE);
-//             assert_eq!(O::LEnc::USIZE % 8, 0);
-//             assert_eq!(O::L::USIZE % 8, 0);
-//             assert_eq!(O::LBytes::USIZE * 8, O::L::USIZE);
-//         }
-
-//         #[instantiate_tests(<OWF128>)]
-//         mod owf_128 {}
-
-//         #[instantiate_tests(<OWF192>)]
-//         mod owf_192 {}
-
-//         #[instantiate_tests(<OWF256>)]
-//         mod owf_256 {}
-
-//         #[instantiate_tests(<OWF128EM>)]
-//         mod owf_em_128 {}
-
-//         #[instantiate_tests(<OWF192EM>)]
-//         mod owf_em_192 {}
-
-//         #[instantiate_tests(<OWF256EM>)]
-//         mod owf_em_256 {}
-//     }
-
-//     #[generic_tests::define]
-//     mod faest_parameters {
-//         use super::*;
-
-//         #[test]
-//         fn tau_config<P: FAESTParameters>() {
-//             assert_eq!(
-//                 <P::OWF as OWFParameters>::Lambda::USIZE,
-//                 <P::Tau as TauParameters>::Tau1::USIZE * <P::Tau as TauParameters>::K::USIZE
-//                     + <P::Tau as TauParameters>::Tau0::USIZE
-//                         * (<P::Tau as TauParameters>::K::USIZE - 1)
-//                     + P::WGRIND::USIZE
-//             );
-//         }
-
-//         #[instantiate_tests(<FAEST128fParameters>)]
-//         mod faest_128f {}
-
-//         #[instantiate_tests(<FAEST128sParameters>)]
-//         mod faest_128s {}
-
-//         #[instantiate_tests(<FAEST192fParameters>)]
-//         mod faest_192f {}
-
-//         #[instantiate_tests(<FAEST192sParameters>)]
-//         mod faest_192s {}
-
-//         #[instantiate_tests(<FAEST256fParameters>)]
-//         mod faest_256f {}
-
-//         #[instantiate_tests(<FAEST256sParameters>)]
-//         mod faest_256s {}
-
-//         #[instantiate_tests(<FAESTEM128fParameters>)]
-//         mod faest_em_128f {}
-
-//         #[instantiate_tests(<FAESTEM128sParameters>)]
-//         mod faest_em_128s {}
-
-//         #[instantiate_tests(<FAESTEM192fParameters>)]
-//         mod faest_em_192f {}
-
-//         #[instantiate_tests(<FAESTEM192sParameters>)]
-//         mod faest_em_192s {}
-
-//         #[instantiate_tests(<FAESTEM256fParameters>)]
-//         mod faest_em_256f {}
-
-//         #[instantiate_tests(<FAESTEM256sParameters>)]
-//         mod faest_em_256s {}
-//     }
-// }
