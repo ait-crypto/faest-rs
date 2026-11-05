@@ -15,7 +15,7 @@ use crate::{
     random_oracles::{Hasher, RandomOracle},
     utils::{
         Reader, bit_word_mask, decode_all_chall_3, extract_bit_slice, get_bit, insert_bit_slice,
-        load_u64, set_bit, xor_arrays, xor_arrays_inplace,
+        load_u64, set_bit, xor_arrays_inplace,
     },
     vole::tables::{PackedMatrix, VoleTables},
 };
@@ -81,10 +81,6 @@ impl<LBytes: ArraySize> Index<usize> for VoleCommitmentCRef<'_, LBytes> {
 impl<'a, LBytes: ArraySize> VoleCommitmentCRef<'a, LBytes> {
     pub(crate) fn new(buffer: &'a [u8]) -> Self {
         Self(buffer, PhantomData)
-    }
-
-    pub(crate) fn as_slice(&self) -> &[u8] {
-        self.0
     }
 }
 

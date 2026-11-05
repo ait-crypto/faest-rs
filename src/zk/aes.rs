@@ -1,154 +1,20 @@
-use core::{iter::zip, mem, ops::Mul};
+use core::{iter::zip, ops::Mul};
 
-#[cfg(not(feature = "std"))]
-use alloc::{borrow::ToOwned, boxed::Box};
-
-use hybrid_array::{Array, ArraySize, typenum::U8};
+use hybrid_array::{ArraySize, typenum::U8};
 
 use super::{ByteCommits, ByteCommitsRef};
-use crate::{
-    aes::*,
-    fields::{BigGaloisField, ByteCombine},
-    parameter::{OWFField, OWFParameters, SecurityParameter},
-    utils::xor_arrays_inplace,
-};
+use crate::{fields::BigGaloisField, parameter::SecurityParameter, utils::xor_arrays_inplace};
 
-// Scalar commitments to known state
-impl<O, L> StateToBytes<O> for Array<u8, L>
-where
-    L: ArraySize + Mul<U8, Output: ArraySize>,
-    O: OWFParameters,
-{
-    type Output = Box<Array<OWFField<O>, O::NStBytes>>;
-
-    fn state_to_bytes(&self) -> Self::Output {
-        Box::new(
-            self.iter()
-                .map(|&k| OWFField::<O>::byte_combine_bits(k))
-                .collect(),
-        )
-    }
-}
-
-// Implementations of AddRound key
-
-// Known state, owned hidden key
-impl<F, L> AddRoundKey<&Array<u8, L>> for ByteCommits<F, L>
+impl<F, L> ByteCommits<F, L>
 where
     L: ArraySize + Mul<U8, Output: ArraySize>,
     F: BigGaloisField,
 {
-    type Output = Self;
-
-    fn add_round_key(&self, rhs: &Array<u8, L>) -> Self::Output {
-        Self::new(
-            Box::new(zip(self.keys.iter(), rhs).map(|(a, b)| a ^ b).collect()),
-            self.tags.to_owned(),
-        )
-    }
-}
-
-// Known state, ref to hidden key
-impl<F, L> AddRoundKey<&Array<u8, L>> for ByteCommitsRef<'_, F, L>
-where
-    L: ArraySize + Mul<U8, Output: ArraySize>,
-    F: BigGaloisField,
-{
-    type Output = ByteCommits<F, L>;
-
-    fn add_round_key(&self, rhs: &Array<u8, L>) -> Self::Output {
-        ByteCommits {
-            keys: Box::new(zip(self.keys, rhs).map(|(a, b)| a ^ b).collect()),
-            tags: Box::new(self.tags.to_owned()),
-        }
-    }
-}
-
-// Committed state, ref to hidden known key
-impl<F, L> AddRoundKey<&ByteCommitsRef<'_, F, L>> for &Array<u8, L>
-where
-    L: ArraySize + Mul<U8, Output: ArraySize>,
-    F: BigGaloisField,
-{
-    type Output = ByteCommits<F, L>;
-
-    fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
-        ByteCommits {
-            keys: Box::new(zip(self.iter(), rhs.keys).map(|(a, b)| a ^ b).collect()),
-            tags: Box::new(rhs.tags[..L::USIZE * 8].iter().cloned().collect()),
-        }
-    }
-}
-
-// Committed state, hidden key
-impl<F, L> AddRoundKey<&ByteCommitsRef<'_, F, L>> for ByteCommits<F, L>
-where
-    L: ArraySize + Mul<U8, Output: ArraySize>,
-    F: BigGaloisField,
-{
-    type Output = Self;
-
-    fn add_round_key(&self, rhs: &ByteCommitsRef<'_, F, L>) -> Self::Output {
-        Self {
-            keys: Box::new(
-                zip(self.keys.iter(), rhs.keys)
-                    .map(|(a, b)| a ^ b)
-                    .collect(),
-            ),
-            tags: Box::new(
-                zip(self.tags.iter(), rhs.tags)
-                    .map(|(&a, b)| a + b)
-                    .collect(),
-            ),
-        }
-    }
-}
-
-// Implementations for AddRoundKeyAssign
-
-// Known state, hidden key
-impl<F, L> AddRoundKeyAssign<&Array<u8, L>> for ByteCommits<F, L>
-where
-    L: ArraySize + Mul<U8, Output: ArraySize>,
-    F: BigGaloisField,
-{
-    fn add_round_key_assign(&mut self, rhs: &Array<u8, L>) {
-        xor_arrays_inplace(self.keys.as_mut_slice(), rhs.as_slice());
-    }
-}
-
-// Committed state, hidden key
-impl<F, L> AddRoundKeyAssign<&ByteCommitsRef<'_, F, L>> for ByteCommits<F, L>
-where
-    L: ArraySize + Mul<U8, Output: ArraySize>,
-    F: BigGaloisField,
-{
-    fn add_round_key_assign(&mut self, rhs: &ByteCommitsRef<'_, F, L>) {
+    /// Add a committed round key to the state in place.
+    pub(super) fn add_round_key_assign(&mut self, rhs: &ByteCommitsRef<'_, F, L>) {
         xor_arrays_inplace(self.keys.as_mut_slice(), rhs.keys.as_slice());
         for (a, b) in zip(self.tags.iter_mut(), rhs.tags.iter()) {
             *a += b;
-        }
-    }
-}
-
-impl<T, L> ShiftRows for Array<T, L>
-where
-    T: Clone,
-    L: ArraySize,
-{
-    fn shift_rows(&mut self) {
-        // TODO: Copy row by row instead of entire state
-        let mut tmp = self.clone();
-        let nst = L::USIZE / 4;
-
-        for r in 0..4 {
-            for c in 0..nst {
-                let off = if (nst != 8) || (r <= 1) { 0 } else { 1 };
-                mem::swap(
-                    &mut self[4 * c + r],
-                    &mut tmp[4 * ((c + r + off) % nst) + r],
-                );
-            }
         }
     }
 }
@@ -231,31 +97,12 @@ where
     }
 }
 
-impl<O: OWFParameters> InverseShiftRows<O> for ByteCommitsRef<'_, OWFField<O>, O::NStBytes> {
-    type Output = ByteCommits<OWFField<O>, O::NStBytes>;
-    fn inverse_shift_rows(&self) -> Self::Output {
-        let mut output = ByteCommits::default();
-        self.inverse_shift_rows_into(&mut output);
-        output
-    }
-}
-
-impl<O: OWFParameters> BytewiseMixColumns<O> for ByteCommitsRef<'_, OWFField<O>, O::NStBytes> {
-    type Output = ByteCommits<OWFField<O>, O::NStBytes>;
-    fn bytewise_mix_columns(&self) -> Self::Output {
-        let mut output = ByteCommits::default();
-        self.bytewise_mix_columns_into(&mut output);
-        output
-    }
-}
-
-/// FAEST v3 Figure 7.6.
-impl<F, L> InverseAffine for ByteCommits<F, L>
+impl<F, L> ByteCommits<F, L>
 where
     F: BigGaloisField,
     L: SecurityParameter,
 {
-    fn inverse_affine(&mut self) {
+    pub(super) fn inverse_affine(&mut self) {
         for i in 0..L::USIZE {
             // ::5
             self.keys[i] = self.keys[i].rotate_right(7)

@@ -172,7 +172,6 @@ pub(crate) trait BigGaloisField:
     + ByteCombineConstants
     + SquareBytes
     + ByteCombineSquared
-    + ByteCombineSquaredConstants
     + SumPoly
     + Sigmas
     + Debug
@@ -209,8 +208,6 @@ pub trait ByteCombine: Field {
 pub trait ByteCombineConstants: Field {
     /// Equivalent `ByteCombing::byte_combine_bits(2)`
     const BYTE_COMBINE_2: Self;
-    /// Equivalent `ByteCombing::byte_combine_bits(3)`
-    const BYTE_COMBINE_3: Self;
 }
 
 /// Trait providing a polynomial sum
@@ -309,14 +306,6 @@ where
 pub trait FromBit: Field {
     /// Takes the first bit from the input byte `x`, and returns the respective Field representation.
     fn from_bit(x: u8) -> Self;
-}
-
-/// Pre-computed values from [`ByteCombineSquared`]
-pub trait ByteCombineSquaredConstants: Field {
-    /// Equivalent `ByteCombing::byte_combine_bits_sq(2)`
-    const BYTE_COMBINE_SQ_2: Self;
-    /// Equivalent `ByteCombing::byte_combine_bits_sq(3)`
-    const BYTE_COMBINE_SQ_3: Self;
 }
 
 impl<T> SumPoly for T
@@ -921,7 +910,6 @@ impl Field for BigGF<u128, 1, 128> {
 
 impl ByteCombineConstants for BigGF<u128, 1, 128> {
     const BYTE_COMBINE_2: Self = Self::ALPHA[0];
-    const BYTE_COMBINE_3: Self = Self([Self::ALPHA[0].0[0] ^ Self::ONE.0[0]]);
 }
 
 impl From<&[u8]> for BigGF<u128, 1, 128> {

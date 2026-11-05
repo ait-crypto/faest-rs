@@ -55,10 +55,6 @@ where
     F: BigGaloisField,
     L: ArraySize + Mul<U8, Output: ArraySize>,
 {
-    pub(super) fn new(keys: Box<Array<u8, L>>, tags: Box<Array<F, Prod<L, U8>>>) -> Self {
-        Self { keys, tags }
-    }
-
     pub(super) fn get_field_commit<A: ConstraintAlgebra<F>>(
         &self,
         algebra: &A,

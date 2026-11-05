@@ -238,21 +238,4 @@ pub(crate) mod test {
         reader.read(&mut ret);
         ret
     }
-
-    /// Clones a slice into an owned `Array`.
-    ///
-    /// This is useful when an owned `Array<T, U>` is needed rather than an
-    /// `&Array<T, U>`. It panics if the slice length does not exactly match
-    /// the array size, so it should only be used when the length is an
-    /// internal invariant.
-    #[inline]
-    pub fn array_from_slice<T, U>(slice: &[T]) -> Array<T, U>
-    where
-        T: Clone,
-        U: ArraySize,
-    {
-        slice
-            .try_into()
-            .expect("slice length must match Array size")
-    }
 }

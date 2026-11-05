@@ -1,9 +1,6 @@
 use crate::fields::{
     Field,
-    large_fields::{
-        Alphas, BigGF, ByteCombineConstants, ByteCombineSquaredConstants, GF128, GF192, GF256,
-        Sigmas,
-    },
+    large_fields::{Alphas, BigGF, ByteCombineConstants, GF128, GF192, GF256, Sigmas},
 };
 
 // GF128 constants
@@ -32,11 +29,6 @@ impl Sigmas for GF128 {
         Self([0x7534634307ce7cbe88fd3d5cb6e7dff9u128]),
         Self([0x872430dcdf135bcc433f53640b5ab39au128]),
     ];
-}
-
-impl ByteCombineSquaredConstants for BigGF<u128, 1, 128> {
-    const BYTE_COMBINE_SQ_2: Self = Self::ALPHA[1];
-    const BYTE_COMBINE_SQ_3: Self = Self([Self::ALPHA[1].0[0] ^ Self::ONE.0[0]]);
 }
 
 // GF192 constants
@@ -117,18 +109,6 @@ impl Sigmas for GF192 {
 
 impl ByteCombineConstants for GF192 {
     const BYTE_COMBINE_2: Self = Self::ALPHA[0];
-    const BYTE_COMBINE_3: Self = Self([
-        Self::ALPHA[0].0[0] ^ Self::ONE.0[0],
-        Self::ALPHA[0].0[1] ^ Self::ONE.0[1],
-    ]);
-}
-
-impl ByteCombineSquaredConstants for GF192 {
-    const BYTE_COMBINE_SQ_2: Self = Self::ALPHA[1];
-    const BYTE_COMBINE_SQ_3: Self = Self([
-        Self::ALPHA[1].0[0] ^ Self::ONE.0[0],
-        Self::ALPHA[1].0[1] ^ Self::ONE.0[1],
-    ]);
 }
 
 // GF256 constants
@@ -209,16 +189,4 @@ impl Sigmas for GF256 {
 
 impl ByteCombineConstants for BigGF<u128, 2, 256> {
     const BYTE_COMBINE_2: Self = Self::ALPHA[0];
-    const BYTE_COMBINE_3: Self = Self([
-        Self::ALPHA[0].0[0] ^ Self::ONE.0[0],
-        Self::ALPHA[0].0[1] ^ Self::ONE.0[1],
-    ]);
-}
-
-impl ByteCombineSquaredConstants for BigGF<u128, 2, 256> {
-    const BYTE_COMBINE_SQ_2: Self = Self::ALPHA[1];
-    const BYTE_COMBINE_SQ_3: Self = Self([
-        Self::ALPHA[1].0[0] ^ Self::ONE.0[0],
-        Self::ALPHA[1].0[1] ^ Self::ONE.0[1],
-    ]);
 }

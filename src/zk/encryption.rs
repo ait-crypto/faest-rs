@@ -8,7 +8,6 @@ use super::{
 use alloc::vec::Vec;
 
 use crate::{
-    aes::{AddRoundKeyAssign, InverseAffine},
     fields::BigGaloisField,
     parameter::{OWFField, OWFParameters},
 };

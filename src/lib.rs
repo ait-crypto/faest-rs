@@ -106,7 +106,6 @@ pub use signature::{self, Error, Keypair, Signer, Verifier};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-mod aes;
 mod bavc;
 #[cfg(feature = "capi")]
 pub mod capi;

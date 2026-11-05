@@ -27,8 +27,8 @@ use hybrid_array::{
 use crate::fields::BaseField;
 
 use super::{
-    BigGaloisField, ByteCombine, ByteCombineConstants, ByteCombineSquaredConstants, Double,
-    ExtensionField, Field, FromBit, GF64, Sigmas, Square,
+    BigGaloisField, ByteCombine, ByteCombineConstants, Double, ExtensionField, Field, FromBit,
+    GF64, Sigmas, Square,
     large_fields::{
         Alphas, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192, GF256 as UnoptimizedGF256,
         GF576 as UnoptimizedGF576, GF768 as UnoptimizedGF768, Modulus,
@@ -707,7 +707,6 @@ impl Alphas for GF128 {
 
 impl ByteCombineConstants for GF128 {
     const BYTE_COMBINE_2: Self = Self(gfu128_as_m128(UnoptimizedGF128::BYTE_COMBINE_2));
-    const BYTE_COMBINE_3: Self = Self(gfu128_as_m128(UnoptimizedGF128::BYTE_COMBINE_3));
 }
 
 impl ByteCombine for GF128 {
@@ -734,13 +733,6 @@ impl ByteCombine for GF128 {
                 sum + (*alpha * (x >> (index + 1)))
             })
     }
-}
-
-// Implementation of ByteCombineSquared
-
-impl ByteCombineSquaredConstants for GF128 {
-    const BYTE_COMBINE_SQ_2: Self = Self(gfu128_as_m128(UnoptimizedGF128::BYTE_COMBINE_SQ_2));
-    const BYTE_COMBINE_SQ_3: Self = Self(gfu128_as_m128(UnoptimizedGF128::BYTE_COMBINE_SQ_3));
 }
 
 impl Sigmas for GF128 {
@@ -1175,7 +1167,6 @@ impl Alphas for GF192 {
 
 impl ByteCombineConstants for GF192 {
     const BYTE_COMBINE_2: Self = Self(gfu192_as_m256(UnoptimizedGF192::BYTE_COMBINE_2));
-    const BYTE_COMBINE_3: Self = Self(gfu192_as_m256(UnoptimizedGF192::BYTE_COMBINE_3));
 }
 
 impl ByteCombine for GF192 {
@@ -1202,13 +1193,6 @@ impl ByteCombine for GF192 {
                 sum + (*alpha * (x >> (index + 1)))
             })
     }
-}
-
-// Implementation of ByteCombineSquared
-
-impl ByteCombineSquaredConstants for GF192 {
-    const BYTE_COMBINE_SQ_2: Self = Self(gfu192_as_m256(UnoptimizedGF192::BYTE_COMBINE_SQ_2));
-    const BYTE_COMBINE_SQ_3: Self = Self(gfu192_as_m256(UnoptimizedGF192::BYTE_COMBINE_SQ_3));
 }
 
 impl Sigmas for GF192 {
@@ -1619,7 +1603,6 @@ impl Alphas for GF256 {
 
 impl ByteCombineConstants for GF256 {
     const BYTE_COMBINE_2: Self = Self(gfu256_as_m256(UnoptimizedGF256::BYTE_COMBINE_2));
-    const BYTE_COMBINE_3: Self = Self(gfu256_as_m256(UnoptimizedGF256::BYTE_COMBINE_3));
 }
 
 impl ByteCombine for GF256 {
@@ -1646,13 +1629,6 @@ impl ByteCombine for GF256 {
                 sum + (*alpha * (x >> (index + 1)))
             })
     }
-}
-
-// Implementation of ByteCombineSquared
-
-impl ByteCombineSquaredConstants for GF256 {
-    const BYTE_COMBINE_SQ_2: Self = Self(gfu256_as_m256(UnoptimizedGF256::BYTE_COMBINE_SQ_2));
-    const BYTE_COMBINE_SQ_3: Self = Self(gfu256_as_m256(UnoptimizedGF256::BYTE_COMBINE_SQ_3));
 }
 
 impl Sigmas for GF256 {
