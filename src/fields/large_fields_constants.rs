@@ -1,6 +1,5 @@
-use crate::fields::{
-    Field,
-    large_fields::{Alphas, BigGF, ByteCombineConstants, GF128, GF192, GF256, Sigmas},
+use crate::fields::large_fields::{
+    Alphas, BigGF, ByteCombineConstants, GF128, GF192, GF256, Sigmas,
 };
 
 // GF128 constants

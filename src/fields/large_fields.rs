@@ -22,7 +22,7 @@ use rand::{
 
 use crate::fields::BaseField;
 
-use super::{Double, ExtensionField, Field, GF8, GF64, Square};
+use super::{ExtensionField, Field, GF8, GF64, Square};
 
 /// U128_LOWER_MASK = 0xFFFFFFFFFFFFFFFF
 const U128_LOWER_MASK: u128 = u64::MAX as u128;
@@ -164,7 +164,6 @@ pub(crate) trait BigGaloisField:
     Field
     + FromBit
     + Copy
-    + Double<Output = Self>
     + Mul<u8, Output = Self>
     + Mul<GF64, Output = Self>
     + Square<Output = Self>
@@ -172,7 +171,6 @@ pub(crate) trait BigGaloisField:
     + ByteCombineConstants
     + SquareBytes
     + ByteCombineSquared
-    + SumPoly
     + Sigmas
     + Debug
 where
@@ -208,13 +206,6 @@ pub trait ByteCombine: Field {
 pub trait ByteCombineConstants: Field {
     /// Equivalent `ByteCombing::byte_combine_bits(2)`
     const BYTE_COMBINE_2: Self;
-}
-
-/// Trait providing a polynomial sum
-pub trait SumPoly: Field {
-    /// Compute polynomial sum
-    fn sum_poly(v: &[Self]) -> Self;
-    fn sum_poly_bits(v: &[u8]) -> Self;
 }
 
 // Trait providing methods for byte squaring, where each byte is represented by 8 field elements.
@@ -306,25 +297,6 @@ where
 pub trait FromBit: Field {
     /// Takes the first bit from the input byte `x`, and returns the respective Field representation.
     fn from_bit(x: u8) -> Self;
-}
-
-impl<T> SumPoly for T
-where
-    T: Copy + Field + Double<Output = Self> + for<'a> Add<&'a Self, Output = Self> + FromBit,
-{
-    fn sum_poly(v: &[Self]) -> Self {
-        v.iter()
-            .rev()
-            .skip(1)
-            .fold(v[v.len() - 1], |sum, val| sum.double() + val)
-    }
-
-    fn sum_poly_bits(v: &[u8]) -> Self {
-        let init = Self::from_bit(v[v.len() - 1] >> 7);
-        (0..v.len() * 8).rev().skip(1).fold(init, |sum, i| {
-            sum.double() + Self::from_bit(v[i / 8] >> (i % 8))
-        })
-    }
 }
 
 /// Binary galois field for larger sizes (e.g., 128 bits and above)
@@ -720,26 +692,6 @@ where
 
             *self += lhs.copy_apply_mask(rhs.to_mask_bit(idx));
         }
-    }
-}
-
-// generic implementation of Double
-
-impl<T, const N: usize, const LENGTH: usize> Double for BigGF<T, N, LENGTH>
-where
-    Self: ToMask<T>,
-    Self: Modulus<T>,
-    Self: ShiftLeft1<Output = Self>,
-    T: BitAnd<Output = T>,
-    T: BitXorAssign,
-{
-    type Output = Self;
-
-    fn double(mut self) -> Self::Output {
-        let mask = self.to_mask();
-        self = self.shift_left_1();
-        self.0[0] ^= mask & Self::MODULUS;
-        self
     }
 }
 
@@ -1514,9 +1466,6 @@ mod test {
 
         use core::iter::zip;
 
-        #[cfg(not(feature = "std"))]
-        use alloc::vec;
-
         use hybrid_array::typenum::Unsigned;
         use nist_pqc_seeded_rng::NistPqcAes256CtrRng;
         use rand::RngExt;
@@ -1599,18 +1548,6 @@ mod test {
                 let res = anything * F::ONE;
                 assert_eq!(res, anything);
             }
-        }
-
-        #[test]
-        fn sum_poly<F: BigGaloisField>() {
-            let all_zeroes = vec![F::ZERO; F::Length::USIZE * 8];
-            assert_eq!(F::sum_poly(&all_zeroes), F::ZERO);
-
-            let all_ones = vec![F::ONE; F::Length::USIZE * 8];
-            assert_eq!(
-                F::sum_poly(&all_ones),
-                F::from(vec![0xff; F::Length::USIZE].as_slice())
-            );
         }
 
         #[test]

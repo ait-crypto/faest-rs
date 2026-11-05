@@ -77,18 +77,6 @@ pub(crate) trait BaseField: Field<Length: Mul<U3, Output: ArraySize>> {
     type ExtenionField: ExtensionField<BaseField = Self, Length = Prod<Self::Length, U3>>;
 }
 
-/// Double a field element
-///
-/// This operation is not equivalent to `self + self` but corresponds to a the
-/// multiplication with the element representing `2`.
-pub(crate) trait Double {
-    /// Output type
-    type Output;
-
-    /// Double a field element
-    fn double(self) -> Self::Output;
-}
-
 /// Square a field element
 pub(crate) trait Square {
     /// Output type

@@ -7,15 +7,12 @@ use std::arch::x86_64;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use x86_64::{
     __m128i, __m256i, _mm_alignr_epi8, _mm_and_si128, _mm_andnot_si128, _mm_bslli_si128,
-    _mm_bsrli_si128, _mm_clmulepi64_si128, _mm_cmpeq_epi32, _mm_loadu_si128, _mm_or_si128,
-    _mm_set_epi8, _mm_set_epi64x, _mm_setr_epi32, _mm_setzero_si128, _mm_shuffle_epi8,
-    _mm_shuffle_epi32, _mm_slli_epi32, _mm_slli_epi64, _mm_slli_si128, _mm_srli_epi32,
-    _mm_srli_epi64, _mm_srli_si128, _mm_storeu_si128, _mm_test_all_zeros, _mm_xor_si128,
-    _mm256_and_si256, _mm256_blend_epi32, _mm256_blendv_epi8, _mm256_cmpeq_epi32,
-    _mm256_extracti128_si256, _mm256_loadu_si256, _mm256_maskload_epi64, _mm256_maskstore_epi64,
-    _mm256_or_si256, _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32, _mm256_set_m128i,
+    _mm_bsrli_si128, _mm_clmulepi64_si128, _mm_loadu_si128, _mm_or_si128, _mm_set_epi64x,
+    _mm_setr_epi32, _mm_setzero_si128, _mm_shuffle_epi32, _mm_slli_epi32, _mm_slli_epi64,
+    _mm_slli_si128, _mm_srli_epi32, _mm_srli_epi64, _mm_srli_si128, _mm_storeu_si128,
+    _mm_test_all_zeros, _mm_xor_si128, _mm256_and_si256, _mm256_extracti128_si256,
+    _mm256_loadu_si256, _mm256_maskload_epi64, _mm256_maskstore_epi64, _mm256_set_m128i,
     _mm256_set1_epi64x, _mm256_setr_epi64x, _mm256_setr_m128i, _mm256_setzero_si256,
-    _mm256_slli_epi32, _mm256_slli_epi64, _mm256_srai_epi32, _mm256_srli_epi32, _mm256_srli_epi64,
     _mm256_storeu_si256, _mm256_testz_si256, _mm256_xor_si256,
 };
 
@@ -27,8 +24,8 @@ use hybrid_array::{
 use crate::fields::BaseField;
 
 use super::{
-    BigGaloisField, ByteCombine, ByteCombineConstants, Double, ExtensionField, Field, FromBit,
-    GF64, Sigmas, Square,
+    BigGaloisField, ByteCombine, ByteCombineConstants, ExtensionField, Field, FromBit, GF64,
+    Sigmas, Square,
     large_fields::{
         Alphas, GF128 as UnoptimizedGF128, GF192 as UnoptimizedGF192, GF256 as UnoptimizedGF256,
         GF576 as UnoptimizedGF576, GF768 as UnoptimizedGF768, Modulus,
@@ -56,94 +53,6 @@ unsafe fn m128_clmul_lh(x: __m128i, y: __m128i) -> __m128i {
 #[target_feature(enable = "avx2", enable = "pclmulqdq")]
 unsafe fn m128_clmul_hh(x: __m128i, y: __m128i) -> __m128i {
     unsafe { _mm_clmulepi64_si128(x, y, 0x11) }
-}
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn m256_shift_left_1(x: __m256i) -> __m256i {
-    unsafe {
-        _mm256_or_si256(
-            _mm256_slli_epi64(x, 1),
-            _mm256_blend_epi32(
-                _mm256_setzero_si256(),
-                _mm256_permute4x64_epi64(_mm256_srli_epi64(x, 63), _MM_SHUFFLE(2, 1, 0, 0)),
-                _MM_SHUFFLE(3, 3, 3, 0),
-            ),
-        )
-    }
-}
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn m128_setones() -> __m128i {
-    unsafe {
-        let zero = _mm_setzero_si128();
-        _mm_cmpeq_epi32(zero, zero)
-    }
-}
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn m128_set_epi32_15() -> __m128i {
-    unsafe { _mm_srli_epi32(m128_setones(), 28) }
-}
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn m128_set_msb() -> __m128i {
-    unsafe {
-        let all_ones = m128_setones();
-        let one = _mm_slli_epi64(all_ones, 63);
-        _mm_slli_si128(one, 64 / 8)
-    }
-}
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn m256_setones() -> __m256i {
-    unsafe {
-        let zero = _mm256_setzero_si256();
-        _mm256_cmpeq_epi32(zero, zero)
-    }
-}
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn m256_set_epi32_7() -> __m256i {
-    unsafe { _mm256_srli_epi32(m256_setones(), 29) }
-}
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn m256_set_epi32_5() -> __m256i {
-    unsafe {
-        let one = _mm256_srli_epi32(m256_setones(), 31);
-        _mm256_xor_si256(one, _mm256_slli_epi32(one, 2))
-    }
-}
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn m256_set_msb_192() -> __m256i {
-    unsafe {
-        _mm256_blend_epi32(
-            _mm256_setzero_si256(),
-            _mm256_slli_epi64(m256_setones(), 63),
-            _MM_SHUFFLE(0, 3, 0, 0),
-        )
-    }
-}
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn m256_set_msb() -> __m256i {
-    unsafe {
-        _mm256_blend_epi32(
-            _mm256_setzero_si256(),
-            _mm256_slli_epi64(m256_setones(), 63),
-            _MM_SHUFFLE(3, 0, 0, 0),
-        )
-    }
 }
 
 // Karatsuba multiplication, but end right after the multiplications
@@ -594,59 +503,6 @@ impl MulAssign<&Self> for GF128 {
     }
 }
 
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn m128_apply_mask_msb(v: __m128i, m: __m128i) -> __m128i {
-    unsafe {
-        // extract MSB
-        let m = _mm_and_si128(m, m128_set_msb());
-        // move MSB to each 1-byte lane
-        let m = _mm_shuffle_epi8(m, m128_set_epi32_15());
-        // if MSB is set, produce index, otherwise keep MSB set to zero result
-        let m = _mm_andnot_si128(
-            m,
-            _mm_set_epi8(
-                15 | i8::MIN,
-                14 | i8::MIN,
-                13 | i8::MIN,
-                12 | i8::MIN,
-                11 | i8::MIN,
-                10 | i8::MIN,
-                9 | i8::MIN,
-                8 | i8::MIN,
-                7 | i8::MIN,
-                6 | i8::MIN,
-                5 | i8::MIN,
-                4 | i8::MIN,
-                3 | i8::MIN,
-                2 | i8::MIN,
-                1 | i8::MIN,
-                i8::MIN,
-            ),
-        );
-        _mm_shuffle_epi8(v, m)
-    }
-}
-
-// implementation of Double
-
-const GF128_MODULUS: __m128i = u128_as_m128(UnoptimizedGF128::MODULUS);
-
-impl Double for GF128 {
-    type Output = Self;
-
-    #[inline]
-    fn double(self) -> Self::Output {
-        Self(unsafe {
-            let shifted = _mm_or_si128(
-                _mm_slli_epi64(self.0, 1),
-                _mm_srli_epi64(_mm_bslli_si128(self.0, 8), 63),
-            );
-            _mm_xor_si128(shifted, m128_apply_mask_msb(GF128_MODULUS, self.0))
-        })
-    }
-}
-
 // implementation of Square
 
 impl Square for GF128 {
@@ -1067,36 +923,6 @@ impl MulAssign<&Self> for GF192 {
     }
 }
 
-// implementation of Double
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn m192_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
-    unsafe {
-        let m = _mm256_and_si256(m, m256_set_msb_192());
-        let m = _mm256_srai_epi32(m, 32);
-        let m = _mm256_permutevar8x32_epi32(m, m256_set_epi32_5());
-        _mm256_blendv_epi8(_mm256_setzero_si256(), v, m)
-    }
-}
-
-const GF192_MODULUS: __m256i = u128_as_m256([UnoptimizedGF192::MODULUS, 0]);
-
-impl Double for GF192 {
-    type Output = Self;
-
-    #[inline]
-    fn double(self) -> Self::Output {
-        Self(unsafe {
-            let shifted = m256_shift_left_1(self.0);
-            _mm256_and_si256(
-                _mm256_xor_si256(shifted, m192_apply_mask_msb(GF192_MODULUS, self.0)),
-                _mm256_setr_epi64x(-1, -1, -1, 0),
-            )
-        })
-    }
-}
-
 // implementation of Square
 
 impl Square for GF192 {
@@ -1513,34 +1339,6 @@ impl MulAssign<&Self> for GF256 {
     #[inline]
     fn mul_assign(&mut self, rhs: &Self) {
         self.0 = unsafe { mul_gf256(self.0, rhs.0) };
-    }
-}
-
-// implementation of Double
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn m256_apply_mask_msb(v: __m256i, m: __m256i) -> __m256i {
-    unsafe {
-        let mask = m256_set_msb();
-        let m = _mm256_and_si256(m, mask);
-        let m = _mm256_srai_epi32(m, 32);
-        let m = _mm256_permutevar8x32_epi32(m, m256_set_epi32_7());
-        _mm256_blendv_epi8(_mm256_setzero_si256(), v, m)
-    }
-}
-
-const GF256_MODULUS: __m256i = u128_as_m256([UnoptimizedGF256::MODULUS, 0]);
-
-impl Double for GF256 {
-    type Output = Self;
-
-    #[inline]
-    fn double(self) -> Self::Output {
-        Self(unsafe {
-            let shifted = m256_shift_left_1(self.0);
-            _mm256_xor_si256(shifted, m256_apply_mask_msb(GF256_MODULUS, self.0))
-        })
     }
 }
 
@@ -2692,27 +2490,6 @@ mod test {
                 let v1 = F::from(r1.as_bytes().as_slice());
                 let check_v3 = F::from(r3.as_bytes().as_slice());
                 let v3 = v1 * r2;
-
-                assert_eq!(check_v3, v3);
-                assert_eq!(v3.as_bytes(), r3.as_bytes());
-            }
-        }
-
-        #[test]
-        fn double<Fu, F: BigGaloisField>()
-        where
-            StandardUniform: Distribution<Fu>,
-            Fu: BigGaloisField<Length = F::Length>,
-        {
-            let mut rng = rand::rng();
-
-            for _ in 0..RUNS {
-                let r1: Fu = rng.random();
-                let r3 = r1.double();
-
-                let v1 = F::from(r1.as_bytes().as_slice());
-                let check_v3 = F::from(r3.as_bytes().as_slice());
-                let v3 = v1.double();
 
                 assert_eq!(check_v3, v3);
                 assert_eq!(v3.as_bytes(), r3.as_bytes());
