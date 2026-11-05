@@ -3,10 +3,7 @@ use core::{iter::zip, mem, ops::Mul};
 #[cfg(not(feature = "std"))]
 use alloc::{borrow::ToOwned, boxed::Box};
 
-use hybrid_array::{
-    Array, ArraySize,
-    typenum::{U8, Unsigned},
-};
+use hybrid_array::{Array, ArraySize, typenum::U8};
 
 use super::{ByteCommits, ByteCommitsRef};
 use crate::{
@@ -156,23 +153,21 @@ where
     }
 }
 
-/// FAEST v3 Figure 7.11.
-impl<O> InverseShiftRows<O> for ByteCommitsRef<'_, OWFField<O>, O::NStBytes>
+impl<F, L> ByteCommitsRef<'_, F, L>
 where
-    O: OWFParameters,
+    F: BigGaloisField,
+    L: ArraySize + Mul<U8, Output: ArraySize>,
 {
-    type Output = ByteCommits<OWFField<O>, O::NStBytes>;
-
-    fn inverse_shift_rows(&self) -> Self::Output {
-        let mut state_prime = ByteCommits::<OWFField<O>, O::NStBytes>::default();
-
+    /// Inverse ShiftRows into a reusable encryption-round buffer.
+    pub(super) fn inverse_shift_rows_into(&self, state_prime: &mut ByteCommits<F, L>) {
+        let n = L::USIZE / 4;
         for r in 0..4 {
-            for c in 0..O::NSt::USIZE {
+            for c in 0..n {
                 // ::3-6
-                let i = if (O::NSt::USIZE != 8) || (r <= 1) {
-                    4 * ((O::NSt::USIZE + c - r) % O::NSt::USIZE) + r
+                let i = if (n != 8) || (r <= 1) {
+                    4 * ((n + c - r) % n) + r
                 } else {
-                    4 * ((O::NSt::USIZE + c - r - 1) % O::NSt::USIZE) + r
+                    4 * ((n + c - r - 1) % n) + r
                 };
 
                 // ::7
@@ -181,22 +176,13 @@ where
                     .copy_from_slice(&self.tags[8 * i..8 * i + 8]);
             }
         }
-
-        state_prime
     }
-}
 
-/// FAEST v3 Figure 7.9.
-impl<O> BytewiseMixColumns<O> for ByteCommitsRef<'_, OWFField<O>, O::NStBytes>
-where
-    O: OWFParameters,
-{
-    type Output = ByteCommits<OWFField<O>, O::NStBytes>;
-
-    fn bytewise_mix_columns(&self) -> Self::Output {
-        let mut o = ByteCommits::default();
-
-        for c in 0..O::NSt::USIZE {
+    /// Bytewise MixColumns into a reusable encryption-round buffer.
+    pub(super) fn bytewise_mix_columns_into(&self, o: &mut ByteCommits<F, L>) {
+        o.keys.fill(0);
+        o.tags.fill(F::ZERO);
+        for c in 0..(L::USIZE / 4) {
             for r in 0..4 {
                 // ::4
                 let a_key = self.keys[4 * c + r];
@@ -242,8 +228,24 @@ where
                 }
             }
         }
+    }
+}
 
-        o
+impl<O: OWFParameters> InverseShiftRows<O> for ByteCommitsRef<'_, OWFField<O>, O::NStBytes> {
+    type Output = ByteCommits<OWFField<O>, O::NStBytes>;
+    fn inverse_shift_rows(&self) -> Self::Output {
+        let mut output = ByteCommits::default();
+        self.inverse_shift_rows_into(&mut output);
+        output
+    }
+}
+
+impl<O: OWFParameters> BytewiseMixColumns<O> for ByteCommitsRef<'_, OWFField<O>, O::NStBytes> {
+    type Output = ByteCommits<OWFField<O>, O::NStBytes>;
+    fn bytewise_mix_columns(&self) -> Self::Output {
+        let mut output = ByteCommits::default();
+        self.bytewise_mix_columns_into(&mut output);
+        output
     }
 }
 

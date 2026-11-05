@@ -1,4 +1,7 @@
-use super::{hashing::ConstraintHasher, polynomial::Polynomial};
+use super::{
+    algebra::{ConstraintAlgebra, Lift},
+    hashing::ConstraintHasher,
+};
 use hybrid_array::{Array, typenum::Unsigned};
 
 #[cfg(not(feature = "std"))]
@@ -29,9 +32,11 @@ pub(super) fn owf_constraints<O>(
     // line 5
     {
         let (k_0, k_1) = ((w.keys[0] & 0b1), (w.keys[0] & 0b10) >> 1);
-        let a = Polynomial::from_key_tag(OWFField::<O>::from_bit(k_0), w.tags[0]);
-        let b = Polynomial::from_key_tag(OWFField::<O>::from_bit(k_1), w.tags[1]);
-        zk_hasher.hash_constraint((a * b).lift(7));
+        let algebra = *zk_hasher.algebra();
+        let a = algebra.linear_constraint(OWFField::<O>::from_bit(k_0), w.tags[0]);
+        let b = algebra.linear_constraint(OWFField::<O>::from_bit(k_1), w.tags[1]);
+        let product = a * b;
+        zk_hasher.hash_constraint(product.lift(&algebra));
     }
 
     if O::IS_EM {

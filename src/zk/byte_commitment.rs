@@ -1,4 +1,4 @@
-use super::polynomial::Polynomial;
+use super::algebra::ConstraintAlgebra;
 use core::ops::Mul;
 
 #[cfg(not(feature = "std"))]
@@ -32,8 +32,8 @@ where
         self.key = GF8::square_bits(self.key);
     }
 
-    pub fn combine(&self) -> Polynomial<F> {
-        Polynomial::from_key_tag(
+    pub fn combine<A: ConstraintAlgebra<F>>(&self, algebra: &A) -> A::ConstraintDeg1 {
+        algebra.linear_constraint(
             F::byte_combine_bits(self.key),
             F::byte_combine_slice(self.tags.as_slice()),
         )
@@ -59,16 +59,23 @@ where
         Self { keys, tags }
     }
 
-    pub(super) fn get_field_commit(&self, index: usize) -> Polynomial<F> {
-        Polynomial::from_key_tag(
+    pub(super) fn get_field_commit<A: ConstraintAlgebra<F>>(
+        &self,
+        algebra: &A,
+        index: usize,
+    ) -> A::ConstraintDeg1 {
+        algebra.linear_constraint(
             F::byte_combine_bits(self.keys[index]),
             F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
         )
     }
 
-    pub(super) fn get_field_commit_sq(&self, index: usize) -> Polynomial<F> {
-        let mut coefficients = [F::ZERO; 8];
-        Polynomial::from_key_tag(
+    pub(super) fn get_field_commit_sq<A: ConstraintAlgebra<F>>(
+        &self,
+        algebra: &A,
+        index: usize,
+    ) -> A::ConstraintDeg1 {
+        algebra.linear_constraint(
             F::byte_combine_bits_sq(self.keys[index]),
             F::byte_combine_sq_slice(&self.tags[index * 8..index * 8 + 8]),
         )
@@ -137,8 +144,12 @@ where
         }
     }
 
-    pub(super) fn get_field_commit(&self, index: usize) -> Polynomial<F> {
-        Polynomial::from_key_tag(
+    pub(super) fn get_field_commit<A: ConstraintAlgebra<F>>(
+        &self,
+        algebra: &A,
+        index: usize,
+    ) -> A::ConstraintDeg1 {
+        algebra.linear_constraint(
             F::byte_combine_bits(self.keys[index]),
             F::byte_combine_slice(&self.tags[index * 8..index * 8 + 8]),
         )

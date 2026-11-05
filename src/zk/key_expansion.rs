@@ -1,4 +1,4 @@
-use super::{ByteCommits, ByteCommitsRef, hashing::ConstraintHasher, polynomial::Polynomial};
+use super::{ByteCommits, ByteCommitsRef, algebra::Lift, hashing::ConstraintHasher};
 use hybrid_array::{
     Array,
     typenum::{U8, Unsigned},
@@ -28,6 +28,7 @@ where
         k.to_ref(),
     );
 
+    let algebra = *zk_hasher.algebra();
     let mut iwd = 32 * (O::NK::USIZE - 1);
     let mut do_rot_word = true;
 
@@ -36,15 +37,18 @@ where
         let r_prime_inv = if do_rot_word { (4 + r - 3) % 4 } else { r };
 
         // lines 12-13
-        let k_hat = k.get_field_commit(iwd / 8 + r_prime_inv);
-        let k_hat_sq = k.get_field_commit_sq(iwd / 8 + r_prime_inv);
+        let k_hat = k.get_field_commit(&algebra, iwd / 8 + r_prime_inv);
+        let k_hat_sq = k.get_field_commit_sq(&algebra, iwd / 8 + r_prime_inv);
 
         // lines 14-15
-        let w_hat = w_flat.get_field_commit(4 * j + r);
-        let w_hat_sq = w_flat.get_field_commit_sq(4 * j + r);
+        let w_hat = w_flat.get_field_commit(&algebra, 4 * j + r);
+        let w_hat_sq = w_flat.get_field_commit_sq(&algebra, 4 * j + r);
 
         // lines 19-20 (directly update zk_hahser with constraints)
-        lift_and_process(zk_hasher, &k_hat, &k_hat_sq, &w_hat, &w_hat_sq);
+        let first = k_hat_sq * w_hat + k_hat.lift(&algebra);
+        let second = k_hat * w_hat_sq + w_hat.lift(&algebra);
+        zk_hasher.hash_constraint(first.lift(&algebra));
+        zk_hasher.hash_constraint(second.lift(&algebra));
 
         if r == 3 {
             // line 16
@@ -62,19 +66,6 @@ where
     }
 
     k
-}
-
-fn lift_and_process<F: BigGaloisField>(
-    hasher: &mut impl ConstraintHasher<F>,
-    a: &Polynomial<F>,
-    a_sq: &Polynomial<F>,
-    b: &Polynomial<F>,
-    b_sq: &Polynomial<F>,
-) {
-    // lines 19-20,
-    let second_product = a * b_sq;
-    hasher.hash_constraint((a_sq * b + a.lift(2)).lift(7));
-    hasher.hash_constraint((second_product + b.lift(2)).lift(7));
 }
 
 fn key_exp_fwd<O>(
