@@ -1,207 +1,175 @@
+use super::algebra::{Lift, Prover, Verifier};
 use crate::fields::BigGaloisField;
-use core::ops::{Add, AddAssign, Mul, MulAssign};
+use core::{
+    marker::PhantomData,
+    ops::{Add, AddAssign, Mul, Sub},
+};
+use hybrid_array::{
+    Array, ArraySize,
+    typenum::{B1, Diff, IsGreaterOrEqual, IsLessOrEqual, Min, Minimum, Sum, U1, U2, U7, U8},
+};
 
-#[derive(Copy, Clone, Debug)]
-pub(super) struct Polynomial<F: BigGaloisField> {
-    pub(super) coefficients: [F; 8],
-    pub(super) degree: usize,
+/// Coefficient counts supported by the constraint algebra.
+/// Degree-seven polynomials omit coefficient 7, which is never hashed by the prover (must be zero).
+pub(super) trait PolynomialSize: ArraySize {
+    type Stored: ArraySize;
 }
 
-impl<F: BigGaloisField> Polynomial<F> {
-    pub(super) fn from_key_tag(key: F, tag: F) -> Self {
-        let mut coefficients = [F::ZERO; 8];
-        coefficients[0] = tag;
-        coefficients[1] = key;
-        Self {
-            degree: 1,
-            coefficients,
-        }
-    }
+impl<L> PolynomialSize for L
+where
+    L: ArraySize + IsGreaterOrEqual<U1, Output = B1> + IsLessOrEqual<U8, Output = B1> + Min<U7>,
+    Minimum<L, U7>: ArraySize,
+{
+    type Stored = Minimum<L, U7>;
+}
 
-    pub(super) fn constant(value: F) -> Self {
-        let mut coefficients = [F::ZERO; 8];
-        coefficients[0] = value;
-        Self {
-            coefficients,
-            degree: 0,
-        }
-    }
+/// A constraint polynomial with coefficient count L.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Polynomial<F, L: PolynomialSize> {
+    pub(super) coefficients: Array<F, L::Stored>,
+}
 
-    /// DegLift multiplies by X^(degree - self.degree), including zero coefficients.
-    pub(super) fn lift(mut self, degree: usize) -> Self {
-        assert!(self.degree <= degree && degree <= 7);
+impl<F: Copy, L: PolynomialSize> Copy for Polynomial<F, L> where Array<F, L::Stored>: Copy {}
+
+impl<F: BigGaloisField, L: PolynomialSize> Polynomial<F, L> {
+    #[cfg(test)]
+    pub(super) fn evaluate(self, delta: F) -> F {
         self.coefficients
-            .copy_within(..=self.degree, degree - self.degree);
-        self.coefficients[..degree - self.degree].fill(F::ZERO);
-        self.degree = degree;
-        self
-    }
-
-    pub(super) fn evaluate(&self, delta: F) -> F {
-        self.coefficients[..=self.degree]
             .iter()
             .rev()
-            .fold(F::ZERO, |acc, c| acc * delta + c)
+            .fold(F::ZERO, |acc, &c| acc * delta + c)
     }
 }
 
-impl<F: BigGaloisField> AddAssign<&Self> for Polynomial<F> {
-    fn add_assign(&mut self, rhs: &Self) {
-        assert_eq!(self.degree, rhs.degree);
+impl<F: BigGaloisField> Polynomial<F, U2> {
+    pub(super) fn from_key_tag(key: F, tag: F) -> Self {
+        Self {
+            coefficients: Array([tag, key]),
+        }
+    }
+}
+
+impl<F, L, R> Mul<Polynomial<F, R>> for Polynomial<F, L>
+where
+    F: BigGaloisField,
+    L: PolynomialSize + Add<R>,
+    R: PolynomialSize,
+    Sum<L, R>: Sub<U1>,
+    Diff<Sum<L, R>, U1>: PolynomialSize,
+{
+    type Output = Polynomial<F, Diff<Sum<L, R>, U1>>;
+
+    fn mul(self, rhs: Polynomial<F, R>) -> Self::Output {
+        let mut coefficients = Array::from_fn(|_| F::ZERO);
+        for i in 0..self.coefficients.len() {
+            // Degree-seven products omit the highest coefficient.
+            for j in 0..rhs.coefficients.len().min(coefficients.len() - i) {
+                coefficients[i + j] += self.coefficients[i] * rhs.coefficients[j];
+            }
+        }
+        Polynomial { coefficients }
+    }
+}
+
+impl<F, L, R> Lift<Polynomial<F, R>, Prover> for Polynomial<F, L>
+where
+    F: BigGaloisField,
+    L: PolynomialSize,
+    R: PolynomialSize + IsGreaterOrEqual<L, Output = B1>,
+{
+    fn lift(self, _context: &Prover) -> Polynomial<F, R> {
+        let shift = R::USIZE - L::USIZE;
+        Polynomial {
+            coefficients: Array::from_fn(|i| {
+                if i < shift {
+                    F::ZERO
+                } else {
+                    self.coefficients[i - shift]
+                }
+            }),
+        }
+    }
+}
+
+impl<F: BigGaloisField, L: PolynomialSize> AddAssign for Polynomial<F, L> {
+    fn add_assign(&mut self, rhs: Self) {
         for (a, b) in self.coefficients.iter_mut().zip(rhs.coefficients) {
             *a += b;
         }
     }
 }
 
-impl<F: BigGaloisField> Add<&Self> for Polynomial<F> {
+impl<F: BigGaloisField, L: PolynomialSize> Add for Polynomial<F, L> {
     type Output = Self;
-
-    fn add(mut self, rhs: &Self) -> Self::Output {
+    fn add(mut self, rhs: Self) -> Self {
         self += rhs;
         self
     }
 }
 
-impl<F: BigGaloisField> Add for Polynomial<F> {
+impl<F: BigGaloisField, L: PolynomialSize> Mul<F> for Polynomial<F, L> {
     type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        self + &rhs
-    }
-}
-
-impl<F: BigGaloisField> Mul for Polynomial<F> {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        &self * &rhs
-    }
-}
-
-impl<F: BigGaloisField> Mul<&Self> for Polynomial<F> {
-    type Output = Self;
-
-    fn mul(self, rhs: &Self) -> Self::Output {
-        &self * rhs
-    }
-}
-
-impl<F: BigGaloisField> Mul<Polynomial<F>> for &Polynomial<F> {
-    type Output = Polynomial<F>;
-
-    fn mul(self, rhs: Polynomial<F>) -> Self::Output {
-        self * &rhs
-    }
-}
-
-impl<F: BigGaloisField> Mul for &Polynomial<F> {
-    type Output = Polynomial<F>;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        let degree = self.degree + rhs.degree;
-        assert!(degree <= 7);
-        let mut coefficients = [F::ZERO; 8];
-        for i in 0..=self.degree {
-            for j in 0..=rhs.degree {
-                coefficients[i + j] += self.coefficients[i] * rhs.coefficients[j];
-            }
+    fn mul(mut self, rhs: F) -> Self {
+        for c in &mut self.coefficients {
+            *c *= rhs;
         }
-        Polynomial {
-            coefficients,
-            degree,
-        }
-    }
-}
-
-impl<F: BigGaloisField> MulAssign<F> for Polynomial<F> {
-    fn mul_assign(&mut self, rhs: F) {
-        for coefficient in &mut self.coefficients {
-            *coefficient *= rhs;
-        }
-    }
-}
-
-impl<F: BigGaloisField> Mul<F> for Polynomial<F> {
-    type Output = Self;
-
-    fn mul(mut self, rhs: F) -> Self::Output {
-        self *= rhs;
         self
     }
 }
 
-impl<F: BigGaloisField> Mul<F> for &Polynomial<F> {
-    type Output = Polynomial<F>;
+/// A polynomial evaluation, with coefficient count L retained in the type.
+#[derive(Copy, Clone)]
+pub(super) struct Evaluation<F, L: PolynomialSize>(pub(super) F, PhantomData<L>);
 
-    fn mul(self, rhs: F) -> Self::Output {
-        *self * rhs
+impl<F, L: PolynomialSize> Evaluation<F, L> {
+    pub(super) fn new(value: F) -> Self {
+        Self(value, PhantomData)
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::fields::{GF128, GF192, GF256};
+impl<F: BigGaloisField, L: PolynomialSize> AddAssign for Evaluation<F, L> {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
 
-    fn arithmetic<F: BigGaloisField>() {
-        let scalar = F::byte_combine_bits(0x31);
-        let p = Polynomial::from_key_tag(F::byte_combine_bits(0x53), F::byte_combine_bits(0xca));
-        let q = Polynomial::from_key_tag(F::byte_combine_bits(0xf1), F::byte_combine_bits(0x77));
-        let mut power = Polynomial::constant(F::ONE);
-        for degree in 0..=7 {
-            assert_eq!(power.degree, degree);
-            let scaled = power * scalar;
-            for factor in [F::ZERO, F::ONE, scalar] {
-                let owned = power * factor;
-                let borrowed = &power * factor;
-                let mut assigned = power;
-                assigned *= factor;
-                assert_eq!(owned.degree, degree);
-                assert_eq!(borrowed.degree, degree);
-                assert_eq!(assigned.degree, degree);
-                for i in 0..8 {
-                    let expected = power.coefficients[i] * factor;
-                    assert_eq!(owned.coefficients[i], expected);
-                    assert_eq!(borrowed.coefficients[i], expected);
-                    assert_eq!(assigned.coefficients[i], expected);
-                }
-            }
-            for i in 0..=degree {
-                assert_eq!(scaled.coefficients[i], power.coefficients[i] * scalar);
-            }
-            for delta in [F::ZERO, F::ONE, F::byte_combine_bits(0x42)] {
-                let expected = (0..degree).fold(F::ONE, |acc, _| acc * p.evaluate(delta));
-                assert_eq!(power.evaluate(delta), expected);
-                assert_eq!(scaled.evaluate(delta), expected * scalar);
-                assert_eq!(
-                    power.clone().lift(7).evaluate(delta),
-                    expected * (0..7 - degree).fold(F::ONE, |acc, _| acc * delta)
-                );
-                if degree < 7 {
-                    assert_eq!((&power * &q).evaluate(delta), expected * q.evaluate(delta));
-                }
-            }
-            if degree < 7 {
-                power = power * &p;
-            }
-        }
-        // A quadratic key-expansion constraint must occupy only coefficients 5,6,7.
-        let lifted = (&p * &q).lift(7);
-        assert_eq!(&lifted.coefficients[..5], &[F::ZERO; 5]);
-        assert_eq!(&lifted.coefficients[5..], &(&p * &q).coefficients[..3]);
+impl<F: BigGaloisField, L: PolynomialSize> Add for Evaluation<F, L> {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        Self::new(self.0 + rhs.0)
     }
+}
 
-    #[test]
-    fn arithmetic_128() {
-        arithmetic::<GF128>();
+impl<F: BigGaloisField, L: PolynomialSize> Mul<F> for Evaluation<F, L> {
+    type Output = Self;
+    fn mul(self, rhs: F) -> Self {
+        Self::new(self.0 * rhs)
     }
-    #[test]
-    fn arithmetic_192() {
-        arithmetic::<GF192>();
+}
+
+impl<F, L, R> Mul<Evaluation<F, R>> for Evaluation<F, L>
+where
+    F: BigGaloisField,
+    L: PolynomialSize + Add<R>,
+    R: PolynomialSize,
+    Sum<L, R>: Sub<U1>,
+    Diff<Sum<L, R>, U1>: PolynomialSize,
+{
+    type Output = Evaluation<F, Diff<Sum<L, R>, U1>>;
+
+    fn mul(self, rhs: Evaluation<F, R>) -> Self::Output {
+        Evaluation::new(self.0 * rhs.0)
     }
-    #[test]
-    fn arithmetic_256() {
-        arithmetic::<GF256>();
+}
+
+impl<F, L, R> Lift<Evaluation<F, R>, Verifier<F>> for Evaluation<F, L>
+where
+    F: BigGaloisField,
+    L: PolynomialSize,
+    R: PolynomialSize + IsGreaterOrEqual<L, Output = B1>,
+{
+    fn lift(self, context: &Verifier<F>) -> Evaluation<F, R> {
+        // use precomputed challenge powers to compute lift
+        Evaluation::new(self.0 * context.powers[R::USIZE - L::USIZE])
     }
 }
