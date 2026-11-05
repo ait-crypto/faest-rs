@@ -477,15 +477,16 @@ mod tests {
     use crate::{
         internal_keys::{PublicKey, UnpackedSecretKey},
         parameter::*,
+        utils::test::hash_array,
     };
     #[cfg(not(feature = "std"))]
-    use alloc::vec;
+    use alloc::{vec, vec::Vec};
 
     struct SignatureFixture {
         sk: &'static [u8],
         pk: &'static [u8],
         witness: &'static [u8],
-        signature: &'static [u8],
+        signature_hash: &'static [u8; 64],
     }
 
     // These vectors are transcribed from faest-ref's tests/faest_tvs.hpp.
@@ -517,10 +518,9 @@ mod tests {
                 * <O<P> as OWFParameters>::LambdaBytes::USIZE
     }
 
-    fn check<P: FAESTParameters>(fixture: &SignatureFixture) {
+    /// Generate the reference signature and check its digest before using it in tests.
+    fn reference_signature<P: FAESTParameters>(fixture: &SignatureFixture) -> Vec<u8> {
         let sk = secret_key::<P>(fixture);
-        faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk.as_view(), fixture.signature).unwrap();
-
         // Dirty output storage also checks that signing writes all padding bytes.
         let mut sig = vec![0xff; P::SIGNATURE_SIZE];
         faest_sign::<P>(
@@ -531,10 +531,16 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            sig.as_slice(),
-            fixture.signature,
-            "reference signature mismatch"
+            hash_array(&sig).as_slice(),
+            fixture.signature_hash,
+            "reference signature hash mismatch"
         );
+        sig
+    }
+
+    fn check<P: FAESTParameters>(fixture: &SignatureFixture) {
+        let sk = secret_key::<P>(fixture);
+        let sig = reference_signature::<P>(fixture);
         faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk.as_view(), &sig).unwrap();
 
         let cached = UnpackedSecretKey::from(sk);
@@ -556,10 +562,11 @@ mod tests {
 
     fn reject_malformed<P: FAESTParameters>(fixture: &SignatureFixture) {
         let sk = secret_key::<P>(fixture);
+        let reference_sig = reference_signature::<P>(fixture);
         let layout = SignatureLayout::new::<P>();
         let mut msg = test_vectors::MESSAGE.to_vec();
         msg[0] ^= 1;
-        assert!(faest_verify::<P>(&msg, &sk.pk.as_view(), fixture.signature).is_err());
+        assert!(faest_verify::<P>(&msg, &sk.pk.as_view(), &reference_sig).is_err());
         for output in [false, true] {
             let mut pk = sk.pk.clone();
             if output {
@@ -568,8 +575,7 @@ mod tests {
                 pk.owf_input[0] ^= 1;
             }
             assert!(
-                faest_verify::<P>(&test_vectors::MESSAGE, &pk.as_view(), fixture.signature)
-                    .is_err()
+                faest_verify::<P>(&test_vectors::MESSAGE, &pk.as_view(), &reference_sig).is_err()
             );
         }
 
@@ -587,22 +593,22 @@ mod tests {
         for pos in positions.into_iter().chain(
             (0..6).map(|i| layout.a_tilde.start + i * <O<P> as OWFParameters>::LambdaBytes::USIZE),
         ) {
-            let mut sig = fixture.signature.to_vec();
+            let mut sig = reference_sig.clone();
             sig[pos] ^= 1;
             assert!(
                 faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk.as_view(), &sig).is_err(),
                 "mutation at {pos}"
             );
         }
-        let mut sig = fixture.signature.to_vec();
+        let mut sig = reference_sig.clone();
         sig[layout.chall_3.end - 1] |= 0x80;
         assert!(faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk.as_view(), &sig).is_err());
 
         // When the reference opening leaves padding, every padding byte must be zero.
-        let pad = padding_start::<P>(fixture.signature, &layout);
+        let pad = padding_start::<P>(&reference_sig, &layout);
         assert!(pad <= layout.decom_i.end);
         if pad < layout.decom_i.end {
-            let mut sig = fixture.signature.to_vec();
+            let mut sig = reference_sig.clone();
             sig[pad] = 1;
             assert!(faest_verify::<P>(&test_vectors::MESSAGE, &sk.pk.as_view(), &sig).is_err());
             sig[pad] = 0;
@@ -619,7 +625,7 @@ mod tests {
                     sk: &test_vectors::$name::SK,
                     pk: &test_vectors::$name::PK,
                     witness: &test_vectors::$name::WITNESS,
-                    signature: &test_vectors::$name::SIGNATURE,
+                    signature_hash: &test_vectors::$name::SIGNATURE_HASH,
                 };
                 #[test]
                 fn reference_signatures() { check::<$p>(&FIXTURE); }
