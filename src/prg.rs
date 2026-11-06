@@ -13,9 +13,9 @@ use zeroize::ZeroizeOnDrop;
 
 use crate::{parameter::SecurityParameter, utils::Reader};
 
-type Aes128Ctr32LE = ctr::Ctr32LE<aes::Aes128>;
-type Aes192Ctr32LE = ctr::Ctr32LE<aes::Aes192>;
-type Aes256Ctr32LE = ctr::Ctr32LE<aes::Aes256>;
+type Aes128Ctr32LE = ctr::Ctr32LE<aes::Aes128Enc>;
+type Aes192Ctr32LE = ctr::Ctr32LE<aes::Aes192Enc>;
+type Aes256Ctr32LE = ctr::Ctr32LE<aes::Aes256Enc>;
 
 /// Size of the IV
 pub(crate) type IVSize = U16;
