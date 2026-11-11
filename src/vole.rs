@@ -12,7 +12,7 @@ use crate::{
         ToBytes,
     },
     prg::{IV, PseudoRandomGenerator},
-    random_oracles::{Hasher, RandomOracle},
+    random_oracles::{Hasher, Hasher4, RandomOracle, Reader4},
     utils::{
         Reader, bit_word_mask, decode_all_chall_3, extract_bit_slice, get_bit, insert_bit_slice,
         load_u64, set_bit, xor_arrays_inplace,
@@ -118,6 +118,27 @@ where
 }
 
 #[inline]
+fn gate_hash4<P: FAESTParameters>(
+    prefix: &impl Hasher4,
+    gates: [usize; 4],
+    labels: &[Array<u8, <P::OWF as OWFParameters>::LambdaBytes>; 4],
+) -> [[u8; 2]; 4] {
+    let mut h = prefix.clone();
+    let indices = gates.map(|e| (e as u32).to_le_bytes());
+    h.update(indices.each_ref().map(|i| i.as_slice()));
+    h.update(labels.each_ref().map(|l| l.as_slice()));
+    let mut hashes = [[0; 2]; 4];
+    h.finish().read(hashes.each_mut().map(|h| h.as_mut_slice()));
+    hashes
+}
+
+fn h5_init4<P: FAESTParameters>(iv: &IV) -> impl Hasher4 {
+    let mut hash =
+        <<P::BAVC as BatchVectorCommitment>::RO as RandomOracle>::Hasher4::<5>::default();
+    hash.update_shared(iv);
+    hash
+}
+
 fn h5_init<P: FAESTParameters>(iv: &IV, e: usize) -> impl Hasher + Clone {
     let mut hash = <P::BAVC as BatchVectorCommitment>::RO::h5_init();
     hash.update(iv);
@@ -418,34 +439,51 @@ pub(crate) fn volecommit<P: FAESTParameters>(
 
     // line 21
     let mut v_tilde = vec![0; NMask::USIZE * n_mult_bytes];
-    let mut ell_e = Array::<u8, <P::OWF as OWFParameters>::LambdaBytes>::default();
-    for e in 0..n_mult {
-        // line 22: L_e_0
-        gate_label(&mut ell_e, &raw_v, &tables.g, e);
-
-        // init hashers
-        let mut hash_one = h5_init::<P>(iv, e);
-        let mut hash_two = hash_one.clone();
-
-        // line 23: hash(L_e_0)
-        let mut he_0 = [0u8; 2];
-        hash_one.update(&ell_e);
-        hash_one.finish().read(&mut he_0);
-
-        // line 22: L_e_1
+    let h5_prefix = h5_init4::<P>(iv);
+    let mut e = 0;
+    while e + 1 < n_mult {
+        let mut labels = core::array::from_fn::<_, 4, _>(|_| {
+            Array::<u8, <P::OWF as OWFParameters>::LambdaBytes>::default()
+        });
+        for gate in 0..2 {
+            gate_label(&mut labels[2 * gate], &raw_v, &tables.g, e + gate);
+            labels[2 * gate + 1] = labels[2 * gate].clone();
+            xor_arrays_inplace(
+                &mut labels[2 * gate + 1],
+                &u[..<P::OWF as OWFParameters>::LambdaBytes::USIZE],
+            );
+        }
+        let hashes = gate_hash4::<P>(&h5_prefix, [e, e, e + 1, e + 1], &labels);
+        for gate in 0..2 {
+            for m in 0..NMask::USIZE {
+                set_bit(
+                    &mut v_tilde[m * n_mult_bytes..(m + 1) * n_mult_bytes],
+                    e + gate,
+                    get_bit(&hashes[2 * gate], m),
+                );
+                c_mult[m * n_mult_bytes + (e + gate) / 8] ^= (get_bit(&hashes[2 * gate], m)
+                    ^ get_bit(&hashes[2 * gate + 1], m))
+                    << ((e + gate) % 8);
+            }
+        }
+        e += 2;
+    }
+    for e in e..n_mult {
+        let mut label = Array::<u8, <P::OWF as OWFParameters>::LambdaBytes>::default();
+        gate_label(&mut label, &raw_v, &tables.g, e);
+        let mut h = h5_init::<P>(iv, e);
+        h.update(&label);
+        let mut he_0 = [0; 2];
+        h.finish().read(&mut he_0);
         xor_arrays_inplace(
-            &mut ell_e,
+            &mut label,
             &u[..<P::OWF as OWFParameters>::LambdaBytes::USIZE],
         );
-
-        // line 23: hash(L_e_1)
-        let mut he_1 = [0u8; 2];
-        hash_two.update(&ell_e);
-        hash_two.finish().read(&mut he_1);
-
+        let mut h = h5_init::<P>(iv, e);
+        h.update(&label);
+        let mut he_1 = [0; 2];
+        h.finish().read(&mut he_1);
         for m in 0..NMask::USIZE {
-            // line 25
-            // TODO: maybe transpose he_0s, he_1s instead
             set_bit(
                 &mut v_tilde[m * n_mult_bytes..(m + 1) * n_mult_bytes],
                 e,
@@ -573,20 +611,35 @@ pub fn volereconstruct<P: FAESTParameters>(
     // lines 21-27: corrected witness columns are the verifier's wire labels.
     let mut q_tilde = vec![0; NMask::USIZE * n_mult_bytes];
     let mut gamma = vec![0; n_mult_bytes];
-    let mut l_e_prime = Array::<u8, <P::OWF as OWFParameters>::LambdaBytes>::default();
     matrix_mul_table(&mut gamma, chall, &tables.g);
-    for e in 0..tables.gates {
-        // line 24
-        gate_label(&mut l_e_prime, &raw_q, &tables.g, e);
-
-        // line 25
+    let h5_prefix = h5_init4::<P>(iv);
+    let mut e = 0;
+    while e + 3 < tables.gates {
+        let mut labels = core::array::from_fn::<_, 4, _>(|_| {
+            Array::<u8, <P::OWF as OWFParameters>::LambdaBytes>::default()
+        });
+        for (lane, label) in labels.iter_mut().enumerate() {
+            gate_label(label, &raw_q, &tables.g, e + lane);
+        }
+        let hashes = gate_hash4::<P>(&h5_prefix, core::array::from_fn(|lane| e + lane), &labels);
+        for (lane, he) in hashes.iter().enumerate() {
+            for m in 0..NMask::USIZE {
+                set_bit(
+                    &mut q_tilde[m * n_mult_bytes..(m + 1) * n_mult_bytes],
+                    e + lane,
+                    get_bit(he, m),
+                );
+            }
+        }
+        e += 4;
+    }
+    for e in e..tables.gates {
+        let mut label = Array::<u8, <P::OWF as OWFParameters>::LambdaBytes>::default();
+        gate_label(&mut label, &raw_q, &tables.g, e);
         let mut hash = h5_init::<P>(iv, e);
-        hash.update(&l_e_prime);
-        let mut he = [0u8; 2];
+        hash.update(&label);
+        let mut he = [0; 2];
         hash.finish().read(&mut he);
-
-        // lines 27: part one (implicit transpose of he)
-        // TODO: transpose he vector instead
         for m in 0..NMask::USIZE {
             set_bit(
                 &mut q_tilde[m * n_mult_bytes..(m + 1) * n_mult_bytes],

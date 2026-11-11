@@ -16,7 +16,7 @@ use crate::{
     internal_keys::{PublicKeyView, SecretKey, SecretKeyView, UnpackedSecretKeyView},
     parameter::{BaseParameters, FAESTParameters, NMask, OWFField, OWFParameters, TauParameters},
     prg::{IV, IVSize},
-    random_oracles::{Hasher, RandomOracle},
+    random_oracles::{Hasher, Hasher4, RandomOracle, Reader4},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
     utils::{Reader, decode_all_chall_3, get_bit, xor_arrays_into},
     vole::{VoleCommitmentCRef, VoleCommitmentCRefMut, volecommit, volereconstruct},
@@ -256,6 +256,29 @@ fn challenge_3<P: FAESTParameters>(
     h.finish().read_into()
 }
 
+/// Use a wider counter so the last batch cannot wrap back to zero.
+fn grind_candidates<T>(
+    start: u64,
+    mut batch: impl FnMut([u32; 4]) -> [T; 4],
+    mut accept: impl FnMut(u32, &T) -> bool,
+) -> Option<u32> {
+    let mut base = start;
+    while base <= u32::MAX as u64 {
+        let counters = core::array::from_fn(|i| (base + i as u64).min(u32::MAX as u64) as u32);
+        for (i, candidate) in batch(counters).iter().enumerate() {
+            let ctr = base + i as u64;
+            if ctr > u32::MAX as u64 {
+                break;
+            }
+            if accept(ctr as u32, candidate) {
+                return Some(ctr as u32);
+            }
+        }
+        base += 4;
+    }
+    None
+}
+
 fn check_challenge_3<P: FAESTParameters>(challenge: &[u8]) -> bool {
     (<O<P> as OWFParameters>::Lambda::USIZE - P::WGRIND::USIZE
         ..<O<P> as OWFParameters>::Lambda::USIZE)
@@ -386,22 +409,43 @@ fn sign<P: FAESTParameters>(
         chunk.copy_from_slice(&coefficient.as_bytes());
     }
 
-    // lines 21–30
-    let h_init = challenge_3_init::<P>(&chall2, proof[0], sig.a_tilde);
-    for ctr in 0..=u32::MAX {
-        let chall_3 = challenge_3::<P>(&h_init, ctr);
-        // declassify chall_3 which is put into the signature
-        declassify!(&chall_3);
-        if !check_challenge_3::<P>(&chall_3) {
-            continue;
-        }
-        let indices = decode_all_chall_3::<P::Tau>(&chall_3);
-        if let Some(opening) = P::BAVC::open(&vole.decom, &indices) {
-            sig.save_opening_and_ctr(&opening, ctr);
-            sig.chall_3.copy_from_slice(&chall_3);
-            return Ok(());
-        }
+    // Build the common prefix once, then inspect each batch in counter order.
+    let mut prefix = <RO<P> as RandomOracle>::Hasher4::<11>::default();
+    prefix.update_shared(&chall2);
+    prefix.update_shared(&proof[0].as_bytes());
+    prefix.update_shared(sig.a_tilde);
+    let result = grind_candidates(
+        0,
+        |counters| {
+            let counters = counters.map(u32::to_le_bytes);
+            let mut h = prefix.clone();
+            h.update(counters.each_ref().map(|c| c.as_slice()));
+            let mut challenges = core::array::from_fn::<_, 4, _>(|_| {
+                Array::<u8, <O<P> as OWFParameters>::LambdaBytes>::default()
+            });
+            h.finish()
+                .read(challenges.each_mut().map(|c| c.as_mut_slice()));
+            challenges
+        },
+        |ctr, chall_3| {
+            // Declassify before either grinding or opening branches.
+            declassify!(chall_3);
+            if !check_challenge_3::<P>(chall_3) {
+                return false;
+            }
+            let indices = decode_all_chall_3::<P::Tau>(chall_3);
+            if let Some(opening) = P::BAVC::open(&vole.decom, &indices) {
+                sig.save_opening_and_ctr(&opening, ctr);
+                sig.chall_3.copy_from_slice(chall_3);
+                return true;
+            }
+            false
+        },
+    );
+    if result.is_some() {
+        return Ok(());
     }
+
     Err(Error::new())
 }
 
@@ -474,6 +518,50 @@ mod test_vectors;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn grinding_preserves_counter_order_and_opening_rejection() {
+        let mut visited = Vec::new();
+        let result = grind_candidates(
+            0,
+            |c| c,
+            |ctr, candidate| {
+                assert_eq!(ctr, *candidate);
+                visited.push(ctr);
+                // Candidates 1, 2, and 3 pass grinding; candidate 1 fails opening.
+                let passes_grinding = ctr >= 1;
+                let opens = ctr >= 2;
+                passes_grinding && opens
+            },
+        );
+        assert_eq!(result, Some(2));
+        assert_eq!(visited, [0, 1, 2]);
+        assert_eq!(grind_candidates(0, |c| c, |_, _| true), Some(0));
+    }
+
+    #[test]
+    fn grinding_does_not_wrap_at_exhaustion() {
+        let mut visited = Vec::new();
+        let start = u32::MAX as u64 - 5;
+        assert_eq!(
+            grind_candidates(
+                start,
+                |c| c,
+                |ctr, candidate| {
+                    assert_eq!(ctr, *candidate);
+                    visited.push(ctr);
+                    false
+                }
+            ),
+            None
+        );
+        assert_eq!(visited, ((u32::MAX - 5)..=u32::MAX).collect::<Vec<_>>());
+        assert_eq!(
+            grind_candidates(u32::MAX as u64 - 1, |c| c, |ctr, _| ctr == u32::MAX),
+            Some(u32::MAX)
+        );
+    }
+
     use crate::{
         internal_keys::{PublicKey, UnpackedSecretKey},
         parameter::*,

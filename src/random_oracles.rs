@@ -5,8 +5,27 @@ use shake::{
 
 use crate::utils::Reader;
 
+#[path = "shake4.rs"]
+mod four;
+use four::Four;
+
+/// Four synchronized, independent random-oracle streams.
+pub(crate) trait Hasher4: Clone {
+    type Reader: Reader4;
+    fn update(&mut self, data: [&[u8]; 4]);
+    fn update_shared(&mut self, data: &[u8]) {
+        self.update([data; 4]);
+    }
+    fn finish(self) -> Self::Reader;
+}
+
+pub(crate) trait Reader4 {
+    fn read(&mut self, dst: [&mut [u8]; 4]);
+}
+
 pub(crate) trait RandomOracle {
     type Hasher<const SEP: u8>: Hasher + Default + Clone;
+    type Hasher4<const SEP: u8>: Hasher4 + Default;
 
     /// Create hasher for `H0`
     fn h0_init() -> Self::Hasher<0> {
@@ -84,6 +103,7 @@ impl Reader for Hasher128Reader {
 
 impl RandomOracle for RandomOracleShake128 {
     type Hasher<const SEP: u8> = Hasher128<SEP>;
+    type Hasher4<const SEP: u8> = Four<Hasher128<SEP>, 168, SEP>;
 }
 
 impl<const SEP: u8> Hasher for Hasher128<SEP> {
@@ -130,6 +150,7 @@ impl Reader for Hasher256Reader {
 
 impl RandomOracle for RandomOracleShake256 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
+    type Hasher4<const SEP: u8> = Four<Hasher256<SEP>, 136, SEP>;
 }
 
 #[cfg(test)]
