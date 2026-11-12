@@ -11,9 +11,12 @@ faest = { path = "../", default-features = false, features = [
   "randomized-signer",
 ] }
 
+zeroize = { version = "=1.9.1", optional = true, default-features = false }
+
 [features]
 default = ["faest/opt-simd"]
 zeroize = ["faest/zeroize"]
+explicit-bzero = ["zeroize", "zeroize/explicit-bzero"]
 
 [dev-dependencies]
 nist-pqc-seeded-rng = {version = "0.4", default-features = false}
