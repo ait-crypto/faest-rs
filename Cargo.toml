@@ -14,7 +14,7 @@ edition = "2024"
 rust-version = "1.88"
 keywords = ["signatures", "FAEST", "post-quantum"]
 categories = ["cryptography"]
-exclude = ["tests/data/*.json", "tests/data/PQCsignKAT_*.rsp", "zeroize/"]
+exclude = ["tests/data/*.json", "tests/data/PQCsignKAT_*.rsp"]
 
 [dependencies]
 aes = { version = "0.9", default-features = false }
@@ -95,9 +95,6 @@ required-features = ["randomized-signer", "std"]
 [profile.dev.package."*"]
 opt-level = 3
 
-[profile.bench]
-lto = "fat"
-
 [profile.profiling]
 inherits = "release"
 debug = true
@@ -113,10 +110,3 @@ version = "1.0.0"
 unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(valgrind, values("enabled"))',
 ] }
-
-[workspace]
-members = ["faest-benches"]
-exclude = ["zeroize"]
-
-[patch.crates-io]
-zeroize = { path = "zeroize" }

@@ -28,6 +28,15 @@ test = false
 doc = false
 doctest = false
 
+[workspace]
+exclude = ["zeroize"]
+
+[patch.crates-io]
+zeroize = { path = "zeroize" }
+
+[profile.bench]
+lto = "fat"
+
 [[bench]]
 name = "faest-bench"
 path = "benches/bench.rs"
