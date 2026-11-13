@@ -198,8 +198,6 @@ where
 
 #[cfg(test)]
 pub(crate) mod test {
-    use super::*;
-
     #[cfg(not(feature = "std"))]
     use alloc::{vec, vec::Vec};
 

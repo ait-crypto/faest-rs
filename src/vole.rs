@@ -560,11 +560,11 @@ pub fn volereconstruct<P: FAESTParameters>(
     for m in 0..NMask::USIZE {
         let ell_m = ell + m * d0;
         offset = 0;
-        for i in 0..tau {
+        for (i, modulus) in tables.tree_moduli.iter().enumerate().take(tau) {
             // line 19
             let di = P::Tau::bavc_max_node_depth(i);
             let columns = &raw_q[offset..offset + di];
-            let reduced = tree_product_share(columns, ell_m, tables.tree_moduli[i]);
+            let reduced = tree_product_share(columns, ell_m, *modulus);
             insert_bit_slice(&mut r_tilde[m], offset, reduced, di as u32);
             offset += di;
         }

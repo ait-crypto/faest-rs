@@ -2512,10 +2512,7 @@ mod test {
 
         use core::iter::zip;
 
-        use rand::{
-            RngExt,
-            distr::{Distribution, StandardUniform},
-        };
+        use rand::distr::{Distribution, StandardUniform};
 
         #[test]
         fn constants<Fu, F: BigGaloisField + Alphas>()
