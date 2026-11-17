@@ -127,7 +127,7 @@ fn h5_init<P: FAESTParameters>(iv: &IV, e: usize) -> impl Hasher + Clone {
 
 /// Compute a packed binary matrix product of the input vector, clearing all output padding
 fn matrix_mul_table(dst: &mut [u8], src: &[u8], table: &PackedMatrix) {
-    assert_eq!(dst.len(), table.rows.div_ceil(8));
+    debug_assert_eq!(dst.len(), table.rows.div_ceil(8));
     dst.fill(0);
     for i in 0..table.rows {
         let mut acc = 0;
@@ -177,8 +177,8 @@ fn xor_shifted_table(
 /// Compute an unreduced GF(2) polynomial product, in coefficient order (most significant first)
 fn poly_mul(dst: &mut [u8], src: &[u8], src_bits: usize, table: &[u64], table_bits: usize) {
     let dst_bits = src_bits + table_bits - 1;
-    assert_eq!(dst.len(), dst_bits.div_ceil(8));
     dst.fill(0);
+    debug_assert_eq!(dst.len(), dst_bits.div_ceil(8));
     for bit in 0..src_bits {
         let mask = 0u64.wrapping_sub(u64::from(get_bit(src, bit)));
         xor_shifted_table(dst, dst_bits, table, table_bits, bit, mask);
@@ -274,11 +274,12 @@ fn convert_to_vole<'a, BAVC: BatchVectorCommitment, LHatBytes: ArraySize>(
 ) {
     let di = BAVC::TAU::bavc_max_node_depth(round as usize);
 
-    assert_eq!(sd.len(), 1 << di);
-    assert_eq!(v.len(), di);
-    assert!(scratch.len() > di);
+    // faest parameters ensure require buffer lengths are always met
+    debug_assert_eq!(sd.len(), 1 << di);
+    debug_assert_eq!(v.len(), di);
+    debug_assert!(scratch.len() > di);
     if !ubot {
-        assert_eq!(u.len(), LHatBytes::USIZE);
+        debug_assert_eq!(u.len(), LHatBytes::USIZE);
     }
     v.fill(Array::default());
 

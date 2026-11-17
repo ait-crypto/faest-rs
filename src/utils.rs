@@ -44,7 +44,7 @@ pub(crate) const fn bit_word_mask(bits: usize) -> u64 {
 pub(crate) fn extract_bit_slice(src: &[u8], offset: usize, bits: u32) -> u16 {
     let bit_offset = offset & 7;
     let byte_idx = offset >> 3;
-    assert!(bits > 0 && bits <= 16);
+    debug_assert!(bits > 0 && bits <= 16);
 
     let mut value = (src[byte_idx] >> bit_offset) as u32;
     if bit_offset + bits as usize > 8 {
@@ -59,7 +59,7 @@ pub(crate) fn extract_bit_slice(src: &[u8], offset: usize, bits: u32) -> u16 {
 pub(crate) fn insert_bit_slice(dst: &mut [u8], offset: usize, value: u16, bits: u32) {
     let bit_offset = offset & 7;
     let byte_idx = offset >> 3;
-    assert!(bits > 0 && bits <= 16);
+    debug_assert!(bits > 0 && bits <= 16);
 
     let shifted = (value as u32) << bit_offset;
     dst[byte_idx] |= shifted as u8;
