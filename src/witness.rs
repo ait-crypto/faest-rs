@@ -2,6 +2,8 @@
 use alloc::{borrow::ToOwned, boxed::Box};
 
 use hybrid_array::{Array, typenum::Unsigned};
+#[cfg(feature = "zeroize")]
+use zeroize::Zeroizing;
 
 use crate::{
     parameter::OWFParameters,
@@ -12,13 +14,19 @@ use crate::{
     },
 };
 
+/// Heap-allocated witness, erased on drop when zeroization is enabled
+#[cfg(feature = "zeroize")]
+pub(crate) type Witness<O> = Box<Zeroizing<Array<u8, <O as OWFParameters>::LBytes>>>;
+#[cfg(not(feature = "zeroize"))]
+pub(crate) type Witness<O> = Box<Array<u8, <O as OWFParameters>::LBytes>>;
+
 pub(crate) fn extend_witness<O: OWFParameters>(
     owf_key: &Array<u8, O::LambdaBytes>,
     owf_input: &Array<u8, O::InputSize>,
-) -> Box<Array<u8, O::LBytes>> {
+) -> Witness<O> {
     let mut input = owf_input.to_owned();
 
-    let mut witness = Box::<Array<u8, O::LBytes>>::default();
+    let mut witness = Witness::<O>::default();
 
     let mut offset = 0;
 

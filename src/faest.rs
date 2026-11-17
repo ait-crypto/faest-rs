@@ -316,10 +316,7 @@ pub(crate) fn faest_sign<P: FAESTParameters>(
 ) -> Result<(), Error> {
     let signature = SignatureRefMut::<P>::from(signature);
     // line 16
-    // TODO: consider directly returning Zeroising array from extendwitness
     let w = O::<P>::extendwitness(sk.owf_key, sk.pk.owf_input);
-    #[cfg(feature = "zeroize")]
-    let w = Zeroizing::new(*w);
     sign::<P>(msg, sk, &w, rho, signature)
 }
 

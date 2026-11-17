@@ -4,7 +4,7 @@ use core::{
 };
 
 #[cfg(not(feature = "std"))]
-use alloc::{borrow::ToOwned, boxed::Box};
+use alloc::borrow::ToOwned;
 
 use crate::{
     classify, declassify,
@@ -25,7 +25,7 @@ use crate::{
         TABLES_128F, TABLES_128S, TABLES_192F, TABLES_192S, TABLES_256F, TABLES_256S,
         TABLES_EM_192F, TABLES_EM_192S, VoleTables,
     },
-    witness::extend_witness,
+    witness::{Witness, extend_witness},
 };
 use aes::{
     Aes128Enc, Aes192Enc, Aes256Enc,
@@ -279,7 +279,7 @@ pub(crate) trait OWFParameters: Sized {
     fn extendwitness(
         owf_key: &Array<u8, Self::LambdaBytes>,
         owf_input: &Array<u8, Self::InputSize>,
-    ) -> Box<Array<u8, Self::LBytes>>;
+    ) -> Witness<Self>;
 
     /// Generates the prover's secret key using the input generator
     fn keygen_with_rng<R: Rng + ?Sized>(rng: &mut R) -> SecretKey<Self> {
@@ -369,7 +369,7 @@ where
     fn extendwitness(
         owf_key: &Array<u8, Self::LambdaBytes>,
         owf_input: &Array<u8, Self::InputSize>,
-    ) -> Box<Array<u8, Self::LBytes>> {
+    ) -> Witness<Self> {
         extend_witness::<Self>(owf_key, owf_input)
     }
 }
@@ -439,7 +439,7 @@ where
     fn extendwitness(
         owf_key: &Array<u8, Self::LambdaBytes>,
         owf_input: &Array<u8, Self::InputSize>,
-    ) -> Box<Array<u8, Self::LBytes>> {
+    ) -> Witness<Self> {
         extend_witness::<Self>(owf_key, owf_input)
     }
 }
@@ -509,7 +509,7 @@ where
     fn extendwitness(
         owf_key: &Array<u8, Self::LambdaBytes>,
         owf_input: &Array<u8, Self::InputSize>,
-    ) -> Box<Array<u8, Self::LBytes>> {
+    ) -> Witness<Self> {
         extend_witness::<Self>(owf_key, owf_input)
     }
 }
@@ -576,7 +576,7 @@ where
     fn extendwitness(
         owf_key: &Array<u8, Self::LambdaBytes>,
         owf_input: &Array<u8, Self::InputSize>,
-    ) -> Box<Array<u8, Self::LBytes>> {
+    ) -> Witness<Self> {
         extend_witness::<Self>(owf_input, owf_key)
     }
 }
@@ -645,7 +645,7 @@ where
     fn extendwitness(
         owf_key: &Array<u8, Self::LambdaBytes>,
         owf_input: &Array<u8, Self::InputSize>,
-    ) -> Box<Array<u8, Self::LBytes>> {
+    ) -> Witness<Self> {
         extend_witness::<Self>(owf_input, owf_key)
     }
 }
@@ -714,7 +714,7 @@ where
     fn extendwitness(
         owf_key: &Array<u8, Self::LambdaBytes>,
         owf_input: &Array<u8, Self::InputSize>,
-    ) -> Box<Array<u8, Self::LBytes>> {
+    ) -> Witness<Self> {
         extend_witness::<Self>(owf_input, owf_key)
     }
 }
