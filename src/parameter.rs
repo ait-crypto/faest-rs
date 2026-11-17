@@ -721,7 +721,7 @@ where
 
 pub(crate) trait TauParameters {
     /// Bilinear multiplication tables
-    const VOLE_TABLES: &'static crate::vole::tables::VoleTables;
+    const VOLE_TABLES: &'static VoleTables;
     /// Number of small-VOLE instances
     type Tau: ArraySize;
     /// Bit-length of the larger small-VOLE instances (the smaller small-VOLE instances have length K-1)
