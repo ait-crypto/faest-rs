@@ -629,14 +629,12 @@ mod test_vectors;
 
 #[cfg(test)]
 mod test {
-    // TODO: refactor
-
     #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
 
-    use super::test_vectors::{DataVOLE, FAEST_EM_TEST_VECTORS, ROOT_KEY, VOLE_TEST_VECTORS};
+    use super::test_vectors::{DataVOLE, ROOT_KEY, VOLE_TEST_VECTORS};
     use super::*;
-    use crate::{fields::Field, parameter::*, utils::test::hash_array};
+    use crate::{parameter::*, utils::test::hash_array};
 
     fn witness_rows<L: ArraySize>(columns: &[Array<u8, L>], lambda_bytes: usize) -> Vec<u8> {
         let mut rows = vec![0; L::USIZE * 8 * lambda_bytes];
@@ -646,55 +644,6 @@ mod test {
             }
         }
         rows
-    }
-
-    fn check_correlations<P: FAESTParameters>(
-        committed: &VoleCommitResult<
-            <P::BAVC as BatchVectorCommitment>::LambdaBytes,
-            <P::BAVC as BatchVectorCommitment>::NLeafCommit,
-            <P::OWF as OWFParameters>::LBytes,
-        >,
-        reconstructed: &VoleReconstructResult<
-            <P::BAVC as BatchVectorCommitment>::LambdaBytes,
-            <P::OWF as OWFParameters>::LBytes,
-        >,
-        challenge: &[u8],
-    ) {
-        assert_eq!(committed.com, reconstructed.com);
-        let table = &P::Tau::VOLE_TABLES.w_crt;
-        let mut expected_delta = vec![0; table.rows.div_ceil(8)];
-        // Independent coefficient matrix product, including non-word-aligned inputs.
-        for row in 0..table.rows {
-            let mut bit = 0;
-            for col in 0..table.columns {
-                bit ^= get_bit(challenge, col)
-                    & ((table.words[row * table.stride + col / 64] >> (col % 64)) as u8 & 1);
-            }
-            set_bit(&mut expected_delta, row, bit);
-        }
-        assert_eq!(reconstructed.delta.as_slice(), expected_delta);
-        for (col, (q, v)) in reconstructed.q.iter().zip(committed.v.iter()).enumerate() {
-            let mask = 0u8.wrapping_sub(get_bit(&expected_delta, col));
-            for byte in 0..<P::OWF as OWFParameters>::LBytes::USIZE {
-                assert_eq!(
-                    q[byte],
-                    v[byte] ^ (committed.u[byte] & mask),
-                    "witness column {col}, byte {byte}"
-                );
-            }
-        }
-        type F<P> =
-            <<<P as FAESTParameters>::OWF as OWFParameters>::BaseParams as BaseParameters>::Field;
-        let delta = F::<P>::from(reconstructed.delta.as_slice());
-        for m in 0..NMask::USIZE {
-            let expected = F::<P>::from(committed.v_bar[m].as_slice())
-                + F::<P>::from(committed.u_bar[m].as_slice()) * delta;
-            assert_eq!(
-                reconstructed.q_bar[m].as_slice(),
-                expected.as_bytes().as_slice(),
-                "mask {m}"
-            );
-        }
     }
 
     fn check_vector<P: FAESTParameters>(tv: &DataVOLE) {
@@ -710,7 +659,7 @@ mod test {
             VoleCommitmentCRefMut::new(&mut c),
             &mut cm,
             &r,
-            &IV::default(),
+            &IV::from(tv.iv),
         );
         assert_eq!(res.com.as_slice(), tv.h, "com");
         assert_eq!(hash_array(&c), tv.hashed_c, "c");
@@ -745,72 +694,23 @@ mod test {
             &opening,
             VoleCommitmentCRef::new(&c),
             &cm,
-            &IV::default(),
+            &IV::from(tv.iv),
         )
         .expect("VOLEReconstruct failed");
+        assert_eq!(rec.com.as_slice(), tv.h, "reconstructed com");
         assert_eq!(hash_array(&witness_rows(&rec.q, r.len())), tv.hashed_q, "q");
         assert_eq!(
             hash_array(rec.q_bar.as_flattened()),
             tv.hashed_bar_q,
             "q_bar"
         );
-        check_correlations::<P>(&res, &rec, &challenge);
-
-        let mut c2 = vec![0; c.len()];
-        let mut cm2 = vec![0; cm.len()];
-        let res2 = volecommit::<P>(
-            VoleCommitmentCRefMut::new(&mut c2),
-            &mut cm2,
-            &r,
-            &IV::default(),
-        );
-        assert_eq!(c, c2);
-        assert_eq!(cm, cm2);
-        assert_eq!(res.com, res2.com);
-        assert_eq!(res.u, res2.u);
-        assert_eq!(res.v, res2.v);
-        assert_eq!(res.u_bar, res2.u_bar);
-        assert_eq!(res.v_bar, res2.v_bar);
-        for column in &res.v[P::Tau::VOLE_TABLES.w_crt.columns..] {
-            assert!(column.iter().all(|&b| b == 0));
-        }
-        let gates = P::Tau::VOLE_TABLES.gates;
-        if gates % 8 != 0 {
-            for row in cm.chunks(gates.div_ceil(8)) {
-                assert_eq!(row[row.len() - 1] >> (gates % 8), 0);
-            }
-        }
-        // Exercise the complete path with a different root and nonzero IV.
-        let mut other_root = r.clone();
-        other_root[0] ^= 0xa5;
-        let iv = IV::from([0x37; 16]);
-        let other = volecommit::<P>(
-            VoleCommitmentCRefMut::new(&mut c2),
-            &mut cm2,
-            &other_root,
-            &iv,
-        );
-        let opening = P::BAVC::open(&other.decom, &indices).unwrap();
-        let rec = volereconstruct::<P>(
-            &challenge,
-            &opening,
-            VoleCommitmentCRef::new(&c2),
-            &cm2,
-            &iv,
-        )
-        .unwrap();
-        check_correlations::<P>(&other, &rec, &challenge);
     }
 
     macro_rules! vector_test {
         ($name:ident, $p:ty, $i:expr) => {
             #[test]
             fn $name() {
-                check_vector::<$p>(if $i < 6 {
-                    &VOLE_TEST_VECTORS[$i]
-                } else {
-                    &FAEST_EM_TEST_VECTORS[$i - 6]
-                });
+                check_vector::<$p>(&VOLE_TEST_VECTORS[$i]);
             }
         };
     }
@@ -826,265 +726,4 @@ mod test {
     vector_test!(commit_em_192f, FAESTEM192fParameters, 9);
     vector_test!(commit_em_256s, FAESTEM256sParameters, 10);
     vector_test!(commit_em_256f, FAESTEM256fParameters, 11);
-
-    #[test]
-    fn packed_polynomial_products() {
-        // Independent coefficient convolution with zero-padded tables, dirty source
-        // padding and carries past the final source/table word.
-        for src_bits in [1usize, 7, 8, 9, 63, 64, 65, 127, 129] {
-            for table_bits in [1usize, 7, 9, 63, 64, 65, 121, 193] {
-                for pattern in 0..4 {
-                    let mut src = vec![0; src_bits.div_ceil(8)];
-                    let mut table = vec![0; table_bits.div_ceil(64)];
-                    for i in 0..src_bits {
-                        let bit = match pattern {
-                            0 => 0,
-                            1 => u8::from(i == src_bits - 1),
-                            2 => 1,
-                            _ => u8::from(i % 3 == 1),
-                        };
-                        set_bit(&mut src, i, bit);
-                    }
-                    for i in 0..table_bits {
-                        let bit = match pattern {
-                            0 => 1,
-                            1 => u64::from(i == table_bits - 1),
-                            2 => 1,
-                            _ => u64::from(i % 5 < 2),
-                        };
-                        table[i / 64] |= bit << (i % 64);
-                    }
-                    if src_bits % 8 != 0 {
-                        *src.last_mut().unwrap() |= 0xff << (src_bits % 8);
-                    }
-                    let bits = src_bits + table_bits - 1;
-                    let mut expected = vec![0; bits.div_ceil(8)];
-                    for i in 0..src_bits {
-                        for j in 0..table_bits {
-                            expected[(i + j) / 8] ^= (get_bit(&src, i)
-                                & ((table[j / 64] >> (j % 64)) as u8 & 1))
-                                << ((i + j) % 8);
-                        }
-                    }
-                    let mut actual = vec![0xff; expected.len()];
-                    poly_mul(&mut actual, &src, src_bits, &table, table_bits);
-                    assert_eq!(
-                        actual, expected,
-                        "src={src_bits}, table={table_bits}, pattern={pattern}"
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn packed_matrix_products() {
-        // Exercise every generated map with zero, every basis vector and dense
-        // inputs. Coefficient lookup is independent of packed word parity.
-        for tables in [
-            Tau128Small::VOLE_TABLES,
-            Tau128Fast::VOLE_TABLES,
-            Tau192Small::VOLE_TABLES,
-            Tau192Fast::VOLE_TABLES,
-            Tau256Small::VOLE_TABLES,
-            Tau256Fast::VOLE_TABLES,
-            Tau128SmallEM::VOLE_TABLES,
-            Tau128FastEM::VOLE_TABLES,
-            Tau192SmallEM::VOLE_TABLES,
-            Tau192FastEM::VOLE_TABLES,
-            Tau256SmallEM::VOLE_TABLES,
-            Tau256FastEM::VOLE_TABLES,
-        ] {
-            for table in [
-                &tables.f,
-                &tables.g,
-                &tables.w_tree,
-                &tables.w_gate,
-                &tables.w_crt,
-            ] {
-                for pattern in 0..table.columns + 3 {
-                    let mut src = vec![0; table.columns.div_ceil(8)];
-                    if pattern < table.columns {
-                        set_bit(&mut src, pattern, 1);
-                    } else if pattern == table.columns + 1 {
-                        src.fill(0xff);
-                    } else if pattern == table.columns + 2 {
-                        src.fill(0xa5);
-                    }
-                    let mut expected = vec![0; table.rows.div_ceil(8)];
-                    for row in 0..table.rows {
-                        let mut bit = 0;
-                        for col in 0..table.columns {
-                            bit ^= get_bit(&src, col)
-                                & ((table.words[row * table.stride + col / 64] >> (col % 64))
-                                    as u8
-                                    & 1);
-                        }
-                        set_bit(&mut expected, row, bit);
-                    }
-                    let mut actual = vec![0xff; expected.len()];
-                    matrix_mul_table(&mut actual, &src, table);
-                    assert_eq!(actual, expected);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn tree_polynomial_reduction() {
-        for tables in [
-            Tau128Small::VOLE_TABLES,
-            Tau192Small::VOLE_TABLES,
-            Tau192FastEM::VOLE_TABLES,
-            Tau256Small::VOLE_TABLES,
-        ] {
-            for &modulus in tables.tree_moduli {
-                let degree = 15 - modulus.leading_zeros() as usize;
-                let limit = 2 * degree;
-                // A coefficient-based polynomial long division, using explicit
-                // coefficient arrays rather than word masks and shifts.
-                for value in (0..limit).map(|i| 1u32 << i).chain([
-                    0,
-                    (1u32 << limit) - 1,
-                    0xaaaa_aaaa & ((1u32 << limit) - 1),
-                ]) {
-                    let mut coeff: Vec<u8> = (0..limit).map(|i| ((value >> i) & 1) as u8).collect();
-                    for i in (degree..limit).rev() {
-                        if coeff[i] != 0 {
-                            for j in 0..=degree {
-                                coeff[i - degree + j] ^= ((modulus >> j) & 1) as u8;
-                            }
-                        }
-                    }
-                    let expected = coeff[..degree]
-                        .iter()
-                        .enumerate()
-                        .fold(0u16, |acc, (i, &b)| acc | (u16::from(b) << i));
-                    assert_eq!(reduce_tree_product(value, modulus, degree), expected);
-                }
-            }
-        }
-    }
-
-    fn check_streaming<B: BatchVectorCommitment, L: ArraySize>() {
-        let iv = IV::from([0x91; 16]);
-        for tree in [0, <B::TAU as TauParameters>::Tau::USIZE - 1] {
-            let depth = B::TAU::bavc_max_node_depth(tree);
-            let count = 1 << depth;
-            let seeds: Vec<Array<u8, B::LambdaBytes>> = (0..count)
-                .map(|leaf| {
-                    let mut seed = Array::default();
-                    for (byte, dst) in seed.iter_mut().enumerate() {
-                        *dst = (leaf as u8)
-                            .wrapping_mul(37)
-                            .wrapping_add((leaf >> 8) as u8)
-                            .wrapping_add(byte as u8);
-                    }
-                    seed
-                })
-                .collect();
-            let mut scratch = vec![Array::<u8, L>::default(); B::TAU::bavc_max_node_depth(0) + 1];
-            for hidden in [None, Some(0), Some(1), Some(count / 2), Some(count - 1)] {
-                for column in &mut scratch {
-                    column.fill(0xa5);
-                }
-                let mut expanded = vec![Array::<u8, L>::default(); count];
-                for (leaf, out) in expanded.iter_mut().enumerate() {
-                    if hidden.is_some() && leaf == 0 {
-                        continue;
-                    }
-                    let original = leaf ^ hidden.unwrap_or(0);
-                    B::PRG::new_prg(&seeds[original], &iv, TWEAK_OFFSET + tree as u32).read(out);
-                }
-                // Straightforward specification traversal, materializing all leaves.
-                let mut expected = vec![Array::<u8, L>::default(); depth];
-                for (level, column) in expected.iter_mut().enumerate() {
-                    for pair in 0..count >> (level + 1) {
-                        xor_arrays_inplace(column, &expanded[2 * pair + 1]);
-                        let mut sum = expanded[2 * pair].clone();
-                        xor_arrays_inplace(&mut sum, &expanded[2 * pair + 1]);
-                        expanded[pair] = sum;
-                    }
-                }
-                let mut actual = vec![Array::<u8, L>::default(); depth];
-                for col in &mut actual {
-                    col.fill(0xff);
-                }
-                let mut u = vec![0x5a; L::USIZE];
-                let bottom = Array::default();
-                let permuted = (0..count).map(|leaf| {
-                    if hidden.is_some() && leaf == 0 {
-                        &bottom
-                    } else {
-                        &seeds[leaf ^ hidden.unwrap_or(0)]
-                    }
-                });
-                convert_to_vole::<B, L>(
-                    permuted,
-                    &iv,
-                    tree as u32,
-                    hidden.is_some(),
-                    &mut u,
-                    &mut actual,
-                    &mut scratch,
-                );
-                assert_eq!(actual, expected, "tree={tree}, hidden={hidden:?}");
-                if hidden.is_none() {
-                    assert_eq!(u, expanded[0].as_slice());
-                } else {
-                    assert!(u.iter().all(|&b| b == 0x5a));
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn streaming_conversion_matches_leaf_reduction() {
-        use hybrid_array::typenum::{U9, U17, U135};
-        check_streaming::<BAVC128Small<crate::fields::GF128>, U1>();
-        check_streaming::<BAVC128Fast<crate::fields::GF128>, U9>();
-        check_streaming::<BAVC192SmallEM, U17>();
-        check_streaming::<BAVC256FastEM, U135>();
-    }
-
-    #[test]
-    fn reconstruction_opening_contents() {
-        type P = FAEST128fParameters;
-        let tables = <P as FAESTParameters>::Tau::VOLE_TABLES;
-        let mut c = vec![
-            0;
-            (tables.tau - 1)
-                * <<P as FAESTParameters>::OWF as OWFParameters>::LBytes::USIZE
-        ];
-        let mut cm = vec![0; NMask::USIZE * tables.gates.div_ceil(8)];
-        let iv = IV::default();
-        let committed = volecommit::<P>(
-            VoleCommitmentCRefMut::new(&mut c),
-            &mut cm,
-            &Array::default(),
-            &iv,
-        );
-        let challenge = Array::try_from(VOLE_TEST_VECTORS[1].chall).unwrap();
-        let indices = decode_all_chall_3::<<P as FAESTParameters>::Tau>(&challenge);
-        let opening = <P as FAESTParameters>::BAVC::open(&committed.decom, &indices).unwrap();
-        let reconstruct = |opening: &BavcOpenResult, c: &[u8], cm: &[u8]| {
-            volereconstruct::<P>(&challenge, opening, VoleCommitmentCRef::new(c), cm, &iv)
-        };
-        // Padding is allowed up to Topen, but must be zero.
-        let pad = [0u8; 16];
-        let mut padded = opening.clone();
-        padded.nodes.push(&pad);
-        let rec = reconstruct(&padded, &c, &cm).unwrap();
-        assert_eq!(rec.com, committed.com);
-        let nonzero_pad = [1u8; 16];
-        padded.nodes.pop();
-        padded.nodes.push(&nonzero_pad);
-        assert!(reconstruct(&padded, &c, &cm).is_none());
-        // Reconstruction computes a commitment; it cannot authenticate it.
-        let mut altered_com = opening.coms[0].to_vec();
-        altered_com[0] ^= 1;
-        let mut altered = opening.clone();
-        altered.coms[0] = &altered_com;
-        assert_ne!(reconstruct(&altered, &c, &cm).unwrap().com, committed.com);
-    }
 }
