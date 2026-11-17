@@ -291,6 +291,12 @@ fn convert_to_vole<'a, BAVC: BatchVectorCommitment, LHatBytes: ArraySize>(
         // ConvertToVOLE (Figure 5.6), lines 1-4: bottom expands to zero.
         current.fill(0);
         if leaf != 0 || !ubot {
+            // TODO: when SIMD available, PRG could benefit from instruction-level parallelism:
+            // - AES-NI: Interleave AES key expansion and encryption rounds instead of sequential execution.
+            // Assume an AESENC instruction takes 4 CPU cycles, before AESENC for sd_i finishes 
+            // we can start executing an independent AESENC for sd_i+1..sd_i+3
+            // - VAES: independent inputs can be processed in multiple VAES lines (2 or 4).
+            // can also be combined with instruction level parallelism as before.
             BAVC::PRG::new_prg(seed, iv, TWEAK_OFFSET + round).read(current);
         }
 
