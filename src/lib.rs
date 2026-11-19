@@ -252,7 +252,7 @@ macro_rules! define_impl {
                     msg: &[u8],
                     sk: &SecretKey<<[<$param Parameters>] as FAESTParameters>::OWF>,
                     rho: &[u8],
-                    signature: &mut [u8;  <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE],
+                    signature: &mut [u8; <[<$param Parameters>] as FAESTParameters>::SIGNATURE_SIZE],
                 ) -> Result<(), Error> {
                     #[cfg(all(
                         feature = "opt-simd",
