@@ -1,4 +1,21 @@
-//! Synchronized SHAKE streams. AVX2 stores each Keccak word as four lanes.
+/*
+Based on the KeccakP-1600-times4 implementation from:
+
+The eXtended Keccak Code Package (XKCP) 
+<https://github.com/XKCP/XKCP/tree/master/lib/low/KeccakP-1600-times4/AVX2>.
+
+The Keccak-p permutations, designed by Guido Bertoni, Joan Daemen, Michaël Peeters and Gilles Van Assche.
+
+Implementation by Gilles Van Assche and Ronny Van Keer, hereby denoted as "the implementer".
+
+For more information, feedback or questions, please refer to the Keccak Team website:
+https://keccak.team/
+
+To the extent possible under law, the implementer has waived all copyright
+and related or neighboring rights to the source code in this file.
+http://creativecommons.org/publicdomain/zero/1.0/
+*/
+
 use super::{Hasher, Hasher4, Reader4};
 use crate::utils::Reader;
 
@@ -33,21 +50,24 @@ impl<H: Hasher + Clone, const RATE: usize, const SEP: u8> Hasher4 for Four<H, RA
             "unequal SHAKE input lengths"
         );
         match self {
+            // fallback to sequential update
             Self::Scalar(hashers) => {
                 for (h, d) in hashers.iter_mut().zip(data) {
                     h.update(d);
                 }
             }
+
             #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
             Self::Avx2(s) => s.update(data),
         }
     }
+
     fn finish(self) -> Self::Reader {
         match self {
             Self::Scalar(h) => FourReader::Scalar(h.map(Hasher::finish)),
             #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
             Self::Avx2(mut s) => {
-                s.update([&[SEP]; 4]);
+                s.update([[SEP].as_ref(); 4]);
                 s.pad();
                 FourReader::Avx2(s)
             }
@@ -83,24 +103,27 @@ mod avx2 {
     // The word-major layout stays packed throughout absorption and squeezing.
     #[derive(Clone)]
     pub(crate) struct Sponge<const RATE: usize> {
-        words: [[u64; 4]; 25],
+        state: [[u64; 4]; 25],
         pos: usize,
     }
+
     impl<const RATE: usize> Default for Sponge<RATE> {
         fn default() -> Self {
             Self {
-                words: [[0; 4]; 25],
+                state: [[0; 4]; 25],
                 pos: 0,
             }
         }
     }
+
     impl<const RATE: usize> Sponge<RATE> {
         fn permute(&mut self) {
-            // SAFETY: this variant is constructed only after runtime AVX2 detection.
+            // SAFETY: this variant is constructed only after runtime AVX2 detection
             unsafe {
-                keccak(&mut self.words);
+                keccak_p1600_times4_avx2(&mut self.state);
             }
         }
+
         pub(super) fn update(&mut self, data: [&[u8]; 4]) {
             let mut offset = 0;
             while offset < data[0].len() {
@@ -110,14 +133,14 @@ mod avx2 {
                     let p = self.pos + j;
                     if p % 8 == 0 && count - j >= 8 {
                         for lane in 0..4 {
-                            self.words[p / 8][lane] ^= u64::from_le_bytes(
+                            self.state[p / 8][lane] ^= u64::from_le_bytes(
                                 data[lane][offset + j..offset + j + 8].try_into().unwrap(),
                             );
                         }
                         j += 8;
                     } else {
                         for lane in 0..4 {
-                            self.words[p / 8][lane] ^=
+                            self.state[p / 8][lane] ^=
                                 (data[lane][offset + j] as u64) << (8 * (p % 8));
                         }
                         j += 1;
@@ -131,14 +154,16 @@ mod avx2 {
                 }
             }
         }
+
         pub(super) fn pad(&mut self) {
             for lane in 0..4 {
-                self.words[self.pos / 8][lane] ^= 0x1f << (8 * (self.pos % 8));
-                self.words[RATE / 8 - 1][lane] ^= 1 << 63;
+                self.state[self.pos / 8][lane] ^= 0x1f << (8 * (self.pos % 8));
+                self.state[RATE / 8 - 1][lane] ^= 1 << 63;
             }
             self.permute();
             self.pos = 0;
         }
+
         pub(super) fn read(&mut self, mut dst: [&mut [u8]; 4]) {
             for offset in 0..dst[0].len() {
                 if self.pos == RATE {
@@ -146,14 +171,14 @@ mod avx2 {
                     self.pos = 0;
                 }
                 for (lane, d) in dst.iter_mut().enumerate() {
-                    d[offset] = (self.words[self.pos / 8][lane] >> (8 * (self.pos % 8))) as u8;
+                    d[offset] = (self.state[self.pos / 8][lane] >> (8 * (self.pos % 8))) as u8;
                 }
                 self.pos += 1;
             }
         }
     }
 
-    const RC: [u64; 24] = [
+    const F1600_ROUND_CONSTANT: [u64; 24] = [
         0x0000000000000001,
         0x0000000000008082,
         0x800000000000808a,
@@ -180,117 +205,158 @@ mod avx2 {
         0x8000000080008008,
     ];
 
+    // Indexed by the source word, x + 5 * y.
+    #[rustfmt::skip]
+    const RHO_OFFSETS: [i32; 25] = [
+         0,  1, 62, 28, 27,
+        36, 44,  6, 55, 20,
+         3, 10, 43, 25, 39,
+        41, 45, 15, 21,  8,
+        18,  2, 61, 56, 14,
+    ];
+
+    #[inline]
     #[target_feature(enable = "avx2")]
-    unsafe fn keccak(words: &mut [[u64; 4]; 25]) {
-        let mut a = [_mm256_setzero_si256(); 25];
-        for i in 0..25 {
-            // SAFETY: each word contains exactly 32 initialized bytes; unaligned loads are allowed.
-            a[i] = unsafe { _mm256_loadu_si256(words[i].as_ptr().cast()) };
+    fn rotate_words(word: __m256i, bits: i32) -> __m256i {
+        if bits == 0 {
+            return word;
         }
-        for rc in RC {
-            let mut c = [_mm256_setzero_si256(); 5];
-            for x in 0..5 {
-                c[x] = _mm256_xor_si256(
-                    _mm256_xor_si256(a[x], a[x + 5]),
-                    _mm256_xor_si256(_mm256_xor_si256(a[x + 10], a[x + 15]), a[x + 20]),
-                );
-            }
-            for x in 0..5 {
-                let next = c[(x + 1) % 5];
-                let d = _mm256_xor_si256(
-                    c[(x + 4) % 5],
-                    _mm256_or_si256(_mm256_slli_epi64::<1>(next), _mm256_srli_epi64::<63>(next)),
-                );
-                for y in 0..5 {
-                    a[x + 5 * y] = _mm256_xor_si256(a[x + 5 * y], d);
+        _mm256_or_si256(
+            _mm256_sll_epi64(word, _mm_cvtsi32_si128(bits)),
+            _mm256_srl_epi64(word, _mm_cvtsi32_si128(64 - bits)),
+        )
+    }
+
+    #[inline]
+    #[target_feature(enable = "avx2")]
+    fn theta_column_parities(state: &[__m256i; 25]) -> [__m256i; 5] {
+        core::array::from_fn(|x| {
+            _mm256_xor_si256(
+                _mm256_xor_si256(state[x], state[x + 5]),
+                _mm256_xor_si256(
+                    _mm256_xor_si256(state[x + 10], state[x + 15]),
+                    state[x + 20],
+                ),
+            )
+        })
+    }
+
+    #[inline]
+    #[target_feature(enable = "avx2")]
+    fn theta_corrections(parities: &[__m256i; 5]) -> [__m256i; 5] {
+        core::array::from_fn(|x| {
+            _mm256_xor_si256(
+                parities[(x + 4) % 5],
+                rotate_words(parities[(x + 1) % 5], 1),
+            )
+        })
+    }
+
+    #[inline]
+    #[target_feature(enable = "avx2")]
+    fn rho_pi_word<const X: usize, const Y: usize>(
+        state: &[__m256i; 25],
+        theta: &[__m256i; 5],
+    ) -> __m256i {
+        // Invert pi: destination (X, Y) came from ((X + 3 * Y) % 5, X).
+        let source_x = (X + 3 * Y) % 5;
+        let source = source_x + 5 * X;
+        let corrected = _mm256_xor_si256(state[source], theta[source_x]);
+        rotate_words(corrected, RHO_OFFSETS[source])
+    }
+
+    #[inline]
+    #[target_feature(enable = "avx2")]
+    fn chi_word(word: __m256i, next: __m256i, after_next: __m256i) -> __m256i {
+        _mm256_xor_si256(word, _mm256_andnot_si256(next, after_next))
+    }
+
+    #[inline]
+    #[target_feature(enable = "avx2")]
+    fn round_row<const Y: usize>(state: &[__m256i; 25], theta: &[__m256i; 5]) -> [__m256i; 5] {
+        // Start chi as soon as its three inputs are ready, then finish the wraparound words.
+        let b0 = rho_pi_word::<0, Y>(state, theta);
+        let b1 = rho_pi_word::<1, Y>(state, theta);
+        let b2 = rho_pi_word::<2, Y>(state, theta);
+        let word0 = chi_word(b0, b1, b2);
+        let b3 = rho_pi_word::<3, Y>(state, theta);
+        let word1 = chi_word(b1, b2, b3);
+        let b4 = rho_pi_word::<4, Y>(state, theta);
+        [
+            word0,
+            word1,
+            chi_word(b2, b3, b4),
+            chi_word(b3, b4, b0),
+            chi_word(b4, b0, b1),
+        ]
+    }
+
+    #[inline]
+    #[target_feature(enable = "avx2")]
+    fn write_round_row<const Y: usize, const PREPARE_NEXT: bool>(
+        state: &[__m256i; 25],
+        theta: &[__m256i; 5],
+        output: &mut [__m256i; 25],
+        parities: &mut [__m256i; 5],
+        round_constant: u64,
+    ) {
+        let mut row = round_row::<Y>(state, theta);
+        if Y == 0 {
+            // Iota changes word (0, 0) before it contributes to the next theta.
+            row[0] = _mm256_xor_si256(row[0], _mm256_set1_epi64x(round_constant as i64));
+        }
+        output[5 * Y..5 * Y + 5].copy_from_slice(&row);
+
+        if PREPARE_NEXT {
+            if Y == 0 {
+                *parities = row;
+            } else {
+                for (parity, word) in parities.iter_mut().zip(row) {
+                    *parity = _mm256_xor_si256(*parity, word);
                 }
             }
-            let mut b = [_mm256_setzero_si256(); 25];
-            b[0] = a[0];
-            b[10] = _mm256_or_si256(_mm256_slli_epi64::<1>(a[1]), _mm256_srli_epi64::<63>(a[1]));
-            b[20] = _mm256_or_si256(_mm256_slli_epi64::<62>(a[2]), _mm256_srli_epi64::<2>(a[2]));
-            b[5] = _mm256_or_si256(_mm256_slli_epi64::<28>(a[3]), _mm256_srli_epi64::<36>(a[3]));
-            b[15] = _mm256_or_si256(_mm256_slli_epi64::<27>(a[4]), _mm256_srli_epi64::<37>(a[4]));
-            b[16] = _mm256_or_si256(_mm256_slli_epi64::<36>(a[5]), _mm256_srli_epi64::<28>(a[5]));
-            b[1] = _mm256_or_si256(_mm256_slli_epi64::<44>(a[6]), _mm256_srli_epi64::<20>(a[6]));
-            b[11] = _mm256_or_si256(_mm256_slli_epi64::<6>(a[7]), _mm256_srli_epi64::<58>(a[7]));
-            b[21] = _mm256_or_si256(_mm256_slli_epi64::<55>(a[8]), _mm256_srli_epi64::<9>(a[8]));
-            b[6] = _mm256_or_si256(_mm256_slli_epi64::<20>(a[9]), _mm256_srli_epi64::<44>(a[9]));
-            b[7] = _mm256_or_si256(
-                _mm256_slli_epi64::<3>(a[10]),
-                _mm256_srli_epi64::<61>(a[10]),
-            );
-            b[17] = _mm256_or_si256(
-                _mm256_slli_epi64::<10>(a[11]),
-                _mm256_srli_epi64::<54>(a[11]),
-            );
-            b[2] = _mm256_or_si256(
-                _mm256_slli_epi64::<43>(a[12]),
-                _mm256_srli_epi64::<21>(a[12]),
-            );
-            b[12] = _mm256_or_si256(
-                _mm256_slli_epi64::<25>(a[13]),
-                _mm256_srli_epi64::<39>(a[13]),
-            );
-            b[22] = _mm256_or_si256(
-                _mm256_slli_epi64::<39>(a[14]),
-                _mm256_srli_epi64::<25>(a[14]),
-            );
-            b[23] = _mm256_or_si256(
-                _mm256_slli_epi64::<41>(a[15]),
-                _mm256_srli_epi64::<23>(a[15]),
-            );
-            b[8] = _mm256_or_si256(
-                _mm256_slli_epi64::<45>(a[16]),
-                _mm256_srli_epi64::<19>(a[16]),
-            );
-            b[18] = _mm256_or_si256(
-                _mm256_slli_epi64::<15>(a[17]),
-                _mm256_srli_epi64::<49>(a[17]),
-            );
-            b[3] = _mm256_or_si256(
-                _mm256_slli_epi64::<21>(a[18]),
-                _mm256_srli_epi64::<43>(a[18]),
-            );
-            b[13] = _mm256_or_si256(
-                _mm256_slli_epi64::<8>(a[19]),
-                _mm256_srli_epi64::<56>(a[19]),
-            );
-            b[14] = _mm256_or_si256(
-                _mm256_slli_epi64::<18>(a[20]),
-                _mm256_srli_epi64::<46>(a[20]),
-            );
-            b[24] = _mm256_or_si256(
-                _mm256_slli_epi64::<2>(a[21]),
-                _mm256_srli_epi64::<62>(a[21]),
-            );
-            b[9] = _mm256_or_si256(
-                _mm256_slli_epi64::<61>(a[22]),
-                _mm256_srli_epi64::<3>(a[22]),
-            );
-            b[19] = _mm256_or_si256(
-                _mm256_slli_epi64::<56>(a[23]),
-                _mm256_srli_epi64::<8>(a[23]),
-            );
-            b[4] = _mm256_or_si256(
-                _mm256_slli_epi64::<14>(a[24]),
-                _mm256_srli_epi64::<50>(a[24]),
-            );
-            for y in 0..5 {
-                for x in 0..5 {
-                    a[x + 5 * y] = _mm256_xor_si256(
-                        b[x + 5 * y],
-                        _mm256_andnot_si256(b[(x + 1) % 5 + 5 * y], b[(x + 2) % 5 + 5 * y]),
-                    );
-                }
-            }
-            a[0] = _mm256_xor_si256(a[0], _mm256_set1_epi64x(rc as i64));
         }
-        for i in 0..25 {
+    }
+
+    #[inline]
+    #[target_feature(enable = "avx2")]
+    fn keccak_round<const PREPARE_NEXT: bool>(
+        state: &[__m256i; 25],
+        output: &mut [__m256i; 25],
+        parities: &mut [__m256i; 5],
+        round_constant: u64,
+    ) {
+        // All five corrections must use the input parities before the rows replace them.
+        let theta = theta_corrections(parities);
+        write_round_row::<0, PREPARE_NEXT>(state, &theta, output, parities, round_constant);
+        write_round_row::<1, PREPARE_NEXT>(state, &theta, output, parities, round_constant);
+        write_round_row::<2, PREPARE_NEXT>(state, &theta, output, parities, round_constant);
+        write_round_row::<3, PREPARE_NEXT>(state, &theta, output, parities, round_constant);
+        write_round_row::<4, PREPARE_NEXT>(state, &theta, output, parities, round_constant);
+    }
+
+    #[target_feature(enable = "avx2")]
+    unsafe fn keccak_p1600_times4_avx2(state: &mut [[u64; 4]; 25]) {
+        let mut current = core::array::from_fn(|i| {
+            // SAFETY: each word contains exactly 32 initialized bytes.
+            unsafe { _mm256_loadu_si256(state[i].as_ptr().cast()) }
+        });
+        let mut next = [_mm256_setzero_si256(); 25];
+        let mut parities = theta_column_parities(&current);
+
+        // Alternate the input and output buffers, with parity carried between rounds.
+        let (earlier_rounds, final_pair) = F1600_ROUND_CONSTANT.split_last_chunk::<2>().unwrap();
+        let (pairs, _) = earlier_rounds.as_chunks::<2>();
+        for &[first, second] in pairs {
+            keccak_round::<true>(&current, &mut next, &mut parities, first);
+            keccak_round::<true>(&next, &mut current, &mut parities, second);
+        }
+        keccak_round::<true>(&current, &mut next, &mut parities, final_pair[0]);
+        keccak_round::<false>(&next, &mut current, &mut parities, final_pair[1]);
+
+        for (word, value) in state.iter_mut().zip(current) {
             // SAFETY: each destination word has space for all four lanes.
-            unsafe {
-                _mm256_storeu_si256(words[i].as_mut_ptr().cast(), a[i]);
-            }
+            unsafe { _mm256_storeu_si256(word.as_mut_ptr().cast(), value) };
         }
     }
 }
