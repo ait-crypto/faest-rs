@@ -3,7 +3,7 @@
 //! Algorithm line references follow FAEST v3, Figures 5.3–5.5:
 //! <https://faest.info/faest-spec-v3.0.pdf>
 
-use core::{marker::PhantomData, ops::Mul};
+use core::{array, marker::PhantomData, ops::Mul};
 
 #[cfg(not(feature = "std"))]
 use alloc::{borrow::ToOwned, vec, vec::Vec};
@@ -13,6 +13,7 @@ use hybrid_array::{
     Array, ArraySize,
     typenum::{Prod, U2, U3, U8, Unsigned},
 };
+use itertools::izip;
 
 use crate::{
     parameter::{SecurityParameter, TauParameters},
@@ -301,6 +302,85 @@ pub(crate) trait BatchVectorCommitment {
 
 pub(crate) struct Bavc<RO, LC, TAU>(PhantomData<(RO, LC, TAU)>);
 
+impl<RO: RandomOracle, LC: LeafCommit, TAU> Bavc<RO, LC, TAU> {
+    #[inline]
+    fn hash_tree_group(
+        coms: &[Array<u8, Prod<LC::LambdaBytes, LC::NLeafCommit>>],
+        leaves_per_tree: usize,
+        com_hasher: &mut RO::Hasher<1>,
+    ) {
+        // parallel hashing of 4 tree leafs
+        let mut batches = coms.chunks_exact(4 * leaves_per_tree);
+        for batch in &mut batches {
+            Self::hash_tree_batch(
+                RO::h1_init_x4(),
+                batch,
+                leaves_per_tree,
+                4,
+                com_hasher,
+            );
+        }
+
+        // with SIMD support, parallel hashing of remaining trees (if multiple)
+        let tail = batches.remainder();
+        if RO::simd_available() && tail.len() / leaves_per_tree >= 2 {
+            Self::hash_tree_batch(
+                RO::h1_init_x4(),
+                tail,
+                leaves_per_tree,
+                tail.len() / leaves_per_tree,
+                com_hasher,
+            );
+        } else {
+            // lines 13-14, sequential hashing
+            for tree in tail.chunks_exact(leaves_per_tree) {
+                let mut h = RO::h1_init();
+                for com in tree {
+                    h.update(com);
+                }
+                com_hasher.update(&h.finish().read_into::<Prod<LC::LambdaBytes, U2>>());
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn hash_tree_batch(
+        mut h: RO::Hasher4<1>,
+        coms: &[Array<u8, Prod<LC::LambdaBytes, LC::NLeafCommit>>],
+        leaves_per_tree: usize,
+        tree_count: usize,
+        com_hasher: &mut RO::Hasher<1>,
+    ) {
+        // Spare lanes (if any) repeat the first tree and their digests are discarded
+        let [tree0, tree1, tree2, tree3] = array::from_fn(|lane| {
+            let start = if lane < tree_count {
+                lane * leaves_per_tree
+            } else {
+                0
+            };
+            &coms[start..start + leaves_per_tree]
+        });
+        for (leaf0, leaf1, leaf2, leaf3) in izip!(tree0, tree1, tree2, tree3) {
+            h.update([
+                leaf0.as_slice(),
+                leaf1.as_slice(),
+                leaf2.as_slice(),
+                leaf3.as_slice(),
+            ]);
+        }
+
+        let mut digests =
+            array::from_fn::<_, 4, _>(|_| Array::<u8, Prod<LC::LambdaBytes, U2>>::default());
+        h.finish()
+            .read(digests.each_mut().map(|d| d.as_mut_slice()));
+
+        // line 14
+        for digest in &digests[..tree_count] {
+            com_hasher.update(digest);
+        }
+    }
+}
+
 impl<RO, LC, TAU> BatchVectorCommitment for Bavc<RO, LC, TAU>
 where
     RO: RandomOracle,
@@ -348,35 +428,11 @@ where
             }
         }
 
-        // Hash four equally sized trees together, retaining tree-major digest order.
-        let mut i = 0;
-        while i < TAU::Tau::USIZE {
-            let n = TAU::bavc_max_node_index(i);
-            if i + 3 < TAU::Tau::USIZE && TAU::bavc_max_node_index(i + 3) == n {
-                let mut h = RO::Hasher4::<1>::default();
-                for j in 0..n {
-                    h.update(core::array::from_fn(|lane| {
-                        coms[TAU::bavc_index_offset(i + lane) + j].as_slice()
-                    }));
-                }
-                let mut digests = core::array::from_fn::<_, 4, _>(|_| {
-                    Array::<u8, Self::LambdaBytesTimes2>::default()
-                });
-                h.finish()
-                    .read(digests.each_mut().map(|d| d.as_mut_slice()));
-                for digest in digests {
-                    com_hasher.update(&digest);
-                }
-                i += 4;
-            } else {
-                let mut h = RO::h1_init();
-                for com in &coms[TAU::bavc_index_offset(i)..TAU::bavc_index_offset(i) + n] {
-                    h.update(com);
-                }
-                com_hasher.update(&h.finish().read_into::<Self::LambdaBytesTimes2>());
-                i += 1;
-            }
-        }
+        // line 13
+        let large_tree_leaves = 1 << TAU::K::USIZE;
+        let (large_trees, small_trees) = coms.split_at(TAU::bavc_index_offset(TAU::Tau1::USIZE));
+        Self::hash_tree_group(large_trees, large_tree_leaves, &mut com_hasher);
+        Self::hash_tree_group(small_trees, large_tree_leaves / 2, &mut com_hasher);
 
         // lines 14–16
         let decom = BavcDecommitment { keys, coms };

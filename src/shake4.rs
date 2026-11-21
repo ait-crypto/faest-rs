@@ -26,7 +26,7 @@ pub(crate) enum Four<H, const RATE: usize, const SEP: u8> {
     Avx2(avx2::Sponge<RATE>),
 }
 
-impl<H: Default, const RATE: usize, const SEP: u8> Default for Four<H, RATE, SEP> {
+impl<H: Hasher + Clone + Default, const RATE: usize, const SEP: u8> Default for Four<H, RATE, SEP> {
     fn default() -> Self {
         #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
         if std::is_x86_feature_detected!("avx2") {
@@ -44,6 +44,7 @@ pub(crate) enum FourReader<R, const RATE: usize> {
 
 impl<H: Hasher + Clone, const RATE: usize, const SEP: u8> Hasher4 for Four<H, RATE, SEP> {
     type Reader = FourReader<H::Reader, RATE>;
+
     fn update(&mut self, data: [&[u8]; 4]) {
         assert!(
             data.iter().all(|s| s.len() == data[0].len()),

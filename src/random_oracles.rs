@@ -26,6 +26,15 @@ pub(crate) trait Reader4 {
 pub(crate) trait RandomOracle {
     type Hasher<const SEP: u8>: Hasher + Default + Clone;
     type Hasher4<const SEP: u8>: Hasher4 + Default;
+    
+    /// Returns if SIMD acceleration is available
+    fn simd_available() -> bool {
+        #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
+        if std::is_x86_feature_detected!("avx2") {
+            return true;
+        }
+        false
+    }
 
     /// Create hasher for `H0`
     fn h0_init() -> Self::Hasher<0> {
@@ -35,6 +44,11 @@ pub(crate) trait RandomOracle {
     /// Create hasher for `H1`
     fn h1_init() -> Self::Hasher<1> {
         Self::Hasher::default()
+    }
+
+    /// Create 4 parallel hashers for `H1`
+    fn h1_init_x4() -> Self::Hasher4<1> {
+        Self::Hasher4::default()
     }
 
     /// Create hasher for `H2^0`
