@@ -12,10 +12,10 @@ use crate::{
         ToBytes,
     },
     prg::{IV, PseudoRandomGenerator},
-    random_oracles::{Hasher, Hasher4, RandomOracle},
+    random_oracles::{Hasher4, RandomOracle},
     utils::{
         Reader, Reader4, bit_word_mask, decode_all_chall_3, extract_bit_slice, get_bit,
-        insert_bit_slice, load_u64, set_bit, xor_arrays_inplace,
+        insert_bit_slice, load_u64, set_bit, xor_arrays_inplace, xor_arrays_into,
     },
     vole::tables::{PackedMatrix, VoleTables},
 };
@@ -23,6 +23,7 @@ use crate::{
 use alloc::{boxed::Box, vec};
 use cmov::Cmov;
 use core::{
+    array,
     marker::PhantomData,
     ops::{Index, IndexMut, Mul},
 };
@@ -134,13 +135,6 @@ fn h5_init4<P: FAESTParameters>(iv: &IV) -> impl Hasher4 {
     let mut hash =
         <<P::BAVC as BatchVectorCommitment>::RO as RandomOracle>::Hasher4::<5>::default();
     hash.update_shared(iv);
-    hash
-}
-
-fn h5_init<P: FAESTParameters>(iv: &IV, e: usize) -> impl Hasher + Clone {
-    let mut hash = <P::BAVC as BatchVectorCommitment>::RO::h5_init();
-    hash.update(iv);
-    hash.update(&(e as u32).to_le_bytes());
     hash
 }
 
@@ -435,57 +429,40 @@ pub(crate) fn volecommit<P: FAESTParameters>(
         );
     }
 
-    // line 21
+    // FAEST parameters ensure n gates is multiple of 2
+    const {
+        assert!(P::Tau::VOLE_TABLES.gates.is_multiple_of(2),);
+    }
+
     let mut v_tilde = vec![0; NMask::USIZE * n_mult_bytes];
     let h5_prefix = h5_init4::<P>(iv);
-    let mut e = 0;
-    while e + 1 < n_mult {
-        let mut labels = core::array::from_fn::<_, 4, _>(|_| {
+    let u_prefix = &u[..<P::OWF as OWFParameters>::LambdaBytes::USIZE];
+    // line 21: two gates per four-lane batch
+    for e in (0..n_mult).step_by(2) {
+        let mut labels = array::from_fn::<_, 4, _>(|_| {
             Array::<u8, <P::OWF as OWFParameters>::LambdaBytes>::default()
         });
-        for gate in 0..2 {
-            gate_label(&mut labels[2 * gate], &raw_v, &tables.g, e + gate);
-            labels[2 * gate + 1] = labels[2 * gate].clone();
-            xor_arrays_inplace(
-                &mut labels[2 * gate + 1],
-                &u[..<P::OWF as OWFParameters>::LambdaBytes::USIZE],
-            );
+        let (label_pairs, _) = labels.as_chunks_mut::<2>();
+        for (gate, [ell_e_0, ell_e_1]) in (e..e + 2).zip(label_pairs) {
+            // line 22: L_e_0 and L_e_1
+            gate_label(ell_e_0, &raw_v, &tables.g, gate);
+            xor_arrays_into(ell_e_1, ell_e_0, u_prefix);
         }
+
+        // line 23: hash(L_e_0) and hash(L_e_1) for each gate
         let hashes = gate_hash4::<P>(&h5_prefix, [e, e, e + 1, e + 1], &labels);
-        for gate in 0..2 {
+        let (hash_pairs, _) = hashes.as_chunks::<2>();
+        for (e, [he_0, he_1]) in (e..e + 2).zip(hash_pairs) {
+            let byte = e / 8;
+            let bit = e % 8;
             for m in 0..NMask::USIZE {
-                set_bit(
-                    &mut v_tilde[m * n_mult_bytes..(m + 1) * n_mult_bytes],
-                    e + gate,
-                    get_bit(&hashes[2 * gate], m),
-                );
-                c_mult[m * n_mult_bytes + (e + gate) / 8] ^= (get_bit(&hashes[2 * gate], m)
-                    ^ get_bit(&hashes[2 * gate + 1], m))
-                    << ((e + gate) % 8);
+                let row = m * n_mult_bytes;
+                let he_0_m = get_bit(he_0, m);
+                // line 25
+                set_bit(&mut v_tilde[row..row + n_mult_bytes], e, he_0_m);
+                // line 26: finish xor
+                c_mult[row + byte] ^= (he_0_m ^ get_bit(he_1, m)) << bit;
             }
-        }
-        e += 2;
-    }
-    for e in e..n_mult {
-        let mut label = Array::<u8, <P::OWF as OWFParameters>::LambdaBytes>::default();
-        gate_label(&mut label, &raw_v, &tables.g, e);
-        let mut h = h5_init::<P>(iv, e);
-        h.update(&label);
-        let he_0 = h.finish().read_into::<U2>();
-        xor_arrays_inplace(
-            &mut label,
-            &u[..<P::OWF as OWFParameters>::LambdaBytes::USIZE],
-        );
-        let mut h = h5_init::<P>(iv, e);
-        h.update(&label);
-        let he_1 = h.finish().read_into::<U2>();
-        for m in 0..NMask::USIZE {
-            set_bit(
-                &mut v_tilde[m * n_mult_bytes..(m + 1) * n_mult_bytes],
-                e,
-                get_bit(&he_0, m),
-            );
-            c_mult[m * n_mult_bytes + e / 8] ^= (get_bit(&he_0, m) ^ get_bit(&he_1, m)) << (e % 8);
         }
     }
 
@@ -527,8 +504,9 @@ pub fn volereconstruct<P: FAESTParameters>(
     let tau = <P::Tau as TauParameters>::Tau::USIZE;
     let ell = <P::OWF as OWFParameters>::L::USIZE;
     let ell_bytes = <P::OWF as OWFParameters>::LBytes::USIZE;
+    let n_mult = tables.gates;
     // TODO: would be nice if this was a constant
-    let n_mult_bytes = tables.gates.div_ceil(8);
+    let n_mult_bytes = n_mult.div_ceil(8);
     let d0 = P::Tau::bavc_max_node_depth(0);
 
     // lines 1
@@ -604,47 +582,41 @@ pub fn volereconstruct<P: FAESTParameters>(
         }
     }
 
-    // lines 21-27: corrected witness columns are the verifier's wire labels.
+    // FAEST parameters ensure n gates is multiple of 4
+    const {
+        assert!(
+            P::Tau::VOLE_TABLES.gates.is_multiple_of(4),
+        );
+    }
+
     let mut q_tilde = vec![0; NMask::USIZE * n_mult_bytes];
+    // line 24: gamma for all gates
     let mut gamma = vec![0; n_mult_bytes];
     matrix_mul_table(&mut gamma, chall, &tables.g);
     let h5_prefix = h5_init4::<P>(iv);
-    let mut e = 0;
-    while e + 3 < tables.gates {
-        let mut labels = core::array::from_fn::<_, 4, _>(|_| {
-            Array::<u8, <P::OWF as OWFParameters>::LambdaBytes>::default()
+
+    // line 23: four gates per four-lane batch
+    for e in (0..n_mult).step_by(4) {
+        let gates = array::from_fn(|lane| e + lane);
+        let labels = gates.map(|gate| {
+            // line 24: L'_e
+            let mut label = Array::default();
+            gate_label(&mut label, &raw_q, &tables.g, gate);
+            label
         });
-        for (lane, label) in labels.iter_mut().enumerate() {
-            gate_label(label, &raw_q, &tables.g, e + lane);
-        }
-        let hashes = gate_hash4::<P>(&h5_prefix, core::array::from_fn(|lane| e + lane), &labels);
-        for (lane, he) in hashes.iter().enumerate() {
+
+        // line 25: hash(L'_e) for each gate
+        let hashes = gate_hash4::<P>(&h5_prefix, gates, &labels);
+        for (e, he) in gates.into_iter().zip(&hashes) {
             for m in 0..NMask::USIZE {
-                set_bit(
-                    &mut q_tilde[m * n_mult_bytes..(m + 1) * n_mult_bytes],
-                    e + lane,
-                    get_bit(he, m),
-                );
+                let row = m * n_mult_bytes;
+                // line 27: store the hash bit
+                set_bit(&mut q_tilde[row..row + n_mult_bytes], e, get_bit(he, m));
             }
-        }
-        e += 4;
-    }
-    for e in e..tables.gates {
-        let mut label = Array::<u8, <P::OWF as OWFParameters>::LambdaBytes>::default();
-        gate_label(&mut label, &raw_q, &tables.g, e);
-        let mut hash = h5_init::<P>(iv, e);
-        hash.update(&label);
-        let he = hash.finish().read_into::<U2>();
-        for m in 0..NMask::USIZE {
-            set_bit(
-                &mut q_tilde[m * n_mult_bytes..(m + 1) * n_mult_bytes],
-                e,
-                get_bit(&he, m),
-            );
         }
     }
 
-    // lines 27: part two
+    // line 27: apply the correction bits
     for m in 0..NMask::USIZE {
         for j in 0..n_mult_bytes {
             q_tilde[m * n_mult_bytes + j] ^= gamma[j] & c_mult[m * n_mult_bytes + j];
