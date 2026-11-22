@@ -118,6 +118,7 @@ mod parameter;
 mod prg;
 mod random_oracles;
 mod rijndael_32;
+mod shake4;
 mod universal_hashing;
 mod utils;
 mod vole;

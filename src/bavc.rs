@@ -312,13 +312,7 @@ impl<RO: RandomOracle, LC: LeafCommit, TAU> Bavc<RO, LC, TAU> {
         // parallel hashing of 4 tree leafs
         let mut batches = coms.chunks_exact(4 * leaves_per_tree);
         for batch in &mut batches {
-            Self::hash_tree_batch(
-                RO::h1_init_x4(),
-                batch,
-                leaves_per_tree,
-                4,
-                com_hasher,
-            );
+            Self::hash_tree_batch(RO::h1_init_x4(), batch, leaves_per_tree, 4, com_hasher);
         }
 
         // with SIMD support, parallel hashing of remaining trees (if multiple)

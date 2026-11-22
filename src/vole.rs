@@ -584,9 +584,7 @@ pub fn volereconstruct<P: FAESTParameters>(
 
     // FAEST parameters ensure n gates is multiple of 4
     const {
-        assert!(
-            P::Tau::VOLE_TABLES.gates.is_multiple_of(4),
-        );
+        assert!(P::Tau::VOLE_TABLES.gates.is_multiple_of(4),);
     }
 
     let mut q_tilde = vec![0; NMask::USIZE * n_mult_bytes];

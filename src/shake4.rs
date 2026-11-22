@@ -16,22 +16,24 @@ and related or neighboring rights to the source code in this file.
 http://creativecommons.org/publicdomain/zero/1.0/
 */
 
-use super::{Hasher, Hasher4};
-use crate::utils::{Reader, Reader4};
+use crate::{
+    random_oracles::{Hasher, Hasher4},
+    utils::{Reader, Reader4},
+};
 
 #[allow(
     clippy::large_enum_variant,
-    reason = "Clippy treats T as zero-sized but both SHAKE backends hold four Keccak states in practice"
+    reason = "Clippy treats T as zero-sized but both SHAKE backends hold four Keccak states"
 )]
 #[derive(Clone)]
-pub(crate) enum ShakeX4<T, const RATE: usize, const SEP: u8> {
+pub(crate) enum ShakeTimes4<T, const RATE: usize, const SEP: u8> {
     Scalar([T; 4]),
     #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
     Avx2(avx2::Sponge<RATE>),
 }
 
 impl<H: Hasher + Clone + Default, const RATE: usize, const SEP: u8> Default
-    for ShakeX4<H, RATE, SEP>
+    for ShakeTimes4<H, RATE, SEP>
 {
     fn default() -> Self {
         #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
@@ -42,8 +44,8 @@ impl<H: Hasher + Clone + Default, const RATE: usize, const SEP: u8> Default
     }
 }
 
-impl<H: Hasher + Clone, const RATE: usize, const SEP: u8> Hasher4 for ShakeX4<H, RATE, SEP> {
-    type Reader = ShakeX4<H::Reader, RATE, SEP>;
+impl<H: Hasher + Clone, const RATE: usize, const SEP: u8> Hasher4 for ShakeTimes4<H, RATE, SEP> {
+    type Reader = ShakeTimes4<H::Reader, RATE, SEP>;
 
     fn update(&mut self, data: [&[u8]; 4]) {
         assert!(
@@ -65,18 +67,18 @@ impl<H: Hasher + Clone, const RATE: usize, const SEP: u8> Hasher4 for ShakeX4<H,
 
     fn finish(self) -> Self::Reader {
         match self {
-            Self::Scalar(h) => ShakeX4::Scalar(h.map(Hasher::finish)),
+            Self::Scalar(h) => ShakeTimes4::Scalar(h.map(Hasher::finish)),
             #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
             Self::Avx2(mut s) => {
                 s.update([[SEP].as_ref(); 4]);
                 s.pad();
-                ShakeX4::Avx2(s)
+                ShakeTimes4::Avx2(s)
             }
         }
     }
 }
 
-impl<R: Reader, const RATE: usize, const SEP: u8> Reader4 for ShakeX4<R, RATE, SEP> {
+impl<R: Reader, const RATE: usize, const SEP: u8> Reader4 for ShakeTimes4<R, RATE, SEP> {
     fn read(&mut self, dst: [&mut [u8]; 4]) {
         assert!(
             dst.iter().all(|s| s.len() == dst[0].len()),
@@ -386,9 +388,9 @@ mod tests {
             let inputs: [Vec<u8>; 4] =
                 core::array::from_fn(|lane| (0..len).map(|i| (i * 37 + lane * 61) as u8).collect());
             for fragment in [1, 7, RATE - 1, RATE + 1] {
-                let mut four = ShakeX4::<H, RATE, SEP>::default();
+                let mut four = ShakeTimes4::<H, RATE, SEP>::default();
                 let mut scalar =
-                    ShakeX4::<H, RATE, SEP>::Scalar(core::array::from_fn(|_| H::default()));
+                    ShakeTimes4::<H, RATE, SEP>::Scalar(core::array::from_fn(|_| H::default()));
                 // Exercise shared prefixes, including a prefix that crosses a rate boundary.
                 let shared = vec![0x93; RATE + 3];
                 four.update_shared(&shared);
@@ -419,8 +421,9 @@ mod tests {
                 }
             }
             // No prefix: in particular, SEP itself can complete an absorption block.
-            let mut four = ShakeX4::<H, RATE, SEP>::default();
-            let mut scalar = ShakeX4::<H, RATE, SEP>::Scalar(core::array::from_fn(|_| H::default()));
+            let mut four = ShakeTimes4::<H, RATE, SEP>::default();
+            let mut scalar =
+                ShakeTimes4::<H, RATE, SEP>::Scalar(core::array::from_fn(|_| H::default()));
             four.update(inputs.each_ref().map(|s| s.as_slice()));
             scalar.update(inputs.each_ref().map(|s| s.as_slice()));
             let actual = four.finish().read_into::<U200>();
@@ -446,17 +449,14 @@ mod tests {
     #[test]
     #[should_panic(expected = "unequal SHAKE input lengths")]
     fn rejects_unsynchronized_updates() {
-        ShakeX4::<Hasher128<1>, 168, 1>::default().update([b"a", b"", b"a", b"a"]);
+        ShakeTimes4::<Hasher128<1>, 168, 1>::default().update([b"a", b"", b"a", b"a"]);
     }
 
     #[test]
     #[should_panic(expected = "unequal SHAKE output lengths")]
     fn rejects_unsynchronized_reads() {
-        ShakeX4::<Hasher256<1>, 136, 1>::default().finish().read([
-            &mut [0; 1],
-            &mut [],
-            &mut [0; 1],
-            &mut [0; 1],
-        ]);
+        ShakeTimes4::<Hasher256<1>, 136, 1>::default()
+            .finish()
+            .read([&mut [0; 1], &mut [], &mut [0; 1], &mut [0; 1]]);
     }
 }

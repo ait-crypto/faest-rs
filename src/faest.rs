@@ -287,8 +287,7 @@ fn consistency_hash<P: FAESTParameters>(
     masks: &Array<Array<u8, LambdaBytes<P>>, NMask>,
 ) -> Array<u8, <B<P> as BaseParameters>::VoleHasherOutputLength> {
     let mut bytes = Vec::with_capacity(
-        (<O<P> as OWFParameters>::L::USIZE + NMask::USIZE)
-            * LambdaBytes::<P>::USIZE,
+        (<O<P> as OWFParameters>::L::USIZE + NMask::USIZE) * LambdaBytes::<P>::USIZE,
     );
     for row in rows {
         bytes.extend(&row.as_bytes());
@@ -434,8 +433,7 @@ pub(crate) fn faest_verify<P: FAESTParameters>(
     let sig = SignatureRef::<P>::from(sig);
     let mu = hash_mu::<P>(pk, msg);
     let iv = hash_iv::<P>(sig.iv_pre, &mu);
-    let challenge: &Array<u8, LambdaBytes<P>> =
-        sig.chall_3.try_into().map_err(|_| Error::new())?;
+    let challenge: &Array<u8, LambdaBytes<P>> = sig.chall_3.try_into().map_err(|_| Error::new())?;
     if !check_challenge_3::<P>(challenge) {
         return Err(Error::new());
     }
@@ -458,10 +456,7 @@ pub(crate) fn faest_verify<P: FAESTParameters>(
     let delta = F::<P>::from(rec.delta.as_slice());
     for (chunk, u) in d_hash
         .chunks_exact_mut(LambdaBytes::<P>::USIZE)
-        .zip(
-            sig.u_tilde
-                .chunks_exact(LambdaBytes::<P>::USIZE),
-        )
+        .zip(sig.u_tilde.chunks_exact(LambdaBytes::<P>::USIZE))
     {
         let value = F::<P>::from(&*chunk) + delta * F::<P>::from(u);
         chunk.copy_from_slice(&value.as_bytes());
@@ -611,9 +606,10 @@ mod tests {
             layout.iv_pre.start,
             layout.ctr.start,
         ];
-        for pos in positions.into_iter().chain(
-            (0..6).map(|i| layout.a_tilde.start + i * LambdaBytes::<P>::USIZE),
-        ) {
+        for pos in positions
+            .into_iter()
+            .chain((0..6).map(|i| layout.a_tilde.start + i * LambdaBytes::<P>::USIZE))
+        {
             let mut sig = reference_sig.clone();
             sig[pos] ^= 1;
             assert!(
