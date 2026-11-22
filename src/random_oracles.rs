@@ -3,7 +3,7 @@ use shake::{
     digest::{ExtendableOutput, Update, XofReader},
 };
 
-use crate::utils::Reader;
+use crate::utils::{Reader, Reader4};
 
 #[path = "shake4.rs"]
 mod four;
@@ -17,10 +17,6 @@ pub(crate) trait Hasher4: Clone {
         self.update([data; 4]);
     }
     fn finish(self) -> Self::Reader;
-}
-
-pub(crate) trait Reader4 {
-    fn read(&mut self, dst: [&mut [u8]; 4]);
 }
 
 pub(crate) trait RandomOracle {

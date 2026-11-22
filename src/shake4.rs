@@ -16,12 +16,12 @@ and related or neighboring rights to the source code in this file.
 http://creativecommons.org/publicdomain/zero/1.0/
 */
 
-use super::{Hasher, Hasher4, Reader4};
-use crate::utils::Reader;
+use super::{Hasher, Hasher4};
+use crate::utils::{Reader, Reader4};
 
 #[derive(Clone)]
-pub(crate) enum Four<H, const RATE: usize, const SEP: u8> {
-    Scalar([H; 4]),
+pub(crate) enum Four<T, const RATE: usize, const SEP: u8> {
+    Scalar([T; 4]),
     #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
     Avx2(avx2::Sponge<RATE>),
 }
@@ -36,14 +36,8 @@ impl<H: Hasher + Clone + Default, const RATE: usize, const SEP: u8> Default for 
     }
 }
 
-pub(crate) enum FourReader<R, const RATE: usize> {
-    Scalar([R; 4]),
-    #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
-    Avx2(avx2::Sponge<RATE>),
-}
-
 impl<H: Hasher + Clone, const RATE: usize, const SEP: u8> Hasher4 for Four<H, RATE, SEP> {
-    type Reader = FourReader<H::Reader, RATE>;
+    type Reader = Four<H::Reader, RATE, SEP>;
 
     fn update(&mut self, data: [&[u8]; 4]) {
         assert!(
@@ -65,18 +59,18 @@ impl<H: Hasher + Clone, const RATE: usize, const SEP: u8> Hasher4 for Four<H, RA
 
     fn finish(self) -> Self::Reader {
         match self {
-            Self::Scalar(h) => FourReader::Scalar(h.map(Hasher::finish)),
+            Self::Scalar(h) => Four::Scalar(h.map(Hasher::finish)),
             #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
             Self::Avx2(mut s) => {
                 s.update([[SEP].as_ref(); 4]);
                 s.pad();
-                FourReader::Avx2(s)
+                Four::Avx2(s)
             }
         }
     }
 }
 
-impl<R: Reader, const RATE: usize> Reader4 for FourReader<R, RATE> {
+impl<R: Reader, const RATE: usize, const SEP: u8> Reader4 for Four<R, RATE, SEP> {
     fn read(&mut self, dst: [&mut [u8]; 4]) {
         assert!(
             dst.iter().all(|s| s.len() == dst[0].len()),
@@ -368,6 +362,7 @@ mod tests {
     use crate::random_oracles::{Hasher128, Hasher256};
     #[cfg(not(feature = "std"))]
     use alloc::{vec, vec::Vec};
+    use hybrid_array::sizes::U200;
 
     fn differential<H: Hasher + Default + Clone, const RATE: usize, const SEP: u8>() {
         for len in [
@@ -422,14 +417,12 @@ mod tests {
             let mut scalar = Four::<H, RATE, SEP>::Scalar(core::array::from_fn(|_| H::default()));
             four.update(inputs.each_ref().map(|s| s.as_slice()));
             scalar.update(inputs.each_ref().map(|s| s.as_slice()));
-            let mut actual = [[0; 200]; 4];
-            let mut expected = actual;
-            four.finish()
-                .read(actual.each_mut().map(|s| s.as_mut_slice()));
+            let actual = four.finish().read_into::<U200>();
+            let mut expected = [[0; 200]; 4];
             scalar
                 .finish()
                 .read(expected.each_mut().map(|s| s.as_mut_slice()));
-            assert_eq!(actual, expected);
+            assert_eq!(actual.map(|digest| digest.0), expected);
         }
     }
 

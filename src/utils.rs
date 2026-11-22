@@ -21,6 +21,22 @@ pub(crate) trait Reader {
     }
 }
 
+/// Reader interface for four synchronized random-oracle streams
+pub(crate) trait Reader4 {
+    /// Read the same number of bytes from each stream into its destination
+    fn read(&mut self, dst: [&mut [u8]; 4]);
+
+    /// Read one array per stream and consume the reader
+    fn read_into<Length: ArraySize>(mut self) -> [Array<u8, Length>; 4]
+    where
+        Self: Sized,
+    {
+        let mut dst: [Array<u8, Length>; 4] = Default::default();
+        self.read(dst.each_mut().map(Array::as_mut_slice));
+        dst
+    }
+}
+
 #[inline]
 pub(crate) fn load_u64(src: &[u8], word_idx: usize) -> u64 {
     let offset = word_idx * 8;

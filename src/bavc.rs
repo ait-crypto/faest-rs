@@ -18,9 +18,9 @@ use itertools::izip;
 use crate::{
     parameter::{SecurityParameter, TauParameters},
     prg::{IV, PseudoRandomGenerator, Twk},
-    random_oracles::{Hasher, Hasher4, RandomOracle, Reader4},
+    random_oracles::{Hasher, Hasher4, RandomOracle},
     universal_hashing::LeafHasher,
-    utils::Reader,
+    utils::{Reader, Reader4},
 };
 
 #[derive(Clone, Debug, Default)]
@@ -369,10 +369,7 @@ impl<RO: RandomOracle, LC: LeafCommit, TAU> Bavc<RO, LC, TAU> {
             ]);
         }
 
-        let mut digests =
-            array::from_fn::<_, 4, _>(|_| Array::<u8, Prod<LC::LambdaBytes, U2>>::default());
-        h.finish()
-            .read(digests.each_mut().map(|d| d.as_mut_slice()));
+        let digests = h.finish().read_into::<Prod<LC::LambdaBytes, U2>>();
 
         // line 14
         for digest in &digests[..tree_count] {
@@ -516,11 +513,7 @@ where
                     }
                     h.update(commitments.each_ref().map(|c| c.as_slice()));
                 }
-                let mut digests = core::array::from_fn::<_, 4, _>(|_| {
-                    Array::<u8, Self::LambdaBytesTimes2>::default()
-                });
-                h.finish()
-                    .read(digests.each_mut().map(|d| d.as_mut_slice()));
+                let digests = h.finish().read_into::<Self::LambdaBytesTimes2>();
                 for digest in digests {
                     h1_com_hasher.update(&digest);
                 }

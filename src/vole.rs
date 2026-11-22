@@ -12,10 +12,10 @@ use crate::{
         ToBytes,
     },
     prg::{IV, PseudoRandomGenerator},
-    random_oracles::{Hasher, Hasher4, RandomOracle, Reader4},
+    random_oracles::{Hasher, Hasher4, RandomOracle},
     utils::{
-        Reader, bit_word_mask, decode_all_chall_3, extract_bit_slice, get_bit, insert_bit_slice,
-        load_u64, set_bit, xor_arrays_inplace,
+        Reader, Reader4, bit_word_mask, decode_all_chall_3, extract_bit_slice, get_bit,
+        insert_bit_slice, load_u64, set_bit, xor_arrays_inplace,
     },
     vole::tables::{PackedMatrix, VoleTables},
 };
@@ -122,14 +122,12 @@ fn gate_hash4<P: FAESTParameters>(
     prefix: &impl Hasher4,
     gates: [usize; 4],
     labels: &[Array<u8, <P::OWF as OWFParameters>::LambdaBytes>; 4],
-) -> [[u8; 2]; 4] {
+) -> [Array<u8, U2>; 4] {
     let mut h = prefix.clone();
     let indices = gates.map(|e| (e as u32).to_le_bytes());
     h.update(indices.each_ref().map(|i| i.as_slice()));
     h.update(labels.each_ref().map(|l| l.as_slice()));
-    let mut hashes = [[0; 2]; 4];
-    h.finish().read(hashes.each_mut().map(|h| h.as_mut_slice()));
-    hashes
+    h.finish().read_into()
 }
 
 fn h5_init4<P: FAESTParameters>(iv: &IV) -> impl Hasher4 {
@@ -473,16 +471,14 @@ pub(crate) fn volecommit<P: FAESTParameters>(
         gate_label(&mut label, &raw_v, &tables.g, e);
         let mut h = h5_init::<P>(iv, e);
         h.update(&label);
-        let mut he_0 = [0; 2];
-        h.finish().read(&mut he_0);
+        let he_0 = h.finish().read_into::<U2>();
         xor_arrays_inplace(
             &mut label,
             &u[..<P::OWF as OWFParameters>::LambdaBytes::USIZE],
         );
         let mut h = h5_init::<P>(iv, e);
         h.update(&label);
-        let mut he_1 = [0; 2];
-        h.finish().read(&mut he_1);
+        let he_1 = h.finish().read_into::<U2>();
         for m in 0..NMask::USIZE {
             set_bit(
                 &mut v_tilde[m * n_mult_bytes..(m + 1) * n_mult_bytes],
@@ -638,8 +634,7 @@ pub fn volereconstruct<P: FAESTParameters>(
         gate_label(&mut label, &raw_q, &tables.g, e);
         let mut hash = h5_init::<P>(iv, e);
         hash.update(&label);
-        let mut he = [0; 2];
-        hash.finish().read(&mut he);
+        let he = hash.finish().read_into::<U2>();
         for m in 0..NMask::USIZE {
             set_bit(
                 &mut q_tilde[m * n_mult_bytes..(m + 1) * n_mult_bytes],
