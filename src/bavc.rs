@@ -303,6 +303,7 @@ pub(crate) trait BatchVectorCommitment {
 pub(crate) struct Bavc<RO, LC, TAU>(PhantomData<(RO, LC, TAU)>);
 
 impl<RO: RandomOracle, LC: LeafCommit, TAU> Bavc<RO, LC, TAU> {
+    #[allow(clippy::type_complexity)]
     #[inline]
     fn hash_tree_group(
         coms: &[Array<u8, Prod<LC::LambdaBytes, LC::NLeafCommit>>],
@@ -337,6 +338,7 @@ impl<RO: RandomOracle, LC: LeafCommit, TAU> Bavc<RO, LC, TAU> {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     #[inline(always)]
     fn hash_tree_batch(
         mut h: RO::Hasher4<1>,
