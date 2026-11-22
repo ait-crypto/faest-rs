@@ -540,8 +540,8 @@ where
     type Output = Self;
 
     fn apply_mask(mut self, mask: T) -> Self::Output {
-        for idx in 0..N {
-            self.0[idx] &= mask;
+        for buf in self.0.iter_mut().take(N) {
+            *buf &= mask;
         }
         self
     }

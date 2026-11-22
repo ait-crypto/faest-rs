@@ -40,7 +40,7 @@ hybrid-array = { version = "0.4.11", default-features = true, features = [
 serde-big-array = { version = "0.5.1", optional = true }
 
 [target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
-cpufeatures = "0.3.0"
+cpufeatures = "0.3.1"
 
 [target.'cfg(valgrind = "enabled")'.dependencies]
 vgzzq = "1"
@@ -95,9 +95,6 @@ required-features = ["randomized-signer", "std"]
 [profile.dev.package."*"]
 opt-level = 3
 
-[profile.bench]
-lto = "fat"
-
 [profile.profiling]
 inherits = "release"
 debug = true
@@ -113,6 +110,3 @@ version = "1.0.0"
 unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(valgrind, values("enabled"))',
 ] }
-
-[workspace]
-members = ["faest-benches"]

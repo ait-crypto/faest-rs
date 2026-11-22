@@ -5,7 +5,7 @@
 use core::fmt::{self, Debug};
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 
 use hybrid_array::{Array, typenum::Unsigned};
 #[cfg(feature = "serde")]
@@ -13,7 +13,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::{ByteEncoding, Error, classify, declassify, parameter::OWFParameters};
+use crate::{
+    ByteEncoding, Error, classify, declassify, parameter::OWFParameters, witness::Witness,
+};
 
 /// Borrowed public key fields for a selected arithmetic backend
 pub(crate) struct PublicKeyView<'a, O: OWFParameters> {
@@ -234,7 +236,7 @@ where
     O: OWFParameters,
 {
     pub(crate) sk: SecretKey<O>,
-    pub(crate) wit: Box<Array<u8, O::LBytes>>,
+    pub(crate) wit: Witness<O>,
 }
 
 impl<O> Clone for UnpackedSecretKey<O>
