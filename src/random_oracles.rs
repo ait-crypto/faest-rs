@@ -6,8 +6,8 @@ use shake::{
 use crate::utils::{Reader, Reader4};
 
 #[path = "shake4.rs"]
-mod four;
-use four::Four;
+mod shake4;
+use shake4::ShakeX4;
 
 /// Four synchronized, independent random-oracle streams.
 pub(crate) trait Hasher4: Clone {
@@ -26,9 +26,8 @@ pub(crate) trait RandomOracle {
     /// Returns if SIMD acceleration is available
     fn simd_available() -> bool {
         #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
-        if std::is_x86_feature_detected!("avx2") {
-            return true;
-        }
+        return std::is_x86_feature_detected!("avx2");
+        #[cfg(not(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64"))))]
         false
     }
 
@@ -113,7 +112,7 @@ impl Reader for Hasher128Reader {
 
 impl RandomOracle for RandomOracleShake128 {
     type Hasher<const SEP: u8> = Hasher128<SEP>;
-    type Hasher4<const SEP: u8> = Four<Hasher128<SEP>, 168, SEP>;
+    type Hasher4<const SEP: u8> = ShakeX4<Hasher128<SEP>, 168, SEP>;
 }
 
 impl<const SEP: u8> Hasher for Hasher128<SEP> {
@@ -160,7 +159,7 @@ impl Reader for Hasher256Reader {
 
 impl RandomOracle for RandomOracleShake256 {
     type Hasher<const SEP: u8> = Hasher256<SEP>;
-    type Hasher4<const SEP: u8> = Four<Hasher256<SEP>, 136, SEP>;
+    type Hasher4<const SEP: u8> = ShakeX4<Hasher256<SEP>, 136, SEP>;
 }
 
 #[cfg(test)]

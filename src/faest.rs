@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 
 #[cfg(not(feature = "std"))]
 use alloc::{boxed::Box, vec::Vec};
-use core::ops::Range;
+use core::{array, ops::Range};
 use hybrid_array::{Array, typenum::Unsigned};
 use rand_core::CryptoRng;
 #[cfg(feature = "zeroize")]
@@ -16,9 +16,9 @@ use crate::{
     internal_keys::{PublicKeyView, SecretKey, SecretKeyView, UnpackedSecretKeyView},
     parameter::{BaseParameters, FAESTParameters, NMask, OWFField, OWFParameters, TauParameters},
     prg::{IV, IVSize},
-    random_oracles::{Hasher, Hasher4, RandomOracle, Reader4},
+    random_oracles::{Hasher, Hasher4, RandomOracle},
     universal_hashing::{VoleHasherInit, VoleHasherProcess},
-    utils::{Reader, decode_all_chall_3, get_bit, xor_arrays_into},
+    utils::{Reader, Reader4, decode_all_chall_3, get_bit, xor_arrays_into},
     vole::{VoleCommitmentCRef, VoleCommitmentCRefMut, volecommit, volereconstruct},
     zk::{Challenge, owf_prove, owf_verify},
 };
@@ -28,6 +28,7 @@ type B<P> = <O<P> as OWFParameters>::BaseParams;
 type F<P> = OWFField<O<P>>;
 type RO<P> = <B<P> as BaseParameters>::RandomOracle;
 type Chall1<P> = Array<u8, <B<P> as BaseParameters>::Chall1>;
+type LambdaBytes<P> = <<P as FAESTParameters>::OWF as OWFParameters>::LambdaBytes;
 
 /// Shared offsets used to construct the borrowed signature views
 struct SignatureLayout {
@@ -44,7 +45,7 @@ struct SignatureLayout {
 
 impl SignatureLayout {
     fn new<P: FAESTParameters>() -> Self {
-        let n = <O<P> as OWFParameters>::LambdaBytes::USIZE;
+        let n = LambdaBytes::<P>::USIZE;
         let ell = <O<P> as OWFParameters>::LBytes::USIZE;
         let mut offset = 0;
         let mut take = |size| {
@@ -156,7 +157,7 @@ impl<'a, P: FAESTParameters> From<&'a [u8]> for SignatureRef<'a, P> {
 
 impl<'a, P: FAESTParameters> SignatureRef<'a, P> {
     fn parse_opening(&self) -> BavcOpenResult<'a> {
-        let n = <O<P> as OWFParameters>::LambdaBytes::USIZE;
+        let n = LambdaBytes::<P>::USIZE;
         let com_size = n * <O<P> as OWFParameters>::NLeafCommit::USIZE;
         let (coms, nodes) = self
             .decom_i
@@ -250,33 +251,10 @@ fn challenge_3_init<P: FAESTParameters>(
 fn challenge_3<P: FAESTParameters>(
     prefix: &<RO<P> as RandomOracle>::Hasher<11>,
     ctr: u32,
-) -> Array<u8, <O<P> as OWFParameters>::LambdaBytes> {
+) -> Array<u8, LambdaBytes<P>> {
     let mut h = prefix.clone();
     h.update(&ctr.to_le_bytes());
     h.finish().read_into()
-}
-
-/// Use a wider counter so the last batch cannot wrap back to zero.
-fn grind_candidates<T>(
-    start: u64,
-    mut batch: impl FnMut([u32; 4]) -> [T; 4],
-    mut accept: impl FnMut(u32, &T) -> bool,
-) -> Option<u32> {
-    let mut base = start;
-    while base <= u32::MAX as u64 {
-        let counters = core::array::from_fn(|i| (base + i as u64).min(u32::MAX as u64) as u32);
-        for (i, candidate) in batch(counters).iter().enumerate() {
-            let ctr = base + i as u64;
-            if ctr > u32::MAX as u64 {
-                break;
-            }
-            if accept(ctr as u32, candidate) {
-                return Some(ctr as u32);
-            }
-        }
-        base += 4;
-    }
-    None
 }
 
 fn check_challenge_3<P: FAESTParameters>(challenge: &[u8]) -> bool {
@@ -293,7 +271,7 @@ fn witness_rows<P: FAESTParameters>(
 ) -> Box<Array<F<P>, <O<P> as OWFParameters>::L>> {
     let mut rows = Box::<Array<F<P>, <O<P> as OWFParameters>::L>>::default();
     for (bit, row) in rows.iter_mut().enumerate() {
-        let mut bytes = Array::<u8, <O<P> as OWFParameters>::LambdaBytes>::default();
+        let mut bytes = Array::<u8, LambdaBytes<P>>::default();
         for (column, data) in columns.iter().enumerate() {
             bytes[column / 8] |= get_bit(data, bit) << (column % 8);
         }
@@ -306,11 +284,11 @@ fn witness_rows<P: FAESTParameters>(
 fn consistency_hash<P: FAESTParameters>(
     chall1: &Chall1<P>,
     rows: impl Iterator<Item = F<P>>,
-    masks: &Array<Array<u8, <O<P> as OWFParameters>::LambdaBytes>, NMask>,
+    masks: &Array<Array<u8, LambdaBytes<P>>, NMask>,
 ) -> Array<u8, <B<P> as BaseParameters>::VoleHasherOutputLength> {
     let mut bytes = Vec::with_capacity(
         (<O<P> as OWFParameters>::L::USIZE + NMask::USIZE)
-            * <O<P> as OWFParameters>::LambdaBytes::USIZE,
+            * LambdaBytes::<P>::USIZE,
     );
     for row in rows {
         bytes.extend(&row.as_bytes());
@@ -403,7 +381,7 @@ fn sign<P: FAESTParameters>(
     // line 30: write a_tilde 1..d_zk -1
     for (chunk, coefficient) in sig
         .a_tilde
-        .chunks_exact_mut(<O<P> as OWFParameters>::LambdaBytes::USIZE)
+        .chunks_exact_mut(LambdaBytes::<P>::USIZE)
         .zip(&proof[1..])
     {
         chunk.copy_from_slice(&coefficient.as_bytes());
@@ -414,38 +392,36 @@ fn sign<P: FAESTParameters>(
     prefix.update_shared(&chall2);
     prefix.update_shared(&proof[0].as_bytes());
     prefix.update_shared(sig.a_tilde);
-    let result = grind_candidates(
-        0,
-        |counters| {
-            let counters = counters.map(u32::to_le_bytes);
-            let mut h = prefix.clone();
-            h.update(counters.each_ref().map(|c| c.as_slice()));
-            let mut challenges = core::array::from_fn::<_, 4, _>(|_| {
-                Array::<u8, <O<P> as OWFParameters>::LambdaBytes>::default()
-            });
-            h.finish()
-                .read(challenges.each_mut().map(|c| c.as_mut_slice()));
-            challenges
-        },
-        |ctr, chall_3| {
-            // Declassify before either grinding or opening branches.
+
+    let mut base = 0;
+    while base <= u32::MAX as u64 {
+        // grind base .. base + 4 in parallel
+        let counters = array::from_fn(|i| (base.wrapping_add(i as u64) as u32).to_le_bytes());
+        let mut h = prefix.clone();
+        h.update(counters.each_ref().map(|c| c.as_slice()));
+        let challenges = h.finish().read_into::<LambdaBytes<P>>();
+
+        for (i, chall_3) in challenges.iter().enumerate() {
+            let ctr = base + i as u64;
+            if ctr > u32::MAX as u64 {
+                break;
+            }
+
+            // declassify chall_3 which is put into the signature
             declassify!(chall_3);
             if !check_challenge_3::<P>(chall_3) {
-                return false;
+                continue;
             }
+
             let indices = decode_all_chall_3::<P::Tau>(chall_3);
             if let Some(opening) = P::BAVC::open(&vole.decom, &indices) {
-                sig.save_opening_and_ctr(&opening, ctr);
+                sig.save_opening_and_ctr(&opening, ctr as u32);
                 sig.chall_3.copy_from_slice(chall_3);
-                return true;
+                return Ok(());
             }
-            false
-        },
-    );
-    if result.is_some() {
-        return Ok(());
+        }
+        base += 4;
     }
-
     Err(Error::new())
 }
 
@@ -458,7 +434,7 @@ pub(crate) fn faest_verify<P: FAESTParameters>(
     let sig = SignatureRef::<P>::from(sig);
     let mu = hash_mu::<P>(pk, msg);
     let iv = hash_iv::<P>(sig.iv_pre, &mu);
-    let challenge: &Array<u8, <O<P> as OWFParameters>::LambdaBytes> =
+    let challenge: &Array<u8, LambdaBytes<P>> =
         sig.chall_3.try_into().map_err(|_| Error::new())?;
     if !check_challenge_3::<P>(challenge) {
         return Err(Error::new());
@@ -481,10 +457,10 @@ pub(crate) fn faest_verify<P: FAESTParameters>(
     let mut d_hash = consistency_hash::<P>(&chall1, q_rows.iter().copied(), &rec.q_bar);
     let delta = F::<P>::from(rec.delta.as_slice());
     for (chunk, u) in d_hash
-        .chunks_exact_mut(<O<P> as OWFParameters>::LambdaBytes::USIZE)
+        .chunks_exact_mut(LambdaBytes::<P>::USIZE)
         .zip(
             sig.u_tilde
-                .chunks_exact(<O<P> as OWFParameters>::LambdaBytes::USIZE),
+                .chunks_exact(LambdaBytes::<P>::USIZE),
         )
     {
         let value = F::<P>::from(&*chunk) + delta * F::<P>::from(u);
@@ -494,8 +470,8 @@ pub(crate) fn faest_verify<P: FAESTParameters>(
 
     // line 20
     let a = core::array::from_fn(|i| {
-        let start = i * <O<P> as OWFParameters>::LambdaBytes::USIZE;
-        F::<P>::from(&sig.a_tilde[start..start + <O<P> as OWFParameters>::LambdaBytes::USIZE])
+        let start = i * LambdaBytes::<P>::USIZE;
+        F::<P>::from(&sig.a_tilde[start..start + LambdaBytes::<P>::USIZE])
     });
     let q_bar = core::array::from_fn(|i| F::<P>::from(rec.q_bar[i].as_slice()));
     let d = sig.d.try_into().map_err(|_| Error::new())?;
@@ -518,49 +494,6 @@ mod test_vectors;
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn grinding_preserves_counter_order_and_opening_rejection() {
-        let mut visited = Vec::new();
-        let result = grind_candidates(
-            0,
-            |c| c,
-            |ctr, candidate| {
-                assert_eq!(ctr, *candidate);
-                visited.push(ctr);
-                // Candidates 1, 2, and 3 pass grinding; candidate 1 fails opening.
-                let passes_grinding = ctr >= 1;
-                let opens = ctr >= 2;
-                passes_grinding && opens
-            },
-        );
-        assert_eq!(result, Some(2));
-        assert_eq!(visited, [0, 1, 2]);
-        assert_eq!(grind_candidates(0, |c| c, |_, _| true), Some(0));
-    }
-
-    #[test]
-    fn grinding_does_not_wrap_at_exhaustion() {
-        let mut visited = Vec::new();
-        let start = u32::MAX as u64 - 5;
-        assert_eq!(
-            grind_candidates(
-                start,
-                |c| c,
-                |ctr, candidate| {
-                    assert_eq!(ctr, *candidate);
-                    visited.push(ctr);
-                    false
-                }
-            ),
-            None
-        );
-        assert_eq!(visited, ((u32::MAX - 5)..=u32::MAX).collect::<Vec<_>>());
-        assert_eq!(
-            grind_candidates(u32::MAX as u64 - 1, |c| c, |ctr, _| ctr == u32::MAX),
-            Some(u32::MAX)
-        );
-    }
 
     use crate::{
         internal_keys::{PublicKey, UnpackedSecretKey},
@@ -603,7 +536,7 @@ mod tests {
         layout.decom_i.start
             + (<P::Tau as TauParameters>::Tau::USIZE * <O<P> as OWFParameters>::NLeafCommit::USIZE
                 + nodes)
-                * <O<P> as OWFParameters>::LambdaBytes::USIZE
+                * LambdaBytes::<P>::USIZE
     }
 
     /// Generate the reference signature and check its digest before using it in tests.
@@ -679,7 +612,7 @@ mod tests {
             layout.ctr.start,
         ];
         for pos in positions.into_iter().chain(
-            (0..6).map(|i| layout.a_tilde.start + i * <O<P> as OWFParameters>::LambdaBytes::USIZE),
+            (0..6).map(|i| layout.a_tilde.start + i * LambdaBytes::<P>::USIZE),
         ) {
             let mut sig = reference_sig.clone();
             sig[pos] ^= 1;
