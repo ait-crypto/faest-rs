@@ -5,6 +5,7 @@ use super::{IV, Twk};
 use core::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
+use core::marker::PhantomData;
 use hybrid_array::{Array, ArraySize};
 
 cpufeatures::new!(caps, "aes", "sse2", "ssse3");
@@ -159,84 +160,145 @@ fn expand<const WORDS: usize, K: ArraySize>(seeds: [&Array<u8, K>; 8], keys: &mu
     }
 }
 
+pub(super) struct Prg8<K> {
+    keys: RoundKeys,
+    counters: [IV; 8],
+    tail: Option<BufferedTile>,
+    key_size: PhantomData<K>,
+}
+
+#[cfg_attr(feature = "zeroize", derive(zeroize::ZeroizeOnDrop))]
+struct BufferedTile {
+    blocks: [[u8; 16]; 8],
+    offset: usize,
+}
+
 /// Caller checks AES, SSE2 and SSSE3 once before entering.
 #[target_feature(enable = "aes,sse2,ssse3")]
-pub(super) unsafe fn generate<K: ArraySize>(
-    seeds: [&Array<u8, K>; 8],
-    iv: &IV,
-    tweaks: [Twk; 8],
-    active: u8,
-    len: usize,
-    mut consume: impl FnMut(usize, usize, &[[u8; 16]; 8]),
-) {
-    let mut keys = RoundKeys([[[0; 16]; 8]; 15]);
+fn expand_keys<K: ArraySize>(seeds: [&Array<u8, K>; 8], keys: &mut RoundKeys) {
     for lane in 0..8 {
         keys.0[0][lane].copy_from_slice(&seeds[lane][..16]);
     }
-    let rounds = match K::USIZE {
-        16 => {
-            expand::<4, K>(seeds, &mut keys);
-            10
-        }
-        24 => {
-            expand::<6, K>(seeds, &mut keys);
-            12
-        }
+    match K::USIZE {
+        16 => expand::<4, K>(seeds, keys),
+        24 => expand::<6, K>(seeds, keys),
         32 => {
             for lane in 0..8 {
                 keys.0[1][lane].copy_from_slice(&seeds[lane][16..]);
             }
-            expand::<8, K>(seeds, &mut keys);
-            14
+            expand::<8, K>(seeds, keys);
         }
         _ => unreachable!(),
-    };
-    // SAFETY: AES/SSE2 are covered by the entry point's runtime check.
-    unsafe {
-        let mut counters = [*iv; 8];
-        for lane in 0..8 {
-            counters[lane] = super::add_tweak(iv, tweaks[lane]);
+    }
+}
+
+impl<K: ArraySize> Prg8<K> {
+    #[inline]
+    pub(super) fn new(iv: &IV, tweaks: [Twk; 8]) -> Self {
+        Self {
+            keys: RoundKeys([[[0; 16]; 8]; 15]),
+            counters: tweaks.map(|tweak| super::add_tweak(iv, tweak)),
+            tail: None,
+            key_size: PhantomData,
         }
-        let mut offset = 0;
-        while len - offset >= 16 {
-            let tile = match rounds {
-                10 => encrypt_tile::<10>(&keys, &mut counters, active),
-                12 => encrypt_tile::<12>(&keys, &mut counters, active),
-                14 => encrypt_tile::<14>(&keys, &mut counters, active),
-                _ => unreachable!(),
-            };
-            consume(offset, 16, &tile);
-            offset += 16;
-        }
-        if offset < len {
-            let valid = len - offset;
-            let mut tile = match rounds {
-                10 => encrypt_tile::<10>(&keys, &mut counters, active),
-                12 => encrypt_tile::<12>(&keys, &mut counters, active),
-                14 => encrypt_tile::<14>(&keys, &mut counters, active),
-                _ => unreachable!(),
-            };
-            for lane in &mut tile {
-                lane[valid..].fill(0);
+    }
+
+    /// The caller has checked AES, SSE2 and SSSE3.
+    #[inline]
+    pub(super) unsafe fn expand_keys(&mut self, seeds: [&Array<u8, K>; 8]) {
+        // SAFETY: The caller checks the required CPU features.
+        unsafe { expand_keys(seeds, &mut self.keys) };
+    }
+
+    /// The caller has checked CPU features.
+    #[inline]
+    pub(super) unsafe fn read_block(&mut self, dst: &mut [[u8; 16]; 8], active: u8) {
+        // SAFETY: The caller checks CPU features. All destinations hold one block.
+        unsafe {
+            if self.tail.is_some() {
+                self.read(dst.each_mut().map(<[u8; 16]>::as_mut_slice), active);
+            } else {
+                encrypt_contiguous::<K>(&self.keys, &mut self.counters, active, dst);
             }
-            consume(offset, valid, &tile);
+        }
+    }
+
+    /// The caller has checked CPU features and equal destination lengths.
+    #[inline]
+    pub(super) unsafe fn read(&mut self, mut dst: [&mut [u8]; 8], active: u8) {
+        let len = dst[0].len();
+        let mut offset = 0;
+        if let Some(tail) = &mut self.tail {
+            offset = len.min(16 - tail.offset);
+            for (lane, dest) in dst.iter_mut().enumerate() {
+                dest[..offset].copy_from_slice(&tail.blocks[lane][tail.offset..][..offset]);
+            }
+            tail.offset += offset;
+            if tail.offset == 16 {
+                self.tail = None;
+            }
+        }
+
+        if len - offset >= 16 {
+            let bases = &dst.each_mut().map(|lane| lane.as_mut_ptr());
+            while len - offset >= 16 {
+                // SAFETY: The caller checks CPU features. The equal-length,
+                // disjoint destinations each have a full block at offset.
+                unsafe {
+                    encrypt_tile::<K>(&self.keys, &mut self.counters, active, move |lane| {
+                        bases[lane].add(offset)
+                    });
+                }
+                offset += 16;
+            }
+        }
+        if offset != len {
+            let used = len - offset;
+            let tail = self.tail.insert(BufferedTile {
+                blocks: [[0; 16]; 8],
+                offset: used,
+            });
+            // SAFETY: The caller checks the required CPU features.
+            unsafe {
+                encrypt_contiguous::<K>(&self.keys, &mut self.counters, active, &mut tail.blocks);
+            };
+            for (dest, block) in dst.iter_mut().zip(&tail.blocks) {
+                dest[offset..].copy_from_slice(&block[..used]);
+            }
         }
     }
 }
 
-// A separate full-tile loop makes the consumer's length constant. In particular,
-// it prevents memcpy/memset calls for each column of every complete VOLE tile.
+#[inline]
+unsafe fn encrypt_contiguous<K: ArraySize>(
+    keys: &RoundKeys,
+    counters: &mut [IV; 8],
+    active: u8,
+    dst: &mut [[u8; 16]; 8],
+) {
+    let base = dst.as_mut_ptr().cast::<u8>();
+    // SAFETY: The caller checks CPU features. The tile holds eight consecutive blocks.
+    unsafe { encrypt_tile::<K>(keys, counters, active, move |lane| base.add(lane * 16)) };
+}
+
 // Keep encryption out of line so LLVM cannot split the eight interleaved
 // streams into smaller groups according to the consumer's XOR dependencies.
 #[inline(never)]
 #[target_feature(enable = "aes,sse2")]
-unsafe fn encrypt_tile<const ROUNDS: usize>(
+unsafe fn encrypt_tile<K: ArraySize>(
     keys: &RoundKeys,
     counters: &mut [IV; 8],
     active: u8,
-) -> [[u8; 16]; 8] {
-    // SAFETY: RoundKeys and all its blocks are aligned; counters and tile each
-    // hold eight complete blocks and use unaligned loads/stores.
+    dest: impl Fn(usize) -> *mut u8,
+) {
+    let rounds = match K::USIZE {
+        16 => 10,
+        24 => 12,
+        32 => 14,
+        _ => unreachable!(),
+    };
+    // SAFETY: RoundKeys and all its blocks are aligned. The counters and
+    // destinations hold complete blocks and use unaligned loads/stores.
     unsafe {
         let mut blocks: [__m128i; 8] = core::array::from_fn(|lane| {
             let counter = _mm_loadu_si128(counters[lane].as_ptr().cast());
@@ -246,7 +308,7 @@ unsafe fn encrypt_tile<const ROUNDS: usize>(
             );
             _mm_xor_si128(counter, _mm_load_si128(keys.0[0][lane].as_ptr().cast()))
         });
-        for round in 1..ROUNDS {
+        for round in 1..rounds {
             for lane in 0..8 {
                 blocks[lane] = _mm_aesenc_si128(
                     blocks[lane],
@@ -254,15 +316,13 @@ unsafe fn encrypt_tile<const ROUNDS: usize>(
                 );
             }
         }
-        let mut tile = [[0; 16]; 8];
         for lane in 0..8 {
             let block = _mm_aesenclast_si128(
                 blocks[lane],
-                _mm_load_si128(keys.0[ROUNDS][lane].as_ptr().cast()),
+                _mm_load_si128(keys.0[rounds][lane].as_ptr().cast()),
             );
             let mask = _mm_set1_epi8(-(((active >> lane) & 1) as i8));
-            _mm_storeu_si128(tile[lane].as_mut_ptr().cast(), _mm_and_si128(block, mask));
+            _mm_storeu_si128(dest(lane).cast(), _mm_and_si128(block, mask));
         }
-        tile
     }
 }
