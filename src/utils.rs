@@ -37,6 +37,24 @@ pub(crate) trait Reader4 {
     }
 }
 
+/// Reader interface for eight synchronized streams.
+pub(crate) trait Reader8 {
+    /// Overwrite eight equal-length destinations and advance each stream.
+    ///
+    /// Panics if the destinations have different lengths.
+    fn read(&mut self, dst: [&mut [u8]; 8]);
+
+    /// Read one array per stream and consume the reader.
+    fn read_into<Length: ArraySize>(mut self) -> [Array<u8, Length>; 8]
+    where
+        Self: Sized,
+    {
+        let mut dst: [Array<u8, Length>; 8] = Default::default();
+        self.read(dst.each_mut().map(Array::as_mut_slice));
+        dst
+    }
+}
+
 #[inline]
 pub(crate) fn load_u64(src: &[u8], word_idx: usize) -> u64 {
     let offset = word_idx * 8;
