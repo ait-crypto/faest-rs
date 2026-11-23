@@ -8,16 +8,6 @@ use crate::{
     utils::{Reader, Reader4},
 };
 
-/// Four synchronized, independent random-oracle streams.
-pub(crate) trait Hasher4: Clone {
-    type Reader: Reader4;
-    fn update(&mut self, data: [&[u8]; 4]);
-    fn update_shared(&mut self, data: &[u8]) {
-        self.update([data; 4]);
-    }
-    fn finish(self) -> Self::Reader;
-}
-
 pub(crate) trait RandomOracle {
     type Hasher<const SEP: u8>: Hasher + Default + Clone;
     type Hasher4<const SEP: u8>: Hasher4 + Default;
@@ -83,6 +73,25 @@ pub(crate) trait Hasher {
 
     /// Hash additional bytes
     fn update(&mut self, data: &[u8]);
+
+    /// Finish hashing
+    fn finish(self) -> Self::Reader;
+}
+
+/// Four synchronized, independent random-oracle streams
+pub(crate) trait Hasher4: Clone {
+    /// Digests reader
+    type Reader: Reader4;
+
+    /// Update each stream with additional bytes
+    ///
+    /// Panics if the input data have different lengths
+    fn update(&mut self, data: [&[u8]; 4]);
+
+    /// Update each stream with the same bytes
+    fn update_shared(&mut self, data: &[u8]) {
+        self.update([data; 4]);
+    }
 
     /// Finish hashing
     fn finish(self) -> Self::Reader;

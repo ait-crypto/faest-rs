@@ -1,8 +1,4 @@
 //! Implementation of the PRGs for security levels 128, 192 and 256
-
-#[cfg(not(feature = "std"))]
-use alloc::borrow::ToOwned;
-
 use aes::cipher::{KeyIvInit, StreamCipher};
 use hybrid_array::{
     Array,
@@ -11,7 +7,11 @@ use hybrid_array::{
 #[cfg(feature = "zeroize")]
 use zeroize::ZeroizeOnDrop;
 
-use crate::{parameter::SecurityParameter, utils::Reader};
+use crate::{
+    parameter::SecurityParameter,
+    prg8::{Prg8, Prg8Storage},
+    utils::Reader,
+};
 
 type Aes128Ctr32LE = ctr::Ctr32LE<aes::Aes128Enc>;
 type Aes192Ctr32LE = ctr::Ctr32LE<aes::Aes192Enc>;
@@ -25,7 +25,7 @@ pub(crate) type IV = Array<u8, IVSize>;
 pub(crate) type Twk = u32;
 
 /// Add tweak to the IV
-fn add_tweak(iv: &IV, tweak: Twk) -> Array<u8, IVSize> {
+pub(crate) fn add_tweak(iv: &IV, tweak: Twk) -> Array<u8, IVSize> {
     let mut iv = *iv;
     let tweaked_word = u32::from_le_bytes([iv[12], iv[13], iv[14], iv[15]]).wrapping_add(tweak);
     iv[12..].copy_from_slice(&tweaked_word.to_le_bytes());
@@ -57,6 +57,19 @@ pub(crate) trait PseudoRandomGenerator: Sized + Reader {
 
     /// Instantiate new PRG instance
     fn new_prg(k: &Array<u8, Self::KeySize>, iv: &IV, tweak: Twk) -> Self;
+
+    /// Instantiate eight PRGs with a shared IV and per-lane seeds and tweaks.
+    /// A set bit in `active` enables the corresponding lane.
+    #[inline]
+    fn new_prg8<'a>(
+        storage: &'a mut Prg8Storage<Self>,
+        seeds: [&Array<u8, Self::KeySize>; 8],
+        iv: &IV,
+        tweaks: [Twk; 8],
+        active: u8,
+    ) -> Prg8<'a, Self> {
+        Prg8::new(storage, seeds, iv, tweaks, active)
+    }
 }
 
 #[cfg_attr(feature = "zeroize", derive(ZeroizeOnDrop))]

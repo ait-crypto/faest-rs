@@ -1,6 +1,6 @@
 //! AES expansion and CTR encryption for eight streams using 256-bit vectors
 
-use super::{IV, Twk};
+use crate::prg::{IV, Twk, add_tweak};
 #[cfg(target_arch = "x86")]
 use core::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -213,7 +213,7 @@ impl<K: ArraySize> Prg8<K> {
     pub(super) fn new(iv: &IV, tweaks: [Twk; 8]) -> Self {
         Self {
             keys: RoundKeys([[[0; 32]; 4]; 15]),
-            counters: tweaks.map(|tweak| super::add_tweak(iv, tweak)),
+            counters: tweaks.map(|tweak| add_tweak(iv, tweak)),
             tail: None,
             key_size: PhantomData,
         }
