@@ -287,6 +287,8 @@ where
     type LambdaBytes = <GF256 as Field>::Length;
     type Lambda = Prod<Self::LambdaBytes, U8>;
 
+    // inlining can yield ~20% slowdown in non-optimized signing
+    #[cfg_attr(not(feature = "opt-simd"), inline(never))]
     fn hash(
         uhash: &Array<u8, Prod<Self::LambdaBytes, U3>>,
         x: &Array<u8, Prod<Self::LambdaBytes, U4>>,
