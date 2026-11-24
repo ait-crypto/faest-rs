@@ -64,6 +64,7 @@ pub(crate) trait LeafCommit {
     type PRG: PseudoRandomGenerator<KeySize = Self::LambdaBytes>;
     type NLeafCommit: ArraySize;
     type Context;
+    type Expansion: ArraySize;
 
     fn init<RO: RandomOracle>(iv: &IV) -> Self::Context;
 
@@ -73,9 +74,18 @@ pub(crate) trait LeafCommit {
         iv: &IV,
         tweak: Twk,
         context: &Self::Context,
-    ) -> (
-        Array<u8, Self::LambdaBytes>,
-        Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>,
+        output_seed: &mut Array<u8, Self::LambdaBytes>,
+        output_com: &mut Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>,
+    );
+
+    #[allow(clippy::type_complexity)]
+    fn commit_batch(
+        seeds: [&Array<u8, Self::LambdaBytes>; 8],
+        iv: &IV,
+        tweak: Twk,
+        context: &Self::Context,
+        output_seeds: &mut [Array<u8, Self::LambdaBytes>; 8],
+        output_coms: &mut [Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>; 8],
     );
 }
 
@@ -90,6 +100,7 @@ where
     type PRG = PRG;
     type NLeafCommit = U3;
     type Context = Array<u8, Prod<LH::LambdaBytes, U3>>;
+    type Expansion = Prod<LH::LambdaBytes, U4>;
 
     fn init<RO: RandomOracle>(iv: &IV) -> Self::Context {
         let mut hasher = RO::h0_init();
@@ -101,16 +112,34 @@ where
         r: &Array<u8, Self::LambdaBytes>,
         iv: &IV,
         tweak: Twk,
-        uhash: &Self::Context,
-    ) -> (
-        Array<u8, Self::LambdaBytes>,
-        Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>,
+        context: &Self::Context,
+        output_seed: &mut Array<u8, Self::LambdaBytes>,
+        output_com: &mut Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>,
     ) {
-        let hash = PRG::new_prg(r, iv, tweak).read_into();
-        let com = <LH as LeafHasher>::hash(uhash, &hash);
-        let sd = hash.into_iter().take(Self::LambdaBytes::USIZE).collect();
+        let x = Self::PRG::new_prg(r, iv, tweak).read_into();
+        *output_com = <LH as LeafHasher>::hash(context, &x);
+        output_seed.copy_from_slice(&x[..Self::LambdaBytes::USIZE]);
+    }
 
-        (sd, com)
+    #[allow(clippy::type_complexity)]
+    fn commit_batch(
+        seeds: [&Array<u8, Self::LambdaBytes>; 8],
+        iv: &IV,
+        tweak: Twk,
+        context: &Self::Context,
+        output_seeds: &mut [Array<u8, Self::LambdaBytes>; 8],
+        output_coms: &mut [Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>; 8],
+    ) {
+        let expanded = {
+            // TODO: eventually create a wrapper for Prg8 with owned storage
+            let mut storage = Prg8Storage::new();
+            Self::PRG::new_prg8(&mut storage, seeds, iv, [tweak; 8], 0xff)
+                .read_into::<Self::Expansion>()
+        };
+        for lane in 0..8 {
+            output_coms[lane] = <LH as LeafHasher>::hash(context, &expanded[lane]);
+            output_seeds[lane].copy_from_slice(&expanded[lane][..Self::LambdaBytes::USIZE]);
+        }
     }
 }
 
@@ -126,6 +155,7 @@ where
     type PRG = PRG;
     type NLeafCommit = U2;
     type Context = ();
+    type Expansion = Prod<PRG::KeySize, U2>;
 
     fn init<RO: RandomOracle>(_iv: &IV) -> Self::Context {}
 
@@ -134,14 +164,27 @@ where
         iv: &IV,
         tweak: Twk,
         _context: &Self::Context,
-    ) -> (
-        Array<u8, Self::LambdaBytes>,
-        Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>,
+        output_seed: &mut Array<u8, Self::LambdaBytes>,
+        output_com: &mut Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>,
     ) {
-        let com = PRG::new_prg(r, iv, tweak).read_into();
-        let sd = r.to_owned();
+        *output_com = Self::PRG::new_prg(r, iv, tweak).read_into();
+        output_seed.copy_from_slice(r);
+    }
 
-        (sd, com)
+    fn commit_batch(
+        seeds: [&Array<u8, Self::LambdaBytes>; 8],
+        iv: &IV,
+        tweak: Twk,
+        _context: &Self::Context,
+        output_seeds: &mut [Array<u8, Self::LambdaBytes>; 8],
+        output_coms: &mut [Array<u8, Self::Expansion>; 8],
+    ) {
+        let mut storage = Prg8Storage::new();
+        PRG::new_prg8(&mut storage, seeds, iv, [tweak; 8], 0xff)
+            .read(output_coms.each_mut().map(Array::as_mut_slice));
+        for (seed, output) in seeds.into_iter().zip(output_seeds) {
+            *output = seed.to_owned();
+        }
     }
 }
 
