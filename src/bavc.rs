@@ -517,20 +517,34 @@ where
         let keys = construct_keys::<LC::PRG, TAU>(r, iv);
 
         let mut com_hasher = RO::h1_init();
-        let mut seeds = Vec::with_capacity(Self::L);
-        let mut coms = Vec::with_capacity(Self::L);
+        let mut seeds = vec![Array::default(); Self::L];
+        let mut coms = vec![Array::default(); Self::L];
 
         // lines 6–12
-        for i in 0..TAU::Tau::U32 {
-            let n_i = TAU::bavc_max_node_index(i as usize);
-            for j in 0..n_i {
-                let alpha = TAU::pos_in_tree(i as usize, j);
-                let tweak = i + Self::L as u32 - 1;
+        for i in 0..TAU::Tau::USIZE {
+            let n_i = TAU::bavc_max_node_index(i);
+            let tweak = i as Twk + Self::L as Twk - 1;
+            let offset = TAU::bavc_index_offset(i);
+            let output_seeds = &mut seeds[offset..offset + n_i];
+            let output_coms = &mut coms[offset..offset + n_i];
 
-                let (sd, com) = Self::LC::commit(&keys[alpha], iv, tweak, &uhash);
-
-                seeds.push(sd);
-                coms.push(com);
+            if prg8::batch_available() {
+                // Each FAEST tree has a multiple of eight leaves
+                let (seed_batches, _) = output_seeds.as_chunks_mut::<8>();
+                let (com_batches, _) = output_coms.as_chunks_mut::<8>();
+                for (j, output_seeds, output_coms) in
+                    izip!((0..n_i).step_by(8), seed_batches, com_batches)
+                {
+                    let leaves = array::from_fn(|lane| &keys[TAU::pos_in_tree(i, j + lane)]);
+                    Self::LC::commit_batch(leaves, iv, tweak, &uhash, output_seeds, output_coms);
+                }
+            } else {
+                for (j, (output_seed, output_com)) in
+                    output_seeds.iter_mut().zip(output_coms).enumerate()
+                {
+                    let alpha = TAU::pos_in_tree(i, j);
+                    Self::LC::commit(&keys[alpha], iv, tweak, &uhash, output_seed, output_com);
+                }
             }
         }
 
@@ -587,40 +601,68 @@ where
         // lines 26–28
         let mut h1_com_hasher = RO::h1_init();
         let mut seeds = vec![Array::default(); TAU::L - TAU::Tau::USIZE];
+        let batch_available = prg8::batch_available();
+        let block_size = if batch_available { 8 } else { 1 };
+        
+        let mut reconstruct_block = |tree: usize,
+                                     first_leaf: usize,
+                                     commitments: &mut [Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>;
+                                              8]|
+         -> Option<()> {
+            let hidden = i_delta[tree] as usize;
+            let leaf_range = first_leaf..first_leaf + block_size;
+            let tweak = tree as Twk + TAU::L as Twk - 1;
+            // Each preceding tree and, after the hidden leaf, this tree omit one seed.
+            let seed_offset =
+                TAU::bavc_index_offset(tree) - tree + first_leaf - usize::from(first_leaf > hidden);
+            let output_seeds = &mut seeds[seed_offset..];
+
+            if batch_available && !leaf_range.contains(&hidden) {
+                let leaf_keys =
+                    array::from_fn(|lane| &keys[TAU::pos_in_tree(tree, first_leaf + lane)]);
+                Self::LC::commit_batch(
+                    leaf_keys,
+                    iv,
+                    tweak,
+                    &context,
+                    output_seeds.first_chunk_mut::<8>().unwrap(),
+                    commitments,
+                );
+            } else {
+                let mut output_seeds = output_seeds.iter_mut();
+                for (leaf, commitment) in leaf_range.zip(&mut commitments[..block_size]) {
+                    if leaf == hidden {
+                        *commitment = Array::try_from(*decom_i.coms.get(tree)?).ok()?;
+                    } else {
+                        let alpha = TAU::pos_in_tree(tree, leaf);
+                        Self::LC::commit(
+                            &keys[alpha],
+                            iv,
+                            tweak,
+                            &context,
+                            output_seeds.next().unwrap(),
+                            commitment,
+                        );
+                    }
+                }
+            }
+            Some(())
+        };
+
         let mut i = 0;
         while i < TAU::Tau::USIZE {
             let n = TAU::bavc_max_node_index(i);
             if i + 3 < TAU::Tau::USIZE && TAU::bavc_max_node_index(i + 3) == n {
-                let mut h = RO::Hasher4::<1>::default();
-                let mut seed_offsets = core::array::from_fn::<_, 4, _>(|lane| {
-                    TAU::bavc_index_offset(i + lane) - (i + lane)
-                });
-                for j in 0..n {
-                    let mut commitments = core::array::from_fn::<_, 4, _>(|_| {
-                        Array::<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>::default()
-                    });
-                    for lane in 0..4 {
-                        let tree = i + lane;
-                        let alpha = TAU::pos_in_tree(tree, j);
-                        if !*s.get(alpha)? {
-                            let (sd, com) = Self::LC::commit(
-                                &keys[alpha],
-                                iv,
-                                tree as u32 + TAU::L as u32 - 1,
-                                &context,
-                            );
-                            seeds[seed_offsets[lane]] = sd;
-                            seed_offsets[lane] += 1;
-                            commitments[lane] = com;
-                        } else {
-                            let com = decom_i.coms.get(tree)?;
-                            if com.len() != commitments[lane].len() {
-                                return None;
-                            }
-                            commitments[lane].copy_from_slice(com);
-                        }
+                let mut h = RO::h1_init_x4();
+                let mut commitments: [[_; 8]; 4] =
+                    array::from_fn(|_| array::from_fn(|_| Array::default()));
+                for first_leaf in (0..n).step_by(block_size) {
+                    for (lane, tree_commitments) in commitments.iter_mut().enumerate() {
+                        reconstruct_block(i + lane, first_leaf, tree_commitments)?;
                     }
-                    h.update(commitments.each_ref().map(|c| c.as_slice()));
+                    for leaf in 0..block_size {
+                        h.update(commitments.each_ref().map(|tree| tree[leaf].as_slice()));
+                    }
                 }
                 let digests = h.finish().read_into::<Self::LambdaBytesTimes2>();
                 for digest in digests {
@@ -629,21 +671,11 @@ where
                 i += 4;
             } else {
                 let mut h = RO::h1_init();
-                let mut offset = TAU::bavc_index_offset(i) - i;
-                for j in 0..n {
-                    let alpha = TAU::pos_in_tree(i, j);
-                    if !*s.get(alpha)? {
-                        let (sd, com) = Self::LC::commit(
-                            &keys[alpha],
-                            iv,
-                            i as u32 + TAU::L as u32 - 1,
-                            &context,
-                        );
-                        seeds[offset] = sd;
-                        offset += 1;
-                        h.update(&com);
-                    } else {
-                        h.update(decom_i.coms.get(i)?);
+                let mut commitments: [_; 8] = array::from_fn(|_| Array::default());
+                for first_leaf in (0..n).step_by(block_size) {
+                    reconstruct_block(i, first_leaf, &mut commitments)?;
+                    for commitment in &commitments[..block_size] {
+                        h.update(commitment);
                     }
                 }
                 h1_com_hasher.update(&h.finish().read_into::<Self::LambdaBytesTimes2>());
