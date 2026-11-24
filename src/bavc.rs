@@ -11,16 +11,18 @@ use alloc::{borrow::ToOwned, vec, vec::Vec};
 use bitvec::{bitvec, slice::BitSlice};
 use hybrid_array::{
     Array, ArraySize,
-    typenum::{Prod, U2, U3, U8, Unsigned},
+    typenum::{Prod, U2, U3, U4, U8, Unsigned},
 };
 use itertools::izip;
 
 use crate::{
     parameter::{SecurityParameter, TauParameters},
     prg::{IV, PseudoRandomGenerator, Twk},
+    prg8,
+    prg8::Prg8Storage,
     random_oracles::{Hasher, Hasher4, RandomOracle},
     universal_hashing::LeafHasher,
-    utils::{Reader, Reader4},
+    utils::{Reader, Reader4, Reader8},
 };
 
 #[derive(Clone, Debug, Default)]
@@ -197,10 +199,19 @@ where
     let mut keys = vec![Array::default(); 2 * TAU::L - 1];
     keys[0].copy_from_slice(r);
 
-    for alpha in 0..TAU::L - 1 {
-        let mut prg = PRG::new_prg(&keys[alpha], iv, alpha as Twk);
-        prg.read(&mut keys[2 * alpha + 1]);
-        prg.read(&mut keys[2 * alpha + 2]);
+    let parent_end = TAU::L - 1;
+    let batch_start = if prg8::batch_available() {
+        7
+    } else {
+        parent_end
+    };
+    for i in 0..batch_start {
+        expand_node::<PRG>(&mut keys, i, iv);
+    }
+
+    // L is a multiple of eight so after first three level every batch fits within one level
+    for first in (batch_start..parent_end).step_by(8) {
+        expand_batch::<PRG>(&mut keys, array::from_fn(|lane| first + lane), iv);
     }
 
     keys
@@ -247,13 +258,72 @@ where
     }
 
     // BAVC.Reconstruct, lines 23–25
-    for i in s[..TAU::L - 1].iter_zeros() {
-        let mut rng = PRG::new_prg(&keys[i], iv, i as Twk);
-        rng.read(&mut keys[2 * i + 1]);
-        rng.read(&mut keys[2 * i + 2]);
+    let parent_end = TAU::L - 1;
+    let mut start = if prg8::batch_available() {
+        7
+    } else {
+        parent_end
+    };
+
+    for i in (0..start).filter(|&i| !s[i]) {
+        expand_node::<PRG>(&mut keys, i, iv);
+    }
+
+    let mut end = 2 * start + 1;
+    while start < parent_end {
+        let mut indices = [0; 8];
+        let mut count = 0;
+        for i in (start..end.min(parent_end)).filter(|&i| !s[i]) {
+            indices[count] = i;
+            count += 1;
+            if count == indices.len() {
+                expand_batch::<PRG>(&mut keys, indices, iv);
+                count = 0;
+            }
+        }
+
+        // Skipping hidden parents can leave a partial batch
+        for &i in &indices[..count] {
+            expand_node::<PRG>(&mut keys, i, iv);
+        }
+        start = end;
+        end = 2 * end + 1;
     }
 
     Some(keys)
+}
+
+fn expand_node<PRG: PseudoRandomGenerator>(
+    keys: &mut [Array<u8, PRG::KeySize>],
+    i: usize,
+    iv: &IV,
+) {
+    let mut prg = PRG::new_prg(&keys[i], iv, i as Twk);
+    prg.read(&mut keys[2 * i + 1]);
+    prg.read(&mut keys[2 * i + 2]);
+}
+
+/// Expands eight parents at the same depth.
+fn expand_batch<PRG: PseudoRandomGenerator>(
+    keys: &mut [Array<u8, PRG::KeySize>],
+    indices: [usize; 8],
+    iv: &IV,
+) {
+    let mut storage = Prg8Storage::new();
+    let mut prg = PRG::new_prg8(
+        &mut storage,
+        indices.map(|i| &keys[i]),
+        iv,
+        indices.map(|i| i as Twk),
+        0xff,
+    );
+    let mut children: [Array<u8, Prod<PRG::KeySize, U2>>; 8] = Default::default();
+    prg.read(children.each_mut().map(Array::as_mut_slice));
+    for (i, pair) in indices.into_iter().zip(&children) {
+        let (left, right) = pair.split_at(PRG::KeySize::USIZE);
+        keys[2 * i + 1].copy_from_slice(left);
+        keys[2 * i + 2].copy_from_slice(right);
+    }
 }
 
 fn mark_nodes<TAU>(s: &mut BitSlice, i_delta: &Array<u16, TAU::Tau>) -> Option<u32>
