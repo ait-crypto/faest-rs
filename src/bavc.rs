@@ -698,6 +698,43 @@ mod test_vectors;
 mod test {
     use super::*;
 
+    fn benchmark_bavc<B: BatchVectorCommitment>(name: &str) {
+        use std::hint::black_box;
+        let r = Array::default();
+        let iv = IV::default();
+        let committed = B::commit(&r, &iv);
+        let indices = Array::default();
+        let opened = B::open(&committed.decom, &indices).unwrap();
+        crate::bench_util::measure(&std::format!("{name}/commit"), || {
+            black_box(B::commit(black_box(&r), &iv));
+        });
+        crate::bench_util::measure(&std::format!("{name}/reconstruct"), || {
+            black_box(B::reconstruct(black_box(&opened), &indices, &iv));
+        });
+    }
+
+    #[test]
+    #[ignore = "component benchmark; run in release with fat LTO and fixed CPU affinity"]
+    fn benchmark_bavc_integration() {
+        #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
+        use crate::fields::x86_simd_large_fields::{GF128, GF192, GF256};
+        macro_rules! run { ($($b:ty),*) => { $(benchmark_bavc::<$b>(stringify!($b));)* }; }
+        run!(
+            BAVC128Fast<GF128>,
+            BAVC128Small<GF128>,
+            BAVC192Fast<GF192>,
+            BAVC192Small<GF192>,
+            BAVC256Fast<GF256>,
+            BAVC256Small<GF256>,
+            BAVC128FastEM,
+            BAVC128SmallEM,
+            BAVC192FastEM,
+            BAVC192SmallEM,
+            BAVC256FastEM,
+            BAVC256SmallEM
+        );
+    }
+
     use super::test_vectors::{
         BAVC_EM_VECTORS, BAVC_VECTORS, BavcVector, LEAF_COMMIT_EM_VECTORS, LEAF_COMMIT_VECTORS,
         Mode,
@@ -797,33 +834,42 @@ mod test {
 
             match data.lambda {
                 128 => {
-                    let (sd, com) = LeafCommitment::<PRG128, LeafHasher128>::commit(
+                    let (mut sd, mut com) = (Array::default(), Array::default());
+                    LeafCommitment::<PRG128, LeafHasher128>::commit(
                         array_ref(data.key),
                         iv,
                         data.tweak,
                         array_ref(data.uhash),
+                        &mut sd,
+                        &mut com,
                     );
                     assert_eq!(sd.as_slice(), data.expected_sd);
                     assert_eq!(com.as_slice(), data.expected_com);
                 }
 
                 192 => {
-                    let (sd, com) = LeafCommitment::<PRG192, LeafHasher192>::commit(
+                    let (mut sd, mut com) = (Array::default(), Array::default());
+                    LeafCommitment::<PRG192, LeafHasher192>::commit(
                         array_ref(data.key),
                         iv,
                         data.tweak,
                         array_ref(data.uhash),
+                        &mut sd,
+                        &mut com,
                     );
                     assert_eq!(sd.as_slice(), data.expected_sd);
                     assert_eq!(com.as_slice(), data.expected_com);
                 }
 
                 256 => {
-                    let (sd, com) = LeafCommitment::<PRG256, LeafHasher256>::commit(
+                    let (mut sd, mut com) = (Array::default(), Array::default());
+                    LeafCommitment::<PRG256, LeafHasher256>::commit(
                         array_ref(data.key),
                         iv,
                         data.tweak,
                         array_ref(data.uhash),
+                        &mut sd,
+                        &mut com,
                     );
                     assert_eq!(sd.as_slice(), data.expected_sd);
                     assert_eq!(com.as_slice(), data.expected_com);
@@ -841,33 +887,42 @@ mod test {
 
             match data.lambda {
                 128 => {
-                    let (sd, com) = LeafCommitmentEm::<PRG128>::commit(
+                    let (mut sd, mut com) = (Array::default(), Array::default());
+                    LeafCommitmentEm::<PRG128>::commit(
                         array_ref(data.key),
                         iv,
                         data.tweak,
                         &(),
+                        &mut sd,
+                        &mut com,
                     );
                     assert_eq!(sd.as_slice(), data.expected_sd);
                     assert_eq!(com.as_slice(), data.expected_com);
                 }
 
                 192 => {
-                    let (sd, com) = LeafCommitmentEm::<PRG192>::commit(
+                    let (mut sd, mut com) = (Array::default(), Array::default());
+                    LeafCommitmentEm::<PRG192>::commit(
                         array_ref(data.key),
                         iv,
                         data.tweak,
                         &(),
+                        &mut sd,
+                        &mut com,
                     );
                     assert_eq!(sd.as_slice(), data.expected_sd);
                     assert_eq!(com.as_slice(), data.expected_com);
                 }
 
                 256 => {
-                    let (sd, com) = LeafCommitmentEm::<PRG256>::commit(
+                    let (mut sd, mut com) = (Array::default(), Array::default());
+                    LeafCommitmentEm::<PRG256>::commit(
                         array_ref(data.key),
                         iv,
                         data.tweak,
                         &(),
+                        &mut sd,
+                        &mut com,
                     );
                     assert_eq!(sd.as_slice(), data.expected_sd);
                     assert_eq!(com.as_slice(), data.expected_com);

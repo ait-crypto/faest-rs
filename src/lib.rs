@@ -87,6 +87,9 @@ extern crate alloc;
 #[cfg(all(test, not(feature = "std")))]
 extern crate std;
 
+#[cfg(test)]
+mod bench_util;
+
 #[cfg(not(feature = "std"))]
 use alloc::{boxed::Box, vec::Vec};
 
@@ -116,6 +119,7 @@ mod internal_keys;
 mod memcheck;
 mod parameter;
 mod prg;
+mod prg8;
 mod random_oracles;
 mod rijndael_32;
 mod shake4;
