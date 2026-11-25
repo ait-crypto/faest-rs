@@ -10,7 +10,6 @@ use hybrid_array::{Array, ArraySize};
 use std::arch::is_x86_feature_detected;
 
 pub(super) fn available() -> bool {
-    // AVX2 detection checks OS support for YMM state. VAES implies AES in Rust.
     is_x86_feature_detected!("avx2")
         && is_x86_feature_detected!("gfni")
         && is_x86_feature_detected!("vaes")
@@ -150,7 +149,7 @@ fn expand<const WORDS: usize, K: ArraySize>(seeds: [&Array<u8, K>; 8], keys: &mu
         }
     } else if WORDS == 6 {
         // Two six-word schedule steps span three four-word round keys.
-        for (step, rcon) in RCON[..8].chunks_exact(2).enumerate() {
+        for (step, rcon) in RCON[..8].as_chunks::<2>().0.iter().enumerate() {
             let round = 3 * step + 1;
             let [a, b, c, d, e, f] =
                 expand_words::<6>(words, schedule_assist::<true>(words[5]), rcon[0]);
