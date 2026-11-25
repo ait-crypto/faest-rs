@@ -69,6 +69,8 @@ serde = ["dep:serde", "dep:serde-big-array", "hybrid-array/serde"]
 # enable SIMD optimization implementations
 # (opt-simd currently implies an x86(-64) machine, so no_std doesn't make too much sense)
 opt-simd = ["std"]
+# enables batch random oracle and PRG implementations
+opt-batch = ["std"]
 # provide C interface via cargo-c
 capi = [
   "dep:rand",

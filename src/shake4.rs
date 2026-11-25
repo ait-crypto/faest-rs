@@ -3,7 +3,7 @@ use crate::{
     utils::{Reader, Reader4},
 };
 
-#[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
+#[cfg(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64")))]
 #[path = "avx2/keccak.rs"]
 mod avx2;
 
@@ -14,7 +14,7 @@ mod avx2;
 #[derive(Clone)]
 pub(crate) enum ShakeTimes4<T, const RATE: usize, const SEP: u8> {
     Scalar([T; 4]),
-    #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
+    #[cfg(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64")))]
     Avx2(avx2::Sponge<RATE>),
 }
 
@@ -22,7 +22,7 @@ impl<H: Hasher + Clone + Default, const RATE: usize, const SEP: u8> Default
     for ShakeTimes4<H, RATE, SEP>
 {
     fn default() -> Self {
-        #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
+        #[cfg(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64")))]
         if avx2::available() {
             return Self::Avx2(avx2::Sponge::default());
         }
@@ -46,7 +46,7 @@ impl<H: Hasher + Clone, const RATE: usize, const SEP: u8> Hasher4 for ShakeTimes
                 }
             }
 
-            #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
+            #[cfg(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64")))]
             Self::Avx2(s) => s.update(data),
         }
     }
@@ -54,7 +54,7 @@ impl<H: Hasher + Clone, const RATE: usize, const SEP: u8> Hasher4 for ShakeTimes
     fn finish(self) -> Self::Reader {
         match self {
             Self::Scalar(h) => ShakeTimes4::Scalar(h.map(Hasher::finish)),
-            #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
+            #[cfg(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64")))]
             Self::Avx2(mut s) => {
                 s.update([[SEP].as_ref(); 4]);
                 s.pad();
@@ -76,7 +76,7 @@ impl<R: Reader, const RATE: usize, const SEP: u8> Reader4 for ShakeTimes4<R, RAT
                     r.read(d);
                 }
             }
-            #[cfg(all(feature = "opt-simd", any(target_arch = "x86", target_arch = "x86_64")))]
+            #[cfg(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64")))]
             Self::Avx2(s) => s.read(dst),
         }
     }

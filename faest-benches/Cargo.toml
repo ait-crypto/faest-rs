@@ -14,7 +14,7 @@ faest = { path = "../", default-features = false, features = [
 zeroize = { version = "=1.9.1", optional = true, default-features = false }
 
 [features]
-default = ["faest/opt-simd"]
+default = ["faest/opt-simd", "faest/opt-batch"]
 zeroize = ["faest/zeroize"]
 explicit-bzero = ["zeroize", "zeroize/explicit-bzero"]
 
