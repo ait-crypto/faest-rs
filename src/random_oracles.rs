@@ -14,9 +14,15 @@ pub(crate) trait RandomOracle {
 
     /// Returns if SIMD acceleration is available
     fn simd_available() -> bool {
-        #[cfg(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64")))]
+        #[cfg(all(
+            feature = "opt-batch",
+            any(target_arch = "x86", target_arch = "x86_64")
+        ))]
         return std::is_x86_feature_detected!("avx2");
-        #[cfg(not(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64"))))]
+        #[cfg(not(all(
+            feature = "opt-batch",
+            any(target_arch = "x86", target_arch = "x86_64")
+        )))]
         false
     }
 

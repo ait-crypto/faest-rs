@@ -25,6 +25,9 @@ use crate::{
     utils::{Reader, Reader4, Reader8},
 };
 
+type LeafCommitmentBytes<LC> =
+    Array<u8, Prod<<LC as LeafCommit>::LambdaBytes, <LC as LeafCommit>::NLeafCommit>>;
+
 #[derive(Clone, Debug, Default)]
 pub(crate) struct BavcCommitResult<LambdaBytes, NLeafCommit>
 where
@@ -77,7 +80,7 @@ pub(crate) trait LeafCommit {
         tweak: Twk,
         context: &Self::Context,
         output_seed: &mut Array<u8, Self::LambdaBytes>,
-        output_com: &mut Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>,
+        output_com: &mut LeafCommitmentBytes<Self>,
     );
 
     #[allow(clippy::type_complexity)]
@@ -87,7 +90,7 @@ pub(crate) trait LeafCommit {
         tweak: Twk,
         context: &Self::Context,
         output_seeds: &mut [Array<u8, Self::LambdaBytes>; 8],
-        output_coms: &mut [Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>; 8],
+        output_coms: &mut [LeafCommitmentBytes<Self>; 8],
     );
 }
 
@@ -116,7 +119,7 @@ where
         tweak: Twk,
         context: &Self::Context,
         output_seed: &mut Array<u8, Self::LambdaBytes>,
-        output_com: &mut Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>,
+        output_com: &mut LeafCommitmentBytes<Self>,
     ) {
         let x = Self::PRG::new_prg(r, iv, tweak).read_into();
         *output_com = <LH as LeafHasher>::hash(context, &x);
@@ -130,7 +133,7 @@ where
         tweak: Twk,
         context: &Self::Context,
         output_seeds: &mut [Array<u8, Self::LambdaBytes>; 8],
-        output_coms: &mut [Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>; 8],
+        output_coms: &mut [LeafCommitmentBytes<Self>; 8],
     ) {
         let expanded = {
             // TODO: eventually create a wrapper for Prg8 with owned storage
@@ -167,7 +170,7 @@ where
         tweak: Twk,
         _context: &Self::Context,
         output_seed: &mut Array<u8, Self::LambdaBytes>,
-        output_com: &mut Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>,
+        output_com: &mut LeafCommitmentBytes<Self>,
     ) {
         *output_com = Self::PRG::new_prg(r, iv, tweak).read_into();
         output_seed.copy_from_slice(r);
@@ -603,11 +606,10 @@ where
         let mut seeds = vec![Array::default(); TAU::L - TAU::Tau::USIZE];
         let batch_available = prg8::batch_available();
         let block_size = if batch_available { 8 } else { 1 };
-        
+
         let mut reconstruct_block = |tree: usize,
                                      first_leaf: usize,
-                                     commitments: &mut [Array<u8, Prod<Self::LambdaBytes, Self::NLeafCommit>>;
-                                              8]|
+                                     commitments: &mut [LeafCommitmentBytes<LC>; 8]|
          -> Option<()> {
             let hidden = i_delta[tree] as usize;
             let leaf_range = first_leaf..first_leaf + block_size;

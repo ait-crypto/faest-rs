@@ -6,16 +6,25 @@ use crate::{
     utils::Reader8,
 };
 
-#[cfg(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64")))]
-#[path = "avx2/prg.rs"]
-mod avx2;
+#[cfg(all(
+    feature = "opt-batch",
+    any(target_arch = "x86", target_arch = "x86_64")
+))]
+#[path = "backends/x86/prg8.rs"]
+mod x86;
 
 pub(crate) fn batch_available() -> bool {
-    #[cfg(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64")))]
+    #[cfg(all(
+        feature = "opt-batch",
+        any(target_arch = "x86", target_arch = "x86_64")
+    ))]
     {
-        avx2::available()
+        x86::available()
     }
-    #[cfg(not(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64"))))]
+    #[cfg(not(all(
+        feature = "opt-batch",
+        any(target_arch = "x86", target_arch = "x86_64")
+    )))]
     {
         false
     }
@@ -46,8 +55,11 @@ pub(crate) struct Prg8<'a, P: PseudoRandomGenerator> {
 )]
 enum Prg8State<P: PseudoRandomGenerator> {
     Scalar([P; 8]),
-    #[cfg(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64")))]
-    Optimized(avx2::Prg8<P::KeySize>),
+    #[cfg(all(
+        feature = "opt-batch",
+        any(target_arch = "x86", target_arch = "x86_64")
+    ))]
+    Optimized(x86::Prg8<P::KeySize>),
 }
 
 // ctr::Ctr32LE accepts this many blocks from the initial nonce.
@@ -61,12 +73,15 @@ impl<'a, P: PseudoRandomGenerator> Prg8<'a, P> {
         iv: &IV,
         tweaks: [Twk; 8],
         active: u8,
-    ) -> Prg8<'a, P> {
-        #[cfg(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64")))]
+    ) -> Self {
+        #[cfg(all(
+            feature = "opt-batch",
+            any(target_arch = "x86", target_arch = "x86_64")
+        ))]
         if batch_available() {
             let state = storage
                 .state
-                .insert(Prg8State::Optimized(avx2::Prg8::new(iv, tweaks)));
+                .insert(Prg8State::Optimized(x86::Prg8::new(iv, tweaks)));
             let Prg8State::Optimized(streams) = state else {
                 unreachable!()
             };
@@ -79,7 +94,6 @@ impl<'a, P: PseudoRandomGenerator> Prg8<'a, P> {
             };
         }
 
-  
         let state = storage
             .state
             .insert(Prg8State::Scalar(core::array::from_fn(|i| {
@@ -106,7 +120,10 @@ impl<P: PseudoRandomGenerator> Prg8<'_, P> {
                     self.active,
                 );
             }
-            #[cfg(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64")))]
+            #[cfg(all(
+                feature = "opt-batch",
+                any(target_arch = "x86", target_arch = "x86_64")
+            ))]
             Prg8State::Optimized(streams) => {
                 // SAFETY: This variant is constructed after checking CPU features.
                 unsafe { streams.read_block(dst, self.active) };
@@ -148,7 +165,10 @@ impl<P: PseudoRandomGenerator> Reader8 for Prg8<'_, P> {
             Prg8State::Scalar(streams) => {
                 Self::read_scalar(streams, dst, self.active);
             }
-            #[cfg(all(feature = "opt-batch", any(target_arch = "x86", target_arch = "x86_64")))]
+            #[cfg(all(
+                feature = "opt-batch",
+                any(target_arch = "x86", target_arch = "x86_64")
+            ))]
             Prg8State::Optimized(streams) => {
                 // SAFETY: This variant is constructed after checking CPU features.
                 unsafe { streams.read(dst, self.active) };
