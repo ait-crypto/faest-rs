@@ -12,9 +12,10 @@ use crate::{
         ToBytes,
     },
     prg::{IV, PseudoRandomGenerator},
+    prg8::Prg8Storage,
     random_oracles::{Hasher4, RandomOracle},
     utils::{
-        Reader, Reader4, bit_word_mask, decode_all_chall_3, extract_bit_slice, get_bit,
+        Reader, Reader4, Reader8, bit_word_mask, decode_all_chall_3, extract_bit_slice, get_bit,
         insert_bit_slice, load_u64, set_bit, xor_arrays_inplace, xor_arrays_into,
     },
     vole::tables::{PackedMatrix, VoleTables},
@@ -285,6 +286,104 @@ fn convert_to_vole<'a, BAVC: BatchVectorCommitment, LHatBytes: ArraySize>(
     v: &mut [Array<u8, LHatBytes>],
     scratch: &mut [Array<u8, LHatBytes>],
 ) {
+    // TODO: batched version could be more efficient even when sd.len() < 8
+    if sd.len() >= 8 && crate::prg8::batch_available() {
+        convert_to_vole_batched::<BAVC, LHatBytes>(sd, iv, round, ubot, u, v, scratch);
+    } else {
+        convert_to_vole_scalar::<BAVC, LHatBytes>(sd, iv, round, ubot, u, v, scratch);
+    }
+}
+
+fn convert_to_vole_batched<'a, BAVC: BatchVectorCommitment, LHatBytes: ArraySize>(
+    mut sd: impl ExactSizeIterator<Item = &'a Array<u8, BAVC::LambdaBytes>>,
+    iv: &IV,
+    round: u32,
+    ubot: bool,
+    u: &mut [u8],
+    v: &mut [Array<u8, LHatBytes>],
+    scratch: &mut [Array<u8, LHatBytes>],
+) {
+    let depth = BAVC::TAU::bavc_max_node_depth(round as usize);
+
+    // faest parameters ensure require buffer lengths are always met
+    assert_eq!(sd.len(), 1 << depth);
+    assert_eq!(v.len(), depth);
+    assert!(scratch.len() > depth);
+    if !ubot {
+        assert_eq!(u.len(), LHatBytes::USIZE);
+    }
+    v.fill(Array::default());
+
+    for sd_idx in (0..sd.len()).step_by(8) {
+        let seeds = core::array::from_fn(|_| sd.next().unwrap());
+        let active = if ubot && sd_idx == 0 { 0xfe } else { 0xff };
+        let mut storage = Prg8Storage::new();
+        let mut prg =
+            BAVC::PRG::new_prg8(&mut storage, seeds, iv, [TWEAK_OFFSET + round; 8], active);
+
+        let mut reduce_tile = |offset: usize, valid: usize, x: &[[u8; 16]; 8]| {
+            let end = offset + valid;
+            let a: [u8; 16] = core::array::from_fn(|b| x[3][b] ^ x[7][b]);
+            let b: [u8; 16] = core::array::from_fn(|b| x[5][b] ^ x[7][b]);
+            let v_low: [[u8; 16]; 3] = [
+                core::array::from_fn(|i| x[1][i] ^ x[5][i] ^ a[i]), // v_0
+                core::array::from_fn(|i| x[2][i] ^ x[6][i] ^ a[i]), // v_1
+                core::array::from_fn(|i| x[4][i] ^ x[6][i] ^ b[i]), // v_2
+            ];
+
+            // line 8 (first three levels)
+            for column in 0..3 {
+                xor_arrays_inplace(&mut v[column][offset..end], &v_low[column][..valid]);
+            }
+            // line 9 (first three levels)
+            let mut root: [u8; 16] = core::array::from_fn(|i| {
+                x[0][i] ^ x[1][i] ^ x[2][i] ^ x[4][i] ^ x[6][i] ^ x[7][i] ^ a[i] ^ b[i]
+            });
+
+            // update remaining levels for which subtree is right child (level bit set)
+            let mut level = 3;
+            while ((sd_idx + 7) >> level) & 1 != 0 {
+                // lines 8-9
+                xor_arrays_inplace(&mut v[level][offset..end], &root[..valid]);
+                xor_arrays_inplace(&mut root[..valid], &scratch[level][offset..end]);
+                level += 1;
+            }
+            // save as left subtree (level bit not set)
+            if level < depth {
+                scratch[level][offset..end].copy_from_slice(&root[..valid]);
+            } else if !ubot {
+                // line 10
+                u[offset..end].copy_from_slice(&root[..valid]);
+            }
+        };
+
+        let mut tile = [[0; 16]; 8];
+        let len = LHatBytes::USIZE;
+        let full_len = len - (len % 16);
+
+        // process each stream in chunks of AES block size
+        for offset in (0..full_len).step_by(16) {
+            prg.read_block(&mut tile);
+            reduce_tile(offset, 16, &tile);
+        }
+        // residual block
+        if full_len < len {
+            let valid = len - full_len;
+            prg.read(tile.each_mut().map(|block| &mut block[..valid]));
+            reduce_tile(full_len, valid, &tile);
+        }
+    }
+}
+
+fn convert_to_vole_scalar<'a, BAVC: BatchVectorCommitment, LHatBytes: ArraySize>(
+    sd: impl ExactSizeIterator<Item = &'a Array<u8, BAVC::LambdaBytes>>,
+    iv: &IV,
+    round: u32,
+    ubot: bool,
+    u: &mut [u8],
+    v: &mut [Array<u8, LHatBytes>],
+    scratch: &mut [Array<u8, LHatBytes>],
+) {
     let di = BAVC::TAU::bavc_max_node_depth(round as usize);
 
     // faest parameters ensure require buffer lengths are always met
@@ -304,12 +403,6 @@ fn convert_to_vole<'a, BAVC: BatchVectorCommitment, LHatBytes: ArraySize>(
         // ConvertToVOLE (Figure 5.6), lines 1-4: bottom expands to zero.
         current.fill(0);
         if leaf != 0 || !ubot {
-            // TODO: when SIMD available, PRG could benefit from instruction-level parallelism:
-            // - AES-NI: Interleave AES key expansion and encryption rounds instead of sequential execution.
-            // Assume an AESENC instruction takes 4 CPU cycles, before AESENC for sd_i finishes 
-            // we can start executing an independent AESENC for sd_i+1..sd_i+3
-            // - VAES: independent inputs can be processed in multiple VAES lines (2 or 4).
-            // can also be combined with instruction level parallelism as before.
             BAVC::PRG::new_prg(seed, iv, TWEAK_OFFSET + round).read(current);
         }
 
