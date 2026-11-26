@@ -180,7 +180,7 @@ macro_rules! define_capi_impl {
                     } else {
                         &[]
                     };
-                    let signature = unsafe { &mut *(signature as *mut [u8; Params::SIGNATURE_SIZE]) };
+                    let signature = unsafe { &*(signature.cast::<[u8; Params::SIGNATURE_SIZE]>()) };
 
                     VerificationKey::try_from(pk).map(|pk| {
                         Params::verify(msg, &pk.0, signature).to_error_code()
