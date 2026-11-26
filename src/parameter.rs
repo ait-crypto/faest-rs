@@ -1024,12 +1024,8 @@ pub(crate) trait FAESTParameters {
 
     /// Returns an iterator over the individual bits of the i-th VOLE sub-challenge (i.e., the one associated to the i-th small-vole instance)
     fn decode_challenge_as_iter(chal: &[u8]) -> impl Iterator<Item = u8> + '_ {
-        (0..<Self::Tau as TauParameters>::Tau1::USIZE + <Self::Tau as TauParameters>::Tau0::USIZE)
-            .flat_map(|i| {
-                let lo = <Self::Tau as TauParameters>::bavc_index_offset(i);
-                let hi = <Self::Tau as TauParameters>::bavc_index_offset(i + 1);
-                (lo..hi).map(|j| (chal[j / 8] >> (j % 8)) & 1)
-            })
+        (0..<Self::OWF as OWFParameters>::Lambda::USIZE - Self::WGRIND::USIZE)
+            .map(|j| (chal[j / 8] >> (j % 8)) & 1)
             .chain(repeat_n(0, Self::WGRIND::USIZE))
     }
 }
